@@ -3,7 +3,12 @@ import { GoogleGenAI, Modality, Type, LiveServerMessage, Schema } from "@google/
 import { RESORT_CENTER } from '../constants';
 import { getEvents, getMenu, getPromotions, getKnowledgeBase, getRoomTypes } from "./dataService";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Get API key from Vite environment variables (prefixed with VITE_)
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || '';
+if (!apiKey) {
+  console.warn('GEMINI_API_KEY is not set. Please set VITE_GEMINI_API_KEY in your environment variables.');
+}
+const ai = new GoogleGenAI({ apiKey });
 
 // --- Admin AI Helpers ---
 
