@@ -25,16 +25,32 @@ git push
    - Output Directory: `dist`
 
 ### 3. Thêm Environment Variables
-Trong Vercel Dashboard → Settings → Environment Variables, thêm:
+Trong Vercel Dashboard → Settings → Environment Variables, thêm các biến sau:
 
+**Database Configuration:**
 ```
 DB_HOST=27.71.229.4
 DB_PORT=6243
 DB_NAME=furama_resort_digital_concierge
 DB_USER=postgres
 DB_PASSWORD=Satthuskt321@
+```
+
+**Gemini API Key (cho frontend - QUAN TRỌNG: phải có prefix VITE_):**
+```
+VITE_GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+**Optional:**
+```
+PORT=3000
 NODE_ENV=production
 ```
+
+**Lưu ý:** 
+- File `env-template.txt` trong project chứa template đầy đủ các environment variables
+- Bạn có thể copy nội dung từ `env-template.txt` và paste vào Vercel Environment Variables
+- Đảm bảo `VITE_GEMINI_API_KEY` được set đúng (có prefix `VITE_`) để Vite expose vào client-side code
 
 ### 4. Deploy!
 Click "Deploy" và Vercel sẽ tự động:
