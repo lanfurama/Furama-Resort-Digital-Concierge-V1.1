@@ -49,12 +49,20 @@ export const userController = {
   async update(req: Request, res: Response) {
     try {
       const id = parseInt(req.params.id);
+      console.log('Updating user:', { id, body: req.body });
+      console.log('Request body keys:', Object.keys(req.body));
+      console.log('Language value:', req.body.language);
+      
       const user = await userModel.update(id, req.body);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
+      console.log('User updated successfully:', user);
+      console.log('Updated user language:', user.language);
       res.json(user);
     } catch (error: any) {
+      console.error('Error updating user:', error);
+      console.error('Error stack:', error.stack);
       res.status(400).json({ error: error.message });
     }
   },

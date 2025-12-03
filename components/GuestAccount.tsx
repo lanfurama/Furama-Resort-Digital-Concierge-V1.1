@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { User, ServiceRequest } from '../types';
 import { getCompletedGuestOrders, updateUserNotes, rateServiceRequest, submitHotelReview, getHotelReview, updateUserLanguage } from '../services/dataService';
 import { Clock, ShoppingBag, Car, Utensils, Sparkles, Waves, User as UserIcon, Save, Star, Hotel, ThumbsUp, Globe, ArrowLeft } from 'lucide-react';
+import Loading from './Loading';
 import { useTranslation } from '../contexts/LanguageContext';
 
 interface GuestAccountProps {
@@ -37,10 +38,15 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
     const [existingReview, setExistingReview] = useState(getHotelReview(user.roomNumber));
     const [notes, setNotes] = useState(user.notes || '');
     const [isSaving, setIsSaving] = useState(false);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(true);
     
     // Load history and hotel review on mount
     useEffect(() => {
-        getCompletedGuestOrders(user.roomNumber).then(setHistory).catch(console.error);
+        setIsLoadingHistory(true);
+        getCompletedGuestOrders(user.roomNumber)
+            .then(setHistory)
+            .catch(console.error)
+            .finally(() => setIsLoadingHistory(false));
         // Load hotel review
         const review = getHotelReview(user.roomNumber);
         setExistingReview(review);
@@ -59,9 +65,35 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
         }
     }, [user.roomNumber]);
     
-    // Language State
+    // Language State - Load from database on mount
     const [selectedLang, setSelectedLang] = useState(user.language || 'English');
     const [isLangSaving, setIsLangSaving] = useState(false);
+    
+    // Sync language from database when component mounts
+    useEffect(() => {
+        const loadLanguageFromDB = async () => {
+            try {
+                const { apiClient } = await import('../services/apiClient');
+                const dbUser = await apiClient.get<any>(`/users/room/${user.roomNumber}`).catch(() => null);
+                if (dbUser && dbUser.language) {
+                    console.log('Loaded language from database:', dbUser.language);
+                    setSelectedLang(dbUser.language);
+                    // Update localStorage
+                    const savedUser = localStorage.getItem('furama_user');
+                    if (savedUser) {
+                        const parsedUser = JSON.parse(savedUser);
+                        parsedUser.language = dbUser.language;
+                        localStorage.setItem('furama_user', JSON.stringify(parsedUser));
+                    }
+                    // Update context
+                    setContextLanguage(dbUser.language as any);
+                }
+            } catch (error) {
+                console.error('Failed to load language from database:', error);
+            }
+        };
+        loadLanguageFromDB();
+    }, [user.roomNumber, setContextLanguage]);
     
     // Service Rating State
     const [activeRatingId, setActiveRatingId] = useState<string | null>(null);
@@ -104,23 +136,47 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
     };
 
     const handleLanguageChange = async (newLang: string) => {
+        console.log('=== handleLanguageChange START ===');
+        console.log('New language:', newLang);
+        console.log('Current language:', selectedLang);
+        console.log('User room number:', user.roomNumber);
+        
         setSelectedLang(newLang);
         setIsLangSaving(true);
+        
         try {
+            console.log('Calling updateUserLanguage...');
             await updateUserLanguage(user.roomNumber, newLang);
+            console.log('updateUserLanguage completed successfully');
+            
             // Update user in localStorage
             const savedUser = localStorage.getItem('furama_user');
             if (savedUser) {
                 const parsedUser = JSON.parse(savedUser);
                 parsedUser.language = newLang;
                 localStorage.setItem('furama_user', JSON.stringify(parsedUser));
+                console.log('localStorage updated');
             }
+            
             // Update Context Immediately
+            console.log('Updating language context...');
             setContextLanguage(newLang as any);
-        } catch (error) {
-            console.error('Failed to save language:', error);
+            console.log('Language context updated');
+            
+            console.log('=== handleLanguageChange SUCCESS ===');
+        } catch (error: any) {
+            console.error('=== handleLanguageChange ERROR ===');
+            console.error('Error:', error);
+            console.error('Error message:', error.message);
+            console.error('Error stack:', error.stack);
+            
+            // Revert selectedLang on error
+            setSelectedLang(selectedLang);
+            
+            alert(`Failed to update language: ${error.message || 'Unknown error'}\n\nPlease check:\n1. Database has 'language' column\n2. Backend server is running\n3. Check browser console for details`);
         } finally {
             setIsLangSaving(false);
+            console.log('=== handleLanguageChange END ===');
         }
     };
 
@@ -357,7 +413,9 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                 {/* Completed Order History */}
                 <div>
                     <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wide mb-3 px-2">{t('completed_orders')}</h4>
-                    {history.length === 0 ? (
+                    {isLoadingHistory ? (
+                        <Loading size="sm" message={t('loading') || 'Loading history...'} />
+                    ) : history.length === 0 ? (
                         <div className="text-center py-8 text-gray-400">
                             <ShoppingBag className="mx-auto w-10 h-10 mb-2 opacity-20"/>
                             <p className="text-sm">No completed orders yet.</p>

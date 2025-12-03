@@ -11,6 +11,7 @@ import serviceRequestRoutes from './serviceRequestRoutes.js';
 import chatMessageRoutes from './chatMessageRoutes.js';
 import roomTypeRoutes from './roomTypeRoutes.js';
 import roomRoutes from './roomRoutes.js';
+import notificationRoutes from './notificationRoutes.js';
 
 const router = Router();
 
@@ -26,6 +27,7 @@ router.use('/service-requests', serviceRequestRoutes);
 router.use('/chat-messages', chatMessageRoutes);
 router.use('/room-types', roomTypeRoutes);
 router.use('/rooms', roomRoutes);
+router.use('/notifications', notificationRoutes);
 
 export default router;
 

@@ -3,20 +3,22 @@ import React, { useState, useEffect } from 'react';
 import { Bell, Check, X } from 'lucide-react';
 import { getNotifications, markNotificationRead } from '../services/dataService';
 import { AppNotification } from '../types';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface NotificationBellProps {
     userId: string;
 }
 
 const NotificationBell: React.FC<NotificationBellProps> = ({ userId }) => {
+    const { t } = useTranslation();
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
 
     // Poll for notifications
     useEffect(() => {
-        const fetch = () => {
-            const list = getNotifications(userId);
+        const fetch = async () => {
+            const list = await getNotifications(userId);
             setNotifications(list);
             setUnreadCount(list.filter(n => !n.isRead).length);
         };
@@ -28,10 +30,10 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId }) => {
 
     const toggleOpen = () => setIsOpen(!isOpen);
 
-    const handleMarkRead = (id: string, e: React.MouseEvent) => {
+    const handleMarkRead = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        markNotificationRead(id);
-        const list = getNotifications(userId);
+        await markNotificationRead(id);
+        const list = await getNotifications(userId);
         setNotifications(list);
         setUnreadCount(list.filter(n => !n.isRead).length);
     };
@@ -40,6 +42,15 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId }) => {
         if (type === 'SUCCESS') return 'bg-green-50 border-green-100 text-green-800';
         if (type === 'WARNING') return 'bg-red-50 border-red-100 text-red-800';
         return 'bg-blue-50 border-blue-100 text-blue-800';
+    };
+
+    const getTypeLabel = (type: string) => {
+        switch (type) {
+            case 'SUCCESS': return t('notification_success');
+            case 'WARNING': return t('notification_warning');
+            case 'INFO': return t('notification_info');
+            default: return type;
+        }
     };
 
     return (
@@ -61,25 +72,25 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId }) => {
                     <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
                     <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
                         <div className="p-3 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-                            <h3 className="font-bold text-gray-700 text-sm">Notifications</h3>
+                            <h3 className="font-bold text-gray-700 text-sm">{t('notifications')}</h3>
                             <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={16}/></button>
                         </div>
                         
                         <div className="max-h-80 overflow-y-auto">
                             {notifications.length === 0 ? (
                                 <div className="p-8 text-center text-gray-400 text-sm">
-                                    No notifications.
+                                    {t('no_notifications')}
                                 </div>
                             ) : (
                                 notifications.map(notif => (
                                     <div 
                                         key={notif.id} 
-                                        onClick={() => !notif.isRead && markNotificationRead(notif.id)}
+                                        onClick={() => !notif.isRead && handleMarkRead(notif.id, {} as React.MouseEvent)}
                                         className={`p-4 border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer relative ${notif.isRead ? 'opacity-60' : 'bg-white'}`}
                                     >
                                         <div className="flex justify-between items-start mb-1">
                                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getTypeStyles(notif.type)}`}>
-                                                {notif.type}
+                                                {getTypeLabel(notif.type)}
                                             </span>
                                             <span className="text-[10px] text-gray-400">
                                                 {new Date(notif.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
@@ -92,7 +103,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId }) => {
                                             <button 
                                                 onClick={(e) => handleMarkRead(notif.id, e)}
                                                 className="absolute bottom-2 right-2 text-emerald-600 hover:bg-emerald-50 p-1 rounded-full"
-                                                title="Mark as read"
+                                                title={t('mark_as_read')}
                                             >
                                                 <Check size={14} />
                                             </button>

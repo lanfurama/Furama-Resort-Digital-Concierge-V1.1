@@ -3,6 +3,7 @@ import { Send, Mic, MapPin, Volume2, X, Navigation, ExternalLink } from 'lucide-
 import { ChatMessage } from '../types';
 import { createChatSession, speakText, connectLiveSession, encode } from '../services/geminiService';
 import { GenerateContentResponse, LiveServerMessage } from '@google/genai';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface ConciergeChatProps {
   onClose: () => void;
@@ -22,7 +23,7 @@ const MapCard: React.FC<{ url: string; title: string }> = ({ url, title }) => (
                 <div className="flex-1 min-w-0 pr-2">
                     <h4 className="font-bold text-sm text-gray-800 truncate">{title}</h4>
                     <p className="text-xs text-emerald-600 flex items-center mt-0.5 font-medium">
-                        <Navigation size={10} className="mr-1 fill-current"/> Get Directions
+                        <Navigation size={10} className="mr-1 fill-current"/> {t('get_directions')}
                     </p>
                 </div>
                 <div className="bg-emerald-100 text-emerald-700 p-2 rounded-full transform group-hover:rotate-45 transition-transform duration-300">
@@ -34,6 +35,7 @@ const MapCard: React.FC<{ url: string; title: string }> = ({ url, title }) => (
 );
 
 const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -59,7 +61,7 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
     setMessages([{
       id: 'welcome',
       role: 'model',
-      text: 'Good day! I am your Furama Digital Concierge. How may I assist you today?'
+      text: t('concierge_welcome')
     }]);
 
     return () => {
@@ -114,7 +116,7 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'model',
-        text: responseText || "I'm sorry, I couldn't process that.",
+        text: responseText || t('sorry_couldnt_process'),
         groundingUrls: groundingUrls.length > 0 ? groundingUrls : undefined
       }]);
 
@@ -123,7 +125,7 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'model',
-        text: "I apologize, but I'm having trouble connecting right now. Please try again."
+        text: t('connection_error')
       }]);
     } finally {
       setIsLoading(false);
@@ -250,7 +252,7 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
     <div className="flex flex-col h-full bg-white relative">
       {/* Header */}
       <div className="p-4 bg-emerald-900 text-white flex justify-between items-center shadow-md z-10">
-        <h2 className="text-xl font-serif">Concierge AI</h2>
+        <h2 className="text-xl font-serif">{t('concierge_ai')}</h2>
         <button onClick={onClose}><X /></button>
       </div>
 
@@ -269,7 +271,7 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
                           {msg.groundingUrls.some(u => u.type !== 'MAP') && (
                               <div className="mb-2">
                                   <p className="text-[10px] uppercase font-bold text-gray-400 mb-1 flex items-center">
-                                      <ExternalLink className="w-3 h-3 mr-1"/> Sources
+                                      <ExternalLink className="w-3 h-3 mr-1"/> {t('sources')}
                                   </p>
                                   <ul className="space-y-1">
                                       {msg.groundingUrls.filter(u => u.type !== 'MAP').map((url, i) => (
@@ -330,7 +332,7 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Ask about dining, spa, or resort info..."
+                placeholder={t('ask_placeholder')}
                 className="flex-1 bg-gray-100 rounded-full px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500"
              />
              <button 
@@ -349,16 +351,16 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
                 <Mic size={48} className="text-white" />
             </div>
             
-            <h3 className="text-2xl font-serif mb-2">Live Concierge</h3>
+            <h3 className="text-2xl font-serif mb-2">{t('live_concierge')}</h3>
             <p className="text-emerald-200 mb-8 text-center max-w-xs">
-                {isLiveConnected ? "Listening... Speak naturally." : "Connecting to Furama Secure Voice..."}
+                {isLiveConnected ? t('listening') : t('connecting_voice')}
             </p>
 
             <button 
                 onClick={toggleLiveMode}
                 className="px-8 py-3 bg-red-500/20 border border-red-400/50 text-red-100 rounded-full hover:bg-red-500/30 transition flex items-center"
             >
-                <X className="mr-2" size={18} /> End Call
+                <X className="mr-2" size={18} /> {t('end_call')}
             </button>
         </div>
       )}

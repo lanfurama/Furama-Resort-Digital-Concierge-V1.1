@@ -4,6 +4,7 @@ import { User, ServiceRequest } from '../types';
 import { getActiveGuestOrders } from '../services/dataService';
 import { Clock, ShoppingBag, Car, Utensils, Sparkles, Waves, User as UserIcon, MessageSquarePlus, ArrowLeft } from 'lucide-react';
 import ServiceChat from './ServiceChat';
+import Loading from './Loading';
 import { useTranslation } from '../contexts/LanguageContext';
 
 interface ActiveOrdersProps {
@@ -15,10 +16,15 @@ const ActiveOrders: React.FC<ActiveOrdersProps> = ({ user, onBack }) => {
     const { t, language } = useTranslation();
     const [activeOrders, setActiveOrders] = useState<ServiceRequest[]>([]);
     const [activeChat, setActiveChat] = useState<{type: string, label: string} | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
     
     // Load active orders on mount
     useEffect(() => {
-        getActiveGuestOrders(user.roomNumber).then(setActiveOrders).catch(console.error);
+        setIsLoading(true);
+        getActiveGuestOrders(user.roomNumber)
+            .then(setActiveOrders)
+            .catch(console.error)
+            .finally(() => setIsLoading(false));
         // Poll for updates every 5 seconds
         const interval = setInterval(() => {
             getActiveGuestOrders(user.roomNumber).then(setActiveOrders).catch(console.error);
@@ -76,7 +82,9 @@ const ActiveOrders: React.FC<ActiveOrdersProps> = ({ user, onBack }) => {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24">
-                {activeOrders.length === 0 ? (
+                {isLoading ? (
+                    <Loading message={t('loading') || 'Loading orders...'} />
+                ) : activeOrders.length === 0 ? (
                     <div className="text-center py-20 text-gray-400 flex flex-col items-center">
                         <ShoppingBag className="w-16 h-16 mb-4 opacity-20" />
                         <p>{t('no_active_orders')}</p>

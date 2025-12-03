@@ -37,7 +37,14 @@ export const chatMessageController = {
   async getByRoomNumber(req: Request, res: Response) {
     try {
       const { roomNumber } = req.params;
-      const messages = await chatMessageModel.getByRoomNumber(roomNumber);
+      const { service_type } = req.query;
+      
+      let messages;
+      if (service_type) {
+        messages = await chatMessageModel.getByRoomNumberAndService(roomNumber, service_type as string);
+      } else {
+        messages = await chatMessageModel.getByRoomNumber(roomNumber);
+      }
       res.json(messages);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

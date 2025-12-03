@@ -9,6 +9,12 @@ async function apiRequest<T>(
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   
+  console.log('API Request:', {
+    method: options.method || 'GET',
+    url,
+    body: options.body ? JSON.parse(options.body as string) : undefined
+  });
+  
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -17,12 +23,24 @@ async function apiRequest<T>(
     },
   });
 
+  console.log('API Response:', {
+    status: response.status,
+    statusText: response.statusText,
+    ok: response.ok,
+    url: response.url
+  });
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Network error' }));
-    throw new Error(error.error || error.message || `HTTP error! status: ${response.status}`);
+    const errorData = await response.json().catch(() => ({ error: 'Network error' }));
+    console.error('API Error:', errorData);
+    const error = new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
+    (error as any).response = { status: response.status, body: errorData };
+    throw error;
   }
 
-  return response.json();
+  const data = await response.json();
+  console.log('API Response Data:', data);
+  return data;
 }
 
 export const apiClient = {

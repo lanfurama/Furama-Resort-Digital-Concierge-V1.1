@@ -117,30 +117,80 @@ let notifications: AppNotification[] = [
 let serviceChats: Record<string, ChatMessage[]> = {};
 
 // --- NOTIFICATIONS ---
-export const getNotifications = (recipientId: string) => {
-    return notifications.filter(n => n.recipientId === recipientId).sort((a,b) => b.timestamp - a.timestamp);
+export const getNotifications = async (recipientId: string): Promise<AppNotification[]> => {
+    try {
+        const dbNotifications = await apiClient.get<any[]>(`/notifications/recipient/${recipientId}`);
+        // Map database notifications to frontend format
+        return dbNotifications.map(n => ({
+            id: n.id.toString(),
+            recipientId: n.recipient_id,
+            title: n.title,
+            message: n.message,
+            type: n.type,
+            timestamp: new Date(n.created_at).getTime(),
+            isRead: n.is_read
+        }));
+    } catch (error) {
+        console.error('Failed to fetch notifications from API:', error);
+        // Fallback to local mock data
+        return notifications.filter(n => n.recipientId === recipientId).sort((a,b) => b.timestamp - a.timestamp);
+    }
 };
 
-export const markNotificationRead = (id: string) => {
-    notifications = notifications.map(n => n.id === id ? { ...n, isRead: true } : n);
+export const markNotificationRead = async (id: string): Promise<void> => {
+    try {
+        await apiClient.put(`/notifications/${id}/read`);
+        // Update local state
+        notifications = notifications.map(n => n.id === id ? { ...n, isRead: true } : n);
+    } catch (error) {
+        console.error('Failed to mark notification as read:', error);
+        // Fallback to local state
+        notifications = notifications.map(n => n.id === id ? { ...n, isRead: true } : n);
+    }
 };
 
-export const sendNotification = (recipientId: string, title: string, message: string, type: 'INFO' | 'SUCCESS' | 'WARNING' = 'INFO') => {
-    const notif: AppNotification = {
-        id: Date.now().toString() + Math.random(),
-        recipientId,
-        title,
-        message,
-        type,
-        timestamp: Date.now(),
-        isRead: false
-    };
-    notifications = [notif, ...notifications];
+export const sendNotification = async (recipientId: string, title: string, message: string, type: 'INFO' | 'SUCCESS' | 'WARNING' = 'INFO'): Promise<void> => {
+    try {
+        const dbNotification = await apiClient.post<any>('/notifications', {
+            recipient_id: recipientId,
+            title,
+            message,
+            type,
+            is_read: false
+        });
+        
+        // Update local state
+        const notif: AppNotification = {
+            id: dbNotification.id.toString(),
+            recipientId: dbNotification.recipient_id,
+            title: dbNotification.title,
+            message: dbNotification.message,
+            type: dbNotification.type,
+            timestamp: new Date(dbNotification.created_at).getTime(),
+            isRead: dbNotification.is_read
+        };
+        notifications = [notif, ...notifications];
+    } catch (error) {
+        console.error('Failed to send notification via API:', error);
+        // Fallback to local state
+        const notif: AppNotification = {
+            id: Date.now().toString() + Math.random(),
+            recipientId,
+            title,
+            message,
+            type,
+            timestamp: Date.now(),
+            isRead: false
+        };
+        notifications = [notif, ...notifications];
+    }
 };
 
-const notifyStaffByDepartment = (department: string, title: string, message: string) => {
+const notifyStaffByDepartment = async (department: string, title: string, message: string) => {
     const staff = users.filter(u => u.role === UserRole.STAFF && (u.department === department || u.department === 'All'));
-    staff.forEach(s => sendNotification(s.roomNumber, title, message, 'INFO'));
+    for (const s of staff) {
+        await sendNotification(s.roomNumber, title, message, 'INFO');
+    }
 };
 
 
@@ -187,28 +237,70 @@ export const updateUserNotes = async (roomNumber: string, notes: string): Promis
 };
 
 export const updateUserLanguage = async (roomNumber: string, language: string): Promise<void> => {
+  console.log('=== updateUserLanguage START ===');
+  console.log('Parameters:', { roomNumber, language });
+  
   try {
     // Get user by room number first
-    const user = await apiClient.get<any>(`/users/room/${roomNumber}`).catch(() => null);
-    if (user && user.id) {
-      // Update user with language (if language field exists in database)
-      // For now, we'll store in localStorage as database doesn't have language column
-      const savedUser = localStorage.getItem('furama_user');
-      if (savedUser) {
-        const parsedUser = JSON.parse(savedUser);
-        parsedUser.language = language;
-        localStorage.setItem('furama_user', JSON.stringify(parsedUser));
-      }
+    console.log('Step 1: Fetching user by room number...');
+    const user = await apiClient.get<any>(`/users/room/${roomNumber}`);
+    console.log('Step 1: User found:', user);
+    
+    if (!user || !user.id) {
+      const error = new Error('User not found or missing ID');
+      console.error('Step 1: FAILED -', error.message, user);
+      throw error;
     }
-  } catch (error) {
-    console.error('Failed to update user language:', error);
-    // Fallback to localStorage
+    
+    console.log('Step 2: Updating user language via API...');
+    console.log('Step 2: Request URL:', `/users/${user.id}`);
+    console.log('Step 2: Request body:', { language });
+    
+    // Update user language in database
+    const updatedUser = await apiClient.put(`/users/${user.id}`, { language });
+    console.log('Step 2: SUCCESS - User updated:', updatedUser);
+    console.log('Step 2: Updated language value:', updatedUser.language);
+    
+    // Verify the update
+    if (updatedUser.language !== language) {
+      console.warn('WARNING: Language mismatch! Expected:', language, 'Got:', updatedUser.language);
+    }
+    
+    // Update localStorage
+    console.log('Step 3: Updating localStorage...');
     const savedUser = localStorage.getItem('furama_user');
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
       parsedUser.language = language;
       localStorage.setItem('furama_user', JSON.stringify(parsedUser));
+      console.log('Step 3: localStorage updated');
     }
+    
+    console.log('=== updateUserLanguage SUCCESS ===');
+  } catch (error: any) {
+    console.error('=== updateUserLanguage ERROR ===');
+    console.error('Error type:', error.constructor.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Try to get more details from fetch error
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response body:', error.response.body);
+    }
+    
+    // Fallback to localStorage
+    console.log('Fallback: Updating localStorage only...');
+    const savedUser = localStorage.getItem('furama_user');
+    if (savedUser) {
+      const parsedUser = JSON.parse(savedUser);
+      parsedUser.language = language;
+      localStorage.setItem('furama_user', JSON.stringify(parsedUser));
+      console.log('Fallback: localStorage updated');
+    }
+    
+    // Re-throw error so component can handle it
+    throw error;
   }
 };
 
@@ -327,11 +419,52 @@ export const getLocations = async (): Promise<Location[]> => {
 
 // Sync version for backward compatibility (used by AdminPortal)
 export const getLocationsSync = () => locations;
-export const addLocation = (loc: Location) => {
-  locations = [...locations, { ...loc, id: Date.now().toString() }];
+
+export const addLocation = async (loc: Location): Promise<void> => {
+  try {
+    const dbLocation = await apiClient.post<any>('/locations', {
+      lat: loc.lat,
+      lng: loc.lng,
+      name: loc.name,
+      type: loc.type || null
+    });
+    
+    // Update local cache
+    locations = [...locations, {
+      id: dbLocation.id.toString(),
+      lat: parseFloat(dbLocation.lat),
+      lng: parseFloat(dbLocation.lng),
+      name: dbLocation.name,
+      type: dbLocation.type as 'VILLA' | 'FACILITY' | 'RESTAURANT'
+    }];
+  } catch (error) {
+    console.error('Failed to add location:', error);
+    // Fallback to local state
+    locations = [...locations, { ...loc, id: Date.now().toString() }];
+    throw error;
+  }
 };
-export const deleteLocation = (name: string) => {
-    locations = locations.filter(l => l.name !== name);
+
+export const deleteLocation = async (idOrName: string): Promise<void> => {
+  try {
+    // Try to find location by name first (for backward compatibility)
+    const location = locations.find(l => l.name === idOrName || l.id === idOrName);
+    
+    if (location && location.id) {
+      // Try to delete by ID
+      await apiClient.delete(`/locations/${location.id}`);
+      // Update local cache
+      locations = locations.filter(l => l.id !== location.id);
+    } else {
+      // Fallback: delete by name from local state
+      locations = locations.filter(l => l.name !== idOrName);
+    }
+  } catch (error) {
+    console.error('Failed to delete location:', error);
+    // Fallback to local state
+    locations = locations.filter(l => l.name !== idOrName && l.id !== idOrName);
+    throw error;
+  }
 };
 
 // --- ROOM TYPES ---
@@ -369,6 +502,32 @@ export const addRoomType = async (rt: RoomType): Promise<RoomType> => {
     const newRt = { ...rt, id: Date.now().toString() };
     roomTypes = [...roomTypes, newRt];
     return newRt;
+  }
+};
+
+export const updateRoomType = async (id: string, rt: Partial<RoomType>): Promise<RoomType> => {
+  try {
+    const dbRoomType = await apiClient.put<any>(`/room-types/${id}`, {
+      name: rt.name,
+      description: rt.description !== undefined ? (rt.description || null) : undefined,
+      location_id: rt.locationId !== undefined ? (rt.locationId ? parseInt(rt.locationId) : null) : undefined
+    });
+    return {
+      id: dbRoomType.id.toString(),
+      name: dbRoomType.name,
+      description: dbRoomType.description || undefined,
+      locationId: dbRoomType.location_id ? dbRoomType.location_id.toString() : undefined
+    };
+  } catch (error) {
+    console.error('Failed to update room type:', error);
+    // Fallback to local
+    const existing = roomTypes.find(r => r.id === id);
+    if (existing) {
+      const updated = { ...existing, ...rt };
+      roomTypes = roomTypes.map(r => r.id === id ? updated : r);
+      return updated;
+    }
+    throw error;
   }
 };
 
@@ -782,7 +941,7 @@ export const addServiceRequest = async (req: ServiceRequest): Promise<ServiceReq
     
     // Notify Staff of that Department
     const readableType = req.type.charAt(0) + req.type.slice(1).toLowerCase();
-    notifyStaffByDepartment(readableType, 'New Service Request', `Room ${req.roomNumber}: ${req.details}`);
+    await notifyStaffByDepartment(readableType, 'New Service Request', `Room ${req.roomNumber}: ${req.details}`);
     
     return req;
   }
@@ -993,11 +1152,8 @@ const mapChatMessageToFrontend = (dbMsg: any): ChatMessage => ({
 
 export const getServiceMessages = async (roomNumber: string, service: string): Promise<ChatMessage[]> => {
   try {
-    // Get all messages for this room number
-    const dbMessages = await apiClient.get<any[]>(`/chat-messages/room/${roomNumber}`);
-    
-    // Filter by service type if needed (for now, we'll get all messages for the room)
-    // You can add a service field to chat_messages table later if needed
+    // Get messages filtered by service type
+    const dbMessages = await apiClient.get<any[]>(`/chat-messages/room/${roomNumber}?service_type=${service}`);
     return dbMessages.map(mapChatMessageToFrontend);
   } catch (error) {
     console.error('Failed to fetch service messages:', error);
@@ -1049,7 +1205,8 @@ export const sendServiceMessage = async (roomNumber: string, service: string, te
       role: dbRole,
       text,
       user_id: userId || null,
-      room_number: roomNumber
+      room_number: roomNumber,
+      service_type: service // Include service type
     });
 
     // Update local cache
@@ -1073,7 +1230,8 @@ export const sendServiceMessage = async (roomNumber: string, service: string, te
             role: 'model',
             text: randomReply,
             user_id: null,
-            room_number: roomNumber
+            room_number: roomNumber,
+            service_type: service // Include service type
           });
           
           // Update local cache

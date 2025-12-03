@@ -122,6 +122,11 @@ const AppContent: React.FC = () => {
             // Save user to localStorage to persist across page refreshes
             localStorage.setItem('furama_user', JSON.stringify(foundUser));
 
+            // Set language from user's database preference
+            if (foundUser.language) {
+                setLanguage(foundUser.language as any);
+            }
+
             // Route to appropriate view based on Role
             switch (foundUser.role) {
             case UserRole.ADMIN: setView(AppView.ADMIN_DASHBOARD); break;
@@ -373,12 +378,25 @@ const AppContent: React.FC = () => {
         {view === AppView.HOME && (
              <div className="flex flex-col min-h-full">
                 {/* Hero Banner (Smaller) */}
-                <div className="mx-4 mt-4 h-32 rounded-2xl overflow-hidden relative shadow-lg mb-6">
-                    <img src="https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Pool-768x552.jpg" className="absolute inset-0 w-full h-full object-cover" alt="Resort" />
-                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/80 to-transparent flex items-center p-6">
+                <div className="mx-4 mt-4 h-40 rounded-2xl overflow-hidden relative shadow-lg mb-6">
+                    <img 
+                        src="https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Beachfront-1920x1080.jpg" 
+                        className="absolute inset-0 w-full h-full object-cover" 
+                        alt="Furama Resort Danang"
+                        onError={(e) => {
+                            // Fallback images
+                            const img = e.target as HTMLImageElement;
+                            if (img.src.includes('Beachfront')) {
+                                img.src = "https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Exterior-1920x1080.jpg";
+                            } else if (img.src.includes('Exterior')) {
+                                img.src = "https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Pool-768x552.jpg";
+                            }
+                        }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/85 via-emerald-900/70 to-transparent flex items-center p-6">
                         <div>
-                             <h2 className="text-white font-serif text-2xl font-bold mb-1">Furama Danang</h2>
-                             <p className="text-emerald-100 text-xs">A Culinary Beach Resort</p>
+                             <h2 className="text-white font-serif text-2xl font-bold mb-1 drop-shadow-lg">Furama Danang</h2>
+                             <p className="text-emerald-100 text-xs drop-shadow-md">A Culinary Beach Resort</p>
                         </div>
                     </div>
                 </div>
@@ -455,7 +473,7 @@ const AppContent: React.FC = () => {
                 active={view === AppView.CHAT} 
                 onClick={() => setView(AppView.CHAT)} 
                 icon={MessageSquare} 
-                label="Concierge" 
+                label={t('concierge')} 
                 special 
            />
            <NavButton 

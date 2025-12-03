@@ -94,6 +94,27 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     'driver': 'Driver',
     'therapist': 'Therapist',
     'staff': 'Staff',
+    
+    // Notifications
+    'notifications': 'Notifications',
+    'no_notifications': 'No notifications.',
+    'mark_as_read': 'Mark as read',
+    'notification_info': 'INFO',
+    'notification_success': 'SUCCESS',
+    'notification_warning': 'WARNING',
+    
+    // Concierge Chat
+    'concierge_ai': 'Concierge AI',
+    'concierge_welcome': 'Good day! I am your Furama Digital Concierge. How may I assist you today?',
+    'get_directions': 'Get Directions',
+    'sources': 'Sources',
+    'ask_placeholder': 'Ask about dining, spa, or resort info...',
+    'live_concierge': 'Live Concierge',
+    'listening': 'Listening... Speak naturally.',
+    'connecting_voice': 'Connecting to Furama Secure Voice...',
+    'end_call': 'End Call',
+    'sorry_couldnt_process': "I'm sorry, I couldn't process that.",
+    'connection_error': "I apologize, but I'm having trouble connecting right now. Please try again.",
   },
   Vietnamese: {
     'welcome_back': 'Chào mừng quay lại,',
@@ -157,6 +178,28 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     'kitchen': 'Bếp',
     'driver': 'Tài xế',
     'therapist': 'Chuyên viên',
+    'staff': 'Nhân viên',
+    
+    // Notifications
+    'notifications': 'Thông báo',
+    'no_notifications': 'Không có thông báo.',
+    'mark_as_read': 'Đánh dấu đã đọc',
+    'notification_info': 'THÔNG TIN',
+    'notification_success': 'THÀNH CÔNG',
+    'notification_warning': 'CẢNH BÁO',
+    
+    // Concierge Chat
+    'concierge_ai': 'Trợ lý AI',
+    'concierge_welcome': 'Xin chào! Tôi là Trợ lý Kỹ thuật số Furama. Tôi có thể giúp gì cho bạn hôm nay?',
+    'get_directions': 'Chỉ đường',
+    'sources': 'Nguồn',
+    'ask_placeholder': 'Hỏi về ẩm thực, spa hoặc thông tin resort...',
+    'live_concierge': 'Trợ lý Trực tiếp',
+    'listening': 'Đang nghe... Hãy nói tự nhiên.',
+    'connecting_voice': 'Đang kết nối với Giọng nói Bảo mật Furama...',
+    'end_call': 'Kết thúc cuộc gọi',
+    'sorry_couldnt_process': 'Xin lỗi, tôi không thể xử lý điều đó.',
+    'connection_error': 'Xin lỗi, nhưng tôi đang gặp sự cố kết nối. Vui lòng thử lại.',
     'staff': 'Nhân viên',
   },
   Korean: {
@@ -222,6 +265,27 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     'driver': '기사',
     'therapist': '테라피스트',
     'staff': '직원',
+    
+    // Notifications
+    'notifications': '알림',
+    'no_notifications': '알림이 없습니다.',
+    'mark_as_read': '읽음으로 표시',
+    'notification_info': '정보',
+    'notification_success': '성공',
+    'notification_warning': '경고',
+    
+    // Concierge Chat
+    'concierge_ai': '컨시어지 AI',
+    'concierge_welcome': '안녕하세요! 저는 푸라마 디지털 컨시어지입니다. 오늘 무엇을 도와드릴까요?',
+    'get_directions': '길 찾기',
+    'sources': '출처',
+    'ask_placeholder': '다이닝, 스파 또는 리조트 정보에 대해 물어보세요...',
+    'live_concierge': '라이브 컨시어지',
+    'listening': '듣는 중... 자연스럽게 말씀해 주세요.',
+    'connecting_voice': '푸라마 보안 음성에 연결 중...',
+    'end_call': '통화 종료',
+    'sorry_couldnt_process': '죄송합니다. 처리할 수 없습니다.',
+    'connection_error': '죄송합니다. 지금 연결에 문제가 있습니다. 다시 시도해 주세요.',
   },
   Japanese: {
     'welcome_back': 'おかえりなさいませ、',
@@ -286,6 +350,27 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     'driver': 'ドライバー',
     'therapist': 'セラピスト',
     'staff': 'スタッフ',
+    
+    // Notifications
+    'notifications': '通知',
+    'no_notifications': '通知はありません。',
+    'mark_as_read': '既読にする',
+    'notification_info': '情報',
+    'notification_success': '成功',
+    'notification_warning': '警告',
+    
+    // Concierge Chat
+    'concierge_ai': 'コンシェルジュ AI',
+    'concierge_welcome': 'こんにちは！私はフラマデジタルコンシェルジュです。本日はどのようにお手伝いできますか？',
+    'get_directions': '道順を取得',
+    'sources': 'ソース',
+    'ask_placeholder': 'ダイニング、スパ、またはリゾート情報についてお尋ねください...',
+    'live_concierge': 'ライブコンシェルジュ',
+    'listening': '聞いています...自然に話してください。',
+    'connecting_voice': 'フラマセキュアボイスに接続中...',
+    'end_call': '通話終了',
+    'sorry_couldnt_process': '申し訳ございませんが、処理できませんでした。',
+    'connection_error': '申し訳ございませんが、現在接続に問題が発生しています。もう一度お試しください。',
   },
   Chinese: {
     'welcome_back': '欢迎回来，',
@@ -350,6 +435,27 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     'driver': '司机',
     'therapist': '理疗师',
     'staff': '员工',
+    
+    // Notifications
+    'notifications': '通知',
+    'no_notifications': '没有通知。',
+    'mark_as_read': '标记为已读',
+    'notification_info': '信息',
+    'notification_success': '成功',
+    'notification_warning': '警告',
+    
+    // Concierge Chat
+    'concierge_ai': '礼宾 AI',
+    'concierge_welcome': '您好！我是富丽华数字礼宾。今天我能为您做些什么？',
+    'get_directions': '获取路线',
+    'sources': '来源',
+    'ask_placeholder': '询问餐饮、水疗或度假村信息...',
+    'live_concierge': '实时礼宾',
+    'listening': '正在聆听...请自然说话。',
+    'connecting_voice': '正在连接到富丽华安全语音...',
+    'end_call': '结束通话',
+    'sorry_couldnt_process': '抱歉，我无法处理该请求。',
+    'connection_error': '抱歉，我现在连接遇到问题。请稍后再试。',
   },
   Russian: {
     'welcome_back': 'С возвращением,',
@@ -414,6 +520,27 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     'driver': 'Водитель',
     'therapist': 'Терапевт',
     'staff': 'Персонал',
+    
+    // Notifications
+    'notifications': 'Уведомления',
+    'no_notifications': 'Нет уведомлений.',
+    'mark_as_read': 'Отметить как прочитанное',
+    'notification_info': 'ИНФО',
+    'notification_success': 'УСПЕХ',
+    'notification_warning': 'ПРЕДУПРЕЖДЕНИЕ',
+    
+    // Concierge Chat
+    'concierge_ai': 'Консьерж AI',
+    'concierge_welcome': 'Добрый день! Я ваш цифровой консьерж Furama. Чем я могу вам помочь сегодня?',
+    'get_directions': 'Получить маршрут',
+    'sources': 'Источники',
+    'ask_placeholder': 'Спросите о ресторанах, спа или информации о курорте...',
+    'live_concierge': 'Живой консьерж',
+    'listening': 'Слушаю... Говорите естественно.',
+    'connecting_voice': 'Подключение к безопасному голосу Furama...',
+    'end_call': 'Завершить звонок',
+    'sorry_couldnt_process': 'Извините, я не смог это обработать.',
+    'connection_error': 'Извините, но у меня сейчас проблемы с подключением. Пожалуйста, попробуйте еще раз.',
   },
   French: {
      // Basic placeholder, can be expanded later

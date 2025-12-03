@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key } from 'lucide-react';
-import { getLocations, addLocation, deleteLocation, getMenu, addMenuItem, deleteMenuItem, getEvents, addEvent, deleteEvent, getPromotions, addPromotion, deletePromotion, getKnowledgeBase, addKnowledgeItem, deleteKnowledgeItem, getUsers, addUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory } from '../services/dataService';
+import { getLocations, getLocationsSync, addLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, deletePromotion, getKnowledgeBase, addKnowledgeItem, deleteKnowledgeItem, getUsers, addUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory } from '../services/dataService';
 import { parseAdminInput, generateTranslations } from '../services/geminiService';
 import { Location, MenuItem, ResortEvent, Promotion, KnowledgeItem, User, UserRole, Department, RoomType, Room } from '../types';
 
@@ -14,21 +14,52 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const [tab, setTab] = useState<'LOCATIONS' | 'MENU' | 'EVENTS' | 'PROMOS' | 'KNOWLEDGE' | 'USERS' | 'GUESTS' | 'ROOMS' | 'HISTORY'>('LOCATIONS');
     
     // Data State
-    const [locations, setLocations] = useState(getLocationsSync());
-    const [menu, setMenu] = useState(getMenuSync());
-    const [events, setEvents] = useState(getEventsSync());
-    const [promotions, setPromotions] = useState(getPromotionsSync());
-    const [knowledge, setKnowledge] = useState(getKnowledgeBase());
-    const [users, setUsers] = useState(getUsers());
+    const [locations, setLocations] = useState<Location[]>([]);
+    const [menu, setMenu] = useState<MenuItem[]>([]);
+    const [events, setEvents] = useState<ResortEvent[]>([]);
+    const [promotions, setPromotions] = useState<Promotion[]>([]);
+    const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
     const [rooms, setRooms] = useState<Room[]>([]);
+    const [serviceHistory, setServiceHistory] = useState<any[]>([]);
     
-    // Load room types and rooms on mount
+    // Load data on mount
     useEffect(() => {
-        getRoomTypes().then(setRoomTypes).catch(console.error);
+        const loadData = async () => {
+            try {
+                const [locationsData, menuData, eventsData, promotionsData, roomTypesData] = await Promise.all([
+                    getLocations().catch(() => getLocationsSync()),
+                    getMenu().catch(() => getMenuSync()),
+                    getEvents().catch(() => getEventsSync()),
+                    getPromotions().catch(() => getPromotionsSync()),
+                    getRoomTypes().catch(() => [])
+                ]);
+                
+                setLocations(locationsData);
+                setMenu(menuData);
+                setEvents(eventsData);
+                setPromotions(promotionsData);
+                setRoomTypes(roomTypesData);
+                setKnowledge([...getKnowledgeBase()]);
+                setUsers([...getUsers()]);
+                setServiceHistory([...getUnifiedHistory()]);
+            } catch (error) {
+                console.error('Failed to load data:', error);
+                // Fallback to sync versions
+                setLocations(getLocationsSync());
+                setMenu(getMenuSync());
+                setEvents(getEventsSync());
+                setPromotions(getPromotionsSync());
+                setKnowledge([...getKnowledgeBase()]);
+                setUsers([...getUsers()]);
+                setServiceHistory([...getUnifiedHistory()]);
+            }
+        };
+        
+        loadData();
         getRooms().then(setRooms).catch(console.error);
     }, []);
-    const [serviceHistory, setServiceHistory] = useState(getUnifiedHistory());
     
     // UI State
     const [isParsing, setIsParsing] = useState(false);
@@ -54,6 +85,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     // Rooms Tab State
     const [roomView, setRoomView] = useState<'TYPES' | 'LIST'>('TYPES');
     const [showRoomTypeForm, setShowRoomTypeForm] = useState(false);
+    const [editingRoomType, setEditingRoomType] = useState<RoomType | null>(null);
     const [newRoomType, setNewRoomType] = useState<Partial<RoomType>>({ name: '', description: '', locationId: '' });
     
     const [showRoomForm, setShowRoomForm] = useState(false);
@@ -65,10 +97,18 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const [historyFilterDate, setHistoryFilterDate] = useState<string>('');
 
     const refreshData = async () => {
-        setLocations([...getLocations()]);
-        setMenu([...getMenu()]);
-        setEvents([...getEvents()]);
-        setPromotions([...getPromotions()]);
+        // Load data asynchronously from API
+        const [locationsData, menuData, eventsData, promotionsData] = await Promise.all([
+            getLocations().catch(() => getLocationsSync()),
+            getMenu().catch(() => getMenuSync()),
+            getEvents().catch(() => getEventsSync()),
+            getPromotions().catch(() => getPromotionsSync())
+        ]);
+        
+        setLocations(locationsData);
+        setMenu(menuData);
+        setEvents(eventsData);
+        setPromotions(promotionsData);
         setKnowledge([...getKnowledgeBase()]);
         setUsers([...getUsers()]);
         // Refresh room types and rooms asynchronously
@@ -166,20 +206,47 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const handleAddRoomType = async () => {
         if (!newRoomType.name) return;
         try {
-            await addRoomType({
-            id: '', // Handled by service
-            name: newRoomType.name,
-            description: newRoomType.description || '',
-            locationId: newRoomType.locationId
-        });
-        setNewRoomType({ name: '', description: '', locationId: '' });
-        setShowRoomTypeForm(false);
+            if (editingRoomType) {
+                // Update existing room type
+                await updateRoomType(editingRoomType.id, {
+                    name: newRoomType.name,
+                    description: newRoomType.description || '',
+                    locationId: newRoomType.locationId
+                });
+                setEditingRoomType(null);
+            } else {
+                // Create new room type
+                await addRoomType({
+                    id: '', // Handled by service
+                    name: newRoomType.name,
+                    description: newRoomType.description || '',
+                    locationId: newRoomType.locationId
+                });
+            }
+            setNewRoomType({ name: '', description: '', locationId: '' });
+            setShowRoomTypeForm(false);
             // Refresh room types
             getRoomTypes().then(setRoomTypes).catch(console.error);
         } catch (error) {
-            console.error('Failed to add room type:', error);
-            alert('Failed to add room type. Please try again.');
+            console.error('Failed to save room type:', error);
+            alert('Failed to save room type. Please try again.');
         }
+    };
+
+    const handleEditRoomType = (rt: RoomType) => {
+        setEditingRoomType(rt);
+        setNewRoomType({
+            name: rt.name,
+            description: rt.description || '',
+            locationId: rt.locationId || ''
+        });
+        setShowRoomTypeForm(true);
+    };
+
+    const handleCancelEditRoomType = () => {
+        setEditingRoomType(null);
+        setNewRoomType({ name: '', description: '', locationId: '' });
+        setShowRoomTypeForm(false);
     };
 
     const handleAddRoom = async () => {
@@ -261,16 +328,21 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         window.URL.revokeObjectURL(url);
     };
 
-    const handleDelete = (id: string, type: 'LOC' | 'ITEM' | 'EVENT' | 'PROMO' | 'KNOW' | 'USER' | 'ROOM_TYPE' | 'ROOM') => {
-        if (type === 'LOC') deleteLocation(id);
-        if (type === 'ITEM') deleteMenuItem(id);
-        if (type === 'EVENT') deleteEvent(id);
-        if (type === 'PROMO') deletePromotion(id);
-        if (type === 'KNOW') deleteKnowledgeItem(id);
-        if (type === 'USER') deleteUser(id);
-        if (type === 'ROOM_TYPE') deleteRoomType(id);
-        if (type === 'ROOM') deleteRoom(id);
-        refreshData();
+    const handleDelete = async (id: string, type: 'LOC' | 'ITEM' | 'EVENT' | 'PROMO' | 'KNOW' | 'USER' | 'ROOM_TYPE' | 'ROOM') => {
+        try {
+            if (type === 'LOC') await deleteLocation(id);
+            else if (type === 'ITEM') await deleteMenuItem(id);
+            else if (type === 'EVENT') await deleteEvent(id);
+            else if (type === 'PROMO') await deletePromotion(id);
+            else if (type === 'KNOW') await deleteKnowledgeItem(id);
+            else if (type === 'USER') await deleteUser(id);
+            else if (type === 'ROOM_TYPE') await deleteRoomType(id);
+            else if (type === 'ROOM') await deleteRoom(id);
+            refreshData();
+        } catch (error) {
+            console.error('Failed to delete:', error);
+            alert('Failed to delete. Please try again.');
+        }
     };
 
     const getPlaceholder = () => {
@@ -513,7 +585,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 {/* Room TYPE Add Form */}
                 {showRoomTypeForm && tab === 'ROOMS' && roomView === 'TYPES' && (
                     <div className="bg-white p-4 rounded-xl shadow-lg border border-emerald-100 mb-6 animate-in slide-in-from-top-2">
-                         <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase">Create Room Type</h3>
+                         <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase">{editingRoomType ? 'Edit Room Type' : 'Create Room Type'}</h3>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                              <div>
                                 <label className="block text-xs font-semibold text-gray-500 mb-1">Type Name</label>
@@ -549,12 +621,20 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 />
                              </div>
                          </div>
-                         <div className="flex justify-end">
+                         <div className="flex justify-end gap-2">
+                            {editingRoomType && (
+                                <button 
+                                    onClick={handleCancelEditRoomType}
+                                    className="bg-gray-500 text-white px-6 py-2 rounded-lg text-sm font-bold"
+                                >
+                                    Cancel
+                                </button>
+                            )}
                             <button 
                                 onClick={handleAddRoomType}
                                 className="bg-emerald-800 text-white px-6 py-2 rounded-lg text-sm font-bold"
                             >
-                                Create Type
+                                {editingRoomType ? 'Update Type' : 'Create Type'}
                             </button>
                         </div>
                     </div>
@@ -770,7 +850,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                         </td>
                                         <td className="p-4 text-sm font-mono text-gray-500 hidden md:table-cell">{loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}</td>
                                         <td className="p-4 text-right">
-                                            <button onClick={() => handleDelete(loc.name, 'LOC')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
+                                            <button onClick={() => handleDelete(loc.id || loc.name, 'LOC')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
                                         </td>
                                     </tr>
                                 ))}
@@ -872,7 +952,15 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                             </thead>
                             <tbody>
                                 {roomTypes.map((rt) => {
-                                    const linkedLoc = locations.find(l => l.id === rt.locationId);
+                                    // Find linked location by matching ID
+                                    // Both IDs are strings, but ensure proper comparison
+                                    const linkedLoc = rt.locationId 
+                                        ? locations.find(l => {
+                                            const locIdStr = String(l.id || '');
+                                            const rtLocIdStr = String(rt.locationId || '');
+                                            return locIdStr === rtLocIdStr && locIdStr !== '';
+                                        })
+                                        : null;
                                     return (
                                         <tr key={rt.id} className="border-b border-gray-100 hover:bg-gray-50">
                                             <td className="p-4">
@@ -889,7 +977,10 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                                 )}
                                             </td>
                                             <td className="p-4 text-right">
-                                                <button onClick={() => handleDelete(rt.id, 'ROOM_TYPE')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
+                                                <div className="flex justify-end gap-2">
+                                                    <button onClick={() => handleEditRoomType(rt)} className="text-emerald-600 hover:text-emerald-700 p-2" title="Edit Location Link"><MapPin size={16}/></button>
+                                                    <button onClick={() => handleDelete(rt.id, 'ROOM_TYPE')} className="text-red-500 hover:text-red-700 p-2" title="Delete"><Trash2 size={16}/></button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );

@@ -45,6 +45,7 @@ export const authController = {
         roomNumber: user.room_number,
         villaType: user.villa_type,
         role: user.role as any,
+        language: user.language || 'English', // Include language from database
       };
 
       res.json({ 
@@ -111,6 +112,7 @@ export const authController = {
         villaType: user.villa_type,
         role: user.role as any,
         department: 'All' as any, // Default, can be updated later
+        language: user.language || 'English', // Include language from database
       };
 
       res.json({ 

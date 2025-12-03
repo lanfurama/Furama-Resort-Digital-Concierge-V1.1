@@ -7,6 +7,7 @@ export interface User {
   villa_type?: string;
   role: 'GUEST' | 'ADMIN' | 'DRIVER' | 'STAFF' | 'SUPERVISOR';
   password?: string;
+  language?: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -37,8 +38,8 @@ export const userModel = {
 
   async create(user: Omit<User, 'id' | 'created_at' | 'updated_at'>): Promise<User> {
     const result = await pool.query(
-      'INSERT INTO users (last_name, room_number, villa_type, role, password) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [user.last_name, user.room_number, user.villa_type || null, user.role, user.password || null]
+      'INSERT INTO users (last_name, room_number, villa_type, role, password, language) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [user.last_name, user.room_number, user.villa_type || null, user.role, user.password || null, user.language || 'English']
     );
     return result.rows[0];
   },
@@ -47,6 +48,8 @@ export const userModel = {
     const fields: string[] = [];
     const values: any[] = [];
     let paramCount = 1;
+
+    console.log('userModel.update called with:', { id, user });
 
     if (user.last_name !== undefined) {
       fields.push(`last_name = $${paramCount++}`);
@@ -68,16 +71,26 @@ export const userModel = {
       fields.push(`password = $${paramCount++}`);
       values.push(user.password);
     }
+    if (user.language !== undefined && user.language !== null) {
+      console.log('Adding language to update:', user.language);
+      fields.push(`language = $${paramCount++}`);
+      values.push(user.language);
+    } else {
+      console.log('Language is undefined or null, skipping update');
+    }
 
     if (fields.length === 0) {
+      console.log('No fields to update, returning existing user');
       return this.getById(id);
     }
 
     values.push(id);
-    const result = await pool.query(
-      `UPDATE users SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`,
-      values
-    );
+    const query = `UPDATE users SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount} RETURNING *`;
+    console.log('Executing query:', query);
+    console.log('Query values:', values);
+    
+    const result = await pool.query(query, values);
+    console.log('Query result:', result.rows[0]);
     return result.rows[0] || null;
   },
 

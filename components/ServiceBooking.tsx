@@ -4,6 +4,7 @@ import { getMenu, addServiceRequest } from '../services/dataService';
 import { User, MenuItem } from '../types';
 import { ArrowLeft, ShoppingBag, Plus, Sparkles, Utensils, Waves, User as UserIcon } from 'lucide-react';
 import ServiceChat from './ServiceChat';
+import Loading from './Loading';
 import { useTranslation } from '../contexts/LanguageContext';
 
 interface ServiceBookingProps {
@@ -17,6 +18,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
     const [cart, setCart] = useState<MenuItem[]>([]);
     const [isOrderPlaced, setIsOrderPlaced] = useState(false);
     const [items, setItems] = useState<MenuItem[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     
     // Filter menu by type
     let categoryFilter: 'Dining' | 'Spa' | 'Pool' | 'Butler' = 'Dining';
@@ -26,7 +28,11 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
 
     // Load menu items on mount
     useEffect(() => {
-        getMenu(categoryFilter).then(setItems).catch(console.error);
+        setIsLoading(true);
+        getMenu(categoryFilter)
+            .then(setItems)
+            .catch(console.error)
+            .finally(() => setIsLoading(false));
     }, [categoryFilter]);
 
     const addToCart = (item: MenuItem) => {
@@ -153,8 +159,11 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 pb-24">
-                <div className="grid gap-4">
-                    {items.map(item => {
+                {isLoading ? (
+                    <Loading message={t('loading') || 'Loading menu...'} />
+                ) : (
+                    <div className="grid gap-4">
+                        {items.map(item => {
                         const tr = item.translations?.[language];
                         const name = tr?.name || item.name;
                         const desc = tr?.description || item.description;
@@ -176,13 +185,14 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                             </button>
                         </div>
                         );
-                    })}
-                    {items.length === 0 && (
-                        <div className="text-center py-10 text-gray-400">
-                            No items available in this category yet.
-                        </div>
-                    )}
-                </div>
+                        })}
+                        {items.length === 0 && (
+                            <div className="text-center py-10 text-gray-400">
+                                No items available in this category yet.
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Cart Summary */}
