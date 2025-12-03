@@ -2,7 +2,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import routes from './routes/index.js';
+import routes from './api/routes/index.js';
 
 dotenv.config();
 
@@ -19,7 +19,7 @@ app.get('/health', (req, res) => {
 });
 
 // API routes - Vercel sẽ route /api/* to this file, so we use /v1 directly
-app.use('/v1', routes);
+app.use('/api/v1', routes);
 app.use('/', routes);
 
 // Error handler
@@ -34,3 +34,4 @@ app.use((err, req, res, next) => {
 export default (req, res) => {
   return app(req, res);
 };
+
