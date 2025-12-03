@@ -20,10 +20,15 @@ const REVIEW_CATEGORIES = [
 ];
 
 const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
-    const history = getGuestHistory(user.roomNumber);
+    const [history, setHistory] = useState<ServiceRequest[]>([]);
     const existingReview = getHotelReview(user.roomNumber);
     const [notes, setNotes] = useState(user.notes || '');
     const [isSaving, setIsSaving] = useState(false);
+    
+    // Load history on mount
+    useEffect(() => {
+        getGuestHistory(user.roomNumber).then(setHistory).catch(console.error);
+    }, [user.roomNumber]);
     
     // Service Rating State
     const [activeRatingId, setActiveRatingId] = useState<string | null>(null);

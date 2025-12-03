@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppView, User, UserRole } from './types';
 import { authenticateUser } from './services/authService';
 import BuggyBooking from './components/BuggyBooking';
@@ -30,46 +30,42 @@ const App: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   // Load promotions for Guest Home
-  const promotions = getPromotions();
+  const [promotions, setPromotions] = useState<any[]>([]);
+  
+  useEffect(() => {
+    if (view === AppView.HOME && user?.role === UserRole.GUEST) {
+      getPromotions().then(setPromotions).catch(console.error);
+    }
+  }, [view, user]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsAuthLoading(true);
     setAuthError('');
     
-    // Simulate role-based auth routing
-    setTimeout(() => {
-        setIsAuthLoading(false);
-        
+    try {
         let foundUser: User | undefined | null;
 
-        // AUTH LOGIC
+        // AUTH LOGIC - Now calls API
         if (selectedRole === UserRole.GUEST) {
             // Guest Login: Room # + Last Name
-            const guestAuth = loginGuest(lastNameInput, usernameInput);
+            const guestAuth = await loginGuest(lastNameInput, usernameInput);
             
             if (guestAuth.success && guestAuth.user) {
                 foundUser = guestAuth.user;
             } else {
                 setAuthError(guestAuth.message || 'Login failed');
+                setIsAuthLoading(false);
                 return;
             }
         } else {
              // Admin/Staff/Driver Login: Username + Password
-             // We use 'usernameInput' to match against the user's roomNumber/ID in mock data
-             foundUser = loginStaff(usernameInput, passwordInput);
+             foundUser = await loginStaff(usernameInput, passwordInput);
              
              if (!foundUser) {
-                 // Debug/Demo Fallback if they type exactly what's in the placeholder for "quick access"
-                 if (passwordInput === '123') {
-                     foundUser = {
-                        lastName: selectedRole.charAt(0) + selectedRole.slice(1).toLowerCase(), // e.g. "Admin"
-                        roomNumber: usernameInput,
-                        role: selectedRole,
-                        department: 'All', 
-                        villaType: 'Staff'
-                    };
-                 }
+                 setAuthError('Invalid credentials');
+                 setIsAuthLoading(false);
+                 return;
              }
         }
 
@@ -86,7 +82,12 @@ const App: React.FC = () => {
         } else {
             setAuthError('Invalid credentials');
         }
-    }, 800);
+    } catch (error: any) {
+        console.error('Login error:', error);
+        setAuthError(error.message || 'Login failed. Please try again.');
+    } finally {
+        setIsAuthLoading(false);
+    }
   };
 
   const handleLogout = () => {

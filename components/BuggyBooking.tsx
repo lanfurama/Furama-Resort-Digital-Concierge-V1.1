@@ -15,32 +15,46 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [activeRide, setActiveRide] = useState<RideRequest | undefined>(undefined);
   const [pickup, setPickup] = useState<string>(`Villa ${user.roomNumber}`);
   const [destination, setDestination] = useState<string>('');
-  const locations = getLocations();
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Mock User Location (Fixed for demo purposes relative to center)
   const userLat = RESORT_CENTER.lat - 0.0005; 
   const userLng = RESORT_CENTER.lng - 0.0005;
 
+  // Load locations on mount
+  useEffect(() => {
+    getLocations().then(setLocations).catch(console.error);
+  }, []);
+
   // Polling for ride updates
   useEffect(() => {
-      const checkStatus = () => {
-          const ride = getActiveRideForUser(user.roomNumber);
+      const checkStatus = async () => {
+          const ride = await getActiveRideForUser(user.roomNumber);
           setActiveRide(ride);
       };
       
       checkStatus(); // Check immediately
-      const interval = setInterval(checkStatus, 1000);
+      const interval = setInterval(checkStatus, 3000); // Check every 3 seconds
       return () => clearInterval(interval);
   }, [user.roomNumber]);
 
-  const handleBook = () => {
+  const handleBook = async () => {
     if (!destination) return;
-    requestRide(user.lastName, user.roomNumber, pickup, destination);
+    setIsLoading(true);
+    try {
+      const newRide = await requestRide(user.lastName, user.roomNumber, pickup, destination);
+      setActiveRide(newRide);
+    } catch (error) {
+      console.error('Failed to request ride:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
       if (activeRide) {
-          cancelRide(activeRide.id);
+          await cancelRide(activeRide.id);
           setActiveRide(undefined);
       }
   };

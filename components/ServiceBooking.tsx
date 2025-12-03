@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getMenu, addServiceRequest } from '../services/dataService';
 import { User, MenuItem } from '../types';
 import { ArrowLeft, ShoppingBag, Plus, Sparkles, Utensils, Waves, User as UserIcon } from 'lucide-react';
@@ -14,6 +14,8 @@ interface ServiceBookingProps {
 const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) => {
     const [cart, setCart] = useState<MenuItem[]>([]);
     const [isOrderPlaced, setIsOrderPlaced] = useState(false);
+    const [items, setItems] = useState<MenuItem[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
     
     // Filter menu by type
     let categoryFilter: 'Dining' | 'Spa' | 'Pool' | 'Butler' = 'Dining';
@@ -21,29 +23,39 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
     if (type === 'POOL') categoryFilter = 'Pool';
     if (type === 'BUTLER') categoryFilter = 'Butler';
 
-    const items = getMenu(categoryFilter);
+    // Load menu items on mount
+    useEffect(() => {
+        getMenu(categoryFilter).then(setItems).catch(console.error);
+    }, [categoryFilter]);
 
     const addToCart = (item: MenuItem) => {
         setCart([...cart, item]);
     };
 
-    const handlePlaceOrder = () => {
+    const handlePlaceOrder = async () => {
         if (cart.length === 0) return;
+        setIsLoading(true);
         
-        const details = cart.map(i => i.name).join(', ');
-        addServiceRequest({
-            id: Date.now().toString(),
-            type: type,
-            status: 'PENDING',
-            details: `Order for: ${details}`,
-            roomNumber: user.roomNumber,
-            timestamp: Date.now()
-        });
-        
-        setIsOrderPlaced(true);
-        setTimeout(() => {
-            onBack();
-        }, 2000);
+        try {
+            const details = cart.map(i => i.name).join(', ');
+            await addServiceRequest({
+                id: Date.now().toString(),
+                type: type,
+                status: 'PENDING',
+                details: `Order for: ${details}`,
+                roomNumber: user.roomNumber,
+                timestamp: Date.now()
+            });
+            
+            setIsOrderPlaced(true);
+            setTimeout(() => {
+                onBack();
+            }, 2000);
+        } catch (error) {
+            console.error('Failed to place order:', error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const totalPrice = cart.reduce((sum, item) => sum + item.price, 0);

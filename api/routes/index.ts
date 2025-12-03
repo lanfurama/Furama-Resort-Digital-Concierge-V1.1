@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import authRoutes from './authRoutes.js';
 import userRoutes from './userRoutes.js';
 import locationRoutes from './locationRoutes.js';
 import menuItemRoutes from './menuItemRoutes.js';
@@ -11,6 +12,7 @@ import chatMessageRoutes from './chatMessageRoutes.js';
 
 const router = Router();
 
+router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/locations', locationRoutes);
 router.use('/menu-items', menuItemRoutes);

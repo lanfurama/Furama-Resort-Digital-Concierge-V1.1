@@ -1,6 +1,7 @@
 
 import { Location, MenuItem, RideRequest, ServiceRequest, BuggyStatus, UserRole, ResortEvent, Promotion, KnowledgeItem, User, Department, RoomType, Room, HotelReview, AppNotification, ChatMessage } from '../types';
 import { MOCK_LOCATIONS, MOCK_PROMOTIONS, MOCK_KNOWLEDGE, MOCK_USERS, MOCK_ROOM_TYPES, MOCK_ROOMS } from '../constants';
+import { apiClient } from './apiClient';
 
 // Initial Mock Data
 let locations: Location[] = [...MOCK_LOCATIONS];
@@ -130,40 +131,40 @@ export const updateUserNotes = (roomNumber: string, notes: string) => {
     }
 };
 
-// Staff Login verification
-export const loginStaff = (username: string, password: string): User | undefined => {
-    return users.find(u => 
-        u.roomNumber.toLowerCase() === username.toLowerCase() && 
-        u.password === password
-    );
+// Staff Login - Calls API
+export const loginStaff = async (username: string, password: string): Promise<User | undefined> => {
+    try {
+        const response = await apiClient.post<{ success: boolean; user?: User; message?: string }>('/auth/staff', {
+            username,
+            password
+        });
+        
+        if (response.success && response.user) {
+            return response.user;
+        }
+        return undefined;
+    } catch (error: any) {
+        console.error('Login staff error:', error);
+        return undefined;
+    }
 };
 
-// Guest Login Validation
-export const loginGuest = (lastName: string, roomNumber: string): { success: boolean; user?: User; message?: string } => {
-    const user = users.find(u => 
-        u.lastName.toLowerCase() === lastName.toLowerCase() && 
-        u.roomNumber.toLowerCase() === roomNumber.toLowerCase() &&
-        u.role === UserRole.GUEST
-    );
-
-    if (!user) {
-        return { success: false, message: "Guest not found. Please check Room # and Last Name." };
+// Guest Login - Calls API
+export const loginGuest = async (lastName: string, roomNumber: string): Promise<{ success: boolean; user?: User; message?: string }> => {
+    try {
+        const response = await apiClient.post<{ success: boolean; user?: User; message?: string }>('/auth/guest', {
+            lastName,
+            roomNumber
+        });
+        
+        return response;
+    } catch (error: any) {
+        console.error('Login guest error:', error);
+        return { 
+            success: false, 
+            message: error.message || 'Login failed. Please try again.' 
+        };
     }
-
-    if (user.checkIn && user.checkOut) {
-        const now = new Date();
-        const checkIn = new Date(user.checkIn);
-        const checkOut = new Date(user.checkOut);
-
-        if (now < checkIn) {
-            return { success: false, message: `Check-in time starts at ${checkIn.toLocaleString()}.` };
-        }
-        if (now > checkOut) {
-            return { success: false, message: "Your stay has expired. Please contact reception." };
-        }
-    }
-
-    return { success: true, user };
 };
 
 export const findUserByCredentials = (lastName: string, roomNumber: string): User | undefined => {
@@ -225,12 +226,60 @@ export const getGuestCSVContent = (): string => {
 };
 
 // --- LOCATIONS ---
-export const getLocations = () => locations;
-export const addLocation = (loc: Location) => {
-  locations = [...locations, { ...loc, id: Date.now().toString() }];
+export const getLocations = async (): Promise<Location[]> => {
+  try {
+    const dbLocations = await apiClient.get<any[]>('/locations');
+    // Map database format to frontend format
+    return dbLocations.map(loc => ({
+      id: loc.id.toString(),
+      lat: parseFloat(loc.lat),
+      lng: parseFloat(loc.lng),
+      name: loc.name,
+      type: loc.type
+    }));
+  } catch (error) {
+    console.error('Failed to fetch locations:', error);
+    return locations; // Fallback to mock data
+  }
 };
-export const deleteLocation = (name: string) => {
-    locations = locations.filter(l => l.name !== name);
+
+// Keep sync version for backward compatibility (will be deprecated)
+let locationsCache: Location[] = [...MOCK_LOCATIONS];
+getLocations().then(locs => locationsCache = locs).catch(() => {});
+
+export const getLocationsSync = () => locationsCache;
+
+export const addLocation = async (loc: Location) => {
+  try {
+    const dbLocation = await apiClient.post<any>('/locations', {
+      lat: loc.lat,
+      lng: loc.lng,
+      name: loc.name,
+      type: loc.type
+    });
+    locationsCache = [...locationsCache, {
+      id: dbLocation.id.toString(),
+      lat: parseFloat(dbLocation.lat),
+      lng: parseFloat(dbLocation.lng),
+      name: dbLocation.name,
+      type: dbLocation.type
+    }];
+  } catch (error) {
+    console.error('Failed to add location:', error);
+  }
+};
+
+export const deleteLocation = async (name: string) => {
+  try {
+    // Find location by name and delete by ID
+    const loc = locationsCache.find(l => l.name === name);
+    if (loc) {
+      await apiClient.delete(`/locations/${loc.id}`);
+      locationsCache = locationsCache.filter(l => l.name !== name);
+    }
+  } catch (error) {
+    console.error('Failed to delete location:', error);
+  }
 };
 
 // --- ROOM TYPES ---
@@ -285,35 +334,178 @@ export const importRoomsFromCSV = (csvContent: string): number => {
 
 
 // --- MENU ---
-export const getMenu = (categoryFilter?: 'Dining' | 'Spa' | 'Pool' | 'Butler') => {
-    if (categoryFilter) {
-        return menuItems.filter(item => item.category === categoryFilter);
-    }
-    return menuItems;
+export const getMenu = async (categoryFilter?: 'Dining' | 'Spa' | 'Pool' | 'Butler'): Promise<MenuItem[]> => {
+  try {
+    const endpoint = categoryFilter 
+      ? `/menu-items?category=${categoryFilter}` 
+      : '/menu-items';
+    const dbMenuItems = await apiClient.get<any[]>(endpoint);
+    // Map database format to frontend format
+    return dbMenuItems.map(item => ({
+      id: item.id.toString(),
+      name: item.name,
+      price: parseFloat(item.price),
+      category: item.category,
+      description: item.description || ''
+    }));
+  } catch (error) {
+    console.error('Failed to fetch menu items:', error);
+    return categoryFilter 
+      ? menuItems.filter(item => item.category === categoryFilter)
+      : menuItems; // Fallback to mock data
+  }
 };
-export const addMenuItem = (item: MenuItem) => {
-  menuItems = [...menuItems, { ...item, id: Date.now().toString() }];
+
+// Keep sync version for backward compatibility
+let menuItemsCache: MenuItem[] = menuItems;
+getMenu().then(items => menuItemsCache = items).catch(() => {});
+
+export const getMenuSync = (categoryFilter?: 'Dining' | 'Spa' | 'Pool' | 'Butler') => {
+  if (categoryFilter) {
+    return menuItemsCache.filter(item => item.category === categoryFilter);
+  }
+  return menuItemsCache;
 };
-export const deleteMenuItem = (id: string) => {
-    menuItems = menuItems.filter(m => m.id !== id);
+
+export const addMenuItem = async (item: MenuItem) => {
+  try {
+    const dbItem = await apiClient.post<any>('/menu-items', {
+      name: item.name,
+      price: item.price,
+      category: item.category,
+      description: item.description
+    });
+    menuItemsCache = [...menuItemsCache, {
+      id: dbItem.id.toString(),
+      name: dbItem.name,
+      price: parseFloat(dbItem.price),
+      category: dbItem.category,
+      description: dbItem.description || ''
+    }];
+  } catch (error) {
+    console.error('Failed to add menu item:', error);
+  }
+};
+
+export const deleteMenuItem = async (id: string) => {
+  try {
+    await apiClient.delete(`/menu-items/${id}`);
+    menuItemsCache = menuItemsCache.filter(m => m.id !== id);
+  } catch (error) {
+    console.error('Failed to delete menu item:', error);
+  }
 };
 
 // --- EVENTS ---
-export const getEvents = () => events;
-export const addEvent = (event: ResortEvent) => {
-    events = [...events, { ...event, id: Date.now().toString() }];
+export const getEvents = async (): Promise<ResortEvent[]> => {
+  try {
+    const dbEvents = await apiClient.get<any[]>('/resort-events');
+    // Map database format to frontend format
+    return dbEvents.map(event => ({
+      id: event.id.toString(),
+      title: event.title,
+      date: event.date,
+      time: event.time,
+      location: event.location,
+      description: event.description || ''
+    }));
+  } catch (error) {
+    console.error('Failed to fetch events:', error);
+    return events; // Fallback to mock data
+  }
 };
-export const deleteEvent = (id: string) => {
-    events = events.filter(e => e.id !== id);
+
+// Keep sync version for backward compatibility
+let eventsCache: ResortEvent[] = events;
+getEvents().then(evts => eventsCache = evts).catch(() => {});
+
+export const getEventsSync = () => eventsCache;
+
+export const addEvent = async (event: ResortEvent) => {
+  try {
+    const dbEvent = await apiClient.post<any>('/resort-events', {
+      title: event.title,
+      date: event.date,
+      time: event.time,
+      location: event.location,
+      description: event.description
+    });
+    eventsCache = [...eventsCache, {
+      id: dbEvent.id.toString(),
+      title: dbEvent.title,
+      date: dbEvent.date,
+      time: dbEvent.time,
+      location: dbEvent.location,
+      description: dbEvent.description || ''
+    }];
+  } catch (error) {
+    console.error('Failed to add event:', error);
+  }
+};
+
+export const deleteEvent = async (id: string) => {
+  try {
+    await apiClient.delete(`/resort-events/${id}`);
+    eventsCache = eventsCache.filter(e => e.id !== id);
+  } catch (error) {
+    console.error('Failed to delete event:', error);
+  }
 };
 
 // --- PROMOTIONS ---
-export const getPromotions = () => promotions;
-export const addPromotion = (promo: Promotion) => {
-    promotions = [...promotions, { ...promo, id: Date.now().toString(), imageColor: 'bg-emerald-500' }];
+export const getPromotions = async (): Promise<Promotion[]> => {
+  try {
+    const dbPromotions = await apiClient.get<any[]>('/promotions');
+    // Map database format to frontend format
+    return dbPromotions.map(promo => ({
+      id: promo.id.toString(),
+      title: promo.title,
+      description: promo.description || '',
+      discount: promo.discount,
+      validUntil: promo.valid_until,
+      imageColor: promo.image_color || 'bg-emerald-500'
+    }));
+  } catch (error) {
+    console.error('Failed to fetch promotions:', error);
+    return promotions; // Fallback to mock data
+  }
 };
-export const deletePromotion = (id: string) => {
-    promotions = promotions.filter(p => p.id !== id);
+
+// Keep sync version for backward compatibility
+let promotionsCache: Promotion[] = [...MOCK_PROMOTIONS];
+getPromotions().then(promos => promotionsCache = promos).catch(() => {});
+
+export const getPromotionsSync = () => promotionsCache;
+
+export const addPromotion = async (promo: Promotion) => {
+  try {
+    const dbPromo = await apiClient.post<any>('/promotions', {
+      title: promo.title,
+      description: promo.description,
+      discount: promo.discount,
+      valid_until: promo.validUntil,
+      image_color: promo.imageColor || 'bg-emerald-500'
+    });
+    promotionsCache = [...promotionsCache, {
+      id: dbPromo.id.toString(),
+      title: dbPromo.title,
+      description: dbPromo.description || '',
+      discount: dbPromo.discount,
+      validUntil: dbPromo.valid_until,
+      imageColor: dbPromo.image_color || 'bg-emerald-500'
+    }];
+  } catch (error) {
+    console.error('Failed to add promotion:', error);
+  }
+};
+
+export const deletePromotion = async (id: string) => {
+  try {
+    await apiClient.delete(`/promotions/${id}`);
+    promotionsCache = promotionsCache.filter(p => p.id !== id);
+  } catch (error) {
+    console.error('Failed to delete promotion:', error);
+  }
 };
 
 // --- KNOWLEDGE BASE (AI Training) ---
@@ -326,69 +518,162 @@ export const deleteKnowledgeItem = (id: string) => {
 };
 
 // --- RIDES (Buggy) ---
-export const getRides = () => rides;
+// Helper function to map database ride to frontend format
+const mapRideToFrontend = (dbRide: any): RideRequest => ({
+  id: dbRide.id.toString(),
+  guestName: dbRide.guest_name,
+  roomNumber: dbRide.room_number,
+  pickup: dbRide.pickup,
+  destination: dbRide.destination,
+  status: dbRide.status as BuggyStatus,
+  timestamp: dbRide.timestamp,
+  driverId: dbRide.driver_id?.toString(),
+  eta: dbRide.eta
+});
 
-export const requestRide = (guestName: string, roomNumber: string, pickup: string, destination: string): RideRequest => {
-  const newRide: RideRequest = {
-    id: Date.now().toString(),
-    guestName,
-    roomNumber,
-    pickup,
-    destination,
-    status: BuggyStatus.SEARCHING,
-    timestamp: Date.now()
-  };
-  rides = [...rides, newRide];
-  
-  // Notify drivers (mock: notify 'driver' user)
-  sendNotification('driver', 'New Ride Request', `Guest ${guestName} (Room ${roomNumber}) needs a ride.`, 'INFO');
-
-  return newRide;
-};
-
-export const updateRideStatus = (rideId: string, status: BuggyStatus, driverId?: string, eta?: number) => {
-  const ride = rides.find(r => r.id === rideId);
-  if (!ride) return;
-
-  rides = rides.map(r => {
-    if (r.id === rideId) {
-      return { 
-        ...r, 
-        status, 
-        driverId: driverId || r.driverId, 
-        eta: eta !== undefined ? eta : r.eta 
-      };
-    }
-    return r;
-  });
-
-  // Notify Guest of status change
-  if (status === BuggyStatus.ASSIGNED) {
-      sendNotification(ride.roomNumber, 'Buggy Assigned', `A driver is on the way. ETA: ${eta} mins.`, 'SUCCESS');
-  } else if (status === BuggyStatus.ARRIVING) {
-      sendNotification(ride.roomNumber, 'Buggy Arriving', `Your buggy has arrived at ${ride.pickup}.`, 'INFO');
-  } else if (status === BuggyStatus.COMPLETED) {
-      sendNotification(ride.roomNumber, 'Ride Completed', `You have arrived at ${ride.destination}. Have a nice day!`, 'SUCCESS');
+export const getRides = async (): Promise<RideRequest[]> => {
+  try {
+    const dbRides = await apiClient.get<any[]>('/ride-requests');
+    return dbRides.map(mapRideToFrontend);
+  } catch (error) {
+    console.error('Failed to fetch rides:', error);
+    return rides; // Fallback to mock data
   }
 };
 
-export const cancelRide = (rideId: string) => {
-    const ride = rides.find(r => r.id === rideId);
-    if (ride) {
-        // Notify guest confirming cancellation
-        sendNotification(ride.roomNumber, 'Ride Cancelled', 'Your buggy request has been cancelled.', 'WARNING');
-    }
-    rides = rides.filter(r => r.id !== rideId);
+export const requestRide = async (guestName: string, roomNumber: string, pickup: string, destination: string): Promise<RideRequest> => {
+  try {
+    const dbRide = await apiClient.post<any>('/ride-requests', {
+      guest_name: guestName,
+      room_number: roomNumber,
+      pickup,
+      destination,
+      status: 'SEARCHING',
+      timestamp: Date.now()
+    });
+    
+    const newRide = mapRideToFrontend(dbRide);
+    rides = [...rides, newRide];
+    
+    // Notify drivers (mock: notify 'driver' user)
+    sendNotification('driver', 'New Ride Request', `Guest ${guestName} (Room ${roomNumber}) needs a ride.`, 'INFO');
+
+    return newRide;
+  } catch (error) {
+    console.error('Failed to request ride:', error);
+    // Fallback to mock behavior
+    const newRide: RideRequest = {
+      id: Date.now().toString(),
+      guestName,
+      roomNumber,
+      pickup,
+      destination,
+      status: BuggyStatus.SEARCHING,
+      timestamp: Date.now()
+    };
+    rides = [...rides, newRide];
+    return newRide;
+  }
 };
 
-export const getActiveRideForUser = (roomNumber: string) => {
+export const updateRideStatus = async (rideId: string, status: BuggyStatus, driverId?: string, eta?: number) => {
+  try {
+    const updateData: any = { status };
+    if (driverId !== undefined) updateData.driver_id = parseInt(driverId);
+    if (eta !== undefined) updateData.eta = eta;
+    
+    await apiClient.put(`/ride-requests/${rideId}`, updateData);
+    
+    // Update local cache
+    rides = rides.map(r => {
+      if (r.id === rideId) {
+        return { 
+          ...r, 
+          status, 
+          driverId: driverId || r.driverId, 
+          eta: eta !== undefined ? eta : r.eta 
+        };
+      }
+      return r;
+    });
+
+    const ride = rides.find(r => r.id === rideId);
+    if (ride) {
+      // Notify Guest of status change
+      if (status === BuggyStatus.ASSIGNED) {
+          sendNotification(ride.roomNumber, 'Buggy Assigned', `A driver is on the way. ETA: ${eta} mins.`, 'SUCCESS');
+      } else if (status === BuggyStatus.ARRIVING) {
+          sendNotification(ride.roomNumber, 'Buggy Arriving', `Your buggy has arrived at ${ride.pickup}.`, 'INFO');
+      } else if (status === BuggyStatus.COMPLETED) {
+          sendNotification(ride.roomNumber, 'Ride Completed', `You have arrived at ${ride.destination}. Have a nice day!`, 'SUCCESS');
+      }
+    }
+  } catch (error) {
+    console.error('Failed to update ride status:', error);
+  }
+};
+
+export const cancelRide = async (rideId: string) => {
+  try {
+    await apiClient.delete(`/ride-requests/${rideId}`);
+    const ride = rides.find(r => r.id === rideId);
+    if (ride) {
+      sendNotification(ride.roomNumber, 'Ride Cancelled', 'Your buggy request has been cancelled.', 'WARNING');
+    }
+    rides = rides.filter(r => r.id !== rideId);
+  } catch (error) {
+    console.error('Failed to cancel ride:', error);
+  }
+};
+
+export const getActiveRideForUser = async (roomNumber: string): Promise<RideRequest | undefined> => {
+  try {
+    const dbRide = await apiClient.get<any>(`/ride-requests/room/${roomNumber}/active`);
+    return mapRideToFrontend(dbRide);
+  } catch (error: any) {
+    // 404 means no active ride, which is fine
+    if (error.message?.includes('404') || error.message?.includes('not found')) {
+      return undefined;
+    }
+    console.error('Failed to get active ride:', error);
+    // Fallback to local cache
     return rides.find(r => r.roomNumber === roomNumber && r.status !== BuggyStatus.COMPLETED);
+  }
 };
 
 // --- SERVICES ---
-export const getServiceRequests = () => serviceRequests;
-export const addServiceRequest = (req: ServiceRequest) => {
-    serviceRequests = [req, ...serviceRequests];
+// Helper function to map database service to frontend format
+const mapServiceToFrontend = (dbService: any): ServiceRequest => ({
+  id: dbService.id.toString(),
+  type: dbService.type,
+  status: dbService.status,
+  details: dbService.details,
+  roomNumber: dbService.room_number,
+  timestamp: dbService.timestamp
+});
+
+export const getServiceRequests = async (): Promise<ServiceRequest[]> => {
+  try {
+    const dbServices = await apiClient.get<any[]>('/service-requests');
+    return dbServices.map(mapServiceToFrontend);
+  } catch (error) {
+    console.error('Failed to fetch service requests:', error);
+    return serviceRequests; // Fallback to mock data
+  }
+};
+
+export const addServiceRequest = async (req: ServiceRequest): Promise<ServiceRequest> => {
+  try {
+    const dbService = await apiClient.post<any>('/service-requests', {
+      type: req.type,
+      status: 'PENDING',
+      details: req.details,
+      room_number: req.roomNumber,
+      timestamp: req.timestamp || Date.now()
+    });
+    
+    const newService = mapServiceToFrontend(dbService);
+    serviceRequests = [newService, ...serviceRequests];
     
     // Notify Guest
     sendNotification(req.roomNumber, 'Order Received', `We have received your ${req.type.toLowerCase()} request.`, 'INFO');
@@ -396,9 +681,20 @@ export const addServiceRequest = (req: ServiceRequest) => {
     // Notify Staff of that Department
     const readableType = req.type.charAt(0) + req.type.slice(1).toLowerCase(); // Dining, Spa, etc.
     notifyStaffByDepartment(readableType, 'New Service Request', `Room ${req.roomNumber}: ${req.details}`);
+    
+    return newService;
+  } catch (error) {
+    console.error('Failed to add service request:', error);
+    // Fallback to mock behavior
+    serviceRequests = [req, ...serviceRequests];
+    return req;
+  }
 };
 
-export const updateServiceStatus = (id: string, status: 'PENDING' | 'CONFIRMED' | 'COMPLETED') => {
+export const updateServiceStatus = async (id: string, status: 'PENDING' | 'CONFIRMED' | 'COMPLETED') => {
+  try {
+    await apiClient.put(`/service-requests/${id}`, { status });
+    
     const req = serviceRequests.find(s => s.id === id);
     if (!req) return;
 
@@ -410,6 +706,9 @@ export const updateServiceStatus = (id: string, status: 'PENDING' | 'CONFIRMED' 
     } else if (status === 'COMPLETED') {
         sendNotification(req.roomNumber, 'Order Completed', `Your ${req.type.toLowerCase()} service is complete.`, 'SUCCESS');
     }
+  } catch (error) {
+    console.error('Failed to update service status:', error);
+  }
 };
 
 export const rateServiceRequest = (id: string, rating: number, feedback: string) => {
@@ -442,27 +741,76 @@ export const getAllHotelReviews = () => hotelReviews;
 
 
 // --- UNIFIED HISTORY (Services + Buggy) ---
-export const getUnifiedHistory = (): ServiceRequest[] => {
+export const getUnifiedHistory = async (): Promise<ServiceRequest[]> => {
+  try {
+    // Fetch both services and rides
+    const [dbServices, dbRides] = await Promise.all([
+      apiClient.get<any[]>('/service-requests').catch(() => []),
+      apiClient.get<any[]>('/ride-requests').catch(() => [])
+    ]);
+    
+    // Map services
+    const services = dbServices.map(mapServiceToFrontend);
+    
     // Map rides to ServiceRequest shape
+    const buggyHistory: ServiceRequest[] = dbRides.map((r: any) => ({
+        id: r.id.toString(),
+        type: 'BUGGY',
+        status: r.status,
+        details: `From ${r.pickup} to ${r.destination} (${r.guest_name})`,
+        roomNumber: r.room_number,
+        timestamp: r.timestamp
+    }));
+
+    const combined = [...services, ...buggyHistory];
+    // Sort descending by timestamp
+    return combined.sort((a, b) => b.timestamp - a.timestamp);
+  } catch (error) {
+    console.error('Failed to fetch unified history:', error);
+    // Fallback to local cache
     const buggyHistory: ServiceRequest[] = rides.map(r => ({
         id: r.id,
         type: 'BUGGY',
-        status: r.status, // e.g. COMPLETED, ARRIVING...
+        status: r.status,
         details: `From ${r.pickup} to ${r.destination} (${r.guestName})`,
         roomNumber: r.roomNumber,
         timestamp: r.timestamp,
         rating: r.rating,
         feedback: r.feedback
     }));
-
     const combined = [...serviceRequests, ...buggyHistory];
-    // Sort descending by timestamp
     return combined.sort((a, b) => b.timestamp - a.timestamp);
+  }
 };
 
 // --- GUEST SPECIFIC DATA ---
-export const getGuestHistory = (roomNumber: string): ServiceRequest[] => {
-    return getUnifiedHistory().filter(req => req.roomNumber === roomNumber);
+export const getGuestHistory = async (roomNumber: string): Promise<ServiceRequest[]> => {
+  try {
+    // Fetch guest-specific data
+    const [dbServices, dbRides] = await Promise.all([
+      apiClient.get<any[]>(`/service-requests/room/${roomNumber}`).catch(() => []),
+      apiClient.get<any[]>(`/ride-requests/room/${roomNumber}`).catch(() => [])
+    ]);
+    
+    const services = dbServices.map(mapServiceToFrontend);
+    const buggyHistory: ServiceRequest[] = dbRides.map((r: any) => ({
+        id: r.id.toString(),
+        type: 'BUGGY',
+        status: r.status,
+        details: `From ${r.pickup} to ${r.destination} (${r.guest_name})`,
+        roomNumber: r.room_number,
+        timestamp: r.timestamp
+    }));
+    
+    const combined = [...services, ...buggyHistory];
+    return combined.sort((a, b) => b.timestamp - a.timestamp);
+  } catch (error) {
+    console.error('Failed to fetch guest history:', error);
+    // Fallback to local cache
+    return getUnifiedHistory().then(history => 
+      history.filter(req => req.roomNumber === roomNumber)
+    ).catch(() => []);
+  }
 };
 
 // --- SERVICE CHATS ---

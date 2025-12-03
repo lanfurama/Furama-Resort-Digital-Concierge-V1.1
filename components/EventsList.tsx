@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Calendar, MapPin, Clock } from 'lucide-react';
 import { getEvents } from '../services/dataService';
 import { ResortEvent } from '../types';
@@ -8,7 +8,11 @@ interface EventsListProps {
 }
 
 const EventsList: React.FC<EventsListProps> = ({ onBack }) => {
-    const events = getEvents();
+    const [events, setEvents] = useState<ResortEvent[]>([]);
+    
+    useEffect(() => {
+        getEvents().then(setEvents).catch(console.error);
+    }, []);
 
     // Helper to format date nicely
     const formatDate = (dateString: string) => {
