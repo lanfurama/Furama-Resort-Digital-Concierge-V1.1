@@ -108,6 +108,17 @@ const App: React.FC = () => {
       else if (serviceId === 'CHAT') setView(AppView.CHAT);
   };
 
+  // Debug: Log env vars on mount (only in development)
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      console.log('🔍 App mounted - Checking env vars...');
+      // @ts-ignore
+      const env = import.meta.env;
+      console.log('🔍 All import.meta.env keys:', Object.keys(env));
+      console.log('🔍 VITE_GEMINI_API_KEY:', env.VITE_GEMINI_API_KEY ? 'SET (' + env.VITE_GEMINI_API_KEY.length + ' chars)' : 'NOT SET');
+    }
+  }, []);
+
   if (view === AppView.LOGIN) {
     return (
       <div className="min-h-screen bg-stone-100 flex flex-col justify-center items-center p-6 relative overflow-hidden">

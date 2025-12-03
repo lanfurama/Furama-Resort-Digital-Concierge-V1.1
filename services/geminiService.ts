@@ -5,14 +5,22 @@ import { getEvents, getMenu, getPromotions, getKnowledgeBase, getRoomTypes } fro
 
 // Get API key from Vite environment variables (prefixed with VITE_)
 // Vite tự động expose các biến có prefix VITE_ vào import.meta.env
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+// Debug: Log available env vars (will be removed in production)
+if (typeof window !== 'undefined') {
+  console.log('🔍 Debug - Available env vars:', Object.keys(import.meta.env));
+  console.log('🔍 Debug - VITE_GEMINI_API_KEY exists:', !!import.meta.env.VITE_GEMINI_API_KEY);
+  console.log('🔍 Debug - VITE_GEMINI_API_KEY length:', import.meta.env.VITE_GEMINI_API_KEY?.length || 0);
+}
+
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || '';
 if (!apiKey) {
   const errorMsg = 'VITE_GEMINI_API_KEY is not set. Please set VITE_GEMINI_API_KEY in your Vercel environment variables and redeploy.';
-  console.error(errorMsg);
+  console.error('❌', errorMsg);
   console.error('Available env vars:', Object.keys(import.meta.env));
-  throw new Error(errorMsg);
+  // Don't throw immediately, allow app to load but show error
+  console.error('Gemini API features will not work until API key is set.');
 }
-const ai = new GoogleGenAI({ apiKey });
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // --- Admin AI Helpers ---
 
@@ -87,6 +95,10 @@ export const parseAdminInput = async (input: string, type: 'MENU_ITEM' | 'LOCATI
     };
   }
 
+  if (!ai) {
+    throw new Error('Gemini API is not initialized. Please set VITE_GEMINI_API_KEY environment variable.');
+  }
+  
   try {
     const response = await ai.models.generateContent({
       model,
@@ -115,6 +127,10 @@ export const createChatSession = () => {
   const events = getEvents().map(e => `Event: ${e.title} at ${e.time} on ${e.date} (${e.location})`).join('\n');
   const promos = getPromotions().map(p => `Promo: ${p.title} - ${p.description} (${p.discount})`).join('\n');
 
+  if (!ai) {
+    throw new Error('Gemini API is not initialized. Please set VITE_GEMINI_API_KEY environment variable.');
+  }
+  
   return ai.chats.create({
     model: 'gemini-2.5-flash',
     config: {
@@ -163,6 +179,10 @@ export const queryResortInfo = async (query: string, userLocation?: {lat: number
   const latitude = userLocation?.lat ?? RESORT_CENTER.lat;
   const longitude = userLocation?.lng ?? RESORT_CENTER.lng;
   
+  if (!ai) {
+    throw new Error('Gemini API is not initialized. Please set VITE_GEMINI_API_KEY environment variable.');
+  }
+  
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
@@ -188,6 +208,10 @@ export const queryResortInfo = async (query: string, userLocation?: {lat: number
 
 // --- TTS (Gemini 2.5 Flash TTS) ---
 export const speakText = async (text: string): Promise<AudioBuffer | null> => {
+  if (!ai) {
+    throw new Error('Gemini API is not initialized. Please set VITE_GEMINI_API_KEY environment variable.');
+  }
+  
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
@@ -266,6 +290,10 @@ export const connectLiveSession = async (
     onClose: () => void,
     onError: (err: any) => void
 ) => {
+    if (!ai) {
+      throw new Error('Gemini API is not initialized. Please set VITE_GEMINI_API_KEY environment variable.');
+    }
+    
     return ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         callbacks: {
