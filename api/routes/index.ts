@@ -1,0 +1,25 @@
+import { Router } from 'express';
+import userRoutes from './userRoutes.js';
+import locationRoutes from './locationRoutes.js';
+import menuItemRoutes from './menuItemRoutes.js';
+import promotionRoutes from './promotionRoutes.js';
+import knowledgeItemRoutes from './knowledgeItemRoutes.js';
+import resortEventRoutes from './resortEventRoutes.js';
+import rideRequestRoutes from './rideRequestRoutes.js';
+import serviceRequestRoutes from './serviceRequestRoutes.js';
+import chatMessageRoutes from './chatMessageRoutes.js';
+
+const router = Router();
+
+router.use('/users', userRoutes);
+router.use('/locations', locationRoutes);
+router.use('/menu-items', menuItemRoutes);
+router.use('/promotions', promotionRoutes);
+router.use('/knowledge-items', knowledgeItemRoutes);
+router.use('/resort-events', resortEventRoutes);
+router.use('/ride-requests', rideRequestRoutes);
+router.use('/service-requests', serviceRequestRoutes);
+router.use('/chat-messages', chatMessageRoutes);
+
+export default router;
+
