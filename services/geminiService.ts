@@ -4,9 +4,13 @@ import { RESORT_CENTER } from '../constants';
 import { getEvents, getMenu, getPromotions, getKnowledgeBase, getRoomTypes } from "./dataService";
 
 // Get API key from Vite environment variables (prefixed with VITE_)
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || '';
+// Vite tự động expose các biến có prefix VITE_ vào import.meta.env
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 if (!apiKey) {
-  console.warn('GEMINI_API_KEY is not set. Please set VITE_GEMINI_API_KEY in your environment variables.');
+  const errorMsg = 'VITE_GEMINI_API_KEY is not set. Please set VITE_GEMINI_API_KEY in your Vercel environment variables and redeploy.';
+  console.error(errorMsg);
+  console.error('Available env vars:', Object.keys(import.meta.env));
+  throw new Error(errorMsg);
 }
 const ai = new GoogleGenAI({ apiKey });
 

@@ -17,12 +17,8 @@ export default defineConfig(({ mode }) => {
         }
       },
       plugins: [react()],
-      define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'import.meta.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-      },
+      // Vite tự động expose các biến có prefix VITE_ vào import.meta.env
+      // Không cần define thủ công, chỉ cần đảm bảo VITE_GEMINI_API_KEY được set trong environment
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),
