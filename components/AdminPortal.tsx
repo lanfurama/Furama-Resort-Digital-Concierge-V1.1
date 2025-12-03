@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key } from 'lucide-react';
-import { getLocations, getLocationsSync, addLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, deletePromotion, getKnowledgeBase, addKnowledgeItem, deleteKnowledgeItem, getUsers, addUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory } from '../services/dataService';
+import { getLocations, getLocationsSync, addLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, addUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory } from '../services/dataService';
 import { parseAdminInput, generateTranslations } from '../services/geminiService';
 import { Location, MenuItem, ResortEvent, Promotion, KnowledgeItem, User, UserRole, Department, RoomType, Room } from '../types';
 
@@ -28,31 +28,70 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [locationsData, menuData, eventsData, promotionsData, roomTypesData] = await Promise.all([
-                    getLocations().catch(() => getLocationsSync()),
+                // Load locations first - CRITICAL for room types to match location IDs
+                let locationsData: Location[];
+                try {
+                    locationsData = await getLocations();
+                    console.log('Locations loaded from database:', locationsData);
+                } catch (error) {
+                    console.error('Failed to load locations from database, using sync:', error);
+                    locationsData = getLocationsSync();
+                }
+                
+                const [menuData, eventsData, promotionsData, roomTypesData] = await Promise.all([
                     getMenu().catch(() => getMenuSync()),
                     getEvents().catch(() => getEventsSync()),
                     getPromotions().catch(() => getPromotionsSync()),
                     getRoomTypes().catch(() => [])
                 ]);
                 
+                // Load knowledge items from API
+                let knowledgeData: KnowledgeItem[];
+                try {
+                    knowledgeData = await getKnowledgeBase();
+                    console.log('Knowledge items loaded from database:', knowledgeData);
+                } catch (error) {
+                    console.error('Failed to load knowledge items from database:', error);
+                    knowledgeData = getKnowledgeBaseSync();
+                }
+                
                 setLocations(locationsData);
                 setMenu(menuData);
                 setEvents(eventsData);
                 setPromotions(promotionsData);
                 setRoomTypes(roomTypesData);
-                setKnowledge([...getKnowledgeBase()]);
-                setUsers([...getUsers()]);
+                setKnowledge(knowledgeData);
+                // Load users from API
+                try {
+                    const usersData = await getUsers();
+                    setUsers(usersData);
+                    console.log('Users loaded from database:', usersData);
+                } catch (error) {
+                    console.error('Failed to load users from database:', error);
+                    setUsers(getUsersSync());
+                }
                 setServiceHistory([...getUnifiedHistory()]);
+                
+                // Debug: Check location ID matches
+                console.log('Data loaded - Checking location matches:', {
+                    locations: locationsData.map(l => ({ id: l.id, name: l.name })),
+                    roomTypes: roomTypesData.map(rt => ({
+                        id: rt.id,
+                        name: rt.name,
+                        locationId: rt.locationId,
+                        matchedLocation: rt.locationId ? locationsData.find(l => String(l.id) === String(rt.locationId))?.name || 'NOT FOUND' : 'NONE'
+                    }))
+                });
             } catch (error) {
                 console.error('Failed to load data:', error);
                 // Fallback to sync versions
-                setLocations(getLocationsSync());
+                const fallbackLocations = getLocationsSync();
+                setLocations(fallbackLocations);
                 setMenu(getMenuSync());
                 setEvents(getEventsSync());
                 setPromotions(getPromotionsSync());
-                setKnowledge([...getKnowledgeBase()]);
-                setUsers([...getUsers()]);
+                setKnowledge(getKnowledgeBaseSync());
+                setUsers(getUsersSync());
                 setServiceHistory([...getUnifiedHistory()]);
             }
         };
@@ -98,19 +137,28 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
 
     const refreshData = async () => {
         // Load data asynchronously from API
-        const [locationsData, menuData, eventsData, promotionsData] = await Promise.all([
+        const [locationsData, menuData, eventsData, promotionsData, knowledgeData] = await Promise.all([
             getLocations().catch(() => getLocationsSync()),
             getMenu().catch(() => getMenuSync()),
             getEvents().catch(() => getEventsSync()),
-            getPromotions().catch(() => getPromotionsSync())
+            getPromotions().catch(() => getPromotionsSync()),
+            getKnowledgeBase().catch(() => getKnowledgeBaseSync())
         ]);
         
         setLocations(locationsData);
         setMenu(menuData);
         setEvents(eventsData);
         setPromotions(promotionsData);
-        setKnowledge([...getKnowledgeBase()]);
-        setUsers([...getUsers()]);
+        setKnowledge(knowledgeData);
+        // Refresh users from API
+        try {
+            const usersData = await getUsers();
+            setUsers(usersData);
+            console.log('Users refreshed:', usersData);
+        } catch (error) {
+            console.error('Failed to refresh users:', error);
+            setUsers(getUsersSync());
+        }
         // Refresh room types and rooms asynchronously
         getRoomTypes().then(setRoomTypes).catch(console.error);
         getRooms().then(setRooms).catch(console.error);
@@ -150,86 +198,214 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         setIsParsing(false);
 
         if (result) {
-            if (tab === 'LOCATIONS') addLocation(result as Location);
-            else if (tab === 'MENU') addMenuItem(result as MenuItem);
-            else if (tab === 'EVENTS') addEvent(result as ResortEvent);
-            else if (tab === 'PROMOS') addPromotion(result as Promotion);
-            else if (tab === 'KNOWLEDGE') addKnowledgeItem(result as KnowledgeItem);
-            else if (tab === 'ROOMS' && roomView === 'LIST') {
+            try {
+                if (tab === 'LOCATIONS') await addLocation(result as Location);
+                else if (tab === 'MENU') {
+                    await addMenuItem(result as MenuItem);
+                    // Refresh menu specifically after adding
+                    try {
+                        const refreshedMenu = await getMenu();
+                        setMenu(refreshedMenu);
+                        console.log('Menu refreshed after add:', refreshedMenu);
+                    } catch (error) {
+                        console.error('Failed to refresh menu after add:', error);
+                    }
+                }
+                else if (tab === 'EVENTS') {
+                    await addEvent(result as ResortEvent);
+                    // Refresh events specifically after adding
+                    try {
+                        const refreshedEvents = await getEvents();
+                        setEvents(refreshedEvents);
+                        console.log('Events refreshed after add:', refreshedEvents);
+                    } catch (error) {
+                        console.error('Failed to refresh events after add:', error);
+                    }
+                }
+                else if (tab === 'PROMOS') {
+                    await addPromotion(result as Promotion);
+                    // Refresh promotions specifically after adding
+                    try {
+                        const refreshedPromotions = await getPromotions();
+                        setPromotions(refreshedPromotions);
+                        console.log('Promotions refreshed after add:', refreshedPromotions);
+                    } catch (error) {
+                        console.error('Failed to refresh promotions after add:', error);
+                    }
+                }
+                else if (tab === 'KNOWLEDGE') {
+                    await addKnowledgeItem(result as KnowledgeItem);
+                    // Refresh knowledge specifically after adding
+                    try {
+                        const refreshedKnowledge = await getKnowledgeBase();
+                        setKnowledge(refreshedKnowledge);
+                        console.log('Knowledge refreshed after add:', refreshedKnowledge);
+                    } catch (error) {
+                        console.error('Failed to refresh knowledge after add:', error);
+                    }
+                }
+                else if (tab === 'ROOMS' && roomView === 'LIST') {
                  // Map typeName to TypeId
                  const typeName = result.typeName;
                  const typeObj = roomTypes.find(rt => rt.name.toLowerCase() === typeName.toLowerCase());
                  if (typeObj) {
-                     addRoom({ id: '', number: result.number, typeId: typeObj.id, status: 'Available' });
+                     await addRoom({ id: '', number: result.number, typeId: typeObj.id, status: 'Available' });
                  } else {
                      alert(`Room Type '${typeName}' not found. Please create it first.`);
+                     return;
                  }
             }
             
-            refreshData();
+            await refreshData();
             setAiInput('');
             setShowAiInput(false);
+            } catch (error: any) {
+                console.error('Failed to add item:', error);
+                alert(`Failed to add item: ${error?.message || 'Unknown error'}. Please check console for details.`);
+            }
         }
     };
 
-    const handleAddUser = () => {
-        if (!newUser.lastName || !newUser.roomNumber) return;
-        addUser({
-            lastName: newUser.lastName,
-            roomNumber: newUser.roomNumber,
-            role: newUser.role || UserRole.STAFF,
-            department: newUser.department || 'All',
-            villaType: 'Staff'
-        });
-        setNewUser({ role: UserRole.STAFF, department: 'Dining' });
-        setShowUserForm(false);
-        refreshData();
+    const handleAddUser = async () => {
+        if (!newUser.lastName || !newUser.roomNumber) {
+            alert('Please enter both name and username.');
+            return;
+        }
+        try {
+            console.log('Adding user - Input:', newUser);
+            await addUser({
+                lastName: newUser.lastName,
+                roomNumber: newUser.roomNumber,
+                role: newUser.role || UserRole.STAFF,
+                department: newUser.department || 'All',
+                villaType: 'Staff',
+                password: '123' // Default password
+            });
+            console.log('User added successfully');
+            alert(`Staff "${newUser.lastName}" created successfully!`);
+            setNewUser({ role: UserRole.STAFF, department: 'Dining' });
+            setShowUserForm(false);
+            // Refresh users specifically after adding
+            try {
+                const refreshedUsers = await getUsers();
+                setUsers(refreshedUsers);
+                console.log('Users refreshed after add:', refreshedUsers);
+            } catch (error) {
+                console.error('Failed to refresh users after add:', error);
+            }
+            await refreshData();
+        } catch (error: any) {
+            console.error('Failed to add user:', error);
+            const errorMessage = error?.message || error?.toString() || 'Unknown error';
+            alert(`Failed to add user: ${errorMessage}. Please check console for details.`);
+        }
     };
 
-    const handleAddGuest = () => {
-        if (!newGuest.lastName || !newGuest.room) return;
-        addUser({
-            lastName: newGuest.lastName,
-            roomNumber: newGuest.room,
-            role: UserRole.GUEST,
-            department: 'All',
-            villaType: newGuest.type,
-            checkIn: newGuest.checkIn ? new Date(newGuest.checkIn).toISOString() : undefined,
-            checkOut: newGuest.checkOut ? new Date(newGuest.checkOut).toISOString() : undefined,
-            language: newGuest.language
-        });
-        setNewGuest({ lastName: '', room: '', type: 'Ocean Suite', checkIn: '', checkOut: '', language: 'English' });
-        setShowGuestForm(false);
-        refreshData();
+    const handleAddGuest = async () => {
+        if (!newGuest.lastName || !newGuest.room) {
+            alert('Please enter both last name and room number.');
+            return;
+        }
+        try {
+            console.log('Adding guest - Input:', newGuest);
+            await addUser({
+                lastName: newGuest.lastName,
+                roomNumber: newGuest.room,
+                role: UserRole.GUEST,
+                department: 'All',
+                villaType: newGuest.type,
+                checkIn: newGuest.checkIn ? new Date(newGuest.checkIn).toISOString() : undefined,
+                checkOut: newGuest.checkOut ? new Date(newGuest.checkOut).toISOString() : undefined,
+                language: newGuest.language
+            });
+            console.log('Guest added successfully');
+            alert(`Guest "${newGuest.lastName}" created successfully!`);
+            setNewGuest({ lastName: '', room: '', type: 'Ocean Suite', checkIn: '', checkOut: '', language: 'English' });
+            setShowGuestForm(false);
+            // Refresh users specifically after adding
+            try {
+                const refreshedUsers = await getUsers();
+                setUsers(refreshedUsers);
+                console.log('Users refreshed after add:', refreshedUsers);
+            } catch (error) {
+                console.error('Failed to refresh users after add:', error);
+            }
+            await refreshData();
+        } catch (error: any) {
+            console.error('Failed to add guest:', error);
+            const errorMessage = error?.message || error?.toString() || 'Unknown error';
+            alert(`Failed to add guest: ${errorMessage}. Please check console for details.`);
+        }
     };
 
     const handleAddRoomType = async () => {
-        if (!newRoomType.name) return;
+        if (!newRoomType.name) {
+            alert('Please enter a room type name.');
+            return;
+        }
         try {
             if (editingRoomType) {
                 // Update existing room type
-                await updateRoomType(editingRoomType.id, {
+                console.log('Updating room type - Editing:', editingRoomType);
+                console.log('Updating room type - New Data:', newRoomType);
+                const updated = await updateRoomType(editingRoomType.id, {
                     name: newRoomType.name,
                     description: newRoomType.description || '',
-                    locationId: newRoomType.locationId
+                    locationId: newRoomType.locationId || '' // Ensure it's a string, empty string will be converted to null
                 });
+                console.log('Room type updated successfully:', updated);
                 setEditingRoomType(null);
+                alert(`Room type "${updated.name}" updated successfully!`);
             } else {
                 // Create new room type
-                await addRoomType({
+                console.log('Creating new room type - Input:', newRoomType);
+                const created = await addRoomType({
                     id: '', // Handled by service
                     name: newRoomType.name,
                     description: newRoomType.description || '',
-                    locationId: newRoomType.locationId
+                    locationId: newRoomType.locationId || '' // Ensure it's a string, empty string will be converted to null
                 });
+                console.log('Room type created successfully:', created);
+                alert(`Room type "${created.name}" created successfully!`);
             }
             setNewRoomType({ name: '', description: '', locationId: '' });
             setShowRoomTypeForm(false);
-            // Refresh room types
-            getRoomTypes().then(setRoomTypes).catch(console.error);
-        } catch (error) {
+            // Refresh room types and locations to ensure data is in sync
+            let refreshedLocations: Location[];
+            try {
+                refreshedLocations = await getLocations();
+                console.log('Locations refreshed from database:', refreshedLocations);
+            } catch (error) {
+                console.error('Failed to refresh locations from database:', error);
+                refreshedLocations = getLocationsSync();
+            }
+            
+            const refreshedRoomTypes = await getRoomTypes();
+            setRoomTypes(refreshedRoomTypes);
+            setLocations(refreshedLocations);
+            
+            console.log('Room types refreshed:', refreshedRoomTypes);
+            console.log('Locations refreshed:', refreshedLocations);
+            console.log('Checking location matches:', refreshedRoomTypes.map(rt => ({
+                name: rt.name,
+                locationId: rt.locationId,
+                locationIdType: typeof rt.locationId,
+                matchedLocation: rt.locationId ? refreshedLocations.find(l => {
+                    const match = String(l.id) === String(rt.locationId);
+                    if (!match && rt.locationId) {
+                        console.log('Location ID mismatch:', {
+                            roomTypeLocationId: rt.locationId,
+                            locationIdType: typeof rt.locationId,
+                            availableLocationIds: refreshedLocations.map(l => ({ id: l.id, idType: typeof l.id, name: l.name }))
+                        });
+                    }
+                    return match;
+                })?.name || 'NOT FOUND' : 'NONE'
+            })));
+        } catch (error: any) {
             console.error('Failed to save room type:', error);
-            alert('Failed to save room type. Please try again.');
+            const errorMessage = error?.message || error?.toString() || 'Unknown error';
+            alert(`Failed to save room type: ${errorMessage}. Please check the console for details.`);
         }
     };
 
@@ -280,15 +456,31 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         }
     };
 
-    const processCsvImport = () => {
+    const processCsvImport = async () => {
         if (!csvFile) return;
         const reader = new FileReader();
-        reader.onload = (evt) => {
+        reader.onload = async (evt) => {
             if (evt.target?.result) {
-                const count = importGuestsFromCSV(evt.target.result as string);
-                alert(`Successfully imported ${count} guests.`);
-                refreshData();
-                setCsvFile(null);
+                try {
+                    console.log('Starting CSV import...');
+                    const count = await importGuestsFromCSV(evt.target.result as string);
+                    console.log(`CSV import completed: ${count} guests imported`);
+                    alert(`Successfully imported ${count} guests.`);
+                    // Refresh users specifically after import
+                    try {
+                        const refreshedUsers = await getUsers();
+                        setUsers(refreshedUsers);
+                        console.log('Users refreshed after CSV import:', refreshedUsers);
+                    } catch (error) {
+                        console.error('Failed to refresh users after CSV import:', error);
+                    }
+                    await refreshData();
+                    setCsvFile(null);
+                } catch (error: any) {
+                    console.error('Failed to import CSV:', error);
+                    const errorMessage = error?.message || error?.toString() || 'Unknown error';
+                    alert(`Failed to import CSV: ${errorMessage}. Please check console for details.`);
+                }
             }
         };
         reader.readAsText(csvFile);
@@ -329,19 +521,84 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     };
 
     const handleDelete = async (id: string, type: 'LOC' | 'ITEM' | 'EVENT' | 'PROMO' | 'KNOW' | 'USER' | 'ROOM_TYPE' | 'ROOM') => {
+        if (!confirm(`Are you sure you want to delete this ${type === 'ROOM_TYPE' ? 'room type' : type.toLowerCase()}?`)) {
+            return;
+        }
         try {
             if (type === 'LOC') await deleteLocation(id);
             else if (type === 'ITEM') await deleteMenuItem(id);
-            else if (type === 'EVENT') await deleteEvent(id);
-            else if (type === 'PROMO') await deletePromotion(id);
-            else if (type === 'KNOW') await deleteKnowledgeItem(id);
-            else if (type === 'USER') await deleteUser(id);
-            else if (type === 'ROOM_TYPE') await deleteRoomType(id);
+            else if (type === 'EVENT') {
+                await deleteEvent(id);
+                // Refresh events specifically after deleting
+                try {
+                    const refreshedEvents = await getEvents();
+                    setEvents(refreshedEvents);
+                    console.log('Events refreshed after delete:', refreshedEvents);
+                } catch (error) {
+                    console.error('Failed to refresh events after delete:', error);
+                }
+            }
+            else if (type === 'PROMO') {
+                await deletePromotion(id);
+                // Refresh promotions specifically after deleting
+                try {
+                    const refreshedPromotions = await getPromotions();
+                    setPromotions(refreshedPromotions);
+                    console.log('Promotions refreshed after delete:', refreshedPromotions);
+                } catch (error) {
+                    console.error('Failed to refresh promotions after delete:', error);
+                }
+            }
+            else if (type === 'KNOW') {
+                await deleteKnowledgeItem(id);
+                // Refresh knowledge specifically after deleting
+                try {
+                    const refreshedKnowledge = await getKnowledgeBase();
+                    setKnowledge(refreshedKnowledge);
+                    console.log('Knowledge refreshed after delete:', refreshedKnowledge);
+                } catch (error) {
+                    console.error('Failed to refresh knowledge after delete:', error);
+                }
+            }
+            else if (type === 'USER') {
+                await deleteUser(id);
+                // Refresh users specifically after deleting
+                try {
+                    const refreshedUsers = await getUsers();
+                    setUsers(refreshedUsers);
+                    console.log('Users refreshed after delete:', refreshedUsers);
+                } catch (error) {
+                    console.error('Failed to refresh users after delete:', error);
+                }
+            }
+            else if (type === 'ROOM_TYPE') {
+                console.log('Deleting room type:', id);
+                await deleteRoomType(id);
+                console.log('Room type deleted successfully');
+            }
             else if (type === 'ROOM') await deleteRoom(id);
-            refreshData();
-        } catch (error) {
+            
+            // Refresh data after successful delete
+            await refreshData();
+            
+            // Also refresh specific data if needed
+            if (type === 'ROOM_TYPE') {
+                const refreshedRoomTypes = await getRoomTypes();
+                setRoomTypes(refreshedRoomTypes);
+            } else if (type === 'ITEM') {
+                // Refresh menu specifically after deleting menu item
+                try {
+                    const refreshedMenu = await getMenu();
+                    setMenu(refreshedMenu);
+                    console.log('Menu refreshed after delete:', refreshedMenu);
+                } catch (error) {
+                    console.error('Failed to refresh menu after delete:', error);
+                }
+            }
+        } catch (error: any) {
             console.error('Failed to delete:', error);
-            alert('Failed to delete. Please try again.');
+            const errorMessage = error?.message || error?.toString() || 'Unknown error';
+            alert(`Failed to delete: ${errorMessage}. Please check the console for details.`);
         }
     };
 
@@ -956,9 +1213,20 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                     // Both IDs are strings, but ensure proper comparison
                                     const linkedLoc = rt.locationId 
                                         ? locations.find(l => {
-                                            const locIdStr = String(l.id || '');
-                                            const rtLocIdStr = String(rt.locationId || '');
-                                            return locIdStr === rtLocIdStr && locIdStr !== '';
+                                            const locIdStr = String(l.id || '').trim();
+                                            const rtLocIdStr = String(rt.locationId || '').trim();
+                                            const match = locIdStr === rtLocIdStr && locIdStr !== '';
+                                            if (rt.locationId && !match) {
+                                                console.log('Location ID mismatch:', {
+                                                    roomTypeId: rt.id,
+                                                    roomTypeName: rt.name,
+                                                    roomTypeLocationId: rt.locationId,
+                                                    rtLocIdStr,
+                                                    locations: locations.map(l => ({ id: l.id, name: l.name })),
+                                                    tryingToMatch: locIdStr
+                                                });
+                                            }
+                                            return match;
                                         })
                                         : null;
                                     return (
@@ -973,7 +1241,9 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                                         <MapPin size={14} className="mr-1"/> {linkedLoc.name}
                                                     </span>
                                                 ) : (
-                                                    <span className="text-sm text-gray-400 italic">Unlinked</span>
+                                                    <span className="text-sm text-gray-400 italic">
+                                                        {rt.locationId ? `Unlinked (ID: ${rt.locationId})` : 'Unlinked'}
+                                                    </span>
                                                 )}
                                             </td>
                                             <td className="p-4 text-right">
@@ -1208,11 +1478,29 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 Cancel
                             </button>
                             <button 
-                                onClick={() => {
+                                onClick={async () => {
                                     if(resetPasswordUserId && resetNewPassword) {
-                                        resetUserPassword(resetPasswordUserId, resetNewPassword);
-                                        setResetPasswordUserId(null);
-                                        refreshData();
+                                        try {
+                                            console.log('Resetting password for user:', resetPasswordUserId);
+                                            await resetUserPassword(resetPasswordUserId, resetNewPassword);
+                                            console.log('Password reset successfully');
+                                            alert('Password reset successfully!');
+                                            setResetPasswordUserId(null);
+                                            setResetNewPassword('');
+                                            // Refresh users specifically after reset
+                                            try {
+                                                const refreshedUsers = await getUsers();
+                                                setUsers(refreshedUsers);
+                                                console.log('Users refreshed after password reset:', refreshedUsers);
+                                            } catch (error) {
+                                                console.error('Failed to refresh users after password reset:', error);
+                                            }
+                                            await refreshData();
+                                        } catch (error: any) {
+                                            console.error('Failed to reset password:', error);
+                                            const errorMessage = error?.message || error?.toString() || 'Unknown error';
+                                            alert(`Failed to reset password: ${errorMessage}. Please check console for details.`);
+                                        }
                                     }
                                 }} 
                                 className="px-4 py-2 bg-emerald-600 text-white rounded font-bold"

@@ -4,7 +4,11 @@ import { RESORT_CENTER } from '../constants';
 import { getEvents, getMenu, getPromotions, getKnowledgeBase, getRoomTypes } from "./dataService";
 import { ContentTranslation } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+if (!apiKey) {
+  console.error('VITE_GEMINI_API_KEY is not set. Please check your .env file.');
+}
+const ai = new GoogleGenAI({ apiKey });
 
 // --- Admin AI Helpers ---
 
