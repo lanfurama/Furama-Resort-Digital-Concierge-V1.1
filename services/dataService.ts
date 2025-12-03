@@ -1223,7 +1223,41 @@ export const deleteKnowledgeItem = async (id: string): Promise<void> => {
 };
 
 // --- RIDES (Buggy) ---
-export const getRides = () => rides;
+export const getRides = async (): Promise<RideRequest[]> => {
+  try {
+    console.log('Fetching rides from API...');
+    const dbRides = await apiClient.get<any[]>('/ride-requests');
+    console.log('Rides API response:', dbRides);
+    
+    const mapped = dbRides.map(r => ({
+      id: r.id.toString(),
+      guestName: r.guest_name || r.guestName || 'Guest',
+      roomNumber: r.room_number || r.roomNumber,
+      pickup: r.pickup,
+      destination: r.destination,
+      status: r.status as BuggyStatus,
+      timestamp: r.timestamp || (r.created_at ? new Date(r.created_at).getTime() : Date.now()),
+      driverId: r.driver_id ? r.driver_id.toString() : undefined,
+      eta: r.eta || undefined,
+      pickedUpAt: r.picked_up_at ? new Date(r.picked_up_at).getTime() : undefined,
+      completedAt: r.completed_at ? new Date(r.completed_at).getTime() : undefined,
+      rating: r.rating || undefined,
+      feedback: r.feedback || undefined
+    }));
+    
+    console.log('Mapped rides:', mapped);
+    // Update local cache
+    rides = mapped;
+    return mapped;
+  } catch (error) {
+    console.error('Failed to fetch rides from API:', error);
+    console.warn('Falling back to mock rides. This means rides are NOT loaded from database!');
+    return rides; // Fallback to mock data
+  }
+};
+
+// Sync version for backward compatibility
+export const getRidesSync = () => rides;
 
 export const requestRide = async (guestName: string, roomNumber: string, pickup: string, destination: string): Promise<RideRequest> => {
   try {
@@ -1271,59 +1305,184 @@ export const requestRide = async (guestName: string, roomNumber: string, pickup:
 };
 
 // Driver creates ride manually (e.g. walk-in guest)
-export const createManualRide = (driverId: string, roomNumber: string, pickup: string, destination: string): RideRequest => {
-    // Try to find guest name if room number exists
-    const guest = users.find(u => u.roomNumber === roomNumber && u.role === UserRole.GUEST);
-    const guestName = guest ? guest.lastName : (roomNumber ? `Guest ${roomNumber}` : 'Walk-in Guest');
+export const createManualRide = async (driverId: string, roomNumber: string, pickup: string, destination: string): Promise<RideRequest> => {
+    try {
+        // Try to find guest name if room number exists
+        const allUsers = await getUsers().catch(() => getUsersSync());
+        const guest = allUsers.find(u => u.roomNumber === roomNumber && u.role === UserRole.GUEST);
+        const guestName = guest ? guest.lastName : (roomNumber ? `Guest ${roomNumber}` : 'Walk-in Guest');
 
-    const newRide: RideRequest = {
-        id: Date.now().toString(),
-        guestName: guestName,
-        roomNumber: roomNumber || 'Walk-in',
-        pickup,
-        destination,
-        status: BuggyStatus.ASSIGNED, // Directly assigned to the driver
-        driverId: driverId,
-        timestamp: Date.now(),
-        eta: 0 // Assume driver is there
-    };
-    
-    rides = [...rides, newRide];
-    return newRide;
+        const requestBody = {
+            guest_name: guestName,
+            room_number: roomNumber || 'Walk-in',
+            pickup,
+            destination,
+            status: 'ASSIGNED', // Directly assigned to the driver
+            driver_id: parseInt(driverId) || null,
+            timestamp: Date.now(),
+            eta: 0 // Assume driver is there
+        };
+        
+        console.log('Creating manual ride via API - Input:', { driverId, roomNumber, pickup, destination });
+        console.log('Creating manual ride via API - Request Body:', requestBody);
+        
+        const dbRide = await apiClient.post<any>('/ride-requests', requestBody);
+        
+        console.log('Manual ride created successfully - API Response:', dbRide);
+        
+        const mappedRide: RideRequest = {
+            id: dbRide.id.toString(),
+            guestName: dbRide.guest_name,
+            roomNumber: dbRide.room_number,
+            pickup: dbRide.pickup,
+            destination: dbRide.destination,
+            status: dbRide.status as BuggyStatus,
+            timestamp: dbRide.timestamp || (dbRide.created_at ? new Date(dbRide.created_at).getTime() : Date.now()),
+            driverId: dbRide.driver_id ? dbRide.driver_id.toString() : driverId,
+            eta: dbRide.eta || 0
+        };
+        
+        // Update local cache
+        rides = [mappedRide, ...rides];
+        console.log('Manual ride added to local cache:', mappedRide);
+        return mappedRide;
+    } catch (error: any) {
+        console.error('Failed to create manual ride via API:', error);
+        console.error('Error details:', {
+            message: error?.message,
+            response: error?.response,
+            status: error?.response?.status,
+            body: error?.response?.body
+        });
+        console.warn('Falling back to local mock data. Ride will NOT be saved to database!');
+        // Fallback to local state
+        const allUsers = getUsersSync();
+        const guest = allUsers.find(u => u.roomNumber === roomNumber && u.role === UserRole.GUEST);
+        const guestName = guest ? guest.lastName : (roomNumber ? `Guest ${roomNumber}` : 'Walk-in Guest');
+        
+        const newRide: RideRequest = {
+            id: Date.now().toString(),
+            guestName: guestName,
+            roomNumber: roomNumber || 'Walk-in',
+            pickup,
+            destination,
+            status: BuggyStatus.ASSIGNED,
+            driverId: driverId,
+            timestamp: Date.now(),
+            eta: 0
+        };
+        
+        rides = [...rides, newRide];
+        throw error; // Re-throw để component có thể handle error
+    }
 };
 
-export const updateRideStatus = (rideId: string, status: BuggyStatus, driverId?: string, eta?: number) => {
-  const ride = rides.find(r => r.id === rideId);
-  if (!ride) return;
-
-  rides = rides.map(r => {
-    if (r.id === rideId) {
-      const updatedRide = { 
-        ...r, 
-        status, 
-        driverId: driverId || r.driverId, 
-        eta: eta !== undefined ? eta : r.eta 
-      };
-
-      if (status === BuggyStatus.ON_TRIP && !updatedRide.pickedUpAt) {
-          updatedRide.pickedUpAt = Date.now();
-      }
-      if (status === BuggyStatus.COMPLETED && !updatedRide.completedAt) {
-          updatedRide.completedAt = Date.now();
-      }
-
-      return updatedRide;
+export const updateRideStatus = async (rideId: string, status: BuggyStatus, driverId?: string, eta?: number): Promise<void> => {
+  try {
+    const ride = rides.find(r => r.id === rideId);
+    if (!ride) {
+      console.warn(`Ride ${rideId} not found in local cache`);
+      return;
     }
-    return r;
-  });
 
-  // Notify Guest of status change
-  if (status === BuggyStatus.ASSIGNED) {
-      sendNotification(ride.roomNumber, 'Buggy Assigned', `A driver is on the way. ETA: ${eta} mins.`, 'SUCCESS');
-  } else if (status === BuggyStatus.ARRIVING) {
-      sendNotification(ride.roomNumber, 'Buggy Arriving', `Your buggy has arrived at ${ride.pickup}.`, 'INFO');
-  } else if (status === BuggyStatus.COMPLETED) {
-      sendNotification(ride.roomNumber, 'Ride Completed', `You have arrived at ${ride.destination}. Have a nice day!`, 'SUCCESS');
+    const updateData: any = {
+      status: status
+    };
+
+    if (driverId !== undefined) {
+      updateData.driver_id = parseInt(driverId) || null;
+    }
+    if (eta !== undefined) {
+      updateData.eta = eta;
+    }
+
+    // Handle timestamp updates for status changes
+    if (status === BuggyStatus.ON_TRIP && !ride.pickedUpAt) {
+      // Note: picked_up_at might be handled by backend, but we can set it here if needed
+    }
+    if (status === BuggyStatus.COMPLETED && !ride.completedAt) {
+      // Note: completed_at might be handled by backend, but we can set it here if needed
+    }
+
+    console.log('Updating ride status via API - Ride ID:', rideId);
+    console.log('Updating ride status via API - Update Data:', updateData);
+
+    const dbRide = await apiClient.put<any>(`/ride-requests/${rideId}`, updateData);
+
+    console.log('Ride status updated successfully - API Response:', dbRide);
+
+    // Map database response to frontend format
+    const updatedRide: RideRequest = {
+      id: dbRide.id.toString(),
+      guestName: dbRide.guest_name || ride.guestName,
+      roomNumber: dbRide.room_number || ride.roomNumber,
+      pickup: dbRide.pickup || ride.pickup,
+      destination: dbRide.destination || ride.destination,
+      status: dbRide.status as BuggyStatus,
+      timestamp: dbRide.timestamp || ride.timestamp,
+      driverId: dbRide.driver_id ? dbRide.driver_id.toString() : (driverId || ride.driverId),
+      eta: dbRide.eta !== undefined ? dbRide.eta : (eta !== undefined ? eta : ride.eta),
+      pickedUpAt: dbRide.picked_up_at ? new Date(dbRide.picked_up_at).getTime() : (status === BuggyStatus.ON_TRIP && !ride.pickedUpAt ? Date.now() : ride.pickedUpAt),
+      completedAt: dbRide.completed_at ? new Date(dbRide.completed_at).getTime() : (status === BuggyStatus.COMPLETED && !ride.completedAt ? Date.now() : ride.completedAt),
+      rating: dbRide.rating || ride.rating,
+      feedback: dbRide.feedback || ride.feedback
+    };
+
+    // Update local cache
+    rides = rides.map(r => r.id === rideId ? updatedRide : r);
+    console.log('Ride updated in local cache:', updatedRide);
+
+    // Notify Guest of status change
+    if (status === BuggyStatus.ASSIGNED) {
+        sendNotification(ride.roomNumber, 'Buggy Assigned', `A driver is on the way. ETA: ${eta} mins.`, 'SUCCESS');
+    } else if (status === BuggyStatus.ARRIVING) {
+        sendNotification(ride.roomNumber, 'Buggy Arriving', `Your buggy has arrived at ${ride.pickup}.`, 'INFO');
+    } else if (status === BuggyStatus.COMPLETED) {
+        sendNotification(ride.roomNumber, 'Ride Completed', `You have arrived at ${ride.destination}. Have a nice day!`, 'SUCCESS');
+    }
+  } catch (error: any) {
+    console.error('Failed to update ride status via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
+    console.warn('Falling back to local mock data. Ride status will NOT be updated in database!');
+    // Fallback to local state
+    const ride = rides.find(r => r.id === rideId);
+    if (!ride) return;
+
+    rides = rides.map(r => {
+      if (r.id === rideId) {
+        const updatedRide = { 
+          ...r, 
+          status, 
+          driverId: driverId || r.driverId, 
+          eta: eta !== undefined ? eta : r.eta 
+        };
+
+        if (status === BuggyStatus.ON_TRIP && !updatedRide.pickedUpAt) {
+            updatedRide.pickedUpAt = Date.now();
+        }
+        if (status === BuggyStatus.COMPLETED && !updatedRide.completedAt) {
+            updatedRide.completedAt = Date.now();
+        }
+
+        return updatedRide;
+      }
+      return r;
+    });
+
+    // Notify Guest of status change
+    if (status === BuggyStatus.ASSIGNED) {
+        sendNotification(ride.roomNumber, 'Buggy Assigned', `A driver is on the way. ETA: ${eta} mins.`, 'SUCCESS');
+    } else if (status === BuggyStatus.ARRIVING) {
+        sendNotification(ride.roomNumber, 'Buggy Arriving', `Your buggy has arrived at ${ride.pickup}.`, 'INFO');
+    } else if (status === BuggyStatus.COMPLETED) {
+        sendNotification(ride.roomNumber, 'Ride Completed', `You have arrived at ${ride.destination}. Have a nice day!`, 'SUCCESS');
+    }
+    throw error; // Re-throw để component có thể handle error
   }
 };
 
@@ -1442,7 +1601,64 @@ export const addServiceRequest = async (req: ServiceRequest): Promise<ServiceReq
   }
 };
 
-export const updateServiceStatus = (id: string, status: 'PENDING' | 'CONFIRMED' | 'COMPLETED') => {
+export const updateServiceStatus = async (id: string, status: 'PENDING' | 'CONFIRMED' | 'COMPLETED'): Promise<void> => {
+  try {
+    // Try to find request in local cache for notification purposes
+    const req = serviceRequests.find(s => s.id === id);
+    
+    const updateData: any = {
+      status: status
+    };
+
+    console.log('Updating service request status via API - Request ID:', id);
+    console.log('Updating service request status via API - Update Data:', updateData);
+
+    const dbRequest = await apiClient.put<any>(`/service-requests/${id}`, updateData);
+
+    console.log('Service request status updated successfully - API Response:', dbRequest);
+
+    // Map database response to frontend format
+    const updatedRequest: ServiceRequest = {
+      id: dbRequest.id.toString(),
+      type: dbRequest.type,
+      status: dbRequest.status,
+      details: dbRequest.details || '',
+      items: req?.items || [], // Keep items from original request if available
+      roomNumber: dbRequest.room_number || req?.roomNumber || '',
+      timestamp: dbRequest.timestamp || (dbRequest.created_at ? new Date(dbRequest.created_at).getTime() : Date.now()),
+      confirmedAt: dbRequest.confirmed_at ? new Date(dbRequest.confirmed_at).getTime() : (req?.confirmedAt || undefined),
+      completedAt: dbRequest.completed_at ? new Date(dbRequest.completed_at).getTime() : (req?.completedAt || undefined),
+      rating: dbRequest.rating || req?.rating || undefined,
+      feedback: dbRequest.feedback || req?.feedback || undefined
+    };
+
+    // Update local cache
+    const existingIndex = serviceRequests.findIndex(s => s.id === id);
+    if (existingIndex >= 0) {
+      serviceRequests[existingIndex] = updatedRequest;
+    } else {
+      serviceRequests = [updatedRequest, ...serviceRequests];
+    }
+    console.log('Service request updated in local cache:', updatedRequest);
+
+    // Notify Guest of status change
+    const roomNumber = updatedRequest.roomNumber;
+    const requestType = updatedRequest.type.toLowerCase();
+    if (status === 'CONFIRMED') {
+        sendNotification(roomNumber, 'Order Confirmed', `Your ${requestType} request has been confirmed.`, 'SUCCESS');
+    } else if (status === 'COMPLETED') {
+        sendNotification(roomNumber, 'Order Completed', `Your ${requestType} service is complete.`, 'SUCCESS');
+    }
+  } catch (error: any) {
+    console.error('Failed to update service request status via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
+    console.warn('Falling back to local mock data. Service request status will NOT be updated in database!');
+    // Fallback to local state
     const req = serviceRequests.find(s => s.id === id);
     if (!req) return;
 
@@ -1463,6 +1679,8 @@ export const updateServiceStatus = (id: string, status: 'PENDING' | 'CONFIRMED' 
     } else if (status === 'COMPLETED') {
         sendNotification(req.roomNumber, 'Order Completed', `Your ${req.type.toLowerCase()} service is complete.`, 'SUCCESS');
     }
+    throw error; // Re-throw để component có thể handle error
+  }
 };
 
 export const rateServiceRequest = async (id: string, rating: number, feedback: string): Promise<void> => {
@@ -1746,19 +1964,20 @@ export const sendServiceMessage = async (roomNumber: string, service: string, te
 };
 
 // --- DASHBOARD ANALYTICS (Supervisor) ---
-export const getDashboardStats = () => {
+export const getDashboardStats = async () => {
     // 1. Guests
-    const activeGuests = users.filter(u => u.role === UserRole.GUEST).length;
+    const allUsers = await getUsers().catch(() => getUsersSync());
+    const activeGuests = allUsers.filter(u => u.role === UserRole.GUEST).length;
     
     // 2. Services Stats
-    const allRequests = getServiceRequests();
+    const allRequests = await getServiceRequests().catch(() => []);
     const pendingDining = allRequests.filter(r => r.type === 'DINING' && r.status === 'PENDING').length;
     const pendingSpa = allRequests.filter(r => r.type === 'SPA' && r.status === 'PENDING').length;
     const pendingPool = allRequests.filter(r => r.type === 'POOL' && r.status === 'PENDING').length;
     const pendingButler = allRequests.filter(r => r.type === 'BUTLER' && r.status === 'PENDING').length;
 
     // 3. Buggies
-    const allRides = getRides();
+    const allRides = await getRides().catch(() => getRidesSync());
     const activeBuggies = allRides.filter(r => r.status === BuggyStatus.ON_TRIP || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ASSIGNED).length;
     const searchingBuggies = allRides.filter(r => r.status === BuggyStatus.SEARCHING).length;
 
@@ -1774,7 +1993,7 @@ export const getDashboardStats = () => {
     const totalRevenue = diningRev + spaRev;
 
     // 5. Activity Feed (Unified & Sorted)
-    const recentActivity = getUnifiedHistory().filter(r => r.timestamp > todayStart.getTime()).slice(0, 10);
+    const recentActivity = (await getUnifiedHistory().catch(() => [])).filter(r => r.timestamp > todayStart.getTime()).slice(0, 10);
 
     return {
         activeGuests,

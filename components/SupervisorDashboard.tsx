@@ -4,16 +4,48 @@ import { getDashboardStats } from '../services/dataService';
 import { Users, AlertCircle, Car, DollarSign, Clock, Activity, Utensils, Sparkles, Waves, User as UserIcon } from 'lucide-react';
 
 const SupervisorDashboard: React.FC = () => {
-    const [stats, setStats] = useState(getDashboardStats());
+    // Initialize with default values to prevent null errors
+    const [stats, setStats] = useState<any>({
+        activeGuests: 0,
+        pendingDining: 0,
+        pendingSpa: 0,
+        pendingPool: 0,
+        pendingButler: 0,
+        activeBuggies: 0,
+        searchingBuggies: 0,
+        totalRevenue: 0,
+        todayCompletedCount: 0,
+        recentActivity: []
+    });
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        // Load initial stats
+        const loadStats = async () => {
+            try {
+                setIsLoading(true);
+                const initialStats = await getDashboardStats();
+                setStats(initialStats);
+            } catch (error) {
+                console.error('Failed to load dashboard stats:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        loadStats();
+
         // Real-time clock
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         
         // Poll stats
-        const dataPoller = setInterval(() => {
-            setStats(getDashboardStats());
+        const dataPoller = setInterval(async () => {
+            try {
+                const newStats = await getDashboardStats();
+                setStats(newStats);
+            } catch (error) {
+                console.error('Failed to update dashboard stats:', error);
+            }
         }, 3000); // Update every 3 seconds
 
         return () => {
@@ -30,13 +62,37 @@ const SupervisorDashboard: React.FC = () => {
         return { color: 'bg-red-500', text: 'Overload' };
     };
 
-    const diningHealth = getHealthStatus(stats.pendingDining);
-    const spaHealth = getHealthStatus(stats.pendingSpa);
-    const buggyHealth = getHealthStatus(stats.searchingBuggies);
+    // Safe access with default values
+    const pendingDining = stats?.pendingDining || 0;
+    const pendingSpa = stats?.pendingSpa || 0;
+    const pendingPool = stats?.pendingPool || 0;
+    const pendingButler = stats?.pendingButler || 0;
+    const searchingBuggies = stats?.searchingBuggies || 0;
+    const activeBuggies = stats?.activeBuggies || 0;
+    const activeGuests = stats?.activeGuests || 0;
+    const totalRevenue = stats?.totalRevenue || 0;
+    const todayCompletedCount = stats?.todayCompletedCount || 0;
+    const recentActivity = stats?.recentActivity || [];
+
+    const diningHealth = getHealthStatus(pendingDining);
+    const spaHealth = getHealthStatus(pendingSpa);
+    const buggyHealth = getHealthStatus(searchingBuggies);
 
     // Calculate chart percentages
-    const totalPending = stats.pendingDining + stats.pendingSpa + stats.pendingPool + stats.pendingButler;
-    const maxVal = Math.max(stats.pendingDining, stats.pendingSpa, stats.pendingPool, stats.pendingButler, 1);
+    const totalPending = pendingDining + pendingSpa + pendingPool + pendingButler;
+    const maxVal = Math.max(pendingDining, pendingSpa, pendingPool, pendingButler, 1);
+
+    // Show loading state
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading dashboard...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -62,7 +118,7 @@ const SupervisorDashboard: React.FC = () => {
                 <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-emerald-500 flex justify-between items-center">
                     <div>
                         <p className="text-xs text-gray-500 uppercase font-bold">Total Guests</p>
-                        <h3 className="text-3xl font-bold text-gray-800">{stats.activeGuests}</h3>
+                        <h3 className="text-3xl font-bold text-gray-800">{activeGuests}</h3>
                     </div>
                     <div className="p-3 bg-emerald-50 rounded-full text-emerald-600">
                         <Users size={24} />
@@ -72,8 +128,8 @@ const SupervisorDashboard: React.FC = () => {
                 <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-500 flex justify-between items-center">
                     <div>
                         <p className="text-xs text-gray-500 uppercase font-bold">Pending Actions</p>
-                        <h3 className="text-3xl font-bold text-gray-800">{totalPending + stats.searchingBuggies}</h3>
-                        <p className="text-[10px] text-amber-600">{stats.searchingBuggies} waiting for buggy</p>
+                        <h3 className="text-3xl font-bold text-gray-800">{totalPending + searchingBuggies}</h3>
+                        <p className="text-[10px] text-amber-600">{searchingBuggies} waiting for buggy</p>
                     </div>
                     <div className="p-3 bg-amber-50 rounded-full text-amber-600">
                         <AlertCircle size={24} />
@@ -83,7 +139,7 @@ const SupervisorDashboard: React.FC = () => {
                 <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-blue-500 flex justify-between items-center">
                     <div>
                         <p className="text-xs text-gray-500 uppercase font-bold">Active Rides</p>
-                        <h3 className="text-3xl font-bold text-gray-800">{stats.activeBuggies}</h3>
+                        <h3 className="text-3xl font-bold text-gray-800">{activeBuggies}</h3>
                         <p className="text-[10px] text-blue-600">On trip or arriving</p>
                     </div>
                     <div className="p-3 bg-blue-50 rounded-full text-blue-600">
@@ -94,8 +150,8 @@ const SupervisorDashboard: React.FC = () => {
                 <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-purple-500 flex justify-between items-center">
                     <div>
                         <p className="text-xs text-gray-500 uppercase font-bold">Est. Daily Rev</p>
-                        <h3 className="text-3xl font-bold text-gray-800">${stats.totalRevenue}</h3>
-                        <p className="text-[10px] text-purple-600">{stats.todayCompletedCount} completed orders</p>
+                        <h3 className="text-3xl font-bold text-gray-800">${totalRevenue}</h3>
+                        <p className="text-[10px] text-purple-600">{todayCompletedCount} completed orders</p>
                     </div>
                     <div className="p-3 bg-purple-50 rounded-full text-purple-600">
                         <DollarSign size={24} />
@@ -113,7 +169,7 @@ const SupervisorDashboard: React.FC = () => {
                             <div className="p-6 text-center">
                                 <div className="flex justify-center mb-2 text-orange-600"><Utensils /></div>
                                 <h4 className="font-bold text-gray-800">Dining</h4>
-                                <div className="text-xs text-gray-500 mb-3">{stats.pendingDining} orders pending</div>
+                                <div className="text-xs text-gray-500 mb-3">{pendingDining} orders pending</div>
                                 <div className={`inline-block px-3 py-1 rounded-full text-xs text-white font-bold ${diningHealth.color}`}>
                                     {diningHealth.text}
                                 </div>
@@ -121,7 +177,7 @@ const SupervisorDashboard: React.FC = () => {
                             <div className="p-6 text-center">
                                 <div className="flex justify-center mb-2 text-purple-600"><Sparkles /></div>
                                 <h4 className="font-bold text-gray-800">Spa</h4>
-                                <div className="text-xs text-gray-500 mb-3">{stats.pendingSpa} bookings pending</div>
+                                <div className="text-xs text-gray-500 mb-3">{pendingSpa} bookings pending</div>
                                 <div className={`inline-block px-3 py-1 rounded-full text-xs text-white font-bold ${spaHealth.color}`}>
                                     {spaHealth.text}
                                 </div>
@@ -129,7 +185,7 @@ const SupervisorDashboard: React.FC = () => {
                             <div className="p-6 text-center">
                                 <div className="flex justify-center mb-2 text-emerald-600"><Car /></div>
                                 <h4 className="font-bold text-gray-800">Buggy</h4>
-                                <div className="text-xs text-gray-500 mb-3">{stats.searchingBuggies} requests pending</div>
+                                <div className="text-xs text-gray-500 mb-3">{searchingBuggies} requests pending</div>
                                 <div className={`inline-block px-3 py-1 rounded-full text-xs text-white font-bold ${buggyHealth.color}`}>
                                     {buggyHealth.text}
                                 </div>
@@ -142,10 +198,10 @@ const SupervisorDashboard: React.FC = () => {
                          <h3 className="font-bold text-gray-700 mb-6">Service Demand Distribution</h3>
                          <div className="space-y-4">
                             {[
-                                { label: 'Dining', val: stats.pendingDining, color: 'bg-orange-500' },
-                                { label: 'Spa', val: stats.pendingSpa, color: 'bg-purple-500' },
-                                { label: 'Pool', val: stats.pendingPool, color: 'bg-blue-500' },
-                                { label: 'Butler', val: stats.pendingButler, color: 'bg-slate-500' },
+                                { label: 'Dining', val: pendingDining, color: 'bg-orange-500' },
+                                { label: 'Spa', val: pendingSpa, color: 'bg-purple-500' },
+                                { label: 'Pool', val: pendingPool, color: 'bg-blue-500' },
+                                { label: 'Butler', val: pendingButler, color: 'bg-slate-500' },
                             ].map((item) => (
                                 <div key={item.label} className="flex items-center text-sm">
                                     <span className="w-16 font-semibold text-gray-600">{item.label}</span>
@@ -171,10 +227,10 @@ const SupervisorDashboard: React.FC = () => {
                         </span>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {stats.recentActivity.length === 0 ? (
+                        {recentActivity.length === 0 ? (
                             <div className="text-center text-gray-400 mt-20 text-sm">No activity today yet.</div>
                         ) : (
-                            stats.recentActivity.map((item, i) => (
+                            recentActivity.map((item, i) => (
                                 <div key={item.id} className="flex items-start space-x-3 pb-3 border-b border-gray-50 last:border-0">
                                     <div className="mt-1">
                                         {item.type === 'DINING' && <div className="p-1.5 bg-orange-100 text-orange-600 rounded-full"><Utensils size={12}/></div>}

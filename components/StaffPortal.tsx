@@ -17,41 +17,87 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
 
     useEffect(() => {
         // Initial fetch
-        const initialRequests = getServiceRequests();
-        prevRequestCount.current = initialRequests.length;
-        setRequests(initialRequests);
-        checkUnread(initialRequests);
-
-        const interval = setInterval(() => {
-            const currentRequests = getServiceRequests();
-            
-            // Check for new orders
-            if (currentRequests.length > prevRequestCount.current) {
-                setNewOrderAlert(true);
+        const loadInitialRequests = async () => {
+            try {
+                const initialRequests = await getServiceRequests();
+                prevRequestCount.current = initialRequests.length;
+                setRequests(initialRequests);
+                await checkUnread(initialRequests);
+            } catch (error) {
+                console.error('Failed to load initial requests:', error);
+                setRequests([]);
             }
-            prevRequestCount.current = currentRequests.length;
+        };
+        loadInitialRequests();
 
-            setRequests(currentRequests);
-            checkUnread(currentRequests);
-        }, 1000);
+        const interval = setInterval(async () => {
+            try {
+                const currentRequests = await getServiceRequests();
+                
+                // Check for new orders
+                if (currentRequests.length > prevRequestCount.current) {
+                    setNewOrderAlert(true);
+                }
+                prevRequestCount.current = currentRequests.length;
+
+                setRequests(currentRequests);
+                await checkUnread(currentRequests);
+            } catch (error) {
+                console.error('Failed to refresh requests:', error);
+            }
+        }, 2000); // Poll every 2 seconds instead of 1 second
         return () => clearInterval(interval);
     }, []);
 
-    const checkUnread = (reqs: ServiceRequest[]) => {
+    const checkUnread = async (reqs: ServiceRequest[]) => {
         const newUnread = new Set<string>();
-        reqs.forEach(req => {
-            const lastMsg = getLastMessage(req.roomNumber, req.type);
-            // If the last message exists and was sent by 'user' (Guest), it is unread for Staff
-            if (lastMsg && lastMsg.role === 'user') {
-                newUnread.add(`${req.roomNumber}_${req.type}`);
+        for (const req of reqs) {
+            try {
+                const lastMsg = await getLastMessage(req.roomNumber, req.type);
+                // If the last message exists and was sent by 'user' (Guest), it is unread for Staff
+                if (lastMsg && lastMsg.role === 'user') {
+                    newUnread.add(`${req.roomNumber}_${req.type}`);
+                }
+            } catch (error) {
+                console.error(`Failed to check unread for ${req.roomNumber}_${req.type}:`, error);
             }
-        });
+        }
         setUnreadChats(newUnread);
     };
 
-    const handleAction = (id: string, newStatus: 'CONFIRMED' | 'COMPLETED') => {
-        updateServiceStatus(id, newStatus);
-        setRequests(getServiceRequests()); // Force refresh
+    const handleAction = async (id: string, newStatus: 'CONFIRMED' | 'COMPLETED', event?: React.MouseEvent<HTMLButtonElement>) => {
+        try {
+            console.log(`Updating service request ${id} to ${newStatus}`);
+            
+            // Show loading state
+            if (event?.currentTarget) {
+                const button = event.currentTarget;
+                button.disabled = true;
+                const originalText = button.textContent;
+                button.textContent = 'Updating...';
+                
+                // Re-enable button after operation (in finally block)
+                setTimeout(() => {
+                    button.disabled = false;
+                    if (originalText) button.textContent = originalText;
+                }, 2000);
+            }
+            
+            await updateServiceStatus(id, newStatus);
+            console.log('Service status updated successfully');
+            
+            // Show success message
+            alert(`Order ${newStatus.toLowerCase()} successfully!`);
+            
+            // Force refresh
+            const refreshedRequests = await getServiceRequests();
+            setRequests(refreshedRequests);
+            await checkUnread(refreshedRequests);
+        } catch (error: any) {
+            console.error('Failed to update service status:', error);
+            const errorMessage = error?.message || error?.response?.body?.error || 'Unknown error';
+            alert(`Failed to update service status: ${errorMessage}. Please check console for details.`);
+        }
     };
 
     const handleNewOrderClick = () => {
@@ -208,16 +254,24 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                             <div className="grid grid-cols-2 gap-2">
                                 {req.status === 'PENDING' && (
                                     <button 
-                                       onClick={() => handleAction(req.id, 'CONFIRMED')}
-                                       className="col-span-2 bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700"
+                                       onClick={(e) => {
+                                           e.preventDefault();
+                                           e.stopPropagation();
+                                           handleAction(req.id, 'CONFIRMED', e);
+                                       }}
+                                       className="col-span-2 bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Confirm
                                     </button>
                                 )}
                                 {req.status === 'CONFIRMED' && (
                                     <button 
-                                       onClick={() => handleAction(req.id, 'COMPLETED')}
-                                       className="col-span-2 bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700"
+                                       onClick={(e) => {
+                                           e.preventDefault();
+                                           e.stopPropagation();
+                                           handleAction(req.id, 'COMPLETED', e);
+                                       }}
+                                       className="col-span-2 bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Complete
                                     </button>

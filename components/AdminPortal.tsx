@@ -70,7 +70,15 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     console.error('Failed to load users from database:', error);
                     setUsers(getUsersSync());
                 }
-                setServiceHistory([...getUnifiedHistory()]);
+                // Load service history from API
+                try {
+                    const historyData = await getUnifiedHistory();
+                    setServiceHistory(historyData);
+                    console.log('Service history loaded from database:', historyData);
+                } catch (error) {
+                    console.error('Failed to load service history from database:', error);
+                    setServiceHistory([]);
+                }
                 
                 // Debug: Check location ID matches
                 console.log('Data loaded - Checking location matches:', {
@@ -92,7 +100,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 setPromotions(getPromotionsSync());
                 setKnowledge(getKnowledgeBaseSync());
                 setUsers(getUsersSync());
-                setServiceHistory([...getUnifiedHistory()]);
+                // Try to load service history from API even in fallback
+                getUnifiedHistory().then(setServiceHistory).catch(() => setServiceHistory([]));
             }
         };
         
@@ -162,7 +171,15 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         // Refresh room types and rooms asynchronously
         getRoomTypes().then(setRoomTypes).catch(console.error);
         getRooms().then(setRooms).catch(console.error);
-        setServiceHistory([...getUnifiedHistory()]);
+        // Refresh service history from API
+        try {
+            const historyData = await getUnifiedHistory();
+            setServiceHistory(historyData);
+            console.log('Service history refreshed:', historyData);
+        } catch (error) {
+            console.error('Failed to refresh service history:', error);
+            setServiceHistory([]);
+        }
     };
 
     const handleAiSubmit = async () => {
