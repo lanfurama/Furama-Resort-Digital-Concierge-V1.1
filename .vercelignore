@@ -1,6 +1,6 @@
-api/config/
-api/controllers/
-api/models/
-api/routes/
+api/config
+api/controllers
+api/models
+api/routes
 api/server.ts
 
