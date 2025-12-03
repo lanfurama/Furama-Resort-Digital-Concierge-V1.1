@@ -1,0 +1,8 @@
+{
+  "name": "Furama Resort Digital Concierge V1.1",
+  "description": "A comprehensive resort companion app for Furama Resort & Villas Da Nang, featuring buggy booking, internal services, and an AI-powered concierge using Gemini Live and Maps.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}
