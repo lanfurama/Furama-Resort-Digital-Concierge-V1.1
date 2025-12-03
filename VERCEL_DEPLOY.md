@@ -18,11 +18,20 @@ git push
 
 ### 2. Kết nối với Vercel
 1. Vào [vercel.com](https://vercel.com)
-2. Import repository từ GitHub
-3. Vercel sẽ tự động detect:
+2. Click **"Add New..."** → **"Project"**
+3. Import repository từ GitHub (chọn repository của bạn)
+4. **Nếu repository là PRIVATE:**
+   - Vercel sẽ yêu cầu bạn **authorize GitHub**
+   - Click **"Authorize Vercel"** hoặc **"Grant Access"**
+   - Chọn quyền truy cập: **"All repositories"** hoặc **"Only select repositories"**
+   - Nếu chọn "Only select repositories", chọn repository của bạn
+   - Click **"Authorize"** hoặc **"Install"**
+5. Vercel sẽ tự động detect:
    - Framework: Vite
    - Build Command: `npm run build`
    - Output Directory: `dist`
+6. **QUAN TRỌNG:** Đảm bảo **"Production Branch"** được set đúng (thường là `main` hoặc `master`)
+7. **QUAN TRỌNG:** Đảm bảo **"Auto-Deploy"** được bật (ON) trong Settings → Git
 
 ### 3. Thêm Environment Variables
 Trong Vercel Dashboard → Settings → Environment Variables, thêm các biến sau:
@@ -80,4 +89,15 @@ Click "Deploy" và Vercel sẽ tự động:
 **Lưu ý**: Với cấu hình hiện tại, API routes sẽ có path `/api/api/v1/...` vì Vercel route `/api/*` đến `api/index.js` và trong đó lại có `/api/v1`. 
 
 Nếu muốn API path là `/api/v1/...` trực tiếp, cần điều chỉnh routing trong `api/index.js`.
+
+## ⚠️ Auto-Deploy không hoạt động?
+
+Nếu Vercel không tự động deploy khi bạn push code, xem file **`VERCEL_AUTO_DEPLOY.md`** để troubleshoot.
+
+**Các nguyên nhân thường gặp:**
+1. Repository chưa được kết nối với Vercel
+2. Auto-Deploy chưa được bật trong Settings → Git
+3. Đang push vào branch sai (không phải Production Branch)
+4. GitHub webhook chưa được setup đúng
+5. Build đang fail (kiểm tra logs trong Deployments tab)
 

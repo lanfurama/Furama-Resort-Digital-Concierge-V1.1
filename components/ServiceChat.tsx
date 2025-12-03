@@ -45,18 +45,22 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
 
     // Poll for new messages (simulating real-time)
     useEffect(() => {
-        const fetch = () => {
-            const msgs = getServiceMessages(roomNumber, serviceType);
+        const fetch = async () => {
+            try {
+                const msgs = await getServiceMessages(roomNumber, serviceType);
             // Simple check to avoid tight loops if object ref changes but content is same
-            if (msgs.length !== messages.length) {
+                if (msgs.length !== messages.length || JSON.stringify(msgs) !== JSON.stringify(messages)) {
                 setMessages(msgs);
+                }
+            } catch (error) {
+                console.error('Failed to fetch messages:', error);
             }
         };
 
         fetch();
-        const interval = setInterval(fetch, 1000);
+        const interval = setInterval(fetch, 3000); // Poll every 3 seconds
         return () => clearInterval(interval);
-    }, [roomNumber, serviceType, messages.length]);
+    }, [roomNumber, serviceType]);
 
     // Handle Auto-Translation when messages change or target language changes
     useEffect(() => {
@@ -75,7 +79,9 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
             
             await Promise.all(msgsToTranslate.map(async (msg) => {
                 const translated = await translateText(msg.text, targetLang);
-                newTranslations[msg.id] = translated;
+                if (translated) {
+                    newTranslations[msg.id] = translated;
+                }
             }));
 
             setTranslatedCache(prev => ({ ...prev, ...newTranslations }));
@@ -91,10 +97,19 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
         }
     }, [messages, isOpen]);
 
-    const handleSend = () => {
+    const handleSend = async () => {
         if (!input.trim()) return;
-        sendServiceMessage(roomNumber, serviceType, input, userRole as 'user' | 'staff');
+        const messageText = input;
         setInput('');
+        try {
+            await sendServiceMessage(roomNumber, serviceType, messageText, userRole as 'user' | 'staff');
+            // Refresh messages after sending
+            const msgs = await getServiceMessages(roomNumber, serviceType);
+            setMessages(msgs);
+        } catch (error) {
+            console.error('Failed to send message:', error);
+            setInput(messageText); // Restore input on error
+        }
     };
 
     const handleClose = () => {

@@ -7,6 +7,7 @@ export enum AppView {
   CHAT = 'CHAT',
   LIVE_CONCIERGE = 'LIVE_CONCIERGE',
   ACCOUNT = 'ACCOUNT', // New View
+  ACTIVE_ORDERS = 'ACTIVE_ORDERS', // New View for Cart
   // Service Sub-views
   DINING_ORDER = 'DINING_ORDER',
   SPA_BOOKING = 'SPA_BOOKING',
@@ -40,6 +41,7 @@ export interface User {
   // Guest Access Control
   checkIn?: string; // ISO Date String
   checkOut?: string; // ISO Date String
+  language?: string; // Preferred Language
   notes?: string; // Guest personal notes/preferences
 }
 
@@ -57,12 +59,20 @@ export interface Room {
   status?: 'Available' | 'Occupied' | 'Maintenance';
 }
 
+// Translation Helper Interface
+export interface ContentTranslation {
+    [langCode: string]: {
+        [field: string]: string;
+    }
+}
+
 export interface MenuItem {
   id: string;
   name: string;
   price: number;
   category: string; // 'Dining' | 'Spa' | 'Pool' | 'Butler'
   description: string;
+  translations?: ContentTranslation;
 }
 
 export interface ResortEvent {
@@ -72,6 +82,7 @@ export interface ResortEvent {
   time: string;
   location: string;
   description: string;
+  translations?: ContentTranslation;
 }
 
 export interface Promotion {
@@ -81,6 +92,7 @@ export interface Promotion {
   discount?: string;
   validUntil?: string;
   imageColor?: string; // For UI styling mock
+  translations?: ContentTranslation;
 }
 
 export interface KnowledgeItem {
@@ -111,6 +123,8 @@ export interface RideRequest {
   eta?: number;
   rating?: number;   // 1-5
   feedback?: string;
+  pickedUpAt?: number;
+  completedAt?: number;
 }
 
 export interface ServiceRequest {
@@ -118,8 +132,11 @@ export interface ServiceRequest {
   type: 'DINING' | 'SPA' | 'POOL' | 'BUTLER' | 'HOUSEKEEPING' | 'BUGGY';
   status: string;
   details: string;
+  items?: MenuItem[]; // Stored items to support dynamic translation display
   roomNumber: string;
   timestamp: number;
+  confirmedAt?: number; // Timestamp when staff confirmed
+  completedAt?: number; // Timestamp when service completed
   rating?: number;   // 1-5 Stars
   feedback?: string; // User comment
 }

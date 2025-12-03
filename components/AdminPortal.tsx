@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key } from 'lucide-react';
 import { getLocations, addLocation, deleteLocation, getMenu, addMenuItem, deleteMenuItem, getEvents, addEvent, deleteEvent, getPromotions, addPromotion, deletePromotion, getKnowledgeBase, addKnowledgeItem, deleteKnowledgeItem, getUsers, addUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory } from '../services/dataService';
-import { parseAdminInput } from '../services/geminiService';
+import { parseAdminInput, generateTranslations } from '../services/geminiService';
 import { Location, MenuItem, ResortEvent, Promotion, KnowledgeItem, User, UserRole, Department, RoomType, Room } from '../types';
 
 interface AdminPortalProps {
@@ -14,14 +14,20 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const [tab, setTab] = useState<'LOCATIONS' | 'MENU' | 'EVENTS' | 'PROMOS' | 'KNOWLEDGE' | 'USERS' | 'GUESTS' | 'ROOMS' | 'HISTORY'>('LOCATIONS');
     
     // Data State
-    const [locations, setLocations] = useState(getLocations());
-    const [menu, setMenu] = useState(getMenu());
-    const [events, setEvents] = useState(getEvents());
-    const [promotions, setPromotions] = useState(getPromotions());
+    const [locations, setLocations] = useState(getLocationsSync());
+    const [menu, setMenu] = useState(getMenuSync());
+    const [events, setEvents] = useState(getEventsSync());
+    const [promotions, setPromotions] = useState(getPromotionsSync());
     const [knowledge, setKnowledge] = useState(getKnowledgeBase());
     const [users, setUsers] = useState(getUsers());
-    const [roomTypes, setRoomTypes] = useState(getRoomTypes());
-    const [rooms, setRooms] = useState(getRooms());
+    const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
+    const [rooms, setRooms] = useState<Room[]>([]);
+    
+    // Load room types and rooms on mount
+    useEffect(() => {
+        getRoomTypes().then(setRoomTypes).catch(console.error);
+        getRooms().then(setRooms).catch(console.error);
+    }, []);
     const [serviceHistory, setServiceHistory] = useState(getUnifiedHistory());
     
     // UI State
@@ -40,8 +46,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
 
     // Guest Management State
     const [showGuestForm, setShowGuestForm] = useState(false);
-    const [newGuest, setNewGuest] = useState<{lastName: string, room: string, type: string, checkIn: string, checkOut: string}>({
-        lastName: '', room: '', type: 'Ocean Suite', checkIn: '', checkOut: ''
+    const [newGuest, setNewGuest] = useState<{lastName: string, room: string, type: string, checkIn: string, checkOut: string, language: string}>({
+        lastName: '', room: '', type: 'Ocean Suite', checkIn: '', checkOut: '', language: 'English'
     });
     const [csvFile, setCsvFile] = useState<File | null>(null);
 
@@ -58,15 +64,16 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const [historyFilterType, setHistoryFilterType] = useState<string>('ALL');
     const [historyFilterDate, setHistoryFilterDate] = useState<string>('');
 
-    const refreshData = () => {
+    const refreshData = async () => {
         setLocations([...getLocations()]);
         setMenu([...getMenu()]);
         setEvents([...getEvents()]);
         setPromotions([...getPromotions()]);
         setKnowledge([...getKnowledgeBase()]);
         setUsers([...getUsers()]);
-        setRoomTypes([...getRoomTypes()]);
-        setRooms([...getRooms()]);
+        // Refresh room types and rooms asynchronously
+        getRoomTypes().then(setRoomTypes).catch(console.error);
+        getRooms().then(setRooms).catch(console.error);
         setServiceHistory([...getUnifiedHistory()]);
     };
 
@@ -82,6 +89,24 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         if (tab === 'ROOMS' && roomView === 'LIST') type = 'ROOM_INVENTORY';
 
         const result = await parseAdminInput(aiInput, type);
+        
+        // Auto-Translate Content if applicable
+        if (result && (tab === 'MENU' || tab === 'EVENTS' || tab === 'PROMOS')) {
+             let contentToTranslate: Record<string, string> = {};
+             if (tab === 'MENU') {
+                 contentToTranslate = { name: result.name, description: result.description };
+             } else if (tab === 'EVENTS') {
+                 contentToTranslate = { title: result.title, description: result.description, location: result.location };
+             } else if (tab === 'PROMOS') {
+                 contentToTranslate = { title: result.title, description: result.description, discount: result.discount };
+             }
+
+             if (Object.keys(contentToTranslate).length > 0) {
+                 const translations = await generateTranslations(contentToTranslate);
+                 result.translations = translations;
+             }
+        }
+
         setIsParsing(false);
 
         if (result) {
@@ -130,16 +155,18 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             department: 'All',
             villaType: newGuest.type,
             checkIn: newGuest.checkIn ? new Date(newGuest.checkIn).toISOString() : undefined,
-            checkOut: newGuest.checkOut ? new Date(newGuest.checkOut).toISOString() : undefined
+            checkOut: newGuest.checkOut ? new Date(newGuest.checkOut).toISOString() : undefined,
+            language: newGuest.language
         });
-        setNewGuest({ lastName: '', room: '', type: 'Ocean Suite', checkIn: '', checkOut: '' });
+        setNewGuest({ lastName: '', room: '', type: 'Ocean Suite', checkIn: '', checkOut: '', language: 'English' });
         setShowGuestForm(false);
         refreshData();
     };
 
-    const handleAddRoomType = () => {
+    const handleAddRoomType = async () => {
         if (!newRoomType.name) return;
-        addRoomType({
+        try {
+            await addRoomType({
             id: '', // Handled by service
             name: newRoomType.name,
             description: newRoomType.description || '',
@@ -147,12 +174,18 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         });
         setNewRoomType({ name: '', description: '', locationId: '' });
         setShowRoomTypeForm(false);
-        refreshData();
+            // Refresh room types
+            getRoomTypes().then(setRoomTypes).catch(console.error);
+        } catch (error) {
+            console.error('Failed to add room type:', error);
+            alert('Failed to add room type. Please try again.');
+        }
     };
 
-    const handleAddRoom = () => {
+    const handleAddRoom = async () => {
         if (!newRoom.number || !newRoom.typeId) return;
-        addRoom({
+        try {
+            await addRoom({
             id: '',
             number: newRoom.number,
             typeId: newRoom.typeId,
@@ -160,7 +193,12 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         });
         setNewRoom({ number: '', typeId: '' });
         setShowRoomForm(false);
-        refreshData();
+            // Refresh rooms
+            getRooms().then(setRooms).catch(console.error);
+        } catch (error) {
+            console.error('Failed to add room:', error);
+            alert('Failed to add room. Please try again.');
+        }
     };
 
     const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,12 +230,19 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const processRoomCsvImport = () => {
         if (!roomCsvFile) return;
         const reader = new FileReader();
-        reader.onload = (evt) => {
+        reader.onload = async (evt) => {
             if (evt.target?.result) {
-                const count = importRoomsFromCSV(evt.target.result as string);
+                try {
+                    const count = await importRoomsFromCSV(evt.target.result as string);
                 alert(`Successfully imported ${count} rooms.`);
+                    // Refresh rooms
+                    getRooms().then(setRooms).catch(console.error);
                 refreshData();
                 setRoomCsvFile(null);
+                } catch (error) {
+                    console.error('Failed to import rooms:', error);
+                    alert('Failed to import rooms. Please check the CSV format.');
+                }
             }
         };
         reader.readAsText(roomCsvFile);
@@ -304,6 +349,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             <div className="flex-1 p-4 md:p-6 overflow-auto">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <h2 className="text-xl font-bold text-gray-800 flex items-center">
+                        {/* Tab Headers */}
                         {tab === 'LOCATIONS' && 'Resort Locations'}
                         {tab === 'ROOMS' && (roomView === 'TYPES' ? 'Room Definitions' : 'Room Inventory')}
                         {tab === 'MENU' && 'Dining & Spa Menus'}
@@ -441,7 +487,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     <div className="bg-white p-4 rounded-xl shadow-lg border border-emerald-100 mb-6 animate-in slide-in-from-top-2">
                         <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
                             <Sparkles className="w-4 h-4 text-amber-500 mr-2" />
-                            AI Natural Input
+                            AI Natural Input (Auto-Translate Enabled)
                         </label>
                         <textarea
                             value={aiInput}
@@ -456,12 +502,14 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 disabled={isParsing || !aiInput}
                                 className="bg-emerald-800 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center space-x-2 disabled:opacity-50"
                             >
-                                {isParsing ? <span>Processing...</span> : <span><Sparkles className="inline w-3 h-3 mr-1"/> Generate & Add</span>}
+                                {isParsing ? <span>Translating & Adding...</span> : <span><Sparkles className="inline w-3 h-3 mr-1"/> Generate & Add</span>}
                             </button>
                         </div>
                     </div>
                 )}
-
+                
+                {/* Forms and Tables */}
+                
                 {/* Room TYPE Add Form */}
                 {showRoomTypeForm && tab === 'ROOMS' && roomView === 'TYPES' && (
                     <div className="bg-white p-4 rounded-xl shadow-lg border border-emerald-100 mb-6 animate-in slide-in-from-top-2">
@@ -511,12 +559,11 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                         </div>
                     </div>
                 )}
-
-                {/* ROOM LIST (Inventory) Add Form & CSV */}
+                
+                 {/* ROOM LIST Add Form */}
                 {showRoomForm && tab === 'ROOMS' && roomView === 'LIST' && (
                     <div className="bg-white p-6 rounded-xl shadow-lg border border-emerald-100 mb-6 animate-in slide-in-from-top-2">
                         <div className="flex gap-8 flex-col md:flex-row">
-                             {/* Manual */}
                              <div className="flex-1">
                                 <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase">Manual Room Entry</h3>
                                 <div className="grid grid-cols-2 gap-4 mb-4">
@@ -547,10 +594,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 <button onClick={handleAddRoom} className="bg-emerald-800 text-white px-4 py-2 rounded-lg text-sm font-bold w-full">Add Room</button>
                             </div>
 
-                            {/* Divider */}
                             <div className="w-px bg-gray-200 hidden md:block"></div>
 
-                            {/* CSV */}
                              <div className="flex-1">
                                 <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase">Bulk Import Rooms (CSV)</h3>
                                 <p className="text-xs text-gray-500 mb-4">Format: RoomNumber, RoomTypeName (Must match existing Type)</p>
@@ -565,8 +610,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     </div>
                 )}
 
-
-                {/* Manual User Add Form (Restricted to Admin) */}
+                {/* Manual User Add Form */}
                 {showUserForm && tab === 'USERS' && user.role === UserRole.ADMIN && (
                     <div className="bg-white p-4 rounded-xl shadow-lg border border-emerald-100 mb-6 animate-in slide-in-from-top-2">
                         <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase">Create New Staff Account</h3>
@@ -601,7 +645,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                         setNewUser({
                                             ...newUser, 
                                             role: role,
-                                            // Auto-set department to All if Supervisor
                                             department: role === UserRole.SUPERVISOR ? 'All' : newUser.department
                                         });
                                     }}
@@ -614,7 +657,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 <select 
                                     className="w-full border border-gray-300 rounded p-2 text-sm"
                                     value={newUser.department}
-                                    disabled={newUser.role === UserRole.SUPERVISOR} // Lock for Supervisor
+                                    disabled={newUser.role === UserRole.SUPERVISOR} 
                                     onChange={e => setNewUser({...newUser, department: e.target.value as Department})}
                                 >
                                     <option value="All">All / Supervisor</option>
@@ -637,18 +680,16 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     </div>
                 )}
 
-                {/* GUEST Add Form & CSV */}
+                {/* GUEST Add Form */}
                 {showGuestForm && tab === 'GUESTS' && (
                     <div className="bg-white p-6 rounded-xl shadow-lg border border-emerald-100 mb-6 animate-in slide-in-from-top-2">
                         <div className="flex gap-8 flex-col md:flex-row">
-                            {/* Manual */}
                             <div className="flex-1">
                                 <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase">Manual Guest Entry</h3>
                                 <div className="grid grid-cols-2 gap-4 mb-4">
                                     <input type="text" className="border border-gray-300 rounded p-2 text-sm" placeholder="Last Name" value={newGuest.lastName} onChange={e => setNewGuest({...newGuest, lastName: e.target.value})} />
                                     <input type="text" className="border border-gray-300 rounded p-2 text-sm" placeholder="Room Number" value={newGuest.room} onChange={e => setNewGuest({...newGuest, room: e.target.value})} />
                                     
-                                    {/* Villa Type Selection from RoomTypes */}
                                     <div className="col-span-2">
                                         <select 
                                             className="w-full border border-gray-300 rounded p-2 text-sm"
@@ -658,6 +699,23 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                             {roomTypes.map(rt => (
                                                 <option key={rt.id} value={rt.name}>{rt.name}</option>
                                             ))}
+                                        </select>
+                                    </div>
+                                    
+                                    <div className="col-span-2">
+                                        <label className="block text-[10px] uppercase text-gray-500 font-bold mb-1">Language</label>
+                                        <select
+                                            className="w-full border border-gray-300 rounded p-2 text-sm"
+                                            value={newGuest.language}
+                                            onChange={e => setNewGuest({...newGuest, language: e.target.value})}
+                                        >
+                                            <option value="English">English</option>
+                                            <option value="Vietnamese">Vietnamese</option>
+                                            <option value="Korean">Korean</option>
+                                            <option value="Japanese">Japanese</option>
+                                            <option value="Chinese">Chinese</option>
+                                            <option value="French">French</option>
+                                            <option value="Russian">Russian</option>
                                         </select>
                                     </div>
 
@@ -675,13 +733,11 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 <button onClick={handleAddGuest} className="bg-emerald-800 text-white px-4 py-2 rounded-lg text-sm font-bold w-full">Create Guest</button>
                             </div>
                             
-                            {/* Divider */}
                             <div className="w-px bg-gray-200 hidden md:block"></div>
 
-                            {/* CSV */}
                             <div className="flex-1">
                                 <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase">Bulk Import (CSV)</h3>
-                                <p className="text-xs text-gray-500 mb-4">Format: LastName, Room, VillaType, CheckIn(ISO), CheckOut(ISO)</p>
+                                <p className="text-xs text-gray-500 mb-4">Format: LastName, Room, VillaType, CheckIn(ISO), CheckOut(ISO), Language</p>
                                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition cursor-pointer relative">
                                     <input type="file" accept=".csv" onChange={handleCsvUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                                     <Upload className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
@@ -693,9 +749,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     </div>
                 )}
 
-                {/* List Views */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    
+                 {/* Tables Section */}
+                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     {/* LOCATIONS TABLE */}
                     {tab === 'LOCATIONS' && (
                         <table className="w-full text-left">
@@ -722,9 +777,91 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                             </tbody>
                         </table>
                     )}
+                    
+                    {/* MENU TABLE */}
+                    {tab === 'MENU' && (
+                        <table className="w-full text-left">
+                             <thead className="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th className="p-4 text-sm font-semibold text-gray-600">Item Details</th>
+                                    <th className="p-4 text-sm font-semibold text-gray-600">Category</th>
+                                    <th className="p-4 text-sm font-semibold text-gray-600 text-right">Price</th>
+                                    <th className="p-4 text-sm font-semibold text-gray-600 text-right"></th>
+                                </tr>
+                            </thead>
+                             <tbody>
+                                {filteredMenu.map((item) => (
+                                    <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                        <td className="p-4">
+                                            <div className="font-medium text-gray-800">{item.name}</div>
+                                            <div className="text-xs text-gray-400 line-clamp-1">{item.description}</div>
+                                            {item.translations && <div className="text-[10px] text-emerald-600 mt-0.5">Translated: {Object.keys(item.translations).length} languages</div>}
+                                        </td>
+                                        <td className="p-4 text-sm">
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${item.category === 'Dining' ? 'bg-orange-100 text-orange-700' : 'bg-purple-100 text-purple-700'}`}>
+                                                {item.category}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-right text-sm font-bold text-emerald-600">${item.price}</td>
+                                        <td className="p-4 text-right">
+                                            <button onClick={() => handleDelete(item.id, 'ITEM')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                    
+                    {tab === 'EVENTS' && (
+                        <div className="divide-y divide-gray-100">
+                             {events.map((event) => (
+                                 <div key={event.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
+                                     <div>
+                                         <div className="font-bold text-gray-800">{event.title}</div>
+                                         <div className="text-sm text-emerald-600">{event.date} • {event.time}</div>
+                                         <div className="text-xs text-gray-500 mt-1">{event.location}</div>
+                                     </div>
+                                     <button onClick={() => handleDelete(event.id, 'EVENT')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
+                                 </div>
+                             ))}
+                        </div>
+                    )}
 
-                    {/* ROOM TYPES TABLE */}
-                    {tab === 'ROOMS' && roomView === 'TYPES' && (
+                    {/* PROMOTIONS TABLE */}
+                    {tab === 'PROMOS' && (
+                        <div className="divide-y divide-gray-100">
+                             {promotions.map((p) => (
+                                 <div key={p.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
+                                     <div className="flex-1">
+                                         <div className="flex items-center space-x-2">
+                                             <span className="font-bold text-gray-800">{p.title}</span>
+                                             <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{p.discount}</span>
+                                         </div>
+                                         <div className="text-sm text-gray-500">{p.description}</div>
+                                         <div className="text-xs text-gray-400 mt-1">Valid: {p.validUntil}</div>
+                                     </div>
+                                     <button onClick={() => handleDelete(p.id, 'PROMO')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
+                                 </div>
+                             ))}
+                        </div>
+                    )}
+                    
+                    {/* KNOWLEDGE TABLE */}
+                    {tab === 'KNOWLEDGE' && (
+                         <div className="divide-y divide-gray-100">
+                            {knowledge.map((k) => (
+                                <div key={k.id} className="p-4 flex justify-between items-start hover:bg-gray-50">
+                                    <div className="pr-4">
+                                        <div className="font-semibold text-emerald-800 text-sm mb-1">Q: {k.question}</div>
+                                        <div className="text-gray-600 text-sm">A: {k.answer}</div>
+                                    </div>
+                                    <button onClick={() => handleDelete(k.id, 'KNOW')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
+                                </div>
+                            ))}
+                       </div>
+                    )}
+
+                     {tab === 'ROOMS' && roomView === 'TYPES' && (
                          <table className="w-full text-left">
                             <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
@@ -760,8 +897,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                             </tbody>
                         </table>
                     )}
-
-                    {/* ROOM LIST (INVENTORY) TABLE */}
+                    
                     {tab === 'ROOMS' && roomView === 'LIST' && (
                          <table className="w-full text-left">
                             <thead className="bg-gray-50 border-b border-gray-200">
@@ -796,92 +932,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                         </table>
                     )}
 
-
-                    {/* MENU TABLE */}
-                    {tab === 'MENU' && (
-                        <table className="w-full text-left">
-                             <thead className="bg-gray-50 border-b border-gray-200">
-                                <tr>
-                                    <th className="p-4 text-sm font-semibold text-gray-600">Item Details</th>
-                                    <th className="p-4 text-sm font-semibold text-gray-600">Category</th>
-                                    <th className="p-4 text-sm font-semibold text-gray-600 text-right">Price</th>
-                                    <th className="p-4 text-sm font-semibold text-gray-600 text-right"></th>
-                                </tr>
-                            </thead>
-                             <tbody>
-                                {filteredMenu.map((item) => (
-                                    <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                        <td className="p-4">
-                                            <div className="font-medium text-gray-800">{item.name}</div>
-                                            <div className="text-xs text-gray-400 line-clamp-1">{item.description}</div>
-                                        </td>
-                                        <td className="p-4 text-sm">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold ${item.category === 'Dining' ? 'bg-orange-100 text-orange-700' : 'bg-purple-100 text-purple-700'}`}>
-                                                {item.category}
-                                            </span>
-                                        </td>
-                                        <td className="p-4 text-right text-sm font-bold text-emerald-600">${item.price}</td>
-                                        <td className="p-4 text-right">
-                                            <button onClick={() => handleDelete(item.id, 'ITEM')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-
-                    {/* EVENTS TABLE */}
-                    {tab === 'EVENTS' && (
-                        <div className="divide-y divide-gray-100">
-                             {events.map((event) => (
-                                 <div key={event.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
-                                     <div>
-                                         <div className="font-bold text-gray-800">{event.title}</div>
-                                         <div className="text-sm text-emerald-600">{event.date} • {event.time}</div>
-                                         <div className="text-xs text-gray-500 mt-1">{event.location}</div>
-                                     </div>
-                                     <button onClick={() => handleDelete(event.id, 'EVENT')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
-                                 </div>
-                             ))}
-                        </div>
-                    )}
-
-                    {/* PROMOTIONS TABLE */}
-                    {tab === 'PROMOS' && (
-                        <div className="divide-y divide-gray-100">
-                             {promotions.map((p) => (
-                                 <div key={p.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
-                                     <div className="flex-1">
-                                         <div className="flex items-center space-x-2">
-                                             <span className="font-bold text-gray-800">{p.title}</span>
-                                             <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{p.discount}</span>
-                                         </div>
-                                         <div className="text-sm text-gray-500">{p.description}</div>
-                                         <div className="text-xs text-gray-400 mt-1">Valid: {p.validUntil}</div>
-                                     </div>
-                                     <button onClick={() => handleDelete(p.id, 'PROMO')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
-                                 </div>
-                             ))}
-                        </div>
-                    )}
-
-                    {/* KNOWLEDGE TABLE */}
-                    {tab === 'KNOWLEDGE' && (
-                         <div className="divide-y divide-gray-100">
-                            {knowledge.map((k) => (
-                                <div key={k.id} className="p-4 flex justify-between items-start hover:bg-gray-50">
-                                    <div className="pr-4">
-                                        <div className="font-semibold text-emerald-800 text-sm mb-1">Q: {k.question}</div>
-                                        <div className="text-gray-600 text-sm">A: {k.answer}</div>
-                                    </div>
-                                    <button onClick={() => handleDelete(k.id, 'KNOW')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
-                                </div>
-                            ))}
-                       </div>
-                    )}
-
-                     {/* STAFF USERS TABLE (Visible only to ADMIN) */}
-                     {tab === 'USERS' && user.role === UserRole.ADMIN && (
+                    {tab === 'USERS' && user.role === UserRole.ADMIN && (
                         <table className="w-full text-left">
                             <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
@@ -924,8 +975,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                             </tbody>
                         </table>
                     )}
-
-                    {/* GUEST USERS TABLE */}
+                    
                     {tab === 'GUESTS' && (
                         <table className="w-full text-left">
                             <thead className="bg-gray-50 border-b border-gray-200">
@@ -952,7 +1002,9 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                             <td className="p-4">
                                                 <div className="font-bold text-gray-800">{u.lastName}</div>
                                                 <div className="text-xs text-gray-500">Room: {u.roomNumber}</div>
-                                                <div className="text-[10px] text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded w-fit mt-1 border border-emerald-100">{u.villaType}</div>
+                                                <div className="text-[10px] text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded w-fit mt-1 border border-emerald-100">
+                                                    {u.villaType} • {u.language || 'English'}
+                                                </div>
                                             </td>
                                             <td className="p-4">
                                                 <div className="text-xs text-gray-600">
@@ -974,8 +1026,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                             </tbody>
                         </table>
                     )}
-
-                    {/* HISTORY TABLE */}
+                    
                     {tab === 'HISTORY' && (
                         <>
                             {filteredHistory.length === 0 ? (
@@ -1042,7 +1093,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                             )}
                         </>
                     )}
-
                 </div>
             </div>
 
@@ -1050,46 +1100,33 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             {resetPasswordUserId && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in">
                     <div className="bg-white p-6 rounded-xl shadow-2xl w-96">
-                        <h3 className="font-bold text-lg mb-4 text-gray-800">Reset Password</h3>
-                        <p className="text-xs text-gray-500 mb-4">Set a new password for the selected user.</p>
-                        
-                        <div className="mb-4">
-                            <div className="flex space-x-2 mb-2">
-                                <input 
-                                    type="text" 
-                                    value={resetNewPassword}
-                                    onChange={(e) => setResetNewPassword(e.target.value)}
-                                    placeholder="New Password"
-                                    className="flex-1 border border-gray-300 rounded p-2 text-sm"
-                                />
-                                <button 
-                                    onClick={() => setResetNewPassword(Math.random().toString(36).slice(-8))}
-                                    className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 rounded text-xs font-bold"
-                                >
-                                    Generate
-                                </button>
-                            </div>
-                        </div>
-
+                        <h3 className="font-bold text-lg mb-4">Reset Password</h3>
+                        <p className="text-sm text-gray-500 mb-4">Enter new password for user.</p>
+                        <input 
+                            type="text" 
+                            className="w-full border border-gray-300 rounded p-2 mb-4"
+                            placeholder="New Password"
+                            value={resetNewPassword}
+                            onChange={(e) => setResetNewPassword(e.target.value)}
+                        />
                         <div className="flex justify-end space-x-2">
                             <button 
-                                onClick={() => setResetPasswordUserId(null)}
-                                className="px-4 py-2 text-gray-500 text-sm hover:bg-gray-100 rounded-lg"
+                                onClick={() => setResetPasswordUserId(null)} 
+                                className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded"
                             >
                                 Cancel
                             </button>
                             <button 
                                 onClick={() => {
-                                    if(resetNewPassword) {
+                                    if(resetPasswordUserId && resetNewPassword) {
                                         resetUserPassword(resetPasswordUserId, resetNewPassword);
-                                        alert('Password updated successfully.');
                                         setResetPasswordUserId(null);
+                                        refreshData();
                                     }
-                                }}
-                                disabled={!resetNewPassword}
-                                className="px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                                }} 
+                                className="px-4 py-2 bg-emerald-600 text-white rounded font-bold"
                             >
-                                Save Password
+                                Save
                             </button>
                         </div>
                     </div>

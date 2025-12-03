@@ -2,25 +2,9 @@
 import { GoogleGenAI, Modality, Type, LiveServerMessage, Schema } from "@google/genai";
 import { RESORT_CENTER } from '../constants';
 import { getEvents, getMenu, getPromotions, getKnowledgeBase, getRoomTypes } from "./dataService";
+import { ContentTranslation } from "../types";
 
-// Get API key from Vite environment variables (prefixed with VITE_)
-// Vite tự động expose các biến có prefix VITE_ vào import.meta.env
-// Debug: Log available env vars (will be removed in production)
-if (typeof window !== 'undefined') {
-  console.log('🔍 Debug - Available env vars:', Object.keys(import.meta.env));
-  console.log('🔍 Debug - VITE_GEMINI_API_KEY exists:', !!import.meta.env.VITE_GEMINI_API_KEY);
-  console.log('🔍 Debug - VITE_GEMINI_API_KEY length:', import.meta.env.VITE_GEMINI_API_KEY?.length || 0);
-}
-
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || '';
-if (!apiKey) {
-  const errorMsg = 'VITE_GEMINI_API_KEY is not set. Please set VITE_GEMINI_API_KEY in your Vercel environment variables and redeploy.';
-  console.error('❌', errorMsg);
-  console.error('Available env vars:', Object.keys(import.meta.env));
-  // Don't throw immediately, allow app to load but show error
-  console.error('Gemini API features will not work until API key is set.');
-}
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // --- Admin AI Helpers ---
 
@@ -95,10 +79,6 @@ export const parseAdminInput = async (input: string, type: 'MENU_ITEM' | 'LOCATI
     };
   }
 
-  if (!ai) {
-    throw new Error('Gemini API is not initialized. Please set VITE_GEMINI_API_KEY environment variable.');
-  }
-  
   try {
     const response = await ai.models.generateContent({
       model,
@@ -127,10 +107,6 @@ export const createChatSession = () => {
   const events = getEvents().map(e => `Event: ${e.title} at ${e.time} on ${e.date} (${e.location})`).join('\n');
   const promos = getPromotions().map(p => `Promo: ${p.title} - ${p.description} (${p.discount})`).join('\n');
 
-  if (!ai) {
-    throw new Error('Gemini API is not initialized. Please set VITE_GEMINI_API_KEY environment variable.');
-  }
-  
   return ai.chats.create({
     model: 'gemini-2.5-flash',
     config: {
@@ -156,7 +132,7 @@ export const createChatSession = () => {
 
 // --- Translation Service (Gemini 2.5 Flash) ---
 export const translateText = async (text: string, targetLanguage: string): Promise<string> => {
-    if (!text || !targetLanguage) return text;
+    if (!text || !targetLanguage || targetLanguage === 'Original') return text;
     
     try {
         const response = await ai.models.generateContent({
@@ -167,10 +143,35 @@ export const translateText = async (text: string, targetLanguage: string): Promi
             
             Text: "${text}"`,
         });
-        return response.text || text;
+        return response.text?.trim() || text;
     } catch (e) {
         console.error("Translation Error", e);
         return text; // Fallback to original
+    }
+};
+
+// --- Batch Translation for CMS Content ---
+export const generateTranslations = async (content: Record<string, string>): Promise<ContentTranslation> => {
+    try {
+        const languages = ['Vietnamese', 'Korean', 'Japanese', 'Chinese', 'Russian'];
+        const prompt = `Translate the following content fields into Vietnamese, Korean, Japanese, Chinese, and Russian.
+        Return a JSON object where keys are the language names (Vietnamese, Korean, Japanese, Chinese, Russian) and values are objects containing the translated fields.
+        
+        Source Content: ${JSON.stringify(content)}
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json"
+            }
+        });
+
+        return JSON.parse(response.text || '{}');
+    } catch (e) {
+        console.error("Batch Translation Error", e);
+        return {};
     }
 };
 
@@ -178,10 +179,6 @@ export const translateText = async (text: string, targetLanguage: string): Promi
 export const queryResortInfo = async (query: string, userLocation?: {lat: number, lng: number}) => {
   const latitude = userLocation?.lat ?? RESORT_CENTER.lat;
   const longitude = userLocation?.lng ?? RESORT_CENTER.lng;
-  
-  if (!ai) {
-    throw new Error('Gemini API is not initialized. Please set VITE_GEMINI_API_KEY environment variable.');
-  }
   
   try {
     const response = await ai.models.generateContent({
@@ -208,10 +205,6 @@ export const queryResortInfo = async (query: string, userLocation?: {lat: number
 
 // --- TTS (Gemini 2.5 Flash TTS) ---
 export const speakText = async (text: string): Promise<AudioBuffer | null> => {
-  if (!ai) {
-    throw new Error('Gemini API is not initialized. Please set VITE_GEMINI_API_KEY environment variable.');
-  }
-  
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
@@ -219,81 +212,35 @@ export const speakText = async (text: string): Promise<AudioBuffer | null> => {
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' },
-          },
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: 'Kore' },
+            },
         },
       },
     });
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) return null;
-
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-    const audioBuffer = await decodeAudioData(
-        decode(base64Audio),
-        audioContext,
-        24000,
-        1
-    );
-    await audioContext.close();
-    return audioBuffer;
-
-  } catch (e) {
-    console.error("TTS Error", e);
+    if (base64Audio) {
+         // Create a temporary AudioContext just for decoding
+         const outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+         // decodeAudioData requires ArrayBuffer
+         const audioBuffer = await outputAudioContext.decodeAudioData(decode(base64Audio).buffer);
+         return audioBuffer;
+    }
+    return null;
+  } catch (error) {
+    console.error("TTS Error", error);
     return null;
   }
 };
 
-// --- Live API Helpers ---
-function decode(base64: string) {
-  const binaryString = atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
-}
-
-export function encode(bytes: Uint8Array) {
-  let binary = '';
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
-async function decodeAudioData(
-  data: Uint8Array,
-  ctx: AudioContext,
-  sampleRate: number,
-  numChannels: number,
-): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
-  const frameCount = dataInt16.length / numChannels;
-  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
-  for (let channel = 0; channel < numChannels; channel++) {
-    const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-    }
-  }
-  return buffer;
-}
-
+// --- Live API ---
 export const connectLiveSession = async (
     onOpen: () => void,
     onMessage: (msg: LiveServerMessage) => void,
     onClose: () => void,
     onError: (err: any) => void
 ) => {
-    if (!ai) {
-      throw new Error('Gemini API is not initialized. Please set VITE_GEMINI_API_KEY environment variable.');
-    }
-    
     return ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         callbacks: {
@@ -305,9 +252,32 @@ export const connectLiveSession = async (
         config: {
             responseModalities: [Modality.AUDIO],
             speechConfig: {
-                voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }
+                voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
             },
-            systemInstruction: "You are a helpful, real-time voice concierge for Furama Resort. Keep responses brief and conversational.",
+            systemInstruction: { parts: [{ text: 'You are a helpful resort concierge.' }] }
         }
     });
 };
+
+// --- Helpers ---
+
+// Decodes a base64 string into a Uint8Array
+function decode(base64: string) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+// Encodes a Uint8Array into a base64 string
+export function encode(bytes: Uint8Array) {
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}

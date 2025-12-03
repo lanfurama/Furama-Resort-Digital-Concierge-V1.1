@@ -1,18 +1,36 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getServiceRequests, updateServiceStatus, getLastMessage } from '../services/dataService';
 import { ServiceRequest, User, UserRole } from '../types';
-import { UserCheck, ShieldCheck, MessageSquare, Eye } from 'lucide-react';
+import { UserCheck, ShieldCheck, MessageSquare, Eye, Bell, Clock, CheckCircle, List, History } from 'lucide-react';
 import ServiceChat from './ServiceChat';
 
 const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout, user }) => {
     const [requests, setRequests] = useState<ServiceRequest[]>([]);
     const [activeChatRequest, setActiveChatRequest] = useState<{roomNumber: string, type: string} | null>(null);
     const [unreadChats, setUnreadChats] = useState<Set<string>>(new Set());
+    const [viewMode, setViewMode] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
+    
+    // New Order Notification State
+    const [newOrderAlert, setNewOrderAlert] = useState(false);
+    const prevRequestCount = useRef(0);
 
     useEffect(() => {
+        // Initial fetch
+        const initialRequests = getServiceRequests();
+        prevRequestCount.current = initialRequests.length;
+        setRequests(initialRequests);
+        checkUnread(initialRequests);
+
         const interval = setInterval(() => {
             const currentRequests = getServiceRequests();
+            
+            // Check for new orders
+            if (currentRequests.length > prevRequestCount.current) {
+                setNewOrderAlert(true);
+            }
+            prevRequestCount.current = currentRequests.length;
+
             setRequests(currentRequests);
             checkUnread(currentRequests);
         }, 1000);
@@ -36,6 +54,11 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
         setRequests(getServiceRequests()); // Force refresh
     };
 
+    const handleNewOrderClick = () => {
+        setNewOrderAlert(false);
+        setViewMode('ACTIVE');
+    };
+
     // Filter requests based on Department and Role
     const filteredRequests = requests.filter(req => {
         // Supervisors see ALL requests
@@ -45,16 +68,29 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
         if (!user.department || user.department === 'All') return true;
         
         // Strict Department Mapping
-        // ServiceRequest.type is uppercase (DINING, SPA, POOL, BUTLER, BUGGY)
-        // User.department is Title case (Dining, Spa, Pool, Butler, Buggy)
         const userDeptUpper = user.department.toUpperCase();
         return req.type === userDeptUpper;
+    });
+
+    // Apply Tab Filtering (Active vs History)
+    const displayedRequests = filteredRequests.filter(req => {
+        if (viewMode === 'ACTIVE') {
+            return req.status === 'PENDING' || req.status === 'CONFIRMED';
+        } else {
+            return req.status === 'COMPLETED';
+        }
     });
 
     // Helper to get Department display name
     const getRoleDisplay = () => {
         if (user.role === UserRole.SUPERVISOR) return 'Supervisor';
         return user.department || 'General Staff';
+    };
+
+    // Format Time Helper
+    const formatTime = (ts?: number) => {
+        if (!ts) return '-';
+        return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
     return (
@@ -80,24 +116,64 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                         </p>
                     </div>
                 </div>
-                <button onClick={onLogout} className="text-sm font-semibold text-gray-500 hover:text-gray-800">Logout</button>
+                
+                <div className="flex items-center space-x-4">
+                    {/* New Order Notification Button */}
+                    {newOrderAlert && (
+                        <button 
+                            onClick={handleNewOrderClick}
+                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center shadow-md animate-pulse transition"
+                        >
+                            <Bell size={14} className="mr-1" />
+                            New Orders!
+                        </button>
+                    )}
+
+                    <button onClick={onLogout} className="text-sm font-semibold text-gray-500 hover:text-gray-800">Logout</button>
+                </div>
             </header>
 
+            {/* View Mode Tabs */}
+            <div className="px-6 pt-6 pb-2">
+                <div className="flex space-x-4 border-b border-gray-200">
+                    <button 
+                        onClick={() => setViewMode('ACTIVE')}
+                        className={`pb-2 px-4 font-semibold text-sm flex items-center ${
+                            viewMode === 'ACTIVE' 
+                            ? 'border-b-2 border-indigo-600 text-indigo-600' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                        <List size={16} className="mr-2"/> Active Orders
+                    </button>
+                    <button 
+                        onClick={() => setViewMode('HISTORY')}
+                        className={`pb-2 px-4 font-semibold text-sm flex items-center ${
+                            viewMode === 'HISTORY' 
+                            ? 'border-b-2 border-indigo-600 text-indigo-600' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                    >
+                        <History size={16} className="mr-2"/> Order History
+                    </button>
+                </div>
+            </div>
+
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                 {filteredRequests.length === 0 && (
+                 {displayedRequests.length === 0 && (
                      <div className="col-span-full text-center py-20 text-gray-400">
                          <ShieldCheck className="w-12 h-12 mx-auto mb-3 opacity-20"/>
-                         <p>No active service requests for {getRoleDisplay()}.</p>
+                         <p>No {viewMode === 'ACTIVE' ? 'active' : 'completed'} requests found for {getRoleDisplay()}.</p>
                      </div>
                  )}
-                 {filteredRequests.map(req => {
+                 {displayedRequests.map(req => {
                      const isUnread = unreadChats.has(`${req.roomNumber}_${req.type}`);
                      
                      return (
                         <div key={req.id} className={`bg-white p-6 rounded-xl shadow-sm border-l-4 ${
                             req.status === 'PENDING' ? 'border-orange-500' : 
                             req.status === 'CONFIRMED' ? 'border-blue-500' : 'border-green-500'
-                        }`}>
+                        } ${req.status === 'COMPLETED' ? 'opacity-90' : ''}`}>
                             <div className="flex justify-between items-start mb-4">
                                 <span className="font-bold text-gray-400 text-xs tracking-wider uppercase">{req.type}</span>
                                 <span className={`px-2 py-1 rounded text-xs font-bold ${
@@ -107,7 +183,27 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                             </div>
                             
                             <h3 className="font-serif text-xl font-bold text-gray-800 mb-1">Room {req.roomNumber}</h3>
-                            <p className="text-gray-600 mb-6">{req.details}</p>
+                            <p className="text-gray-600 mb-4">{req.details}</p>
+
+                            {/* Timeline Info */}
+                            <div className="bg-gray-50 rounded-lg p-3 mb-4 text-xs text-gray-500 space-y-1">
+                                <div className="flex justify-between">
+                                    <span className="flex items-center"><Clock size={10} className="mr-1"/> Requested:</span>
+                                    <span className="font-mono text-gray-700">{formatTime(req.timestamp)}</span>
+                                </div>
+                                {req.confirmedAt && (
+                                     <div className="flex justify-between text-blue-600">
+                                        <span className="flex items-center"><CheckCircle size={10} className="mr-1"/> Confirmed:</span>
+                                        <span className="font-mono font-bold">{formatTime(req.confirmedAt)}</span>
+                                    </div>
+                                )}
+                                {req.completedAt && (
+                                     <div className="flex justify-between text-green-600">
+                                        <span className="flex items-center"><CheckCircle size={10} className="mr-1"/> Completed:</span>
+                                        <span className="font-mono font-bold">{formatTime(req.completedAt)}</span>
+                                    </div>
+                                )}
+                            </div>
 
                             <div className="grid grid-cols-2 gap-2">
                                 {req.status === 'PENDING' && (
@@ -127,7 +223,7 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                                     </button>
                                 )}
 
-                                {/* CHAT BUTTON */}
+                                {/* CHAT BUTTON - Only show in Active View */}
                                 {(req.status === 'PENDING' || req.status === 'CONFIRMED') && (
                                     <button
                                         onClick={() => setActiveChatRequest({ roomNumber: req.roomNumber, type: req.type })}

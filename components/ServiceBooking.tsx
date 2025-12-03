@@ -4,6 +4,7 @@ import { getMenu, addServiceRequest } from '../services/dataService';
 import { User, MenuItem } from '../types';
 import { ArrowLeft, ShoppingBag, Plus, Sparkles, Utensils, Waves, User as UserIcon } from 'lucide-react';
 import ServiceChat from './ServiceChat';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface ServiceBookingProps {
     type: 'DINING' | 'SPA' | 'POOL' | 'BUTLER';
@@ -12,10 +13,10 @@ interface ServiceBookingProps {
 }
 
 const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) => {
+    const { t, language } = useTranslation();
     const [cart, setCart] = useState<MenuItem[]>([]);
     const [isOrderPlaced, setIsOrderPlaced] = useState(false);
     const [items, setItems] = useState<MenuItem[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
     
     // Filter menu by type
     let categoryFilter: 'Dining' | 'Spa' | 'Pool' | 'Butler' = 'Dining';
@@ -34,15 +35,15 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
 
     const handlePlaceOrder = async () => {
         if (cart.length === 0) return;
-        setIsLoading(true);
         
+        const details = cart.map(i => i.name).join(', ');
         try {
-            const details = cart.map(i => i.name).join(', ');
             await addServiceRequest({
                 id: Date.now().toString(),
                 type: type,
                 status: 'PENDING',
                 details: `Order for: ${details}`,
+                items: cart, // Save full items for translation support
                 roomNumber: user.roomNumber,
                 timestamp: Date.now()
             });
@@ -53,8 +54,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
             }, 2000);
         } catch (error) {
             console.error('Failed to place order:', error);
-        } finally {
-            setIsLoading(false);
+            alert('Failed to place order. Please try again.');
         }
     };
 
@@ -68,7 +68,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                 btnColor: 'bg-orange-600 hover:bg-orange-700',
                 lightBg: 'bg-orange-50',
                 textColor: 'text-orange-600',
-                title: 'In-Room Dining', 
+                title: t('dining'), 
                 subtitle: 'Delicious meals delivered',
                 icon: <Utensils /> 
             };
@@ -77,7 +77,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                 btnColor: 'bg-purple-600 hover:bg-purple-700',
                 lightBg: 'bg-purple-50',
                 textColor: 'text-purple-600',
-                title: 'Spa & Wellness', 
+                title: t('spa'), 
                 subtitle: 'Relax & Rejuvenate',
                 icon: <Sparkles /> 
             };
@@ -86,7 +86,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                 btnColor: 'bg-blue-500 hover:bg-blue-600',
                 lightBg: 'bg-blue-50',
                 textColor: 'text-blue-600',
-                title: 'Pool Services', 
+                title: t('pool'), 
                 subtitle: 'Drinks, towels & suncare',
                 icon: <Waves /> 
             };
@@ -95,7 +95,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                 btnColor: 'bg-slate-600 hover:bg-slate-700',
                 lightBg: 'bg-slate-50',
                 textColor: 'text-slate-600',
-                title: 'Butler Service', 
+                title: t('butler'), 
                 subtitle: 'Personalized assistance',
                 icon: <UserIcon /> 
             };
@@ -119,14 +119,14 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                 <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
                     <Sparkles className="w-10 h-10 text-emerald-600" />
                 </div>
-                <h2 className="text-2xl font-serif font-bold mb-2">Request Received!</h2>
-                <p className="text-gray-600">We will confirm your {type.toLowerCase().replace('_', ' ')} request for Room {user.roomNumber} shortly.</p>
+                <h2 className="text-2xl font-serif font-bold mb-2">{t('request_received')}</h2>
+                <p className="text-gray-600">{t('request_confirm_msg')}</p>
             </div>
         );
     }
 
     // Determine chat label based on type
-    const chatLabel = type === 'DINING' ? 'Kitchen' : 'Staff';
+    const chatLabel = type === 'DINING' ? t('kitchen') : t('staff');
 
     return (
         <div className="flex flex-col h-full bg-gray-50 relative">
@@ -154,11 +154,16 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 pb-24">
                 <div className="grid gap-4">
-                    {items.map(item => (
+                    {items.map(item => {
+                        const tr = item.translations?.[language];
+                        const name = tr?.name || item.name;
+                        const desc = tr?.description || item.description;
+
+                        return (
                         <div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
                             <div className="flex-1">
-                                <h3 className="font-bold text-gray-800">{item.name}</h3>
-                                <p className="text-sm text-gray-500 line-clamp-2">{item.description}</p>
+                                    <h3 className="font-bold text-gray-800">{name}</h3>
+                                    <p className="text-sm text-gray-500 line-clamp-2">{desc}</p>
                                 <p className={`font-bold mt-1 ${config.textColor}`}>
                                     {item.price > 0 ? `$${item.price}` : 'Complimentary'}
                                 </p>
@@ -170,7 +175,8 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                                 <Plus size={20} />
                             </button>
                         </div>
-                    ))}
+                        );
+                    })}
                     {items.length === 0 && (
                         <div className="text-center py-10 text-gray-400">
                             No items available in this category yet.
@@ -183,14 +189,14 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
             {cart.length > 0 && (
                 <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-xl z-20">
                     <div className="flex justify-between items-center mb-4">
-                        <span className="text-gray-600 font-medium">{cart.length} items</span>
+                        <span className="text-gray-600 font-medium">{cart.length} {t('items')}</span>
                         <span className="text-xl font-bold text-gray-800">${totalPrice}</span>
                     </div>
                     <button 
                         onClick={handlePlaceOrder}
                         className={`w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition transform active:scale-95 ${config.btnColor}`}
                     >
-                        Request Service
+                        {t('place_order')}
                     </button>
                 </div>
             )}

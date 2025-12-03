@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppView, User, UserRole } from './types';
-import { authenticateUser } from './services/authService';
+import { authenticateUser, authenticateStaff } from './services/authService';
 import BuggyBooking from './components/BuggyBooking';
 import ConciergeChat from './components/ConciergeChat';
 import ServiceMenu from './components/ServiceMenu';
@@ -11,11 +11,15 @@ import AdminPortal from './components/AdminPortal';
 import DriverPortal from './components/DriverPortal';
 import StaffPortal from './components/StaffPortal';
 import GuestAccount from './components/GuestAccount';
+import ActiveOrders from './components/ActiveOrders';
 import NotificationBell from './components/NotificationBell';
-import { findUserByCredentials, loginStaff, loginGuest, getPromotions } from './services/dataService';
-import { User as UserIcon, LogOut, MessageSquare, Car, Percent, Lock, Eye, EyeOff } from 'lucide-react';
+import SupervisorDashboard from './components/SupervisorDashboard';
+import { findUserByCredentials, loginStaff, loginGuest, getPromotions, getActiveGuestOrders } from './services/dataService';
+import { User as UserIcon, LogOut, MessageSquare, Car, Percent, Lock, Eye, EyeOff, ShoppingCart, Home } from 'lucide-react';
+import { LanguageProvider, useTranslation } from './contexts/LanguageContext';
 
-const App: React.FC = () => {
+// Main Inner Component to access Context
+const AppContent: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<AppView>(AppView.LOGIN);
   
@@ -28,15 +32,61 @@ const App: React.FC = () => {
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // Translation hook
+  const { t, setLanguage, language } = useTranslation();
 
   // Load promotions for Guest Home
   const [promotions, setPromotions] = useState<any[]>([]);
   
   useEffect(() => {
-    if (view === AppView.HOME && user?.role === UserRole.GUEST) {
+    if (view === AppView.HOME && user) {
       getPromotions().then(setPromotions).catch(console.error);
     }
   }, [view, user]);
+
+  // Restore user from localStorage on mount
+  useEffect(() => {
+    const savedUser = localStorage.getItem('furama_user');
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+        
+        // Set view based on user role
+        switch (parsedUser.role) {
+          case UserRole.ADMIN:
+          case UserRole.SUPERVISOR:
+            setView(AppView.ADMIN_DASHBOARD);
+            break;
+          case UserRole.DRIVER:
+            setView(AppView.DRIVER_DASHBOARD);
+            break;
+          case UserRole.STAFF:
+            setView(AppView.STAFF_DASHBOARD);
+            break;
+          default:
+            setView(AppView.HOME);
+            break;
+        }
+        
+        // Restore language if available
+        if (parsedUser.language) {
+          setLanguage(parsedUser.language as any);
+        }
+      } catch (error) {
+        console.error('Failed to restore user from localStorage:', error);
+        localStorage.removeItem('furama_user');
+      }
+    }
+  }, [setLanguage]);
+
+  // Sync Language Context when User logs in or updates profile
+  useEffect(() => {
+      if (user && user.role === UserRole.GUEST && user.language) {
+          setLanguage(user.language as any);
+      }
+  }, [user, setLanguage]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,41 +94,42 @@ const App: React.FC = () => {
     setAuthError('');
     
     try {
-        let foundUser: User | undefined | null;
+        let foundUser: User | null = null;
 
-        // AUTH LOGIC - Now calls API
+        // AUTH LOGIC - Now uses API
         if (selectedRole === UserRole.GUEST) {
-            // Guest Login: Room # + Last Name
-            const guestAuth = await loginGuest(lastNameInput, usernameInput);
+            // Guest Login: Room # + Last Name - Calls API
+            foundUser = await authenticateUser(lastNameInput, usernameInput);
             
-            if (guestAuth.success && guestAuth.user) {
-                foundUser = guestAuth.user;
-            } else {
-                setAuthError(guestAuth.message || 'Login failed');
+            if (!foundUser) {
+                setAuthError('Invalid guest credentials. Please check Room # and Last Name.');
                 setIsAuthLoading(false);
                 return;
             }
         } else {
-             // Admin/Staff/Driver Login: Username + Password
-             foundUser = await loginStaff(usernameInput, passwordInput);
+             // Admin/Staff/Driver/Supervisor Login: Username + Password - Calls API
+             foundUser = await authenticateStaff(usernameInput, passwordInput);
              
              if (!foundUser) {
-                 setAuthError('Invalid credentials');
-                 setIsAuthLoading(false);
+                 setAuthError('Invalid staff credentials. Please check Username and Password.');
+        setIsAuthLoading(false);
                  return;
              }
         }
 
         if (foundUser) {
             setUser(foundUser);
+            // Save user to localStorage to persist across page refreshes
+            localStorage.setItem('furama_user', JSON.stringify(foundUser));
+
             // Route to appropriate view based on Role
             switch (foundUser.role) {
-                case UserRole.ADMIN: setView(AppView.ADMIN_DASHBOARD); break;
+            case UserRole.ADMIN: setView(AppView.ADMIN_DASHBOARD); break;
                 case UserRole.SUPERVISOR: setView(AppView.ADMIN_DASHBOARD); break; // Supervisors use Admin Dashboard (Restricted)
-                case UserRole.DRIVER: setView(AppView.DRIVER_DASHBOARD); break;
-                case UserRole.STAFF: setView(AppView.STAFF_DASHBOARD); break;
-                default: setView(AppView.HOME); break;
-            }
+            case UserRole.DRIVER: setView(AppView.DRIVER_DASHBOARD); break;
+            case UserRole.STAFF: setView(AppView.STAFF_DASHBOARD); break;
+            default: setView(AppView.HOME); break;
+        }
         } else {
             setAuthError('Invalid credentials');
         }
@@ -98,6 +149,9 @@ const App: React.FC = () => {
       setPasswordInput('');
       setSelectedRole(UserRole.GUEST);
       setAuthError('');
+      setLanguage('English'); // Reset to default
+      // Clear user from localStorage
+      localStorage.removeItem('furama_user');
   };
 
   const handleServiceSelect = (serviceId: string) => {
@@ -109,16 +163,23 @@ const App: React.FC = () => {
       else if (serviceId === 'CHAT') setView(AppView.CHAT);
   };
 
-  // Debug: Log env vars on mount (only in development)
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      console.log('🔍 App mounted - Checking env vars...');
-      // @ts-ignore
-      const env = import.meta.env;
-      console.log('🔍 All import.meta.env keys:', Object.keys(env));
-      console.log('🔍 VITE_GEMINI_API_KEY:', env.VITE_GEMINI_API_KEY ? 'SET (' + env.VITE_GEMINI_API_KEY.length + ' chars)' : 'NOT SET');
+  // Helper for Nav Bar Active State
+  const isActive = (v: AppView) => view === v;
+  const [activeOrderCount, setActiveOrderCount] = useState(0);
+  
+  // Load active order count
+  useEffect(() => {
+    if (user) {
+      getActiveGuestOrders(user.roomNumber).then(orders => setActiveOrderCount(orders.length)).catch(console.error);
+      // Poll for updates every 10 seconds
+      const interval = setInterval(() => {
+        getActiveGuestOrders(user.roomNumber).then(orders => setActiveOrderCount(orders.length)).catch(console.error);
+      }, 10000);
+      return () => clearInterval(interval);
+    } else {
+      setActiveOrderCount(0);
     }
-  }, []);
+  }, [user]);
 
   if (view === AppView.LOGIN) {
     return (
@@ -184,194 +245,278 @@ const App: React.FC = () => {
                     <>
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Username</label>
-                            <div className="relative">
-                                <UserIcon className="absolute left-3 top-3.5 text-gray-400 w-5 h-5" />
-                                <input 
-                                    type="text" 
-                                    value={usernameInput}
-                                    onChange={(e) => setUsernameInput(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 focus:border-emerald-500 outline-none text-gray-800"
-                                    placeholder={`e.g. ${selectedRole.toLowerCase()}`}
-                                    required
-                                />
-                            </div>
+                            <input 
+                                type="text" 
+                                value={usernameInput}
+                                onChange={(e) => setUsernameInput(e.target.value)}
+                                className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-gray-800"
+                                placeholder="Staff ID"
+                                required
+                            />
                         </div>
-                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Password</label>
+                        <div>
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">Password</label>
+                            </div>
                             <div className="relative">
-                                <Lock className="absolute left-3 top-3.5 text-gray-400 w-5 h-5" />
-                                <input 
+                        <input 
                                     type={showPassword ? "text" : "password"}
                                     value={passwordInput}
                                     onChange={(e) => setPasswordInput(e.target.value)}
-                                    className="w-full pl-10 pr-10 py-3 rounded-lg border border-gray-200 focus:border-emerald-500 outline-none text-gray-800"
-                                    placeholder="••••••"
+                                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-gray-800"
+                                    placeholder="Enter password"
                                     required
                                 />
                                 <button 
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-3.5 text-gray-400 hover:text-emerald-600"
+                                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
                                 >
-                                    {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
+                                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                 </button>
                             </div>
                         </div>
                     </>
                 )}
-                
-                {authError && <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-md border border-red-100">{authError}</p>}
+
+                {authError && (
+                    <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm flex items-center">
+                        <span className="w-2 h-2 bg-red-600 rounded-full mr-2"></span>
+                        {authError}
+                    </div>
+                )}
 
                 <button 
                     type="submit" 
                     disabled={isAuthLoading}
-                    className="w-full bg-emerald-800 text-white font-bold py-4 rounded-xl hover:bg-emerald-900 transition shadow-lg active:scale-95 disabled:opacity-70 mt-4"
+                    className="w-full bg-emerald-800 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-emerald-900 transition transform active:scale-95 disabled:opacity-70 flex justify-center items-center"
                 >
-                    {isAuthLoading ? 'Verifying...' : 'Sign In'}
+                    {isAuthLoading ? (
+                         <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                        <span>{t('submit')}</span>
+                    )}
                 </button>
             </form>
             
-            <div className="mt-6 text-[10px] text-gray-400 text-center border-t border-gray-100 pt-4">
-                <p className="font-bold mb-1">Demo Credentials:</p>
-                {selectedRole === UserRole.GUEST ? (
-                     <p>Room: 101, Name: Smith</p>
-                ) : (
-                     <p>User: {selectedRole.toLowerCase()}, Pass: 123</p>
-                )}
+            <div className="mt-8 text-center">
+                <p className="text-xs text-gray-400">© 2024 Furama Resort Danang. All rights reserved.</p>
             </div>
         </div>
       </div>
     );
   }
 
-  // --- Specialized Portals ---
+  // --- AUTHENTICATED VIEWS ---
 
+  if (!user) return null; // Should not happen based on logic
+
+  // ADMIN VIEW
   if (view === AppView.ADMIN_DASHBOARD) {
-      return <AdminPortal onLogout={handleLogout} user={user!} />;
+      if (user.role === UserRole.SUPERVISOR) {
+          // Supervisor Dashboard wrap
+          return (
+              <div className="min-h-screen bg-gray-100 flex flex-col">
+                  <header className="bg-white p-4 flex justify-between items-center shadow-sm border-b border-gray-200">
+                        <h1 className="font-bold text-gray-800">Supervisor Dashboard</h1>
+                        <button onClick={handleLogout} className="text-sm font-semibold text-gray-500">Logout</button>
+                  </header>
+                  <div className="p-6">
+                    <SupervisorDashboard />
+                  </div>
+                  {/* Reuse Admin Portal for management but restricted inside component */}
+                  <div className="p-6 pt-0">
+                    <AdminPortal user={user} onLogout={handleLogout} />
+                  </div>
+              </div>
+          );
+  }
+      return <AdminPortal user={user} onLogout={handleLogout} />;
   }
 
+  // DRIVER VIEW
   if (view === AppView.DRIVER_DASHBOARD) {
       return <DriverPortal onLogout={handleLogout} />;
   }
 
+  // STAFF VIEW
   if (view === AppView.STAFF_DASHBOARD) {
-      return <StaffPortal onLogout={handleLogout} user={user!} />;
+      return <StaffPortal user={user} onLogout={handleLogout} />;
   }
 
-  // --- Guest App View ---
-
+  // --- GUEST VIEW (MOBILE APP LAYOUT) ---
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col max-w-lg mx-auto shadow-2xl overflow-hidden relative">
-      {/* App Content */}
-      <div className="flex-1 overflow-hidden relative bg-gray-50">
+    <div className="flex flex-col h-screen bg-gray-50 max-w-md mx-auto shadow-2xl overflow-hidden relative">
+      
+      {/* 1. Compact Header */}
+      <div className="bg-emerald-900 text-white pt-4 pb-4 px-5 flex justify-between items-center shadow-md z-30 shrink-0">
+          <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center border border-white/20">
+                   <span className="font-serif text-lg font-bold">{user.lastName.charAt(0)}</span>
+              </div>
+              <div>
+                  <p className="text-[10px] text-emerald-300 uppercase tracking-widest">{t('welcome_back')}</p>
+                  <h1 className="font-bold text-lg leading-tight truncate max-w-[150px]">{user.lastName}</h1>
+              </div>
+          </div>
+          <div className="flex items-center space-x-2">
+               <NotificationBell userId={user.roomNumber} />
+               <button onClick={handleLogout} className="p-2 rounded-full hover:bg-white/10 text-emerald-200 hover:text-white transition" title="Logout">
+                  <LogOut size={20} />
+               </button>
+          </div>
+      </div>
+
+      {/* 2. Main Content Area */}
+      <div className="flex-1 overflow-y-auto pb-20 relative bg-gray-50 scrollbar-hide">
+        {/* Render View Content */}
         {view === AppView.HOME && (
-            <div className="h-full overflow-y-auto relative">
-                {/* Home Header Container */}
-                <div className="relative">
-                    {/* Background Layer (Z-10: Behind Quick Actions) */}
-                    <div className="absolute inset-0 bg-emerald-900 rounded-b-[2.5rem] shadow-xl z-10"></div>
-                    
-                    {/* Content Layer (Z-30: In Front of Quick Actions) */}
-                    <div className="relative z-30 p-6 pb-12 text-white">
-                        <div className="flex justify-between items-start mb-6">
-                            <div>
-                                <p className="text-emerald-200 text-sm">Welcome back,</p>
-                                <h2 className="font-serif text-2xl">Mr/Ms {user?.lastName}</h2>
-                                <p className="text-xs opacity-80 mt-1">{user?.villaType} • Room {user?.roomNumber}</p>
-                            </div>
-                            <div className="flex items-center space-x-4">
-                                {/* NOTIFICATION BELL */}
-                                <NotificationBell userId={user?.roomNumber || ''} />
-                                <button onClick={handleLogout} className="opacity-80 hover:opacity-100"><LogOut size={20}/></button>
-                            </div>
+             <div className="flex flex-col min-h-full">
+                {/* Hero Banner (Smaller) */}
+                <div className="mx-4 mt-4 h-32 rounded-2xl overflow-hidden relative shadow-lg mb-6">
+                    <img src="https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Pool-768x552.jpg" className="absolute inset-0 w-full h-full object-cover" alt="Resort" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/80 to-transparent flex items-center p-6">
+                        <div>
+                             <h2 className="text-white font-serif text-2xl font-bold mb-1">Furama Danang</h2>
+                             <p className="text-emerald-100 text-xs">A Culinary Beach Resort</p>
                         </div>
                     </div>
                 </div>
 
-                {/* Quick Actions (Z-20: Overlaps Background, Under Content) */}
-                <div className="-mt-8 px-6 mb-8 relative z-20">
-                    <div className="bg-white rounded-2xl shadow-lg p-4 flex justify-around items-center">
-                        <button onClick={() => setView(AppView.BUGGY)} className="flex flex-col items-center gap-2 group">
-                            <div className="p-3 bg-emerald-50 text-emerald-800 rounded-full group-hover:bg-emerald-100 transition">
-                                <Car size={24} />
-                            </div>
-                            <span className="text-xs font-semibold text-gray-600">Buggy</span>
-                        </button>
-                        <div className="w-px h-10 bg-gray-100"></div>
-                        <button onClick={() => setView(AppView.CHAT)} className="flex flex-col items-center gap-2 group">
-                            <div className="p-3 bg-emerald-50 text-emerald-800 rounded-full group-hover:bg-emerald-100 transition">
-                                <MessageSquare size={24} />
-                            </div>
-                            <span className="text-xs font-semibold text-gray-600">Chat AI</span>
-                        </button>
-                    </div>
-                </div>
-
-                {/* PROMOTIONS SECTION */}
-                <div className="mb-6 px-4">
-                    <div className="flex items-center justify-between mb-3 px-2">
-                        <h3 className="font-serif text-lg text-gray-800 flex items-center">
-                            <Percent size={18} className="mr-2 text-amber-500" /> Exclusive Offers
-                        </h3>
-                    </div>
-                    <div className="flex overflow-x-auto gap-4 pb-4 scrollbar-hide snap-x">
-                        {promotions.map(p => (
-                            <div key={p.id} className="snap-center min-w-[280px] bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                                <div className={`h-24 ${p.imageColor || 'bg-emerald-500'} relative p-4 flex items-end`}>
-                                     <span className="bg-white text-gray-900 text-xs font-bold px-2 py-1 rounded-md shadow-sm">
-                                         {p.discount || 'Special'}
-                                     </span>
-                                </div>
-                                <div className="p-4">
-                                    <h4 className="font-bold text-gray-800 mb-1">{p.title}</h4>
-                                    <p className="text-xs text-gray-500 line-clamp-2">{p.description}</p>
-                                    <p className="text-[10px] text-gray-400 mt-2 font-medium uppercase tracking-wide">{p.validUntil}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
                 {/* Services Grid */}
-                <div className="px-4 pb-20">
-                    <h3 className="font-serif text-lg text-gray-800 mb-4 px-2">Resort Services</h3>
-                    <ServiceMenu onSelect={handleServiceSelect} />
+                <div className="px-4">
+                    <div className="flex justify-between items-center mb-2 px-1">
+                        <h3 className="font-bold text-gray-800 text-lg">{t('resort_services')}</h3>
+                            </div>
+                    {/* Using negative margin to counteract default padding of ServiceMenu if needed, or just standard render */}
+                    <div className="-mx-4">
+                        <ServiceMenu onSelect={handleServiceSelect} />
+                    </div>
+                </div>
+
+                {/* Promotions Carousel */}
+                <div className="p-6 pt-2 pb-8">
+                    <h3 className="font-bold text-gray-800 text-lg mb-4 px-1">{t('exclusive_offers')}</h3>
+                    <div className="flex space-x-4 overflow-x-auto pb-4 snap-x scrollbar-hide">
+                        {promotions.map(promo => {
+                            const tr = promo.translations?.[language];
+                            const title = tr?.title || promo.title;
+                            const desc = tr?.description || promo.description;
+                            const discount = tr?.discount || promo.discount;
+
+                            return (
+                                <div key={promo.id} className={`min-w-[260px] p-5 rounded-2xl ${promo.imageColor || 'bg-emerald-500'} text-white shadow-lg snap-center relative overflow-hidden shrink-0`}>
+                                    <div className="relative z-10">
+                                        <div className="bg-white/20 w-fit px-2 py-1 rounded text-[10px] font-bold mb-2 backdrop-blur-sm">{discount}</div>
+                                        <h4 className="font-bold text-lg mb-1">{title}</h4>
+                                        <p className="text-xs opacity-90 line-clamp-2">{desc}</p>
+                                        <p className="text-[10px] mt-3 opacity-75">{promo.validUntil}</p>
+                    </div>
+                                    <div className="absolute -bottom-4 -right-4 text-white/10">
+                                        <Percent size={100} />
+                                </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
         )}
 
-        {view === AppView.BUGGY && <BuggyBooking user={user!} onBack={() => setView(AppView.HOME)} />}
-        
+        {/* Sub-Views rendered in content area */}
+        {view === AppView.BUGGY && <BuggyBooking user={user} onBack={() => setView(AppView.HOME)} />}
         {view === AppView.CHAT && <ConciergeChat onClose={() => setView(AppView.HOME)} />}
-
-        {view === AppView.DINING_ORDER && <ServiceBooking type="DINING" user={user!} onBack={() => setView(AppView.HOME)} />}
-        {view === AppView.SPA_BOOKING && <ServiceBooking type="SPA" user={user!} onBack={() => setView(AppView.HOME)} />}
-        {view === AppView.POOL_ORDER && <ServiceBooking type="POOL" user={user!} onBack={() => setView(AppView.HOME)} />}
-        {view === AppView.BUTLER_REQUEST && <ServiceBooking type="BUTLER" user={user!} onBack={() => setView(AppView.HOME)} />}
-        {view === AppView.EVENTS && <EventsList onBack={() => setView(AppView.HOME)} />}
+        {view === AppView.ACTIVE_ORDERS && <ActiveOrders user={user} onBack={() => setView(AppView.HOME)} />}
+        {view === AppView.ACCOUNT && <GuestAccount user={user} onBack={() => setView(AppView.HOME)} />}
         
-        {view === AppView.ACCOUNT && <GuestAccount user={user!} onBack={() => setView(AppView.HOME)} />}
-
+        {/* Service Booking Views */}
+        {view === AppView.DINING_ORDER && <ServiceBooking type="DINING" user={user} onBack={() => setView(AppView.HOME)} />}
+        {view === AppView.SPA_BOOKING && <ServiceBooking type="SPA" user={user} onBack={() => setView(AppView.HOME)} />}
+        {view === AppView.POOL_ORDER && <ServiceBooking type="POOL" user={user} onBack={() => setView(AppView.HOME)} />}
+        {view === AppView.BUTLER_REQUEST && <ServiceBooking type="BUTLER" user={user} onBack={() => setView(AppView.HOME)} />}
+        {view === AppView.EVENTS && <EventsList onBack={() => setView(AppView.HOME)} />}
       </div>
 
-      {/* Bottom Nav (Only visible on Home/Account) */}
-      {(view === AppView.HOME || view === AppView.ACCOUNT) && (
-        <div className="bg-white border-t border-gray-100 p-4 flex justify-around items-center text-gray-400 absolute bottom-0 w-full z-30">
-           <button onClick={() => setView(AppView.HOME)} className={`flex flex-col items-center hover:text-emerald-800 transition ${view === AppView.HOME ? 'text-emerald-800' : ''}`}>
-              <div className={`w-6 h-6 rounded-full mb-1 ${view === AppView.HOME ? 'bg-emerald-800' : 'bg-gray-300'}`}></div>
-              <span className="text-[10px] font-bold">Home</span>
-           </button>
-           <button onClick={() => setView(AppView.CHAT)} className="flex flex-col items-center hover:text-emerald-600 transition">
-              <MessageSquare size={24} className="mb-1" />
-              <span className="text-[10px]">Concierge</span>
-           </button>
-           <button onClick={() => setView(AppView.ACCOUNT)} className={`flex flex-col items-center hover:text-emerald-600 transition ${view === AppView.ACCOUNT ? 'text-emerald-800' : ''}`}>
-              <UserIcon size={24} className="mb-1" />
-              <span className="text-[10px]">Account</span>
-           </button>
+      {/* 3. Fixed Bottom Navigation Bar */}
+      <div className="bg-white border-t border-gray-200 h-20 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-40 flex justify-around items-center px-2 pb-2">
+           <NavButton 
+                active={view === AppView.HOME} 
+                onClick={() => setView(AppView.HOME)} 
+                icon={Home} 
+                label={t('home')} 
+           />
+           <NavButton 
+                active={view === AppView.BUGGY} 
+                onClick={() => setView(AppView.BUGGY)} 
+                icon={Car} 
+                label={t('buggy')} 
+           />
+           <NavButton 
+                active={view === AppView.CHAT} 
+                onClick={() => setView(AppView.CHAT)} 
+                icon={MessageSquare} 
+                label="Concierge" 
+                special 
+           />
+           <NavButton 
+                active={view === AppView.ACTIVE_ORDERS} 
+                onClick={() => setView(AppView.ACTIVE_ORDERS)} 
+                icon={ShoppingCart} 
+                label={t('shopping_cart')}
+                badge={activeOrderCount}
+           />
+           <NavButton 
+                active={view === AppView.ACCOUNT} 
+                onClick={() => setView(AppView.ACCOUNT)} 
+                icon={UserIcon} 
+                label={t('account')} 
+           />
         </div>
-      )}
     </div>
+  );
+};
+
+// Helper Component for Bottom Nav Buttons
+const NavButton: React.FC<{ 
+    active: boolean; 
+    onClick: () => void; 
+    icon: React.ElementType; 
+    label: string; 
+    special?: boolean;
+    badge?: number;
+}> = ({ active, onClick, icon: Icon, label, special, badge }) => (
+    <button 
+        onClick={onClick}
+        className={`flex flex-col items-center justify-center w-full h-full relative ${
+            active ? 'text-emerald-700' : 'text-gray-400 hover:text-gray-600'
+        }`}
+    >
+        {special ? (
+            <div className={`p-3 rounded-full mb-1 shadow-lg transform -translate-y-4 border-4 border-gray-50 transition ${active ? 'bg-emerald-700 text-white' : 'bg-emerald-600 text-white'}`}>
+                <Icon size={24} />
+            </div>
+        ) : (
+            <div className="mb-1 relative">
+                <Icon size={24} strokeWidth={active ? 2.5 : 2} />
+                {badge && badge > 0 ? (
+                    <span className="absolute -top-1 -right-1.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full border border-white">
+                        {badge}
+                    </span>
+                ) : null}
+            </div>
+        )}
+        <span className={`text-[10px] font-medium ${special ? '-mt-3' : ''}`}>
+            {label}
+        </span>
+    </button>
+);
+
+// Main App Wrapper for Providers
+const App: React.FC = () => {
+    return (
+        <LanguageProvider>
+            <AppContent />
+        </LanguageProvider>
   );
 };
 

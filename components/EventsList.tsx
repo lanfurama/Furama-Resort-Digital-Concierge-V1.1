@@ -2,14 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Calendar, MapPin, Clock } from 'lucide-react';
 import { getEvents } from '../services/dataService';
 import { ResortEvent } from '../types';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface EventsListProps {
     onBack: () => void;
 }
 
 const EventsList: React.FC<EventsListProps> = ({ onBack }) => {
+    const { t, language } = useTranslation();
     const [events, setEvents] = useState<ResortEvent[]>([]);
     
+    // Load events on mount
     useEffect(() => {
         getEvents().then(setEvents).catch(console.error);
     }, []);
@@ -31,7 +34,7 @@ const EventsList: React.FC<EventsListProps> = ({ onBack }) => {
                 <button onClick={onBack} className="mr-4 text-white hover:text-gray-200">
                     <ArrowLeft className="w-6 h-6" />
                 </button>
-                <h2 className="text-xl font-serif font-bold">Resort Events</h2>
+                <h2 className="text-xl font-serif font-bold">{t('events')}</h2>
             </div>
 
             {/* Content */}
@@ -44,6 +47,13 @@ const EventsList: React.FC<EventsListProps> = ({ onBack }) => {
                 ) : (
                     events.map(event => {
                         const dateObj = formatDate(event.date);
+                        
+                        // Translation Fallback
+                        const tr = event.translations?.[language];
+                        const title = tr?.title || event.title;
+                        const description = tr?.description || event.description;
+                        const location = tr?.location || event.location;
+
                         return (
                             <div key={event.id} className="bg-white rounded-xl shadow-sm border border-pink-100 overflow-hidden hover:shadow-md transition">
                                 <div className="flex">
@@ -55,18 +65,18 @@ const EventsList: React.FC<EventsListProps> = ({ onBack }) => {
                                     
                                     {/* Info Column */}
                                     <div className="p-4 flex-1">
-                                        <h3 className="font-bold text-gray-800 text-lg leading-tight mb-1">{event.title}</h3>
+                                        <h3 className="font-bold text-gray-800 text-lg leading-tight mb-1">{title}</h3>
                                         
                                         <div className="flex items-center text-pink-700 text-sm font-medium mb-2">
                                             <Clock size={14} className="mr-1" />
                                             {event.time}
                                         </div>
                                         
-                                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">{event.description}</p>
+                                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">{description}</p>
                                         
                                         <div className="flex items-center text-xs text-gray-500 bg-gray-50 p-2 rounded-lg inline-flex">
                                             <MapPin size={14} className="mr-1.5 text-gray-400" />
-                                            {event.location}
+                                            {location}
                                         </div>
                                     </div>
                                 </div>
