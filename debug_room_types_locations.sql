@@ -13,3 +13,4 @@ ORDER BY rt.name;
 -- Check all locations
 SELECT id, name, type FROM locations ORDER BY name;
 
+
