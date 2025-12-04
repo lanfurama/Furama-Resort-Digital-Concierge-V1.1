@@ -22,65 +22,130 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         pickup: '',
         destination: ''
     });
-    const locations = getLocations();
+    const [locations, setLocations] = useState<any[]>([]);
+
+    // Load locations on mount
+    useEffect(() => {
+        const loadLocations = async () => {
+            try {
+                const locs = await getLocations();
+                setLocations(locs);
+            } catch (error) {
+                console.error('Failed to load locations:', error);
+                setLocations([]);
+            }
+        };
+        loadLocations();
+    }, []);
 
     // Polling for new rides and chat messages
     useEffect(() => {
-        const interval = setInterval(() => {
-            const allRides = getRides();
-            setRides(allRides);
-            
-            // Check if I have an active ride
-            const active = allRides.find(r => 
-                (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP) 
-                // In a real app check driver ID, here we simulate single driver session
-            );
-            
-            if (active) {
-                setMyRideId(active.id);
-                // Check for unread messages from Guest for this ride
-                const lastMsg = getLastMessage(active.roomNumber, 'BUGGY');
-                // If last message exists and was sent by 'user' (Guest), it's unread for the Driver
-                if (lastMsg && lastMsg.role === 'user') {
-                    setHasUnreadChat(true);
+        const loadRides = async () => {
+            try {
+                const allRides = await getRides();
+                setRides(allRides);
+                
+                // Check if I have an active ride
+                const active = allRides.find(r => 
+                    (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP) 
+                    // In a real app check driver ID, here we simulate single driver session
+                );
+                
+                if (active) {
+                    setMyRideId(active.id);
+                    // Check for unread messages from Guest for this ride
+                    const lastMsg = await getLastMessage(active.roomNumber, 'BUGGY');
+                    // If last message exists and was sent by 'user' (Guest), it's unread for the Driver
+                    if (lastMsg && lastMsg.role === 'user') {
+                        setHasUnreadChat(true);
+                    }
+                } else {
+                    setMyRideId(null);
+                    setShowChat(false);
+                    setHasUnreadChat(false);
                 }
-            } else {
-                setMyRideId(null);
-                setShowChat(false);
-                setHasUnreadChat(false);
+            } catch (error) {
+                console.error('Failed to load rides:', error);
             }
-        }, 1000);
+        };
+
+        // Initial load
+        loadRides();
+
+        const interval = setInterval(loadRides, 2000); // Poll every 2 seconds
         return () => clearInterval(interval);
     }, []);
 
-    const acceptRide = (id: string) => {
-        updateRideStatus(id, BuggyStatus.ARRIVING, 'driver-1', 5); // 5 min ETA mock
+    const acceptRide = async (id: string) => {
+        try {
+            console.log('Accepting ride:', id);
+            await updateRideStatus(id, BuggyStatus.ARRIVING, 'driver-1', 5); // 5 min ETA mock
+            console.log('Ride accepted successfully');
+            // Refresh rides after update
+            const allRides = await getRides();
+            setRides(allRides);
+        } catch (error) {
+            console.error('Failed to accept ride:', error);
+            alert('Failed to accept ride. Please try again.');
+        }
     };
 
-    const pickUpGuest = (id: string) => {
-        updateRideStatus(id, BuggyStatus.ON_TRIP);
+    const pickUpGuest = async (id: string) => {
+        try {
+            console.log('Picking up guest for ride:', id);
+            await updateRideStatus(id, BuggyStatus.ON_TRIP);
+            console.log('Guest picked up successfully');
+            // Refresh rides after update
+            const allRides = await getRides();
+            setRides(allRides);
+        } catch (error) {
+            console.error('Failed to pick up guest:', error);
+            alert('Failed to update ride status. Please try again.');
+        }
     };
 
-    const completeRide = (id: string) => {
-        updateRideStatus(id, BuggyStatus.COMPLETED);
-        setShowChat(false);
+    const completeRide = async (id: string) => {
+        try {
+            console.log('Completing ride:', id);
+            await updateRideStatus(id, BuggyStatus.COMPLETED);
+            console.log('Ride completed successfully');
+            setShowChat(false);
+            // Refresh rides after update
+            const allRides = await getRides();
+            setRides(allRides);
+        } catch (error) {
+            console.error('Failed to complete ride:', error);
+            alert('Failed to complete ride. Please try again.');
+        }
     };
 
-    const handleCreateManualRide = () => {
+    const handleCreateManualRide = async () => {
         if (!manualRideData.pickup || !manualRideData.destination) return;
         
-        const newRide = createManualRide(
-            'driver-1', 
-            manualRideData.roomNumber, 
-            manualRideData.pickup, 
-            manualRideData.destination
-        );
-        
-        // Immediately set this as my active ride and switch view
-        setMyRideId(newRide.id);
-        setViewMode('ACTIVE');
-        setShowCreateModal(false);
-        setManualRideData({ roomNumber: '', pickup: '', destination: '' });
+        try {
+            console.log('Creating manual ride:', manualRideData);
+            const newRide = await createManualRide(
+                'driver-1', 
+                manualRideData.roomNumber, 
+                manualRideData.pickup, 
+                manualRideData.destination
+            );
+            
+            console.log('Manual ride created successfully:', newRide);
+            
+            // Immediately set this as my active ride and switch view
+            setMyRideId(newRide.id);
+            setViewMode('ACTIVE');
+            setShowCreateModal(false);
+            setManualRideData({ roomNumber: '', pickup: '', destination: '' });
+            
+            // Refresh rides after create
+            const allRides = await getRides();
+            setRides(allRides);
+        } catch (error) {
+            console.error('Failed to create manual ride:', error);
+            alert('Failed to create ride. Please try again.');
+        }
     };
 
     const pendingRides = rides.filter(r => r.status === BuggyStatus.SEARCHING);

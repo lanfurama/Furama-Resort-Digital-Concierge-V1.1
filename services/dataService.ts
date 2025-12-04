@@ -195,19 +195,133 @@ const notifyStaffByDepartment = async (department: string, title: string, messag
 
 
 // --- USERS ---
-export const getUsers = () => users;
+export const getUsers = async (): Promise<User[]> => {
+  try {
+    console.log('Fetching users from API...');
+    const dbUsers = await apiClient.get<any[]>('/users');
+    console.log('Users API response:', dbUsers);
+    
+    const mapped = dbUsers.map(user => ({
+      id: user.id.toString(),
+      lastName: user.last_name,
+      roomNumber: user.room_number,
+      password: user.password || undefined,
+      villaType: user.villa_type || undefined,
+      role: user.role as UserRole,
+      department: 'All' as Department, // Default, database doesn't have department field
+      checkIn: user.check_in || undefined,
+      checkOut: user.check_out || undefined,
+      language: user.language || undefined,
+      notes: undefined // Database doesn't have notes field
+    }));
+    
+    console.log('Mapped users:', mapped);
+    // Update local cache
+    users = mapped;
+    return mapped;
+  } catch (error) {
+    console.error('Failed to fetch users from API:', error);
+    console.warn('Falling back to mock users. This means users are NOT loaded from database!');
+    return users; // Fallback to mock data
+  }
+};
 
-export const addUser = (user: User) => {
-    // Default password for new manually created users is '123'
+// Sync version for backward compatibility
+export const getUsersSync = () => users;
+
+export const addUser = async (user: User): Promise<void> => {
+  try {
+    const requestBody = {
+      last_name: user.lastName,
+      room_number: user.roomNumber,
+      villa_type: user.villaType || null,
+      role: user.role,
+      password: user.password || '123', // Default password for new users
+      language: user.language || 'English'
+    };
+    
+    console.log('Adding user via API - Input:', user);
+    console.log('Adding user via API - Request Body:', requestBody);
+    
+    const dbUser = await apiClient.post<any>('/users', requestBody);
+    
+    console.log('User added successfully - API Response:', dbUser);
+    
+    // Update local cache
+    const mappedUser: User = {
+      id: dbUser.id.toString(),
+      lastName: dbUser.last_name,
+      roomNumber: dbUser.room_number,
+      password: dbUser.password || undefined,
+      villaType: dbUser.villa_type || undefined,
+      role: dbUser.role as UserRole,
+      department: 'All' as Department,
+      checkIn: dbUser.check_in || undefined,
+      checkOut: dbUser.check_out || undefined,
+      language: dbUser.language || undefined
+    };
+    
+    users = [...users, mappedUser];
+    console.log('User added to local cache:', mappedUser);
+  } catch (error: any) {
+    console.error('Failed to add user via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
+    console.warn('Falling back to local mock data. User will NOT be saved to database!');
+    // Fallback to local state
     users = [...users, { ...user, id: Date.now().toString(), password: user.password || '123' }];
+    throw error;
+  }
 };
 
-export const deleteUser = (id: string) => {
+export const deleteUser = async (id: string): Promise<void> => {
+  try {
+    console.log('Deleting user via API:', id);
+    await apiClient.delete(`/users/${id}`);
+    console.log('User deleted successfully from database');
+    // Update local cache
     users = users.filter(u => u.id !== id);
+    console.log('User removed from local cache');
+  } catch (error: any) {
+    console.error('Failed to delete user via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
+    console.warn('Falling back to local mock data. User will NOT be deleted from database!');
+    // Fallback to local state
+    users = users.filter(u => u.id !== id);
+    throw error; // Re-throw để component có thể handle error
+  }
 };
 
-export const resetUserPassword = (userId: string, newPass: string) => {
+export const resetUserPassword = async (userId: string, newPass: string): Promise<void> => {
+  try {
+    console.log('Resetting user password via API:', { userId, newPass });
+    await apiClient.put(`/users/${userId}`, { password: newPass });
+    console.log('User password reset successfully');
+    // Update local cache
     users = users.map(u => u.id === userId ? { ...u, password: newPass } : u);
+    console.log('User password updated in local cache');
+  } catch (error: any) {
+    console.error('Failed to reset user password via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
+    console.warn('Falling back to local mock data. Password will NOT be updated in database!');
+    // Fallback to local state
+    users = users.map(u => u.id === userId ? { ...u, password: newPass } : u);
+    throw error; // Re-throw để component có thể handle error
+  }
 };
 
 export const updateUserNotes = async (roomNumber: string, notes: string): Promise<void> => {
@@ -349,11 +463,12 @@ export const findUserByCredentials = (lastName: string, roomNumber: string): Use
 };
 
 // CSV Import Logic (Guests)
-export const importGuestsFromCSV = (csvContent: string): number => {
+export const importGuestsFromCSV = async (csvContent: string): Promise<number> => {
     const lines = csvContent.split(/\r?\n/);
     let count = 0;
+    const errors: string[] = [];
 
-    lines.forEach(line => {
+    for (const line of lines) {
         const parts = line.split(',');
         if (parts.length >= 2) {
             const lastName = parts[0].trim();
@@ -364,29 +479,46 @@ export const importGuestsFromCSV = (csvContent: string): number => {
             const language = parts[5]?.trim() || "English";
 
             if (lastName && roomNumber) {
-                const existingIdx = users.findIndex(u => u.roomNumber === roomNumber && u.role === UserRole.GUEST);
-                
-                const newUser: User = {
-                    id: existingIdx >= 0 ? users[existingIdx].id : Date.now().toString() + Math.random(),
-                    lastName,
-                    roomNumber,
-                    role: UserRole.GUEST,
-                    department: 'All',
-                    villaType,
-                    checkIn,
-                    checkOut,
-                    language
-                };
-
-                if (existingIdx >= 0) {
-                    users[existingIdx] = newUser;
-                } else {
-                    users.push(newUser);
+                try {
+                    const newUser: User = {
+                        lastName,
+                        roomNumber,
+                        role: UserRole.GUEST,
+                        department: 'All',
+                        villaType,
+                        checkIn,
+                        checkOut,
+                        language
+                    };
+                    
+                    console.log('Importing guest from CSV:', newUser);
+                    await addUser(newUser);
+                    count++;
+                    console.log(`Guest "${lastName}" (${roomNumber}) imported successfully`);
+                } catch (error: any) {
+                    console.error(`Failed to import guest "${lastName}" (${roomNumber}):`, error);
+                    errors.push(`${lastName} (${roomNumber}): ${error?.message || 'Unknown error'}`);
+                    // Continue with next user even if one fails
                 }
-                count++;
             }
         }
-    });
+    }
+    
+    if (errors.length > 0) {
+        console.warn('Some guests failed to import:', errors);
+    }
+    
+    console.log(`CSV import completed: ${count} guests imported${errors.length > 0 ? `, ${errors.length} failed` : ''}`);
+    
+    // Refresh users after import
+    try {
+        const refreshedUsers = await getUsers();
+        users = refreshedUsers;
+        console.log('Users refreshed after CSV import');
+    } catch (error) {
+        console.error('Failed to refresh users after CSV import:', error);
+    }
+    
     return count;
 };
 
@@ -403,16 +535,23 @@ export const getGuestCSVContent = (): string => {
 // --- LOCATIONS ---
 export const getLocations = async (): Promise<Location[]> => {
   try {
+    console.log('Fetching locations from API...');
     const dbLocations = await apiClient.get<any[]>('/locations');
-    return dbLocations.map(loc => ({
+    console.log('Locations API response:', dbLocations);
+    
+    const mappedLocations = dbLocations.map(loc => ({
       id: loc.id.toString(),
       lat: parseFloat(loc.lat),
       lng: parseFloat(loc.lng),
       name: loc.name,
       type: loc.type as 'VILLA' | 'FACILITY' | 'RESTAURANT'
     }));
+    
+    console.log('Mapped locations:', mappedLocations);
+    return mappedLocations;
   } catch (error) {
-    console.error('Failed to fetch locations:', error);
+    console.error('Failed to fetch locations from API:', error);
+    console.warn('Falling back to mock locations. This may cause location ID mismatches with room types from database!');
     return locations; // Fallback to mock data
   }
 };
@@ -470,56 +609,129 @@ export const deleteLocation = async (idOrName: string): Promise<void> => {
 // --- ROOM TYPES ---
 export const getRoomTypes = async (): Promise<RoomType[]> => {
   try {
+    console.log('Fetching room types from API...');
     const dbRoomTypes = await apiClient.get<any[]>('/room-types');
-    return dbRoomTypes.map(rt => ({
+    console.log('Room types API response:', dbRoomTypes);
+    
+    const mapped = dbRoomTypes.map(rt => ({
       id: rt.id.toString(),
       name: rt.name,
       description: rt.description || undefined,
       locationId: rt.location_id ? rt.location_id.toString() : undefined
     }));
+    
+    console.log('Mapped room types:', mapped);
+    return mapped;
   } catch (error) {
-    console.error('Failed to fetch room types:', error);
+    console.error('Failed to fetch room types from API:', error);
+    console.warn('Falling back to mock room types. This means room types are NOT loaded from database!');
     return roomTypes; // Fallback to mock data
   }
 };
 
 export const addRoomType = async (rt: RoomType): Promise<RoomType> => {
   try {
-    const dbRoomType = await apiClient.post<any>('/room-types', {
+    // Prepare location_id: if locationId is empty string or undefined, send null; otherwise parse as int
+    let location_id: number | null = null;
+    if (rt.locationId && rt.locationId.trim() !== '') {
+      location_id = parseInt(rt.locationId);
+      if (isNaN(location_id)) {
+        console.warn('Invalid locationId, setting to null:', rt.locationId);
+        location_id = null;
+      }
+    }
+    
+    const requestBody = {
       name: rt.name,
       description: rt.description || null,
-      location_id: rt.locationId ? parseInt(rt.locationId) : null
-    });
-    return {
+      location_id: location_id
+    };
+    
+    console.log('Adding room type via API - Input:', rt);
+    console.log('Adding room type via API - Request Body:', requestBody);
+    
+    const dbRoomType = await apiClient.post<any>('/room-types', requestBody);
+    
+    console.log('Room type added successfully - API Response:', dbRoomType);
+    
+    const result = {
       id: dbRoomType.id.toString(),
       name: dbRoomType.name,
       description: dbRoomType.description || undefined,
       locationId: dbRoomType.location_id ? dbRoomType.location_id.toString() : undefined
     };
-  } catch (error) {
-    console.error('Failed to add room type:', error);
+    
+    console.log('Mapped room type result:', result);
+    return result;
+  } catch (error: any) {
+    console.error('Failed to add room type via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status
+    });
+    console.warn('Falling back to local mock data. Room type will NOT be saved to database!');
     // Fallback to local
     const newRt = { ...rt, id: Date.now().toString() };
     roomTypes = [...roomTypes, newRt];
-    return newRt;
+    throw error; // Re-throw để component có thể handle error
   }
 };
 
 export const updateRoomType = async (id: string, rt: Partial<RoomType>): Promise<RoomType> => {
   try {
-    const dbRoomType = await apiClient.put<any>(`/room-types/${id}`, {
-      name: rt.name,
-      description: rt.description !== undefined ? (rt.description || null) : undefined,
-      location_id: rt.locationId !== undefined ? (rt.locationId ? parseInt(rt.locationId) : null) : undefined
-    });
-    return {
+    // Prepare location_id: if locationId is empty string or undefined, send null; otherwise parse as int
+    let location_id: number | null | undefined = undefined;
+    if (rt.locationId !== undefined) {
+      if (rt.locationId && rt.locationId.trim() !== '') {
+        const parsed = parseInt(rt.locationId);
+        if (isNaN(parsed)) {
+          console.warn('Invalid locationId, setting to null:', rt.locationId);
+          location_id = null;
+        } else {
+          location_id = parsed;
+        }
+      } else {
+        location_id = null; // Empty string or whitespace -> null
+      }
+    }
+    
+    // Build request body - only include fields that are defined
+    const requestBody: any = {};
+    if (rt.name !== undefined) {
+      requestBody.name = rt.name;
+    }
+    if (rt.description !== undefined) {
+      requestBody.description = rt.description || null;
+    }
+    if (rt.locationId !== undefined) {
+      requestBody.location_id = location_id;
+    }
+    
+    console.log('updateRoomType - Input:', { id, rt });
+    console.log('updateRoomType - Request Body:', requestBody);
+    
+    const dbRoomType = await apiClient.put<any>(`/room-types/${id}`, requestBody);
+    
+    console.log('updateRoomType - API Response:', dbRoomType);
+    
+    const result = {
       id: dbRoomType.id.toString(),
       name: dbRoomType.name,
       description: dbRoomType.description || undefined,
       locationId: dbRoomType.location_id ? dbRoomType.location_id.toString() : undefined
     };
-  } catch (error) {
+    
+    console.log('updateRoomType - Mapped Result:', result);
+    return result;
+  } catch (error: any) {
     console.error('Failed to update room type:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
     // Fallback to local
     const existing = roomTypes.find(r => r.id === id);
     if (existing) {
@@ -527,17 +739,21 @@ export const updateRoomType = async (id: string, rt: Partial<RoomType>): Promise
       roomTypes = roomTypes.map(r => r.id === id ? updated : r);
       return updated;
     }
-    throw error;
+    throw error; // Re-throw để component có thể handle error
   }
 };
 
 export const deleteRoomType = async (id: string): Promise<void> => {
   try {
+    console.log('Deleting room type via API:', id);
     await apiClient.delete(`/room-types/${id}`);
+    console.log('Room type deleted successfully');
   } catch (error) {
-    console.error('Failed to delete room type:', error);
+    console.error('Failed to delete room type via API:', error);
+    console.warn('Falling back to local mock data. Room type will NOT be deleted from database!');
     // Fallback to local
     roomTypes = roomTypes.filter(rt => rt.id !== id);
+    throw error; // Re-throw để component có thể handle error
   }
 };
 
@@ -626,7 +842,10 @@ export const importRoomsFromCSV = async (csvContent: string): Promise<number> =>
 // --- MENU ---
 export const getMenu = async (categoryFilter?: 'Dining' | 'Spa' | 'Pool' | 'Butler'): Promise<MenuItem[]> => {
   try {
+    console.log('Fetching menu items from API...');
     const dbMenuItems = await apiClient.get<any[]>('/menu-items');
+    console.log('Menu items API response:', dbMenuItems);
+    
     let filtered = dbMenuItems.map(item => ({
       id: item.id.toString(),
       name: item.name,
@@ -639,9 +858,11 @@ export const getMenu = async (categoryFilter?: 'Dining' | 'Spa' | 'Pool' | 'Butl
       filtered = filtered.filter(item => item.category === categoryFilter);
     }
     
+    console.log('Mapped menu items:', filtered);
     return filtered;
   } catch (error) {
-    console.error('Failed to fetch menu items:', error);
+    console.error('Failed to fetch menu items from API:', error);
+    console.warn('Falling back to mock menu data. This means menu items are NOT saved to database!');
     // Fallback to mock data
     if (categoryFilter) {
       return menuItems.filter(item => item.category === categoryFilter);
@@ -657,18 +878,79 @@ export const getMenuSync = (categoryFilter?: 'Dining' | 'Spa' | 'Pool' | 'Butler
     }
     return menuItems;
 };
-export const addMenuItem = (item: MenuItem) => {
-  menuItems = [...menuItems, { ...item, id: Date.now().toString() }];
+export const addMenuItem = async (item: MenuItem): Promise<void> => {
+  try {
+    const requestBody = {
+      name: item.name,
+      price: item.price,
+      category: item.category,
+      description: item.description || null
+    };
+    
+    console.log('Adding menu item via API - Input:', item);
+    console.log('Adding menu item via API - Request Body:', requestBody);
+    
+    const dbMenuItem = await apiClient.post<any>('/menu-items', requestBody);
+    
+    console.log('Menu item added successfully - API Response:', dbMenuItem);
+    
+    // Update local cache
+    const mappedItem = {
+      id: dbMenuItem.id.toString(),
+      name: dbMenuItem.name,
+      price: parseFloat(dbMenuItem.price),
+      category: dbMenuItem.category as 'Dining' | 'Spa' | 'Pool' | 'Butler',
+      description: dbMenuItem.description || undefined
+    };
+    
+    menuItems = [...menuItems, mappedItem];
+    console.log('Menu item added to local cache:', mappedItem);
+  } catch (error: any) {
+    console.error('Failed to add menu item via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
+    console.warn('Falling back to local mock data. Menu item will NOT be saved to database!');
+    // Fallback to local state
+    menuItems = [...menuItems, { ...item, id: Date.now().toString() }];
+    throw error;
+  }
 };
-export const deleteMenuItem = (id: string) => {
+
+export const deleteMenuItem = async (id: string): Promise<void> => {
+  try {
+    console.log('Deleting menu item via API:', id);
+    await apiClient.delete(`/menu-items/${id}`);
+    console.log('Menu item deleted successfully from database');
+    // Update local cache
     menuItems = menuItems.filter(m => m.id !== id);
+    console.log('Menu item removed from local cache');
+  } catch (error: any) {
+    console.error('Failed to delete menu item via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
+    console.warn('Falling back to local mock data. Menu item will NOT be deleted from database!');
+    // Fallback to local state
+    menuItems = menuItems.filter(m => m.id !== id);
+    throw error; // Re-throw để component có thể handle error
+  }
 };
 
 // --- EVENTS ---
 export const getEvents = async (): Promise<ResortEvent[]> => {
   try {
+    console.log('Fetching events from API...');
     const dbEvents = await apiClient.get<any[]>('/resort-events');
-    return dbEvents.map(event => ({
+    console.log('Events API response:', dbEvents);
+    
+    const mapped = dbEvents.map(event => ({
       id: event.id.toString(),
       title: event.title,
       date: event.date,
@@ -676,26 +958,94 @@ export const getEvents = async (): Promise<ResortEvent[]> => {
       location: event.location,
       description: event.description || undefined
     }));
+    
+    console.log('Mapped events:', mapped);
+    return mapped;
   } catch (error) {
-    console.error('Failed to fetch events:', error);
+    console.error('Failed to fetch events from API:', error);
+    console.warn('Falling back to mock events. This means events are NOT loaded from database!');
     return events; // Fallback to mock data
   }
 };
 
 // Sync version for backward compatibility (used by AdminPortal)
 export const getEventsSync = () => events;
-export const addEvent = (event: ResortEvent) => {
+
+export const addEvent = async (event: ResortEvent): Promise<void> => {
+  try {
+    const requestBody = {
+      title: event.title,
+      date: event.date,
+      time: event.time,
+      location: event.location,
+      description: event.description || null
+    };
+    
+    console.log('Adding event via API - Input:', event);
+    console.log('Adding event via API - Request Body:', requestBody);
+    
+    const dbEvent = await apiClient.post<any>('/resort-events', requestBody);
+    
+    console.log('Event added successfully - API Response:', dbEvent);
+    
+    // Update local cache
+    const mappedEvent = {
+      id: dbEvent.id.toString(),
+      title: dbEvent.title,
+      date: dbEvent.date,
+      time: dbEvent.time,
+      location: dbEvent.location,
+      description: dbEvent.description || undefined
+    };
+    
+    events = [...events, mappedEvent];
+    console.log('Event added to local cache:', mappedEvent);
+  } catch (error: any) {
+    console.error('Failed to add event via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
+    console.warn('Falling back to local mock data. Event will NOT be saved to database!');
+    // Fallback to local state
     events = [...events, { ...event, id: Date.now().toString() }];
+    throw error;
+  }
 };
-export const deleteEvent = (id: string) => {
+
+export const deleteEvent = async (id: string): Promise<void> => {
+  try {
+    console.log('Deleting event via API:', id);
+    await apiClient.delete(`/resort-events/${id}`);
+    console.log('Event deleted successfully from database');
+    // Update local cache
     events = events.filter(e => e.id !== id);
+    console.log('Event removed from local cache');
+  } catch (error: any) {
+    console.error('Failed to delete event via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
+    console.warn('Falling back to local mock data. Event will NOT be deleted from database!');
+    // Fallback to local state
+    events = events.filter(e => e.id !== id);
+    throw error; // Re-throw để component có thể handle error
+  }
 };
 
 // --- PROMOTIONS ---
 export const getPromotions = async (): Promise<Promotion[]> => {
   try {
+    console.log('Fetching promotions from API...');
     const dbPromotions = await apiClient.get<any[]>('/promotions');
-    return dbPromotions.map(promo => ({
+    console.log('Promotions API response:', dbPromotions);
+    
+    const mapped = dbPromotions.map(promo => ({
       id: promo.id.toString(),
       title: promo.title,
       description: promo.description || undefined,
@@ -703,32 +1053,211 @@ export const getPromotions = async (): Promise<Promotion[]> => {
       validUntil: promo.valid_until || undefined,
       imageColor: promo.image_color || 'bg-emerald-500'
     }));
+    
+    console.log('Mapped promotions:', mapped);
+    return mapped;
   } catch (error) {
-    console.error('Failed to fetch promotions:', error);
+    console.error('Failed to fetch promotions from API:', error);
+    console.warn('Falling back to mock promotions. This means promotions are NOT loaded from database!');
     return promotions; // Fallback to mock data
   }
 };
 
 // Sync version for backward compatibility (used by AdminPortal)
 export const getPromotionsSync = () => promotions;
-export const addPromotion = (promo: Promotion) => {
+
+export const addPromotion = async (promo: Promotion): Promise<void> => {
+  try {
+    const requestBody = {
+      title: promo.title,
+      description: promo.description || null,
+      discount: promo.discount || null,
+      valid_until: promo.validUntil || null,
+      image_color: promo.imageColor || 'bg-emerald-500',
+      image_url: null
+    };
+    
+    console.log('Adding promotion via API - Input:', promo);
+    console.log('Adding promotion via API - Request Body:', requestBody);
+    
+    const dbPromotion = await apiClient.post<any>('/promotions', requestBody);
+    
+    console.log('Promotion added successfully - API Response:', dbPromotion);
+    
+    // Update local cache
+    const mappedPromo = {
+      id: dbPromotion.id.toString(),
+      title: dbPromotion.title,
+      description: dbPromotion.description || undefined,
+      discount: dbPromotion.discount || undefined,
+      validUntil: dbPromotion.valid_until || undefined,
+      imageColor: dbPromotion.image_color || 'bg-emerald-500'
+    };
+    
+    promotions = [...promotions, mappedPromo];
+    console.log('Promotion added to local cache:', mappedPromo);
+  } catch (error: any) {
+    console.error('Failed to add promotion via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
+    console.warn('Falling back to local mock data. Promotion will NOT be saved to database!');
+    // Fallback to local state
     promotions = [...promotions, { ...promo, id: Date.now().toString(), imageColor: 'bg-emerald-500' }];
+    throw error;
+  }
 };
-export const deletePromotion = (id: string) => {
+
+export const deletePromotion = async (id: string): Promise<void> => {
+  try {
+    console.log('Deleting promotion via API:', id);
+    await apiClient.delete(`/promotions/${id}`);
+    console.log('Promotion deleted successfully from database');
+    // Update local cache
     promotions = promotions.filter(p => p.id !== id);
+    console.log('Promotion removed from local cache');
+  } catch (error: any) {
+    console.error('Failed to delete promotion via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
+    console.warn('Falling back to local mock data. Promotion will NOT be deleted from database!');
+    // Fallback to local state
+    promotions = promotions.filter(p => p.id !== id);
+    throw error; // Re-throw để component có thể handle error
+  }
 };
 
 // --- KNOWLEDGE BASE (AI Training) ---
-export const getKnowledgeBase = () => knowledgeBase;
-export const addKnowledgeItem = (item: KnowledgeItem) => {
-    knowledgeBase = [...knowledgeBase, { ...item, id: Date.now().toString() }];
+export const getKnowledgeBase = async (): Promise<KnowledgeItem[]> => {
+  try {
+    console.log('Fetching knowledge items from API...');
+    const dbKnowledgeItems = await apiClient.get<any[]>('/knowledge-items');
+    console.log('Knowledge items API response:', dbKnowledgeItems);
+    
+    const mapped = dbKnowledgeItems.map(item => ({
+      id: item.id.toString(),
+      question: item.question,
+      answer: item.answer
+    }));
+    
+    console.log('Mapped knowledge items:', mapped);
+    // Update local cache
+    knowledgeBase = mapped;
+    return mapped;
+  } catch (error) {
+    console.error('Failed to fetch knowledge items from API:', error);
+    console.warn('Falling back to mock knowledge. This means knowledge items are NOT loaded from database!');
+    return knowledgeBase; // Fallback to mock data
+  }
 };
-export const deleteKnowledgeItem = (id: string) => {
+
+// Sync version for backward compatibility
+export const getKnowledgeBaseSync = () => knowledgeBase;
+
+export const addKnowledgeItem = async (item: KnowledgeItem): Promise<void> => {
+  try {
+    const requestBody = {
+      question: item.question,
+      answer: item.answer
+    };
+    
+    console.log('Adding knowledge item via API - Input:', item);
+    console.log('Adding knowledge item via API - Request Body:', requestBody);
+    
+    const dbKnowledgeItem = await apiClient.post<any>('/knowledge-items', requestBody);
+    
+    console.log('Knowledge item added successfully - API Response:', dbKnowledgeItem);
+    
+    // Update local cache
+    const mappedItem = {
+      id: dbKnowledgeItem.id.toString(),
+      question: dbKnowledgeItem.question,
+      answer: dbKnowledgeItem.answer
+    };
+    
+    knowledgeBase = [...knowledgeBase, mappedItem];
+    console.log('Knowledge item added to local cache:', mappedItem);
+  } catch (error: any) {
+    console.error('Failed to add knowledge item via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
+    console.warn('Falling back to local mock data. Knowledge item will NOT be saved to database!');
+    // Fallback to local state
+    knowledgeBase = [...knowledgeBase, { ...item, id: Date.now().toString() }];
+    throw error;
+  }
+};
+
+export const deleteKnowledgeItem = async (id: string): Promise<void> => {
+  try {
+    console.log('Deleting knowledge item via API:', id);
+    await apiClient.delete(`/knowledge-items/${id}`);
+    console.log('Knowledge item deleted successfully from database');
+    // Update local cache
     knowledgeBase = knowledgeBase.filter(k => k.id !== id);
+    console.log('Knowledge item removed from local cache');
+  } catch (error: any) {
+    console.error('Failed to delete knowledge item via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
+    console.warn('Falling back to local mock data. Knowledge item will NOT be deleted from database!');
+    // Fallback to local state
+    knowledgeBase = knowledgeBase.filter(k => k.id !== id);
+    throw error; // Re-throw để component có thể handle error
+  }
 };
 
 // --- RIDES (Buggy) ---
-export const getRides = () => rides;
+export const getRides = async (): Promise<RideRequest[]> => {
+  try {
+    console.log('Fetching rides from API...');
+    const dbRides = await apiClient.get<any[]>('/ride-requests');
+    console.log('Rides API response:', dbRides);
+    
+    const mapped = dbRides.map(r => ({
+      id: r.id.toString(),
+      guestName: r.guest_name || r.guestName || 'Guest',
+      roomNumber: r.room_number || r.roomNumber,
+      pickup: r.pickup,
+      destination: r.destination,
+      status: r.status as BuggyStatus,
+      timestamp: r.timestamp || (r.created_at ? new Date(r.created_at).getTime() : Date.now()),
+      driverId: r.driver_id ? r.driver_id.toString() : undefined,
+      eta: r.eta || undefined,
+      pickedUpAt: r.picked_up_at ? new Date(r.picked_up_at).getTime() : undefined,
+      completedAt: r.completed_at ? new Date(r.completed_at).getTime() : undefined,
+      rating: r.rating || undefined,
+      feedback: r.feedback || undefined
+    }));
+    
+    console.log('Mapped rides:', mapped);
+    // Update local cache
+    rides = mapped;
+    return mapped;
+  } catch (error) {
+    console.error('Failed to fetch rides from API:', error);
+    console.warn('Falling back to mock rides. This means rides are NOT loaded from database!');
+    return rides; // Fallback to mock data
+  }
+};
+
+// Sync version for backward compatibility
+export const getRidesSync = () => rides;
 
 export const requestRide = async (guestName: string, roomNumber: string, pickup: string, destination: string): Promise<RideRequest> => {
   try {
@@ -776,59 +1305,184 @@ export const requestRide = async (guestName: string, roomNumber: string, pickup:
 };
 
 // Driver creates ride manually (e.g. walk-in guest)
-export const createManualRide = (driverId: string, roomNumber: string, pickup: string, destination: string): RideRequest => {
-    // Try to find guest name if room number exists
-    const guest = users.find(u => u.roomNumber === roomNumber && u.role === UserRole.GUEST);
-    const guestName = guest ? guest.lastName : (roomNumber ? `Guest ${roomNumber}` : 'Walk-in Guest');
+export const createManualRide = async (driverId: string, roomNumber: string, pickup: string, destination: string): Promise<RideRequest> => {
+    try {
+        // Try to find guest name if room number exists
+        const allUsers = await getUsers().catch(() => getUsersSync());
+        const guest = allUsers.find(u => u.roomNumber === roomNumber && u.role === UserRole.GUEST);
+        const guestName = guest ? guest.lastName : (roomNumber ? `Guest ${roomNumber}` : 'Walk-in Guest');
 
-    const newRide: RideRequest = {
-        id: Date.now().toString(),
-        guestName: guestName,
-        roomNumber: roomNumber || 'Walk-in',
-        pickup,
-        destination,
-        status: BuggyStatus.ASSIGNED, // Directly assigned to the driver
-        driverId: driverId,
-        timestamp: Date.now(),
-        eta: 0 // Assume driver is there
-    };
-    
-    rides = [...rides, newRide];
-    return newRide;
+        const requestBody = {
+            guest_name: guestName,
+            room_number: roomNumber || 'Walk-in',
+            pickup,
+            destination,
+            status: 'ASSIGNED', // Directly assigned to the driver
+            driver_id: parseInt(driverId) || null,
+            timestamp: Date.now(),
+            eta: 0 // Assume driver is there
+        };
+        
+        console.log('Creating manual ride via API - Input:', { driverId, roomNumber, pickup, destination });
+        console.log('Creating manual ride via API - Request Body:', requestBody);
+        
+        const dbRide = await apiClient.post<any>('/ride-requests', requestBody);
+        
+        console.log('Manual ride created successfully - API Response:', dbRide);
+        
+        const mappedRide: RideRequest = {
+            id: dbRide.id.toString(),
+            guestName: dbRide.guest_name,
+            roomNumber: dbRide.room_number,
+            pickup: dbRide.pickup,
+            destination: dbRide.destination,
+            status: dbRide.status as BuggyStatus,
+            timestamp: dbRide.timestamp || (dbRide.created_at ? new Date(dbRide.created_at).getTime() : Date.now()),
+            driverId: dbRide.driver_id ? dbRide.driver_id.toString() : driverId,
+            eta: dbRide.eta || 0
+        };
+        
+        // Update local cache
+        rides = [mappedRide, ...rides];
+        console.log('Manual ride added to local cache:', mappedRide);
+        return mappedRide;
+    } catch (error: any) {
+        console.error('Failed to create manual ride via API:', error);
+        console.error('Error details:', {
+            message: error?.message,
+            response: error?.response,
+            status: error?.response?.status,
+            body: error?.response?.body
+        });
+        console.warn('Falling back to local mock data. Ride will NOT be saved to database!');
+        // Fallback to local state
+        const allUsers = getUsersSync();
+        const guest = allUsers.find(u => u.roomNumber === roomNumber && u.role === UserRole.GUEST);
+        const guestName = guest ? guest.lastName : (roomNumber ? `Guest ${roomNumber}` : 'Walk-in Guest');
+        
+        const newRide: RideRequest = {
+            id: Date.now().toString(),
+            guestName: guestName,
+            roomNumber: roomNumber || 'Walk-in',
+            pickup,
+            destination,
+            status: BuggyStatus.ASSIGNED,
+            driverId: driverId,
+            timestamp: Date.now(),
+            eta: 0
+        };
+        
+        rides = [...rides, newRide];
+        throw error; // Re-throw để component có thể handle error
+    }
 };
 
-export const updateRideStatus = (rideId: string, status: BuggyStatus, driverId?: string, eta?: number) => {
-  const ride = rides.find(r => r.id === rideId);
-  if (!ride) return;
-
-  rides = rides.map(r => {
-    if (r.id === rideId) {
-      const updatedRide = { 
-        ...r, 
-        status, 
-        driverId: driverId || r.driverId, 
-        eta: eta !== undefined ? eta : r.eta 
-      };
-
-      if (status === BuggyStatus.ON_TRIP && !updatedRide.pickedUpAt) {
-          updatedRide.pickedUpAt = Date.now();
-      }
-      if (status === BuggyStatus.COMPLETED && !updatedRide.completedAt) {
-          updatedRide.completedAt = Date.now();
-      }
-
-      return updatedRide;
+export const updateRideStatus = async (rideId: string, status: BuggyStatus, driverId?: string, eta?: number): Promise<void> => {
+  try {
+    const ride = rides.find(r => r.id === rideId);
+    if (!ride) {
+      console.warn(`Ride ${rideId} not found in local cache`);
+      return;
     }
-    return r;
-  });
 
-  // Notify Guest of status change
-  if (status === BuggyStatus.ASSIGNED) {
-      sendNotification(ride.roomNumber, 'Buggy Assigned', `A driver is on the way. ETA: ${eta} mins.`, 'SUCCESS');
-  } else if (status === BuggyStatus.ARRIVING) {
-      sendNotification(ride.roomNumber, 'Buggy Arriving', `Your buggy has arrived at ${ride.pickup}.`, 'INFO');
-  } else if (status === BuggyStatus.COMPLETED) {
-      sendNotification(ride.roomNumber, 'Ride Completed', `You have arrived at ${ride.destination}. Have a nice day!`, 'SUCCESS');
+    const updateData: any = {
+      status: status
+    };
+
+    if (driverId !== undefined) {
+      updateData.driver_id = parseInt(driverId) || null;
+    }
+    if (eta !== undefined) {
+      updateData.eta = eta;
+    }
+
+    // Handle timestamp updates for status changes
+    if (status === BuggyStatus.ON_TRIP && !ride.pickedUpAt) {
+      // Note: picked_up_at might be handled by backend, but we can set it here if needed
+    }
+    if (status === BuggyStatus.COMPLETED && !ride.completedAt) {
+      // Note: completed_at might be handled by backend, but we can set it here if needed
+    }
+
+    console.log('Updating ride status via API - Ride ID:', rideId);
+    console.log('Updating ride status via API - Update Data:', updateData);
+
+    const dbRide = await apiClient.put<any>(`/ride-requests/${rideId}`, updateData);
+
+    console.log('Ride status updated successfully - API Response:', dbRide);
+
+    // Map database response to frontend format
+    const updatedRide: RideRequest = {
+      id: dbRide.id.toString(),
+      guestName: dbRide.guest_name || ride.guestName,
+      roomNumber: dbRide.room_number || ride.roomNumber,
+      pickup: dbRide.pickup || ride.pickup,
+      destination: dbRide.destination || ride.destination,
+      status: dbRide.status as BuggyStatus,
+      timestamp: dbRide.timestamp || ride.timestamp,
+      driverId: dbRide.driver_id ? dbRide.driver_id.toString() : (driverId || ride.driverId),
+      eta: dbRide.eta !== undefined ? dbRide.eta : (eta !== undefined ? eta : ride.eta),
+      pickedUpAt: dbRide.picked_up_at ? new Date(dbRide.picked_up_at).getTime() : (status === BuggyStatus.ON_TRIP && !ride.pickedUpAt ? Date.now() : ride.pickedUpAt),
+      completedAt: dbRide.completed_at ? new Date(dbRide.completed_at).getTime() : (status === BuggyStatus.COMPLETED && !ride.completedAt ? Date.now() : ride.completedAt),
+      rating: dbRide.rating || ride.rating,
+      feedback: dbRide.feedback || ride.feedback
+    };
+
+    // Update local cache
+    rides = rides.map(r => r.id === rideId ? updatedRide : r);
+    console.log('Ride updated in local cache:', updatedRide);
+
+    // Notify Guest of status change
+    if (status === BuggyStatus.ASSIGNED) {
+        sendNotification(ride.roomNumber, 'Buggy Assigned', `A driver is on the way. ETA: ${eta} mins.`, 'SUCCESS');
+    } else if (status === BuggyStatus.ARRIVING) {
+        sendNotification(ride.roomNumber, 'Buggy Arriving', `Your buggy has arrived at ${ride.pickup}.`, 'INFO');
+    } else if (status === BuggyStatus.COMPLETED) {
+        sendNotification(ride.roomNumber, 'Ride Completed', `You have arrived at ${ride.destination}. Have a nice day!`, 'SUCCESS');
+    }
+  } catch (error: any) {
+    console.error('Failed to update ride status via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
+    console.warn('Falling back to local mock data. Ride status will NOT be updated in database!');
+    // Fallback to local state
+    const ride = rides.find(r => r.id === rideId);
+    if (!ride) return;
+
+    rides = rides.map(r => {
+      if (r.id === rideId) {
+        const updatedRide = { 
+          ...r, 
+          status, 
+          driverId: driverId || r.driverId, 
+          eta: eta !== undefined ? eta : r.eta 
+        };
+
+        if (status === BuggyStatus.ON_TRIP && !updatedRide.pickedUpAt) {
+            updatedRide.pickedUpAt = Date.now();
+        }
+        if (status === BuggyStatus.COMPLETED && !updatedRide.completedAt) {
+            updatedRide.completedAt = Date.now();
+        }
+
+        return updatedRide;
+      }
+      return r;
+    });
+
+    // Notify Guest of status change
+    if (status === BuggyStatus.ASSIGNED) {
+        sendNotification(ride.roomNumber, 'Buggy Assigned', `A driver is on the way. ETA: ${eta} mins.`, 'SUCCESS');
+    } else if (status === BuggyStatus.ARRIVING) {
+        sendNotification(ride.roomNumber, 'Buggy Arriving', `Your buggy has arrived at ${ride.pickup}.`, 'INFO');
+    } else if (status === BuggyStatus.COMPLETED) {
+        sendNotification(ride.roomNumber, 'Ride Completed', `You have arrived at ${ride.destination}. Have a nice day!`, 'SUCCESS');
+    }
+    throw error; // Re-throw để component có thể handle error
   }
 };
 
@@ -947,7 +1601,64 @@ export const addServiceRequest = async (req: ServiceRequest): Promise<ServiceReq
   }
 };
 
-export const updateServiceStatus = (id: string, status: 'PENDING' | 'CONFIRMED' | 'COMPLETED') => {
+export const updateServiceStatus = async (id: string, status: 'PENDING' | 'CONFIRMED' | 'COMPLETED'): Promise<void> => {
+  try {
+    // Try to find request in local cache for notification purposes
+    const req = serviceRequests.find(s => s.id === id);
+    
+    const updateData: any = {
+      status: status
+    };
+
+    console.log('Updating service request status via API - Request ID:', id);
+    console.log('Updating service request status via API - Update Data:', updateData);
+
+    const dbRequest = await apiClient.put<any>(`/service-requests/${id}`, updateData);
+
+    console.log('Service request status updated successfully - API Response:', dbRequest);
+
+    // Map database response to frontend format
+    const updatedRequest: ServiceRequest = {
+      id: dbRequest.id.toString(),
+      type: dbRequest.type,
+      status: dbRequest.status,
+      details: dbRequest.details || '',
+      items: req?.items || [], // Keep items from original request if available
+      roomNumber: dbRequest.room_number || req?.roomNumber || '',
+      timestamp: dbRequest.timestamp || (dbRequest.created_at ? new Date(dbRequest.created_at).getTime() : Date.now()),
+      confirmedAt: dbRequest.confirmed_at ? new Date(dbRequest.confirmed_at).getTime() : (req?.confirmedAt || undefined),
+      completedAt: dbRequest.completed_at ? new Date(dbRequest.completed_at).getTime() : (req?.completedAt || undefined),
+      rating: dbRequest.rating || req?.rating || undefined,
+      feedback: dbRequest.feedback || req?.feedback || undefined
+    };
+
+    // Update local cache
+    const existingIndex = serviceRequests.findIndex(s => s.id === id);
+    if (existingIndex >= 0) {
+      serviceRequests[existingIndex] = updatedRequest;
+    } else {
+      serviceRequests = [updatedRequest, ...serviceRequests];
+    }
+    console.log('Service request updated in local cache:', updatedRequest);
+
+    // Notify Guest of status change
+    const roomNumber = updatedRequest.roomNumber;
+    const requestType = updatedRequest.type.toLowerCase();
+    if (status === 'CONFIRMED') {
+        sendNotification(roomNumber, 'Order Confirmed', `Your ${requestType} request has been confirmed.`, 'SUCCESS');
+    } else if (status === 'COMPLETED') {
+        sendNotification(roomNumber, 'Order Completed', `Your ${requestType} service is complete.`, 'SUCCESS');
+    }
+  } catch (error: any) {
+    console.error('Failed to update service request status via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
+    console.warn('Falling back to local mock data. Service request status will NOT be updated in database!');
+    // Fallback to local state
     const req = serviceRequests.find(s => s.id === id);
     if (!req) return;
 
@@ -968,6 +1679,8 @@ export const updateServiceStatus = (id: string, status: 'PENDING' | 'CONFIRMED' 
     } else if (status === 'COMPLETED') {
         sendNotification(req.roomNumber, 'Order Completed', `Your ${req.type.toLowerCase()} service is complete.`, 'SUCCESS');
     }
+    throw error; // Re-throw để component có thể handle error
+  }
 };
 
 export const rateServiceRequest = async (id: string, rating: number, feedback: string): Promise<void> => {
@@ -1251,19 +1964,20 @@ export const sendServiceMessage = async (roomNumber: string, service: string, te
 };
 
 // --- DASHBOARD ANALYTICS (Supervisor) ---
-export const getDashboardStats = () => {
+export const getDashboardStats = async () => {
     // 1. Guests
-    const activeGuests = users.filter(u => u.role === UserRole.GUEST).length;
+    const allUsers = await getUsers().catch(() => getUsersSync());
+    const activeGuests = allUsers.filter(u => u.role === UserRole.GUEST).length;
     
     // 2. Services Stats
-    const allRequests = getServiceRequests();
+    const allRequests = await getServiceRequests().catch(() => []);
     const pendingDining = allRequests.filter(r => r.type === 'DINING' && r.status === 'PENDING').length;
     const pendingSpa = allRequests.filter(r => r.type === 'SPA' && r.status === 'PENDING').length;
     const pendingPool = allRequests.filter(r => r.type === 'POOL' && r.status === 'PENDING').length;
     const pendingButler = allRequests.filter(r => r.type === 'BUTLER' && r.status === 'PENDING').length;
 
     // 3. Buggies
-    const allRides = getRides();
+    const allRides = await getRides().catch(() => getRidesSync());
     const activeBuggies = allRides.filter(r => r.status === BuggyStatus.ON_TRIP || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ASSIGNED).length;
     const searchingBuggies = allRides.filter(r => r.status === BuggyStatus.SEARCHING).length;
 
@@ -1279,7 +1993,7 @@ export const getDashboardStats = () => {
     const totalRevenue = diningRev + spaRev;
 
     // 5. Activity Feed (Unified & Sorted)
-    const recentActivity = getUnifiedHistory().filter(r => r.timestamp > todayStart.getTime()).slice(0, 10);
+    const recentActivity = (await getUnifiedHistory().catch(() => [])).filter(r => r.timestamp > todayStart.getTime()).slice(0, 10);
 
     return {
         activeGuests,
