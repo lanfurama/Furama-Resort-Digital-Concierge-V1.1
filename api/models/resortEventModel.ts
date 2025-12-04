@@ -7,13 +7,23 @@ export interface ResortEvent {
   time: string; // TIME type in DB
   location: string;
   description?: string;
+  language?: string;
   created_at: Date;
   updated_at: Date;
 }
 
 export const resortEventModel = {
-  async getAll(): Promise<ResortEvent[]> {
-    const result = await pool.query('SELECT * FROM resort_events ORDER BY date DESC, time DESC');
+  async getAll(language?: string): Promise<ResortEvent[]> {
+    let query = 'SELECT * FROM resort_events';
+    const params: any[] = [];
+    
+    if (language) {
+      query += ' WHERE language = $1';
+      params.push(language);
+    }
+    
+    query += ' ORDER BY date DESC, time DESC';
+    const result = await pool.query(query, params);
     return result.rows;
   },
 
@@ -24,13 +34,14 @@ export const resortEventModel = {
 
   async create(resortEvent: Omit<ResortEvent, 'id' | 'created_at' | 'updated_at'>): Promise<ResortEvent> {
     const result = await pool.query(
-      'INSERT INTO resort_events (title, date, time, location, description) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      'INSERT INTO resort_events (title, date, time, location, description, language) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [
         resortEvent.title,
         resortEvent.date,
         resortEvent.time,
         resortEvent.location,
-        resortEvent.description || null
+        resortEvent.description || null,
+        resortEvent.language || 'English'
       ]
     );
     return result.rows[0];
@@ -60,6 +71,10 @@ export const resortEventModel = {
     if (resortEvent.description !== undefined) {
       fields.push(`description = $${paramCount++}`);
       values.push(resortEvent.description);
+    }
+    if (resortEvent.language !== undefined) {
+      fields.push(`language = $${paramCount++}`);
+      values.push(resortEvent.language);
     }
 
     if (fields.length === 0) {

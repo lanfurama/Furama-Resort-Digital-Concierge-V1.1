@@ -839,11 +839,31 @@ export const importRoomsFromCSV = async (csvContent: string): Promise<number> =>
 };
 
 
+// Helper function to get current user language
+const getCurrentLanguage = (): string => {
+  try {
+    const savedUser = localStorage.getItem('furama_user');
+    if (savedUser) {
+      const parsedUser = JSON.parse(savedUser);
+      return parsedUser.language || 'English';
+    }
+  } catch (error) {
+    console.error('Failed to get user language from localStorage:', error);
+  }
+  return 'English';
+};
+
 // --- MENU ---
 export const getMenu = async (categoryFilter?: 'Dining' | 'Spa' | 'Pool' | 'Butler'): Promise<MenuItem[]> => {
   try {
-    console.log('Fetching menu items from API...');
-    const dbMenuItems = await apiClient.get<any[]>('/menu-items');
+    const language = getCurrentLanguage();
+    console.log('Fetching menu items from API...', { language, categoryFilter });
+    const queryParams = new URLSearchParams();
+    if (language) queryParams.append('language', language);
+    if (categoryFilter) queryParams.append('category', categoryFilter);
+    const queryString = queryParams.toString();
+    const endpoint = `/menu-items${queryString ? `?${queryString}` : ''}`;
+    const dbMenuItems = await apiClient.get<any[]>(endpoint);
     console.log('Menu items API response:', dbMenuItems);
     
     let filtered = dbMenuItems.map(item => ({
@@ -880,11 +900,13 @@ export const getMenuSync = (categoryFilter?: 'Dining' | 'Spa' | 'Pool' | 'Butler
 };
 export const addMenuItem = async (item: MenuItem): Promise<void> => {
   try {
+    const language = getCurrentLanguage();
     const requestBody = {
       name: item.name,
       price: item.price,
       category: item.category,
-      description: item.description || null
+      description: item.description || null,
+      language: language
     };
     
     console.log('Adding menu item via API - Input:', item);
@@ -946,8 +968,13 @@ export const deleteMenuItem = async (id: string): Promise<void> => {
 // --- EVENTS ---
 export const getEvents = async (): Promise<ResortEvent[]> => {
   try {
-    console.log('Fetching events from API...');
-    const dbEvents = await apiClient.get<any[]>('/resort-events');
+    const language = getCurrentLanguage();
+    console.log('Fetching events from API...', { language });
+    const queryParams = new URLSearchParams();
+    if (language) queryParams.append('language', language);
+    const queryString = queryParams.toString();
+    const endpoint = `/resort-events${queryString ? `?${queryString}` : ''}`;
+    const dbEvents = await apiClient.get<any[]>(endpoint);
     console.log('Events API response:', dbEvents);
     
     const mapped = dbEvents.map(event => ({
@@ -973,12 +1000,14 @@ export const getEventsSync = () => events;
 
 export const addEvent = async (event: ResortEvent): Promise<void> => {
   try {
+    const language = getCurrentLanguage();
     const requestBody = {
       title: event.title,
       date: event.date,
       time: event.time,
       location: event.location,
-      description: event.description || null
+      description: event.description || null,
+      language: language
     };
     
     console.log('Adding event via API - Input:', event);
@@ -1041,8 +1070,13 @@ export const deleteEvent = async (id: string): Promise<void> => {
 // --- PROMOTIONS ---
 export const getPromotions = async (): Promise<Promotion[]> => {
   try {
-    console.log('Fetching promotions from API...');
-    const dbPromotions = await apiClient.get<any[]>('/promotions');
+    const language = getCurrentLanguage();
+    console.log('Fetching promotions from API...', { language });
+    const queryParams = new URLSearchParams();
+    if (language) queryParams.append('language', language);
+    const queryString = queryParams.toString();
+    const endpoint = `/promotions${queryString ? `?${queryString}` : ''}`;
+    const dbPromotions = await apiClient.get<any[]>(endpoint);
     console.log('Promotions API response:', dbPromotions);
     
     const mapped = dbPromotions.map(promo => ({
@@ -1068,13 +1102,15 @@ export const getPromotionsSync = () => promotions;
 
 export const addPromotion = async (promo: Promotion): Promise<void> => {
   try {
+    const language = getCurrentLanguage();
     const requestBody = {
       title: promo.title,
       description: promo.description || null,
       discount: promo.discount || null,
       valid_until: promo.validUntil || null,
       image_color: promo.imageColor || 'bg-emerald-500',
-      image_url: null
+      image_url: null,
+      language: language
     };
     
     console.log('Adding promotion via API - Input:', promo);
@@ -1549,10 +1585,50 @@ export const getActiveRideForUser = async (roomNumber: string): Promise<RideRequ
 export const getServiceRequests = async (): Promise<ServiceRequest[]> => {
   try {
     const dbRequests = await apiClient.get<any[]>('/service-requests');
-    return dbRequests.map(mapServiceRequestToFrontend);
+    const serviceReqs = dbRequests.map(mapServiceRequestToFrontend);
+    
+    // Also include buggy rides as service requests
+    try {
+      const dbRideRequests = await apiClient.get<any[]>('/ride-requests');
+      const buggyReqs: ServiceRequest[] = dbRideRequests.map(r => ({
+        id: r.id.toString(),
+        type: 'BUGGY',
+        status: r.status,
+        details: `From ${r.pickup} to ${r.destination} (${r.guest_name || r.guestName})`,
+        roomNumber: r.room_number || r.roomNumber,
+        timestamp: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+        confirmedAt: r.assigned_at ? new Date(r.assigned_at).getTime() : (r.status === 'ASSIGNED' && r.updated_at ? new Date(r.updated_at).getTime() : undefined),
+        assignedAt: r.assigned_at ? new Date(r.assigned_at).getTime() : (r.status === 'ASSIGNED' && r.updated_at ? new Date(r.updated_at).getTime() : undefined),
+        pickedUpAt: r.picked_up_at ? new Date(r.picked_up_at).getTime() : (r.status === 'ON_TRIP' && r.updated_at ? new Date(r.updated_at).getTime() : undefined),
+        arrivingAt: r.arriving_at ? new Date(r.arriving_at).getTime() : (r.status === 'ARRIVING' && r.updated_at ? new Date(r.updated_at).getTime() : undefined),
+        completedAt: r.completed_at ? new Date(r.completed_at).getTime() : (r.status === 'COMPLETED' && r.updated_at ? new Date(r.updated_at).getTime() : undefined),
+        rating: r.rating || undefined,
+        feedback: r.feedback || undefined
+      }));
+      return [...serviceReqs, ...buggyReqs];
+    } catch (buggyError) {
+      console.error('Failed to get buggy requests:', buggyError);
+      return serviceReqs; // Return service requests only if buggy fails
+    }
   } catch (error) {
     console.error('Failed to get service requests:', error);
-    return serviceRequests; // Fallback to local
+    // Fallback to local - include buggy rides from local cache
+    const buggyReqs: ServiceRequest[] = rides.map(r => ({
+      id: r.id,
+      type: 'BUGGY',
+      status: r.status,
+      details: `From ${r.pickup} to ${r.destination} (${r.guestName})`,
+      roomNumber: r.roomNumber,
+      timestamp: r.timestamp,
+      confirmedAt: r.status === BuggyStatus.ASSIGNED ? r.timestamp : undefined,
+      assignedAt: r.status === BuggyStatus.ASSIGNED ? r.timestamp : undefined,
+      pickedUpAt: r.pickedUpAt,
+      arrivingAt: r.status === BuggyStatus.ARRIVING ? r.timestamp : undefined,
+      completedAt: r.completedAt,
+      rating: r.rating,
+      feedback: r.feedback
+    }));
+    return [...serviceRequests, ...buggyReqs];
   }
 };
 
@@ -1791,6 +1867,11 @@ export const getUnifiedHistory = async (): Promise<ServiceRequest[]> => {
       details: `From ${r.pickup} to ${r.destination} (${r.guest_name || r.guestName})`,
       roomNumber: r.room_number || r.roomNumber,
       timestamp: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+      confirmedAt: r.assigned_at ? new Date(r.assigned_at).getTime() : (r.status === 'ASSIGNED' && r.updated_at ? new Date(r.updated_at).getTime() : undefined),
+      assignedAt: r.assigned_at ? new Date(r.assigned_at).getTime() : (r.status === 'ASSIGNED' && r.updated_at ? new Date(r.updated_at).getTime() : undefined),
+      pickedUpAt: r.picked_up_at ? new Date(r.picked_up_at).getTime() : (r.status === 'ON_TRIP' && r.updated_at ? new Date(r.updated_at).getTime() : undefined),
+      arrivingAt: r.arriving_at ? new Date(r.arriving_at).getTime() : (r.status === 'ARRIVING' && r.updated_at ? new Date(r.updated_at).getTime() : undefined),
+      completedAt: r.completed_at ? new Date(r.completed_at).getTime() : (r.status === 'COMPLETED' && r.updated_at ? new Date(r.updated_at).getTime() : undefined),
       rating: r.rating || undefined,
       feedback: r.feedback || undefined
     }));
@@ -1808,6 +1889,11 @@ export const getUnifiedHistory = async (): Promise<ServiceRequest[]> => {
       details: `From ${r.pickup} to ${r.destination} (${r.guestName})`,
       roomNumber: r.roomNumber,
       timestamp: r.timestamp,
+      confirmedAt: r.status === BuggyStatus.ASSIGNED ? r.timestamp : undefined,
+      assignedAt: r.status === BuggyStatus.ASSIGNED ? r.timestamp : undefined,
+      pickedUpAt: r.pickedUpAt,
+      arrivingAt: r.status === BuggyStatus.ARRIVING ? r.timestamp : undefined,
+      completedAt: r.completedAt,
       rating: r.rating,
       feedback: r.feedback
     }));

@@ -237,10 +237,28 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                                     <span className="flex items-center"><Clock size={10} className="mr-1"/> Requested:</span>
                                     <span className="font-mono text-gray-700">{formatTime(req.timestamp)}</span>
                                 </div>
-                                {req.confirmedAt && (
+                                {req.confirmedAt && req.type !== 'BUGGY' && (
                                      <div className="flex justify-between text-blue-600">
                                         <span className="flex items-center"><CheckCircle size={10} className="mr-1"/> Confirmed:</span>
                                         <span className="font-mono font-bold">{formatTime(req.confirmedAt)}</span>
+                                    </div>
+                                )}
+                                {req.assignedAt && req.type === 'BUGGY' && (
+                                     <div className="flex justify-between text-blue-600">
+                                        <span className="flex items-center"><CheckCircle size={10} className="mr-1"/> Assigned:</span>
+                                        <span className="font-mono font-bold">{formatTime(req.assignedAt)}</span>
+                                    </div>
+                                )}
+                                {req.arrivingAt && req.type === 'BUGGY' && (
+                                     <div className="flex justify-between text-purple-600">
+                                        <span className="flex items-center"><CheckCircle size={10} className="mr-1"/> Arriving:</span>
+                                        <span className="font-mono font-bold">{formatTime(req.arrivingAt)}</span>
+                                    </div>
+                                )}
+                                {req.pickedUpAt && req.type === 'BUGGY' && (
+                                     <div className="flex justify-between text-indigo-600">
+                                        <span className="flex items-center"><CheckCircle size={10} className="mr-1"/> Picked Up:</span>
+                                        <span className="font-mono font-bold">{formatTime(req.pickedUpAt)}</span>
                                     </div>
                                 )}
                                 {req.completedAt && (

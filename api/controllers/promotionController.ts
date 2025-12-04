@@ -4,7 +4,8 @@ import { promotionModel } from '../models/promotionModel.js';
 export const promotionController = {
   async getAll(req: Request, res: Response) {
     try {
-      const promotions = await promotionModel.getAll();
+      const language = req.query.language as string | undefined;
+      const promotions = await promotionModel.getAll(language);
       res.json(promotions);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

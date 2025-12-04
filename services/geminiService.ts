@@ -105,11 +105,15 @@ export const parseAdminInput = async (input: string, type: 'MENU_ITEM' | 'LOCATI
 };
 
 // --- Text Chat (Gemini 2.5 Flash) ---
-export const createChatSession = () => {
+export const createChatSession = async () => {
   // Construct dynamic knowledge base
-  const knowledge = getKnowledgeBase().map(k => `Q: ${k.question} A: ${k.answer}`).join('\n');
-  const events = getEvents().map(e => `Event: ${e.title} at ${e.time} on ${e.date} (${e.location})`).join('\n');
-  const promos = getPromotions().map(p => `Promo: ${p.title} - ${p.description} (${p.discount})`).join('\n');
+  const knowledgeItems = await getKnowledgeBase();
+  const eventsList = await getEvents();
+  const promosList = await getPromotions();
+  
+  const knowledge = knowledgeItems.map(k => `Q: ${k.question} A: ${k.answer}`).join('\n');
+  const events = eventsList.map(e => `Event: ${e.title} at ${e.time} on ${e.date} (${e.location})`).join('\n');
+  const promos = promosList.map(p => `Promo: ${p.title} - ${p.description} (${p.discount})`).join('\n');
 
   return ai.chats.create({
     model: 'gemini-2.5-flash',

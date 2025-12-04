@@ -8,13 +8,23 @@ export interface Promotion {
   valid_until?: string;
   image_color?: string;
   image_url?: string;
+  language?: string;
   created_at: Date;
   updated_at: Date;
 }
 
 export const promotionModel = {
-  async getAll(): Promise<Promotion[]> {
-    const result = await pool.query('SELECT * FROM promotions ORDER BY created_at DESC');
+  async getAll(language?: string): Promise<Promotion[]> {
+    let query = 'SELECT * FROM promotions';
+    const params: any[] = [];
+    
+    if (language) {
+      query += ' WHERE language = $1';
+      params.push(language);
+    }
+    
+    query += ' ORDER BY created_at DESC';
+    const result = await pool.query(query, params);
     return result.rows;
   },
 
@@ -25,14 +35,15 @@ export const promotionModel = {
 
   async create(promotion: Omit<Promotion, 'id' | 'created_at' | 'updated_at'>): Promise<Promotion> {
     const result = await pool.query(
-      'INSERT INTO promotions (title, description, discount, valid_until, image_color, image_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      'INSERT INTO promotions (title, description, discount, valid_until, image_color, image_url, language) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
       [
         promotion.title,
         promotion.description || null,
         promotion.discount || null,
         promotion.valid_until || null,
         promotion.image_color || null,
-        promotion.image_url || null
+        promotion.image_url || null,
+        promotion.language || 'English'
       ]
     );
     return result.rows[0];
@@ -66,6 +77,10 @@ export const promotionModel = {
     if (promotion.image_url !== undefined) {
       fields.push(`image_url = $${paramCount++}`);
       values.push(promotion.image_url);
+    }
+    if (promotion.language !== undefined) {
+      fields.push(`language = $${paramCount++}`);
+      values.push(promotion.language);
     }
 
     if (fields.length === 0) {

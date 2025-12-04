@@ -5,7 +5,8 @@ export const menuItemController = {
   async getAll(req: Request, res: Response) {
     try {
       const category = req.query.category as string | undefined;
-      const menuItems = await menuItemModel.getAll(category);
+      const language = req.query.language as string | undefined;
+      const menuItems = await menuItemModel.getAll(category, language);
       res.json(menuItems);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

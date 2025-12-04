@@ -136,6 +136,9 @@ export interface ServiceRequest {
   roomNumber: string;
   timestamp: number;
   confirmedAt?: number; // Timestamp when staff confirmed
+  assignedAt?: number; // Timestamp when buggy assigned (for BUGGY type)
+  pickedUpAt?: number; // Timestamp when buggy picked up guest (for BUGGY type)
+  arrivingAt?: number; // Timestamp when buggy arriving (for BUGGY type)
   completedAt?: number; // Timestamp when service completed
   rating?: number;   // 1-5 Stars
   feedback?: string; // User comment

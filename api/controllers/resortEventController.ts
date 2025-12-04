@@ -4,7 +4,8 @@ import { resortEventModel } from '../models/resortEventModel.js';
 export const resortEventController = {
   async getAll(req: Request, res: Response) {
     try {
-      const events = await resortEventModel.getAll();
+      const language = req.query.language as string | undefined;
+      const events = await resortEventModel.getAll(language);
       res.json(events);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

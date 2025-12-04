@@ -56,7 +56,11 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
 
   useEffect(() => {
     // Initialize text chat session
-    chatSessionRef.current = createChatSession();
+    createChatSession().then(session => {
+      chatSessionRef.current = session;
+    }).catch(error => {
+      console.error('Failed to create chat session:', error);
+    });
     // Welcome message
     setMessages([{
       id: 'welcome',
@@ -81,6 +85,12 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
+    
+    // Ensure chat session is initialized
+    if (!chatSessionRef.current) {
+      console.warn('Chat session not ready yet');
+      return;
+    }
 
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: input };
     setMessages(prev => [...prev, userMsg]);

@@ -67,6 +67,12 @@ export const rideRequestModel = {
   },
 
   async update(id: number, rideRequest: Partial<Omit<RideRequest, 'id' | 'created_at' | 'updated_at'>>): Promise<RideRequest | null> {
+    // First, get the current ride to check status change
+    const currentRide = await this.getById(id);
+    if (!currentRide) {
+      return null;
+    }
+
     const fields: string[] = [];
     const values: any[] = [];
     let paramCount = 1;
@@ -87,10 +93,34 @@ export const rideRequestModel = {
       fields.push(`destination = $${paramCount++}`);
       values.push(rideRequest.destination);
     }
+    
+    // Handle status change and set appropriate timestamps
     if (rideRequest.status !== undefined) {
       fields.push(`status = $${paramCount++}`);
       values.push(rideRequest.status);
+      
+      // Set timestamp columns based on status change
+      const newStatus = rideRequest.status;
+      const now = new Date();
+      
+      if (newStatus === 'ASSIGNED' && currentRide.status !== 'ASSIGNED') {
+        fields.push(`assigned_at = $${paramCount++}`);
+        values.push(now);
+      }
+      if (newStatus === 'ARRIVING' && currentRide.status !== 'ARRIVING') {
+        fields.push(`arriving_at = $${paramCount++}`);
+        values.push(now);
+      }
+      if (newStatus === 'ON_TRIP' && currentRide.status !== 'ON_TRIP') {
+        fields.push(`picked_up_at = $${paramCount++}`);
+        values.push(now);
+      }
+      if (newStatus === 'COMPLETED' && currentRide.status !== 'COMPLETED') {
+        fields.push(`completed_at = $${paramCount++}`);
+        values.push(now);
+      }
     }
+    
     if (rideRequest.timestamp !== undefined) {
       fields.push(`timestamp = $${paramCount++}`);
       values.push(rideRequest.timestamp);

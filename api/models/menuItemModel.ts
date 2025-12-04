@@ -6,18 +6,29 @@ export interface MenuItem {
   price: number;
   category: string;
   description?: string;
+  language?: string;
   created_at: Date;
   updated_at: Date;
 }
 
 export const menuItemModel = {
-  async getAll(category?: string): Promise<MenuItem[]> {
+  async getAll(category?: string, language?: string): Promise<MenuItem[]> {
     let query = 'SELECT * FROM menu_items';
     const params: any[] = [];
+    const conditions: string[] = [];
     
     if (category) {
-      query += ' WHERE category = $1';
+      conditions.push(`category = $${params.length + 1}`);
       params.push(category);
+    }
+    
+    if (language) {
+      conditions.push(`language = $${params.length + 1}`);
+      params.push(language);
+    }
+    
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
     }
     
     query += ' ORDER BY category, name';
@@ -32,8 +43,8 @@ export const menuItemModel = {
 
   async create(menuItem: Omit<MenuItem, 'id' | 'created_at' | 'updated_at'>): Promise<MenuItem> {
     const result = await pool.query(
-      'INSERT INTO menu_items (name, price, category, description) VALUES ($1, $2, $3, $4) RETURNING *',
-      [menuItem.name, menuItem.price, menuItem.category, menuItem.description || null]
+      'INSERT INTO menu_items (name, price, category, description, language) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [menuItem.name, menuItem.price, menuItem.category, menuItem.description || null, menuItem.language || 'English']
     );
     return result.rows[0];
   },
@@ -58,6 +69,10 @@ export const menuItemModel = {
     if (menuItem.description !== undefined) {
       fields.push(`description = $${paramCount++}`);
       values.push(menuItem.description);
+    }
+    if (menuItem.language !== undefined) {
+      fields.push(`language = $${paramCount++}`);
+      values.push(menuItem.language);
     }
 
     if (fields.length === 0) {
