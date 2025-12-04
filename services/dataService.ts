@@ -1812,17 +1812,113 @@ export const rateServiceRequest = async (id: string, rating: number, feedback: s
 };
 
 // --- HOTEL REVIEWS ---
-export const submitHotelReview = (review: HotelReview) => {
-    // Remove existing review if updating
-    hotelReviews = hotelReviews.filter(r => r.roomNumber !== review.roomNumber);
-    hotelReviews.push(review);
+export const submitHotelReview = async (review: HotelReview): Promise<void> => {
+    try {
+        console.log('Submitting hotel review via API...', review);
+        const requestBody = {
+            room_number: review.roomNumber,
+            guest_name: review.guestName,
+            category_ratings: review.categoryRatings,
+            average_rating: review.averageRating,
+            comment: review.comment || null,
+            timestamp: review.timestamp
+        };
+        
+        const dbReview = await apiClient.post<any>('/hotel-reviews', requestBody);
+        console.log('Hotel review submitted successfully:', dbReview);
+        
+        // Update local cache
+        const mappedReview: HotelReview = {
+            id: dbReview.id.toString(),
+            roomNumber: dbReview.room_number,
+            guestName: dbReview.guest_name,
+            categoryRatings: typeof dbReview.category_ratings === 'string' 
+                ? JSON.parse(dbReview.category_ratings) 
+                : dbReview.category_ratings,
+            averageRating: parseFloat(dbReview.average_rating),
+            comment: dbReview.comment || undefined,
+            timestamp: dbReview.timestamp
+        };
+        
+        // Update local cache
+        hotelReviews = hotelReviews.filter(r => r.roomNumber !== review.roomNumber);
+        hotelReviews.push(mappedReview);
+    } catch (error: any) {
+        console.error('Failed to submit hotel review via API:', error);
+        console.error('Error details:', {
+            message: error?.message,
+            response: error?.response,
+            status: error?.response?.status,
+            body: error?.response?.body
+        });
+        // Fallback to local storage
+        hotelReviews = hotelReviews.filter(r => r.roomNumber !== review.roomNumber);
+        hotelReviews.push(review);
+        throw error;
+    }
 };
 
-export const getHotelReview = (roomNumber: string): HotelReview | undefined => {
-    return hotelReviews.find(r => r.roomNumber === roomNumber);
+export const getHotelReview = async (roomNumber: string): Promise<HotelReview | undefined> => {
+    try {
+        console.log('Fetching hotel review from API for room:', roomNumber);
+        const dbReview = await apiClient.get<any>(`/hotel-reviews/room/${roomNumber}`).catch(() => null);
+        
+        if (!dbReview) {
+            // Check local cache as fallback
+            return hotelReviews.find(r => r.roomNumber === roomNumber);
+        }
+        
+        const mappedReview: HotelReview = {
+            id: dbReview.id.toString(),
+            roomNumber: dbReview.room_number,
+            guestName: dbReview.guest_name,
+            categoryRatings: typeof dbReview.category_ratings === 'string' 
+                ? JSON.parse(dbReview.category_ratings) 
+                : dbReview.category_ratings,
+            averageRating: parseFloat(dbReview.average_rating),
+            comment: dbReview.comment || undefined,
+            timestamp: dbReview.timestamp
+        };
+        
+        // Update local cache
+        hotelReviews = hotelReviews.filter(r => r.roomNumber !== roomNumber);
+        hotelReviews.push(mappedReview);
+        
+        return mappedReview;
+    } catch (error) {
+        console.error('Failed to fetch hotel review from API:', error);
+        // Fallback to local cache
+        return hotelReviews.find(r => r.roomNumber === roomNumber);
+    }
 };
 
-export const getAllHotelReviews = () => hotelReviews;
+export const getAllHotelReviews = async (): Promise<HotelReview[]> => {
+    try {
+        console.log('Fetching all hotel reviews from API...');
+        const dbReviews = await apiClient.get<any[]>('/hotel-reviews');
+        
+        const mappedReviews: HotelReview[] = dbReviews.map(dbReview => ({
+            id: dbReview.id.toString(),
+            roomNumber: dbReview.room_number,
+            guestName: dbReview.guest_name,
+            categoryRatings: typeof dbReview.category_ratings === 'string' 
+                ? JSON.parse(dbReview.category_ratings) 
+                : dbReview.category_ratings,
+            averageRating: parseFloat(dbReview.average_rating),
+            comment: dbReview.comment || undefined,
+            timestamp: dbReview.timestamp
+        }));
+        
+        // Update local cache
+        hotelReviews = mappedReviews;
+        
+        return mappedReviews;
+    } catch (error) {
+        console.error('Failed to fetch hotel reviews from API:', error);
+        // Fallback to local cache
+        return hotelReviews;
+    }
+};
 
 
 // Helper function to map database service request to frontend format

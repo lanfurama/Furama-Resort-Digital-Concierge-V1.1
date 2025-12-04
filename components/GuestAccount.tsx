@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, ServiceRequest } from '../types';
+import { User, ServiceRequest, HotelReview } from '../types';
 import { getCompletedGuestOrders, updateUserNotes, rateServiceRequest, submitHotelReview, getHotelReview, updateUserLanguage } from '../services/dataService';
 import { Clock, ShoppingBag, Car, Utensils, Sparkles, Waves, User as UserIcon, Save, Star, Hotel, ThumbsUp, Globe, ArrowLeft } from 'lucide-react';
 import Loading from './Loading';
@@ -35,34 +35,43 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
     
     // Only fetch Completed orders for Account History
     const [history, setHistory] = useState<ServiceRequest[]>([]);
-    const [existingReview, setExistingReview] = useState(getHotelReview(user.roomNumber));
+    const [existingReview, setExistingReview] = useState<HotelReview | undefined>(undefined);
     const [notes, setNotes] = useState(user.notes || '');
     const [isSaving, setIsSaving] = useState(false);
     const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+    const [isLoadingReview, setIsLoadingReview] = useState(true);
     
     // Load history and hotel review on mount
     useEffect(() => {
         setIsLoadingHistory(true);
+        setIsLoadingReview(true);
+        
+        // Load completed orders
         getCompletedGuestOrders(user.roomNumber)
             .then(setHistory)
             .catch(console.error)
             .finally(() => setIsLoadingHistory(false));
-        // Load hotel review
-        const review = getHotelReview(user.roomNumber);
-        setExistingReview(review);
-        if (review) {
-            const initialRatings = REVIEW_CATEGORIES.map(cat => {
-                const existing = review.categoryRatings?.find(r => r.category === cat.label);
-                return { 
-                    id: cat.id, 
-                    label: cat.label, 
-                    value: existing ? existing.rating : 5 
-                };
-            });
-            setRatings(initialRatings);
-            setHotelComment(review.comment);
-            setIsHotelReviewSubmitted(true);
-        }
+        
+        // Load hotel review from API
+        getHotelReview(user.roomNumber)
+            .then(review => {
+                setExistingReview(review);
+                if (review) {
+                    const initialRatings = REVIEW_CATEGORIES.map(cat => {
+                        const existing = review.categoryRatings?.find(r => r.category === cat.label);
+                        return { 
+                            id: cat.id, 
+                            label: cat.label, 
+                            value: existing ? existing.rating : 5 
+                        };
+                    });
+                    setRatings(initialRatings);
+                    setHotelComment(review.comment);
+                    setIsHotelReviewSubmitted(true);
+                }
+            })
+            .catch(console.error)
+            .finally(() => setIsLoadingReview(false));
     }, [user.roomNumber]);
     
     // Language State - Load from database on mount
@@ -103,19 +112,16 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
     // Hotel Review State
     const [showHotelReview, setShowHotelReview] = useState(false);
     
-    // Initialize detailed ratings from existing review or default to 5
-    const initialRatings = REVIEW_CATEGORIES.map(cat => {
-        const existing = existingReview?.categoryRatings?.find(r => r.category === cat.label);
-        return { 
-            id: cat.id, 
-            label: cat.label, 
-            value: existing ? existing.rating : 5 
-        };
-    });
+    // Initialize detailed ratings from default to 5 (will be updated when review loads)
+    const initialRatings = REVIEW_CATEGORIES.map(cat => ({
+        id: cat.id,
+        label: cat.label,
+        value: 5
+    }));
 
     const [ratings, setRatings] = useState(initialRatings);
-    const [hotelComment, setHotelComment] = useState(existingReview ? existingReview.comment : '');
-    const [isHotelReviewSubmitted, setIsHotelReviewSubmitted] = useState(!!existingReview);
+    const [hotelComment, setHotelComment] = useState('');
+    const [isHotelReviewSubmitted, setIsHotelReviewSubmitted] = useState(false);
 
     const handleSaveNotes = async () => {
         setIsSaving(true);
@@ -213,7 +219,8 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                 comment: hotelComment,
                 timestamp: Date.now()
             };
-            submitHotelReview(review);
+            
+            await submitHotelReview(review);
             setExistingReview(review);
             setIsHotelReviewSubmitted(true);
             setShowHotelReview(false);
