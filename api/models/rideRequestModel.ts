@@ -10,6 +10,8 @@ export interface RideRequest {
   timestamp: number;
   driver_id?: number;
   eta?: number;
+  rating?: number | null;
+  feedback?: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -132,6 +134,14 @@ export const rideRequestModel = {
     if (rideRequest.eta !== undefined) {
       fields.push(`eta = $${paramCount++}`);
       values.push(rideRequest.eta);
+    }
+    if (rideRequest.rating !== undefined) {
+      fields.push(`rating = $${paramCount++}`);
+      values.push(rideRequest.rating || null);
+    }
+    if (rideRequest.feedback !== undefined) {
+      fields.push(`feedback = $${paramCount++}`);
+      values.push(rideRequest.feedback || null);
     }
 
     if (fields.length === 0) {

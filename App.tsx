@@ -380,13 +380,13 @@ const AppContent: React.FC = () => {
                 {/* Hero Banner (Smaller) */}
                 <div className="mx-4 mt-4 h-40 rounded-2xl overflow-hidden relative shadow-lg mb-6">
                     <img 
-                        src="https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Beachfront-1920x1080.jpg" 
+                        src="https://furamavietnam.com/wp-content/uploads/2025/10/furama-resort-danang.jpg" 
                         className="absolute inset-0 w-full h-full object-cover" 
                         alt="Furama Resort Danang"
                         onError={(e) => {
                             // Fallback images
                             const img = e.target as HTMLImageElement;
-                            if (img.src.includes('Beachfront')) {
+                            if (img.src.includes('furama-resort-danang.jpg')) {
                                 img.src = "https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Exterior-1920x1080.jpg";
                             } else if (img.src.includes('Exterior')) {
                                 img.src = "https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Pool-768x552.jpg";

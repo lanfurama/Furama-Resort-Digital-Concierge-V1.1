@@ -124,7 +124,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
     }
 
     return (
-        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end pointer-events-none">
+        <div className="fixed bottom-24 right-4 md:right-6 z-50 flex flex-col items-end pointer-events-none">
             {/* Chat Window */}
             {isOpen && (
                 <div className="bg-white w-80 h-96 rounded-2xl shadow-2xl border border-gray-200 flex flex-col mb-4 overflow-hidden pointer-events-auto animate-in slide-in-from-bottom-5">
@@ -236,6 +236,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                 <button 
                     onClick={toggleOpen}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-full shadow-lg transition transform hover:scale-105 active:scale-95 pointer-events-auto flex items-center justify-center"
+                    style={{ marginBottom: '0' }}
                 >
                     {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
                 </button>

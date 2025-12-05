@@ -11,3 +11,5 @@ router.delete('/:id', hotelReviewController.delete);
 
 export default router;
 
+
+

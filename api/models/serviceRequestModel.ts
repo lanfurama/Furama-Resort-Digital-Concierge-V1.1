@@ -7,6 +7,8 @@ export interface ServiceRequest {
   details: string;
   room_number: string;
   timestamp: number;
+  rating?: number | null;
+  feedback?: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -84,6 +86,14 @@ export const serviceRequestModel = {
     if (serviceRequest.timestamp !== undefined) {
       fields.push(`timestamp = $${paramCount++}`);
       values.push(serviceRequest.timestamp);
+    }
+    if (serviceRequest.rating !== undefined) {
+      fields.push(`rating = $${paramCount++}`);
+      values.push(serviceRequest.rating || null);
+    }
+    if (serviceRequest.feedback !== undefined) {
+      fields.push(`feedback = $${paramCount++}`);
+      values.push(serviceRequest.feedback || null);
     }
 
     if (fields.length === 0) {

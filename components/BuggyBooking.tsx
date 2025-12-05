@@ -19,8 +19,11 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [destination, setDestination] = useState<string>('');
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoadingRide, setIsLoadingRide] = useState(true);
+  const [elapsedTime, setElapsedTime] = useState<number>(0); // Time elapsed in seconds
   const userLocationRef = useRef<HTMLDivElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  
+  const MAX_WAIT_TIME = 10 * 60; // 10 minutes in seconds
   
   // Load locations on mount
   useEffect(() => {
@@ -53,6 +56,37 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       return () => clearInterval(interval);
   }, [user.roomNumber]);
 
+  // Countdown timer for ride waiting time
+  useEffect(() => {
+      if (!activeRide || activeRide.status === BuggyStatus.COMPLETED || activeRide.status === BuggyStatus.ON_TRIP) {
+          setElapsedTime(0);
+          return;
+      }
+
+      // Calculate elapsed time from when ride was created or assigned
+      // Use confirmedAt if available (when driver accepted), otherwise use timestamp (when ride was created)
+      const startTime = activeRide.confirmedAt || activeRide.timestamp;
+      
+      // Safety check: if startTime seems invalid (too old or in the future), use current time
+      const now = Date.now();
+      if (!startTime || startTime > now || startTime < now - (24 * 60 * 60 * 1000)) {
+          // If timestamp is invalid or more than 24 hours ago, reset to current time
+          setElapsedTime(0);
+          return;
+      }
+      
+      const updateElapsed = () => {
+          const currentTime = Date.now();
+          const elapsed = Math.max(0, Math.floor((currentTime - startTime) / 1000)); // Convert to seconds, ensure non-negative
+          setElapsedTime(elapsed);
+      };
+
+      updateElapsed(); // Update immediately
+      const timer = setInterval(updateElapsed, 1000); // Update every second
+      
+      return () => clearInterval(timer);
+  }, [activeRide]);
+
 
   const handleBook = async () => {
     if (!destination) return;
@@ -68,15 +102,27 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
   const handleCancel = async () => {
       if (activeRide) {
-          // Double check to prevent cancelling if already picked up (race condition)
+          // Prevent cancelling if already picked up
           if (activeRide.status === BuggyStatus.ON_TRIP || activeRide.status === BuggyStatus.COMPLETED) {
               alert("Cannot cancel ride. Driver has already picked you up.");
               return;
           }
-          if (window.confirm("Are you sure you want to cancel this ride?")) {
+          
+          // If driver has accepted but wait time is less than 10 minutes
+          if ((activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && elapsedTime < MAX_WAIT_TIME) {
+              alert(`Cannot cancel ride yet. You can cancel after waiting 10 minutes. Current wait time: ${formatCountdown(elapsedTime)}`);
+              return;
+          }
+          
+          const confirmMessage = elapsedTime >= MAX_WAIT_TIME 
+              ? `You have been waiting for over 10 minutes. Are you sure you want to cancel this ride?`
+              : "Are you sure you want to cancel this ride?";
+              
+          if (window.confirm(confirmMessage)) {
             try {
               await cancelRide(activeRide.id);
               setActiveRide(undefined);
+              setElapsedTime(0);
             } catch (error) {
               console.error('Failed to cancel ride:', error);
               alert('Failed to cancel ride. Please try again.');
@@ -132,17 +178,37 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       }
   }, [isLoadingRide]);
 
-  // Determine if ride can be cancelled (Before Pickup)
+  // Determine if ride can be cancelled
+  // Can cancel if: searching OR (assigned/arriving AND elapsed time > 10 minutes)
   const canCancel = activeRide && (
-      activeRide.status === BuggyStatus.SEARCHING || 
-      activeRide.status === BuggyStatus.ASSIGNED || 
-      activeRide.status === BuggyStatus.ARRIVING
+    activeRide.status === BuggyStatus.SEARCHING || 
+    (elapsedTime >= MAX_WAIT_TIME && (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING))
   );
 
+  // Format countdown timer
+  const formatCountdown = (seconds: number): string => {
+      if (seconds >= MAX_WAIT_TIME) {
+          // Show overtime: how many minutes and seconds over 10 minutes
+          const overTime = seconds - MAX_WAIT_TIME;
+          const overHours = Math.floor(overTime / 3600);
+          const overMinutes = Math.floor((overTime % 3600) / 60);
+          const overSecs = overTime % 60;
+          if (overHours > 0) {
+              return `+${overHours}:${overMinutes.toString().padStart(2, '0')}:${overSecs.toString().padStart(2, '0')}`;
+          }
+          return `+${overMinutes}:${overSecs.toString().padStart(2, '0')}`;
+      }
+      // Show remaining time: how much time left until 10 minutes
+      const remaining = MAX_WAIT_TIME - seconds;
+      const minutes = Math.floor(remaining / 60);
+      const secs = remaining % 60;
+      return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full bg-gray-50 relative z-0">
       {/* Header */}
-      <div className={`p-4 text-white shadow-md ${THEME_COLORS.primary} flex items-center flex-shrink-0`}>
+      <div className={`p-4 text-white shadow-md ${THEME_COLORS.primary} flex items-center flex-shrink-0 relative z-0`}>
         <button onClick={onBack} className="mr-4 text-white hover:text-gray-200">
           <Navigation className="w-6 h-6 rotate-180" />
         </button>
@@ -150,21 +216,21 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       </div>
 
       {/* Interactive Map - Scrollable */}
-      <div ref={mapContainerRef} className="relative flex-1 bg-emerald-50 overflow-auto shadow-inner">
+      <div ref={mapContainerRef} className="relative flex-1 bg-emerald-50 overflow-auto shadow-inner z-0">
         {/* Map Container - Larger than viewport to allow scrolling */}
-        <div className="relative" style={{ minHeight: '600px', minWidth: '100%' }}>
+        <div className="relative z-0" style={{ minHeight: '600px', minWidth: '100%' }}>
 
           {/* User Location Pin - Always visible with high z-index */}
           <div 
               ref={userLocationRef}
-              className="absolute transform -translate-x-1/2 -translate-y-1/2 z-40 flex flex-col items-center group"
+              className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center group"
               style={{ top: userPos.top, left: userPos.left }}
           >
-              <div className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg mb-1 whitespace-nowrap z-50">
+              <div className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg mb-1 whitespace-nowrap relative z-10">
                   You (Villa {user.roomNumber})
               </div>
-              <div className="w-5 h-5 bg-red-600 rounded-full border-3 border-white shadow-xl animate-pulse relative z-50"></div>
-              <div className="w-10 h-10 bg-red-600/30 rounded-full absolute top-6 animate-ping z-40"></div>
+              <div className="w-5 h-5 bg-red-600 rounded-full border-3 border-white shadow-xl animate-pulse relative z-10"></div>
+              <div className="w-10 h-10 bg-red-600/30 rounded-full absolute top-6 animate-ping z-0 pointer-events-none"></div>
           </div>
 
           {/* Resort Locations Pins */}
@@ -175,7 +241,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                   <button
                       key={loc.name}
                       onClick={() => !activeRide && setDestination(loc.name)}
-                      className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center transition-all duration-300 ${isSelected ? 'scale-110 z-20' : 'hover:scale-110 opacity-80 hover:opacity-100'}`}
+                      className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center transition-all duration-300 ${isSelected ? 'scale-110 z-15' : 'hover:scale-110 opacity-80 hover:opacity-100'}`}
                       style={{ top: pos.top, left: pos.left }}
                   >
                       <div className={`text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm mb-1 whitespace-nowrap transition-colors ${isSelected ? 'bg-amber-500 text-white' : 'bg-white text-gray-600'}`}>
@@ -215,7 +281,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
           {/* Moving Buggy Animation (If active) */}
           {activeRide && activeRide.status !== BuggyStatus.SEARCHING && destPos && (
                <div 
-                  className="absolute transform -translate-x-1/2 -translate-y-1/2 z-30 transition-all duration-[3000ms] ease-linear"
+                  className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10 transition-all duration-[3000ms] ease-linear"
                   style={{ 
                       top: activeRide.status === BuggyStatus.ON_TRIP ? destPos.top : userPos.top,
                       left: activeRide.status === BuggyStatus.ON_TRIP ? destPos.left : userPos.left,
@@ -248,8 +314,22 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                     )}
                  </div>
                  <div className="text-right">
-                    {activeRide.eta && activeRide.status !== BuggyStatus.SEARCHING && (
-                        <div className="text-2xl font-bold text-emerald-600">{activeRide.eta} min</div>
+                    {activeRide.status !== BuggyStatus.SEARCHING && activeRide.status !== BuggyStatus.COMPLETED && activeRide.status !== BuggyStatus.ON_TRIP && (
+                        <div className="flex flex-col items-end">
+                            {activeRide.eta && (
+                                <div className="text-2xl font-bold text-emerald-600">{activeRide.eta} min</div>
+                            )}
+                            {/* Countdown Timer */}
+                            <div className={`text-xs font-semibold mt-1 ${
+                                elapsedTime >= MAX_WAIT_TIME ? 'text-red-600' : 'text-gray-500'
+                            }`}>
+                                {elapsedTime >= MAX_WAIT_TIME ? (
+                                    <span>Wait: {formatCountdown(elapsedTime)}</span>
+                                ) : (
+                                    <span>Wait: {formatCountdown(elapsedTime)}</span>
+                                )}
+                            </div>
+                        </div>
                     )}
                  </div>
               </div>
@@ -266,15 +346,31 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                  </div>
               </div>
 
-              {/* CANCEL BUTTON: Visible if Searching, Assigned, or Arriving */}
+              {/* CANCEL BUTTON: Visible if Searching OR (Assigned/Arriving AND wait time >= 10 minutes) */}
               {canCancel && (
                   <button 
                     onClick={handleCancel}
-                    className="w-full py-3 bg-red-50 text-red-600 font-semibold rounded-lg hover:bg-red-100 transition border border-red-100 flex items-center justify-center"
+                    className={`w-full py-3 font-semibold rounded-lg transition border flex items-center justify-center ${
+                        elapsedTime >= MAX_WAIT_TIME 
+                            ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200' 
+                            : 'bg-red-50 text-red-600 hover:bg-red-100 border-red-100'
+                    }`}
                   >
                     <XCircle size={18} className="mr-2" />
-                    {activeRide.status === BuggyStatus.SEARCHING ? t('cancel_request') : t('cancel_ride')}
+                    {activeRide.status === BuggyStatus.SEARCHING 
+                        ? t('cancel_request') 
+                        : elapsedTime >= MAX_WAIT_TIME 
+                            ? `${t('cancel_ride')} (Over 10 min)`
+                            : t('cancel_ride')
+                    }
                   </button>
+              )}
+              
+              {/* Warning message if waiting but can't cancel yet */}
+              {activeRide && (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && elapsedTime < MAX_WAIT_TIME && (
+                  <div className="mt-2 text-xs text-gray-500 text-center">
+                      You can cancel after waiting 10 minutes ({formatCountdown(elapsedTime)} remaining)
+                  </div>
               )}
            </div>
       )}

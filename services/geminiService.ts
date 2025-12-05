@@ -214,6 +214,7 @@ export const queryResortInfo = async (query: string, userLocation?: {lat: number
 // --- TTS (Gemini 2.5 Flash TTS) ---
 export const speakText = async (text: string): Promise<AudioBuffer | null> => {
   try {
+    console.log('TTS: Calling Gemini API with text:', text.substring(0, 50) + '...');
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text }] }],
@@ -227,17 +228,47 @@ export const speakText = async (text: string): Promise<AudioBuffer | null> => {
       },
     });
 
+    console.log('TTS: Response received', response);
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (base64Audio) {
-         // Create a temporary AudioContext just for decoding
-         const outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-         // decodeAudioData requires ArrayBuffer
-         const audioBuffer = await outputAudioContext.decodeAudioData(decode(base64Audio).buffer);
-         return audioBuffer;
+    
+    if (!base64Audio) {
+      console.error('TTS: No audio data in response');
+      console.log('TTS: Response structure:', JSON.stringify(response, null, 2));
+      return null;
     }
-    return null;
+    
+    console.log('TTS: Audio data found, length:', base64Audio.length);
+    
+    // Create a temporary AudioContext just for decoding
+    const outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // Resume context if suspended (required for autoplay policies)
+    if (outputAudioContext.state === 'suspended') {
+      console.log('TTS: Resuming suspended AudioContext');
+      await outputAudioContext.resume();
+    }
+    
+    // decodeAudioData requires ArrayBuffer
+    const decodedBytes = decode(base64Audio);
+    console.log('TTS: Decoded bytes length:', decodedBytes.length);
+    
+    try {
+      const audioBuffer = await outputAudioContext.decodeAudioData(decodedBytes.buffer);
+      console.log('TTS: Audio buffer decoded successfully, duration:', audioBuffer.duration, 'sampleRate:', audioBuffer.sampleRate);
+      
+      // Don't close the context here - let the caller handle it
+      // The context will be garbage collected or can be closed after playback
+      return audioBuffer;
+    } catch (decodeError) {
+      console.error('TTS: Error decoding audio data', decodeError);
+      outputAudioContext.close();
+      return null;
+    }
   } catch (error) {
     console.error("TTS Error", error);
+    if (error instanceof Error) {
+      console.error("TTS Error details:", error.message, error.stack);
+    }
     return null;
   }
 };

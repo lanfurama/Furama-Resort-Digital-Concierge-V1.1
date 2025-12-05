@@ -77,40 +77,62 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
     // Language State - Load from database on mount
     const [selectedLang, setSelectedLang] = useState(user.language || 'English');
     const [isLangSaving, setIsLangSaving] = useState(false);
+    const [isLoadingUserData, setIsLoadingUserData] = useState(true);
     
-    // Sync language from database when component mounts
+    // Sync language and notes from database when component mounts
     useEffect(() => {
-        const loadLanguageFromDB = async () => {
+        const loadUserDataFromDB = async () => {
+            setIsLoadingUserData(true);
             try {
                 const { apiClient } = await import('../services/apiClient');
                 const dbUser = await apiClient.get<any>(`/users/room/${user.roomNumber}`).catch(() => null);
-                if (dbUser && dbUser.language) {
-                    console.log('Loaded language from database:', dbUser.language);
-                    setSelectedLang(dbUser.language);
-                    // Update localStorage
-                    const savedUser = localStorage.getItem('furama_user');
-                    if (savedUser) {
-                        const parsedUser = JSON.parse(savedUser);
-                        parsedUser.language = dbUser.language;
-                        localStorage.setItem('furama_user', JSON.stringify(parsedUser));
+                if (dbUser) {
+                    // Update language if exists in database
+                    if (dbUser.language) {
+                        console.log('Loaded language from database:', dbUser.language);
+                        setSelectedLang(dbUser.language);
+                        // Update localStorage
+                        const savedUser = localStorage.getItem('furama_user');
+                        if (savedUser) {
+                            const parsedUser = JSON.parse(savedUser);
+                            parsedUser.language = dbUser.language;
+                            localStorage.setItem('furama_user', JSON.stringify(parsedUser));
+                        }
+                        // Update context
+                        setContextLanguage(dbUser.language as any);
                     }
-                    // Update context
-                    setContextLanguage(dbUser.language as any);
+                    
+                    // Update notes if exists in database
+                    if (dbUser.notes !== undefined && dbUser.notes !== null) {
+                        console.log('Loaded notes from database:', dbUser.notes);
+                        setNotes(dbUser.notes);
+                        // Update localStorage
+                        const savedUser = localStorage.getItem('furama_user');
+                        if (savedUser) {
+                            const parsedUser = JSON.parse(savedUser);
+                            parsedUser.notes = dbUser.notes;
+                            localStorage.setItem('furama_user', JSON.stringify(parsedUser));
+                        }
+                    }
                 }
             } catch (error) {
-                console.error('Failed to load language from database:', error);
+                console.error('Failed to load user data from database:', error);
+            } finally {
+                setIsLoadingUserData(false);
             }
         };
-        loadLanguageFromDB();
+        loadUserDataFromDB();
     }, [user.roomNumber, setContextLanguage]);
     
     // Service Rating State
     const [activeRatingId, setActiveRatingId] = useState<string | null>(null);
     const [serviceRatingValue, setServiceRatingValue] = useState(5);
     const [serviceCommentValue, setServiceCommentValue] = useState('');
+    const [isSubmittingRating, setIsSubmittingRating] = useState(false);
     
     // Hotel Review State
     const [showHotelReview, setShowHotelReview] = useState(false);
+    const [isSubmittingReview, setIsSubmittingReview] = useState(false);
     
     // Initialize detailed ratings from default to 5 (will be updated when review loads)
     const initialRatings = REVIEW_CATEGORIES.map(cat => ({
@@ -186,17 +208,23 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
         }
     };
 
-    const handleSubmitServiceRating = async (id: string) => {
+    const handleSubmitServiceRating = async (id: string, requestType?: string) => {
+        if (isSubmittingRating) return;
+        
+        setIsSubmittingRating(true);
         try {
-            await rateServiceRequest(id, serviceRatingValue, serviceCommentValue);
+            await rateServiceRequest(id, serviceRatingValue, serviceCommentValue, requestType);
             setActiveRatingId(null);
             setServiceRatingValue(5);
             setServiceCommentValue('');
             // Refresh history to show updated rating
-            getCompletedGuestOrders(user.roomNumber).then(setHistory).catch(console.error);
-        } catch (error) {
+            const updatedHistory = await getCompletedGuestOrders(user.roomNumber);
+            setHistory(updatedHistory);
+        } catch (error: any) {
             console.error('Failed to submit rating:', error);
-            alert('Failed to submit rating. Please try again.');
+            alert(t('error_submit_rating') || `Failed to submit rating: ${error.message || 'Please try again.'}`);
+        } finally {
+            setIsSubmittingRating(false);
         }
     };
 
@@ -205,28 +233,43 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
     };
 
     const handleSubmitHotelReview = async () => {
+        if (isSubmittingReview) return;
+        
+        setIsSubmittingReview(true);
         try {
             // Calculate Average
             const sum = ratings.reduce((acc, curr) => acc + curr.value, 0);
             const avg = parseFloat((sum / ratings.length).toFixed(1));
 
             const review = {
-                id: Date.now().toString(),
+                id: existingReview?.id || Date.now().toString(),
                 roomNumber: user.roomNumber,
                 guestName: user.lastName,
                 categoryRatings: ratings.map(r => ({ category: r.label, rating: r.value })),
                 averageRating: avg,
                 comment: hotelComment,
-                timestamp: Date.now()
+                timestamp: existingReview?.timestamp || Date.now()
             };
             
-            await submitHotelReview(review);
-            setExistingReview(review);
+            // If there's an existing review, update it; otherwise create new
+            const reviewId = existingReview?.id;
+            await submitHotelReview(review, reviewId);
+            
+            // Reload review from API to get updated data
+            const updatedReview = await getHotelReview(user.roomNumber);
+            if (updatedReview) {
+                setExistingReview(updatedReview);
+            } else {
+                setExistingReview(review);
+            }
+            
             setIsHotelReviewSubmitted(true);
             setShowHotelReview(false);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to submit hotel review:', error);
-            alert('Failed to submit review. Please try again.');
+            alert(t('error_submit_review') || `Failed to submit review: ${error.message || 'Please try again.'}`);
+        } finally {
+            setIsSubmittingReview(false);
         }
     };
 
@@ -261,22 +304,27 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
     return (
         <div className="flex flex-col h-full bg-gray-50 relative">
             {/* Header */}
-            <div className="bg-emerald-900 text-white p-6 pb-8 rounded-b-[2.5rem] shadow-xl relative z-10">
+            <div className="bg-emerald-900 text-white p-4 pb-6 rounded-b-[2.5rem] shadow-xl relative z-10">
                 {/* Back Button for consistency */}
-                <button onClick={onBack} className="absolute top-4 left-4 text-white hover:text-emerald-200">
-                    <ArrowLeft className="w-6 h-6" />
+                <button onClick={onBack} className="absolute top-3 left-3 text-white hover:text-emerald-200">
+                    <ArrowLeft className="w-5 h-5" />
                 </button>
-                <h2 className="text-2xl font-serif font-bold text-center">{t('my_account')}</h2>
-                <div className="mt-6 flex flex-col items-center">
-                    <div className="w-20 h-20 bg-emerald-700 rounded-full flex items-center justify-center border-4 border-emerald-800 shadow-inner">
-                        <span className="text-3xl font-serif text-emerald-200">{user.lastName.charAt(0)}</span>
+                <h2 className="text-xl font-serif font-bold text-center">{t('my_account')}</h2>
+                <div className="mt-4 flex flex-col items-center">
+                    <div className="w-16 h-16 bg-emerald-700 rounded-full flex items-center justify-center border-4 border-emerald-800 shadow-inner">
+                        <span className="text-2xl font-serif text-emerald-200">{user.lastName.charAt(0)}</span>
                     </div>
-                    <h3 className="text-xl font-bold mt-3">Mr/Ms {user.lastName}</h3>
-                    <p className="text-emerald-300 text-sm">{t('room')} {user.roomNumber}</p>
+                    <h3 className="text-lg font-bold mt-2">Mr/Ms {user.lastName}</h3>
+                    <p className="text-emerald-300 text-xs">{t('room')} {user.roomNumber}</p>
                 </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-6 -mt-4 relative z-20 pb-24">
+                {(isLoadingHistory || isLoadingReview || isLoadingUserData) && (
+                    <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                        <Loading size="md" message={t('loading') || 'Loading account data...'} />
+                    </div>
+                )}
                 
                 {/* Profile Card */}
                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
@@ -319,7 +367,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                         <h4 className="text-sm font-bold text-emerald-800 uppercase tracking-wide flex items-center">
                             <Hotel size={16} className="mr-2"/> {t('experience_feedback')}
                         </h4>
-                        {isHotelReviewSubmitted && (
+                        {isHotelReviewSubmitted && !isLoadingReview && (
                             <div className="flex items-center bg-white px-2 py-1 rounded-lg border border-emerald-100 shadow-sm">
                                 <Star size={12} className="fill-amber-400 text-amber-400 mr-1"/>
                                 <span className="text-xs font-bold text-gray-800">{averageRatingDisplay}</span>
@@ -327,16 +375,17 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                         )}
                      </div>
                      
-                     {!isHotelReviewSubmitted ? (
-                         !showHotelReview ? (
-                             <button 
-                                onClick={() => setShowHotelReview(true)}
-                                className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-md hover:bg-emerald-700 transition"
-                            >
-                                {t('rate_stay')}
-                             </button>
-                         ) : (
-                             <div className="animate-in fade-in slide-in-from-top-2">
+                     {isLoadingReview ? (
+                         <Loading size="sm" message={t('loading') || 'Loading review...'} />
+                     ) : !showHotelReview && !isHotelReviewSubmitted ? (
+                         <button 
+                            onClick={() => setShowHotelReview(true)}
+                            className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-md hover:bg-emerald-700 transition"
+                        >
+                            {t('rate_stay')}
+                         </button>
+                     ) : showHotelReview ? (
+                         <div className="animate-in fade-in slide-in-from-top-2">
                                  <p className="text-xs text-gray-500 mb-3 text-center">Please rate us on the following categories:</p>
                                  
                                  <div className="space-y-3 mb-4">
@@ -362,7 +411,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                  </div>
 
                                  <textarea 
-                                    className="w-full bg-white border border-gray-200 rounded-lg p-3 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    className="w-full bg-white border border-gray-200 rounded-lg p-3 text-sm text-gray-800 mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                     rows={3}
                                     placeholder="Any additional comments or suggestions?"
                                     value={hotelComment}
@@ -370,15 +419,33 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                  ></textarea>
 
                                  <div className="flex space-x-2">
-                                     <button onClick={() => setShowHotelReview(false)} className="flex-1 py-3 text-gray-500 text-xs font-bold hover:bg-gray-100 rounded-xl">{t('cancel')}</button>
-                                     <button onClick={handleSubmitHotelReview} className="flex-1 py-3 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-md hover:bg-emerald-700">{t('submit')}</button>
+                                     <button 
+                                        onClick={() => setShowHotelReview(false)} 
+                                        disabled={isSubmittingReview}
+                                        className="flex-1 py-3 text-gray-500 text-xs font-bold hover:bg-gray-100 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                     >
+                                        {t('cancel')}
+                                     </button>
+                                     <button 
+                                        onClick={handleSubmitHotelReview} 
+                                        disabled={isSubmittingReview}
+                                        className="flex-1 py-3 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-md hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center"
+                                     >
+                                        {isSubmittingReview ? (
+                                            <>
+                                                <span className="animate-spin mr-2">⏳</span>
+                                                {t('submitting') || 'Submitting...'}
+                                            </>
+                                        ) : (
+                                            t('submit')
+                                        )}
+                                     </button>
                                  </div>
                              </div>
-                         )
                      ) : (
                          <div className="bg-white/50 rounded-xl p-2">
                              <div className="text-center mb-3">
-                                 <p className="text-sm text-gray-600 italic">"{hotelComment || 'Thank you for your valuable feedback!'}"</p>
+                                 <p className="text-sm text-gray-600 italic">"{hotelComment || existingReview?.comment || 'Thank you for your valuable feedback!'}"</p>
                              </div>
                              {/* Mini Breakdown Display */}
                              <div className="grid grid-cols-2 gap-2">
@@ -391,7 +458,27 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                      </div>
                                  ))}
                              </div>
-                             <button onClick={() => setShowHotelReview(true)} className="w-full text-center text-[10px] text-emerald-600 underline mt-3 hover:text-emerald-800">Edit Review</button>
+                             <button 
+                                 onClick={() => {
+                                     setShowHotelReview(true);
+                                     // Load existing review data into form
+                                     if (existingReview) {
+                                         const initialRatings = REVIEW_CATEGORIES.map(cat => {
+                                             const existing = existingReview.categoryRatings?.find(r => r.category === cat.label);
+                                             return { 
+                                                 id: cat.id, 
+                                                 label: cat.label, 
+                                                 value: existing ? existing.rating : 5 
+                                             };
+                                         });
+                                         setRatings(initialRatings);
+                                         setHotelComment(existingReview.comment || '');
+                                     }
+                                 }} 
+                                 className="w-full text-center text-[10px] text-emerald-600 underline mt-3 hover:text-emerald-800 transition"
+                             >
+                                 Edit Review
+                             </button>
                          </div>
                      )}
                 </div>
@@ -478,13 +565,36 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                                         <input 
                                                             type="text" 
                                                             placeholder="Comments (optional)..."
-                                                            className="w-full text-xs bg-gray-50 border border-gray-200 rounded p-2 mb-2 focus:outline-none"
+                                                            className="w-full text-xs bg-gray-50 border border-gray-200 rounded p-2 mb-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                                             value={serviceCommentValue}
                                                             onChange={(e) => setServiceCommentValue(e.target.value)}
                                                         />
                                                         <div className="flex space-x-2">
-                                                            <button onClick={() => setActiveRatingId(null)} className="flex-1 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded">{t('cancel')}</button>
-                                                            <button onClick={() => handleSubmitServiceRating(req.id)} className="flex-1 py-1 text-xs bg-emerald-600 text-white rounded font-bold">{t('submit')}</button>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setActiveRatingId(null);
+                                                                    setServiceRatingValue(5);
+                                                                    setServiceCommentValue('');
+                                                                }} 
+                                                                disabled={isSubmittingRating}
+                                                                className="flex-1 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                                            >
+                                                                {t('cancel')}
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleSubmitServiceRating(req.id, req.type)} 
+                                                                disabled={isSubmittingRating}
+                                                                className="flex-1 py-1 text-xs bg-emerald-600 text-white rounded font-bold disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center"
+                                                            >
+                                                                {isSubmittingRating ? (
+                                                                    <>
+                                                                        <span className="animate-spin mr-1">⏳</span>
+                                                                        {t('submitting') || 'Submitting...'}
+                                                                    </>
+                                                                ) : (
+                                                                    t('submit')
+                                                                )}
+                                                            </button>
                                                         </div>
                                                     </div>
                                                 ) : (

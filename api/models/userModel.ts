@@ -8,6 +8,7 @@ export interface User {
   role: 'GUEST' | 'ADMIN' | 'DRIVER' | 'STAFF' | 'SUPERVISOR';
   password?: string;
   language?: string | null;
+  notes?: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -38,8 +39,8 @@ export const userModel = {
 
   async create(user: Omit<User, 'id' | 'created_at' | 'updated_at'>): Promise<User> {
     const result = await pool.query(
-      'INSERT INTO users (last_name, room_number, villa_type, role, password, language) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [user.last_name, user.room_number, user.villa_type || null, user.role, user.password || null, user.language || 'English']
+      'INSERT INTO users (last_name, room_number, villa_type, role, password, language, notes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [user.last_name, user.room_number, user.villa_type || null, user.role, user.password || null, user.language || 'English', user.notes || null]
     );
     return result.rows[0];
   },
@@ -77,6 +78,11 @@ export const userModel = {
       values.push(user.language);
     } else {
       console.log('Language is undefined or null, skipping update');
+    }
+    if (user.notes !== undefined) {
+      console.log('Adding notes to update:', user.notes);
+      fields.push(`notes = $${paramCount++}`);
+      values.push(user.notes || null);
     }
 
     if (fields.length === 0) {

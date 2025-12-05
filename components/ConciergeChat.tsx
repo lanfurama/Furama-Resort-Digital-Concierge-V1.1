@@ -4,12 +4,78 @@ import { ChatMessage } from '../types';
 import { createChatSession, speakText, connectLiveSession, encode } from '../services/geminiService';
 import { GenerateContentResponse, LiveServerMessage } from '@google/genai';
 import { useTranslation } from '../contexts/LanguageContext';
+import { apiClient } from '../services/apiClient';
 
 interface ConciergeChatProps {
   onClose: () => void;
 }
 
-const MapCard: React.FC<{ url: string; title: string }> = ({ url, title }) => (
+const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
+  const { t } = useTranslation();
+  
+  // Get roomNumber from localStorage
+  const getRoomNumber = (): string | null => {
+    const savedUser = localStorage.getItem('furama_user');
+    if (savedUser) {
+      const parsedUser = JSON.parse(savedUser);
+      return parsedUser.roomNumber || null;
+    }
+    return null;
+  };
+
+  // Helper to save message to database
+  const saveMessageToDB = async (role: 'user' | 'model', text: string) => {
+    const roomNumber = getRoomNumber();
+    if (!roomNumber) {
+      console.warn('No room number found, skipping database save');
+      return;
+    }
+
+    try {
+      // Get user ID if available
+      const savedUser = localStorage.getItem('furama_user');
+      let userId: number | undefined;
+      if (savedUser) {
+        const parsedUser = JSON.parse(savedUser);
+        userId = parsedUser.id ? parseInt(parsedUser.id) : undefined;
+      }
+
+      await apiClient.post('/chat-messages', {
+        role: role === 'user' ? 'user' : 'model',
+        text,
+        user_id: userId || null,
+        room_number: roomNumber,
+        service_type: 'CONCIERGE' // Mark as concierge chat
+      });
+    } catch (error) {
+      console.error('Failed to save message to database:', error);
+      // Don't throw - allow chat to continue even if DB save fails
+    }
+  };
+
+  // Helper to load messages from database
+  const loadMessagesFromDB = async (): Promise<ChatMessage[]> => {
+    const roomNumber = getRoomNumber();
+    if (!roomNumber) {
+      return [];
+    }
+
+    try {
+      const dbMessages = await apiClient.get<any[]>(`/chat-messages/room/${roomNumber}?service_type=CONCIERGE`);
+      
+      // Map database format to frontend format
+      return dbMessages.map((msg: any) => ({
+        id: msg.id.toString(),
+        role: msg.role === 'model' ? 'model' : 'user',
+        text: msg.text
+      }));
+    } catch (error) {
+      console.error('Failed to load messages from database:', error);
+      return [];
+    }
+  };
+  
+  const MapCard: React.FC<{ url: string; title: string }> = ({ url, title }) => (
     <a href={url} target="_blank" rel="noreferrer" className="block mt-3 group w-full max-w-sm">
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
             {/* Visual Abstract Map Pattern */}
@@ -32,10 +98,7 @@ const MapCard: React.FC<{ url: string; title: string }> = ({ url, title }) => (
             </div>
         </div>
     </a>
-);
-
-const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
-  const { t } = useTranslation();
+  );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -55,18 +118,33 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
   const nextStartTimeRef = useRef<number>(0);
 
   useEffect(() => {
+    // Load messages from database
+    const loadMessages = async () => {
+      const dbMessages = await loadMessagesFromDB();
+      if (dbMessages.length > 0) {
+        // If we have saved messages, use them
+        setMessages(dbMessages);
+      } else {
+        // Otherwise, show welcome message
+        const welcomeMsg: ChatMessage = {
+          id: 'welcome',
+          role: 'model',
+          text: t('concierge_welcome')
+        };
+        setMessages([welcomeMsg]);
+        // Save welcome message to database
+        await saveMessageToDB('model', welcomeMsg.text);
+      }
+    };
+
+    loadMessages();
+
     // Initialize text chat session
     createChatSession().then(session => {
       chatSessionRef.current = session;
     }).catch(error => {
       console.error('Failed to create chat session:', error);
     });
-    // Welcome message
-    setMessages([{
-      id: 'welcome',
-      role: 'model',
-      text: t('concierge_welcome')
-    }]);
 
     return () => {
        // Cleanup Live API if active
@@ -94,6 +172,10 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
 
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: input };
     setMessages(prev => [...prev, userMsg]);
+    
+    // Save user message to database
+    await saveMessageToDB('user', userMsg.text);
+    
     setInput('');
     setIsLoading(true);
 
@@ -123,37 +205,92 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
           });
       }
 
-      setMessages(prev => [...prev, {
+      const modelMsg: ChatMessage = {
         id: Date.now().toString(),
         role: 'model',
         text: responseText || t('sorry_couldnt_process'),
         groundingUrls: groundingUrls.length > 0 ? groundingUrls : undefined
-      }]);
+      };
+
+      setMessages(prev => [...prev, modelMsg]);
+      
+      // Save model response to database
+      await saveMessageToDB('model', modelMsg.text);
 
     } catch (error) {
       console.error("Chat Error", error);
-      setMessages(prev => [...prev, {
+      const errorMsg: ChatMessage = {
         id: Date.now().toString(),
         role: 'model',
         text: t('connection_error')
-      }]);
+      };
+      setMessages(prev => [...prev, errorMsg]);
+      
+      // Save error message to database
+      await saveMessageToDB('model', errorMsg.text);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleTTS = async (text: string) => {
-      if (isPlayingAudio) return;
+      if (isPlayingAudio) {
+        console.log('TTS: Already playing audio');
+        return;
+      }
+      if (!text || text.trim().length === 0) {
+        console.warn('TTS: Empty text provided');
+        return;
+      }
+      
       setIsPlayingAudio(true);
-      const audioBuffer = await speakText(text);
-      if (audioBuffer) {
+      try {
+        console.log('TTS: Requesting audio for text:', text.substring(0, 50) + '...');
+        const audioBuffer = await speakText(text);
+        
+        if (!audioBuffer) {
+          console.error('TTS: No audio buffer returned');
+          setIsPlayingAudio(false);
+          return;
+        }
+        
+        console.log('TTS: Audio buffer received, duration:', audioBuffer.duration, 'sampleRate:', audioBuffer.sampleRate);
+        
+        // Create AudioContext for playback
         const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        
+        // Resume context if suspended (required for autoplay policies in browsers)
+        if (ctx.state === 'suspended') {
+          console.log('TTS: Resuming suspended playback AudioContext');
+          await ctx.resume();
+          console.log('TTS: AudioContext state after resume:', ctx.state);
+        }
+        
         const source = ctx.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(ctx.destination);
-        source.onended = () => setIsPlayingAudio(false);
-        source.start();
-      } else {
+        
+        source.onended = () => {
+          console.log('TTS: Audio playback ended');
+          setIsPlayingAudio(false);
+          // Close context after a short delay to ensure cleanup
+          setTimeout(() => {
+            if (ctx.state !== 'closed') {
+              ctx.close().catch(err => console.warn('TTS: Error closing AudioContext', err));
+            }
+          }, 100);
+        };
+        
+        source.onerror = (error) => {
+          console.error('TTS: Audio playback error', error);
+          setIsPlayingAudio(false);
+          ctx.close().catch(err => console.warn('TTS: Error closing AudioContext on error', err));
+        };
+        
+        console.log('TTS: Starting audio playback, AudioContext state:', ctx.state);
+        source.start(0);
+      } catch (error) {
+        console.error('TTS: Error in handleTTS', error);
         setIsPlayingAudio(false);
       }
   };
@@ -307,9 +444,11 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
                   {/* TTS Button for Model */}
                   {msg.role === 'model' && (
                       <button 
+                        type="button"
                         onClick={() => handleTTS(msg.text)} 
-                        className="mt-2 text-emerald-600 hover:text-emerald-800 transition"
+                        className="mt-2 p-2 rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-800 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                         disabled={isPlayingAudio}
+                        title={t('play_audio') || 'Play audio'}
                       >
                          <Volume2 size={16} />
                       </button>
@@ -332,8 +471,9 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
           {/* Input Area */}
           <div className="p-4 bg-white border-t border-gray-100 flex items-center space-x-2">
              <button 
+               type="button"
                onClick={toggleLiveMode}
-               className="p-3 rounded-full bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition"
+               className="p-3 rounded-full bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
              >
                 <Mic size={20} />
              </button>
@@ -343,12 +483,13 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 placeholder={t('ask_placeholder')}
-                className="flex-1 bg-gray-100 rounded-full px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="flex-1 bg-gray-100 rounded-full px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
              />
              <button 
+                type="button"
                 onClick={handleSend}
                 disabled={!input.trim()}
-                className="p-3 rounded-full bg-emerald-800 text-white hover:bg-emerald-900 disabled:opacity-50 transition"
+                className="p-3 rounded-full bg-emerald-800 text-white hover:bg-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
              >
                 <Send size={20} />
              </button>

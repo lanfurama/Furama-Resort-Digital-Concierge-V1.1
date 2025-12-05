@@ -212,7 +212,7 @@ export const getUsers = async (): Promise<User[]> => {
       checkIn: user.check_in || undefined,
       checkOut: user.check_out || undefined,
       language: user.language || undefined,
-      notes: undefined // Database doesn't have notes field
+      notes: user.notes || undefined
     }));
     
     console.log('Mapped users:', mapped);
@@ -326,27 +326,57 @@ export const resetUserPassword = async (userId: string, newPass: string): Promis
 
 export const updateUserNotes = async (roomNumber: string, notes: string): Promise<void> => {
   try {
+    console.log('=== updateUserNotes START ===');
+    console.log('Parameters:', { roomNumber, notes });
+    
     // Get user by room number first
-    const user = await apiClient.get<any>(`/users/room/${roomNumber}`).catch(() => null);
-    if (user && user.id) {
-      // Update user with notes (if notes field exists in database)
-      // For now, we'll store in localStorage as database doesn't have notes column
-      const savedUser = localStorage.getItem('furama_user');
-      if (savedUser) {
-        const parsedUser = JSON.parse(savedUser);
-        parsedUser.notes = notes;
-        localStorage.setItem('furama_user', JSON.stringify(parsedUser));
-      }
+    console.log('Step 1: Fetching user by room number...');
+    const user = await apiClient.get<any>(`/users/room/${roomNumber}`);
+    console.log('Step 1: User found:', user);
+    
+    if (!user || !user.id) {
+      const error = new Error('User not found or missing ID');
+      console.error('Step 1: FAILED -', error.message, user);
+      throw error;
     }
-  } catch (error) {
-    console.error('Failed to update user notes:', error);
-    // Fallback to localStorage
+    
+    console.log('Step 2: Updating user notes via API...');
+    console.log('Step 2: Request URL:', `/users/${user.id}`);
+    console.log('Step 2: Request body:', { notes });
+    
+    // Update user notes in database
+    const updatedUser = await apiClient.put(`/users/${user.id}`, { notes });
+    console.log('Step 2: SUCCESS - User updated:', updatedUser);
+    console.log('Step 2: Updated notes value:', updatedUser.notes);
+    
+    // Update localStorage
+    console.log('Step 3: Updating localStorage...');
     const savedUser = localStorage.getItem('furama_user');
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
       parsedUser.notes = notes;
       localStorage.setItem('furama_user', JSON.stringify(parsedUser));
+      console.log('Step 3: localStorage updated');
     }
+    
+    console.log('=== updateUserNotes SUCCESS ===');
+  } catch (error: any) {
+    console.error('=== updateUserNotes ERROR ===');
+    console.error('Error:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Fallback to localStorage on error
+    console.log('Falling back to localStorage...');
+    const savedUser = localStorage.getItem('furama_user');
+    if (savedUser) {
+      const parsedUser = JSON.parse(savedUser);
+      parsedUser.notes = notes;
+      localStorage.setItem('furama_user', JSON.stringify(parsedUser));
+      console.log('localStorage updated as fallback');
+    }
+    
+    throw error; // Re-throw để component có thể handle error
   }
 };
 
@@ -1759,62 +1789,133 @@ export const updateServiceStatus = async (id: string, status: 'PENDING' | 'CONFI
   }
 };
 
-export const rateServiceRequest = async (id: string, rating: number, feedback: string): Promise<void> => {
+export const rateServiceRequest = async (id: string, rating: number, feedback: string, requestType?: string): Promise<void> => {
   try {
-    // Try to update service request first
-    try {
-      await apiClient.put(`/service-requests/${id}`, { rating, feedback });
-      // Update local state
-      const serviceIdx = serviceRequests.findIndex(s => s.id === id);
-      if (serviceIdx >= 0) {
-        serviceRequests[serviceIdx] = { ...serviceRequests[serviceIdx], rating, feedback };
-        return;
-      }
-    } catch (serviceError) {
-      // If not a service request, try ride request
+    console.log('=== rateServiceRequest START ===');
+    console.log('Parameters:', { id, rating, feedback, requestType });
+    
+    // Determine if this is a ride request or service request based on type or by checking both
+    const isRideRequest = requestType === 'BUGGY';
+    
+    if (isRideRequest) {
+      // Directly update ride request
       try {
-        await apiClient.put(`/ride-requests/${id}`, { rating, feedback });
+        console.log('Updating ride request via API...');
+        console.log('Request URL:', `/ride-requests/${id}`);
+        console.log('Request body:', { rating, feedback });
+        
+        const updatedRide = await apiClient.put(`/ride-requests/${id}`, { rating, feedback });
+        console.log('SUCCESS - Ride request updated:', updatedRide);
+        
         // Update local state
         const rideIdx = rides.findIndex(r => r.id === id);
         if (rideIdx >= 0) {
           rides[rideIdx] = { ...rides[rideIdx], rating, feedback };
-          return;
+          console.log('Local cache updated for ride request');
         }
-      } catch (rideError) {
-        console.error('Failed to rate service/ride request:', serviceError, rideError);
+        console.log('=== rateServiceRequest SUCCESS ===');
+        return;
+      } catch (rideError: any) {
+        console.error('Failed to update ride request via API:', rideError);
         // Fallback to local state
-        const serviceIdx = serviceRequests.findIndex(s => s.id === id);
-        if (serviceIdx >= 0) {
-          serviceRequests[serviceIdx] = { ...serviceRequests[serviceIdx], rating, feedback };
-          return;
-        }
         const rideIdx = rides.findIndex(r => r.id === id);
         if (rideIdx >= 0) {
           rides[rideIdx] = { ...rides[rideIdx], rating, feedback };
+          console.log('Fallback: Updated local cache for ride request');
           return;
+        }
+        throw new Error(`Failed to rate ride request: ${rideError.message}`);
+      }
+    } else {
+      // Try service request first, then ride request as fallback
+      try {
+        console.log('Attempting to update service request via API...');
+        console.log('Request URL:', `/service-requests/${id}`);
+        console.log('Request body:', { rating, feedback });
+        
+        const updatedRequest = await apiClient.put(`/service-requests/${id}`, { rating, feedback });
+        console.log('SUCCESS - Service request updated:', updatedRequest);
+        
+        // Update local state
+        const serviceIdx = serviceRequests.findIndex(s => s.id === id);
+        if (serviceIdx >= 0) {
+          serviceRequests[serviceIdx] = { ...serviceRequests[serviceIdx], rating, feedback };
+          console.log('Local cache updated for service request');
+        }
+        console.log('=== rateServiceRequest SUCCESS ===');
+        return;
+      } catch (serviceError: any) {
+        console.log('Service request update failed, trying ride request...');
+        console.log('Service error:', serviceError.message);
+        
+        // If not a service request, try ride request
+        try {
+          console.log('Attempting to update ride request via API...');
+          console.log('Request URL:', `/ride-requests/${id}`);
+          console.log('Request body:', { rating, feedback });
+          
+          const updatedRide = await apiClient.put(`/ride-requests/${id}`, { rating, feedback });
+          console.log('SUCCESS - Ride request updated:', updatedRide);
+          
+          // Update local state
+          const rideIdx = rides.findIndex(r => r.id === id);
+          if (rideIdx >= 0) {
+            rides[rideIdx] = { ...rides[rideIdx], rating, feedback };
+            console.log('Local cache updated for ride request');
+          }
+          console.log('=== rateServiceRequest SUCCESS ===');
+          return;
+        } catch (rideError: any) {
+          console.error('=== rateServiceRequest ERROR ===');
+          console.error('Both service and ride request updates failed');
+          console.error('Service error:', serviceError.message);
+          console.error('Ride error:', rideError.message);
+          
+          // Fallback to local state
+          const serviceIdx = serviceRequests.findIndex(s => s.id === id);
+          if (serviceIdx >= 0) {
+            serviceRequests[serviceIdx] = { ...serviceRequests[serviceIdx], rating, feedback };
+            console.log('Fallback: Updated local cache for service request');
+            return;
+          }
+          const rideIdx = rides.findIndex(r => r.id === id);
+          if (rideIdx >= 0) {
+            rides[rideIdx] = { ...rides[rideIdx], rating, feedback };
+            console.log('Fallback: Updated local cache for ride request');
+            return;
+          }
+          
+          throw new Error(`Failed to rate request: ${serviceError.message || rideError.message}`);
         }
       }
     }
-  } catch (error) {
-    console.error('Failed to rate service request:', error);
-    // Fallback to local state
+  } catch (error: any) {
+    console.error('=== rateServiceRequest FATAL ERROR ===');
+    console.error('Error:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Final fallback to local state
     const serviceIdx = serviceRequests.findIndex(s => s.id === id);
     if (serviceIdx >= 0) {
       serviceRequests[serviceIdx] = { ...serviceRequests[serviceIdx], rating, feedback };
+      console.log('Final fallback: Updated local cache for service request');
       return;
     }
     const rideIdx = rides.findIndex(r => r.id === id);
     if (rideIdx >= 0) {
       rides[rideIdx] = { ...rides[rideIdx], rating, feedback };
+      console.log('Final fallback: Updated local cache for ride request');
       return;
     }
+    
+    throw error; // Re-throw để component có thể handle error
   }
 };
 
 // --- HOTEL REVIEWS ---
-export const submitHotelReview = async (review: HotelReview): Promise<void> => {
+export const submitHotelReview = async (review: HotelReview, existingReviewId?: string): Promise<void> => {
     try {
-        console.log('Submitting hotel review via API...', review);
         const requestBody = {
             room_number: review.roomNumber,
             guest_name: review.guestName,
@@ -1824,8 +1925,18 @@ export const submitHotelReview = async (review: HotelReview): Promise<void> => {
             timestamp: review.timestamp
         };
         
-        const dbReview = await apiClient.post<any>('/hotel-reviews', requestBody);
-        console.log('Hotel review submitted successfully:', dbReview);
+        let dbReview: any;
+        
+        // If existing review ID is provided, update instead of create
+        if (existingReviewId) {
+            console.log('Updating hotel review via API...', existingReviewId, review);
+            dbReview = await apiClient.put<any>(`/hotel-reviews/${existingReviewId}`, requestBody);
+            console.log('Hotel review updated successfully:', dbReview);
+        } else {
+            console.log('Submitting hotel review via API...', review);
+            dbReview = await apiClient.post<any>('/hotel-reviews', requestBody);
+            console.log('Hotel review submitted successfully:', dbReview);
+        }
         
         // Update local cache
         const mappedReview: HotelReview = {
@@ -1840,11 +1951,11 @@ export const submitHotelReview = async (review: HotelReview): Promise<void> => {
             timestamp: dbReview.timestamp
         };
         
-        // Update local cache
+        // Update local cache (remove old review for this room, add new one)
         hotelReviews = hotelReviews.filter(r => r.roomNumber !== review.roomNumber);
         hotelReviews.push(mappedReview);
     } catch (error: any) {
-        console.error('Failed to submit hotel review via API:', error);
+        console.error('Failed to submit/update hotel review via API:', error);
         console.error('Error details:', {
             message: error?.message,
             response: error?.response,
