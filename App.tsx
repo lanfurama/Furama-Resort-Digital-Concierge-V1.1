@@ -228,7 +228,7 @@ const AppContent: React.FC = () => {
                                 type="text" 
                                 value={usernameInput}
                                 onChange={(e) => setUsernameInput(e.target.value)}
-                                className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-gray-800"
+                                className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-black"
                                 placeholder="e.g. 101"
                                 required
                             />
@@ -239,7 +239,7 @@ const AppContent: React.FC = () => {
                                 type="text" 
                                 value={lastNameInput}
                                 onChange={(e) => setLastNameInput(e.target.value)}
-                                className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-gray-800"
+                                className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-black"
                                 placeholder="e.g. Smith"
                                 required
                             />
@@ -254,7 +254,7 @@ const AppContent: React.FC = () => {
                                 type="text" 
                                 value={usernameInput}
                                 onChange={(e) => setUsernameInput(e.target.value)}
-                                className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-gray-800"
+                                className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-black"
                                 placeholder="Staff ID"
                                 required
                             />
@@ -268,7 +268,7 @@ const AppContent: React.FC = () => {
                                     type={showPassword ? "text" : "password"}
                                     value={passwordInput}
                                     onChange={(e) => setPasswordInput(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-gray-800"
+                                    className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-black"
                                     placeholder="Enter password"
                                     required
                                 />
@@ -305,7 +305,7 @@ const AppContent: React.FC = () => {
             </form>
             
             <div className="mt-8 text-center">
-                <p className="text-xs text-gray-400">© 2024 Furama Resort Danang. All rights reserved.</p>
+                <p className="text-xs text-gray-400">© 2025 Furama Resort Danang. All rights reserved.</p>
             </div>
         </div>
       </div>

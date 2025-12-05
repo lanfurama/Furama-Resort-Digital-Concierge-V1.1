@@ -4,6 +4,7 @@ import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, Brain
 import { getLocations, getLocationsSync, addLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, addUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory } from '../services/dataService';
 import { parseAdminInput, generateTranslations } from '../services/geminiService';
 import { Location, MenuItem, ResortEvent, Promotion, KnowledgeItem, User, UserRole, Department, RoomType, Room } from '../types';
+import Loading from './Loading';
 
 interface AdminPortalProps {
     onLogout: () => void;
@@ -24,9 +25,13 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const [rooms, setRooms] = useState<Room[]>([]);
     const [serviceHistory, setServiceHistory] = useState<any[]>([]);
     
+    // Loading state
+    const [isLoading, setIsLoading] = useState(true);
+    
     // Load data on mount
     useEffect(() => {
         const loadData = async () => {
+            setIsLoading(true);
             try {
                 // Load locations first - CRITICAL for room types to match location IDs
                 let locationsData: Location[];
@@ -102,11 +107,13 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 setUsers(getUsersSync());
                 // Try to load service history from API even in fallback
                 getUnifiedHistory().then(setServiceHistory).catch(() => setServiceHistory([]));
+            } finally {
+                setIsLoading(false);
             }
         };
         
         loadData();
-        getRooms().then(setRooms).catch(console.error);
+        getRooms().then(setRooms).catch(console.error).finally(() => setIsLoading(false));
     }, []);
     
     // UI State
@@ -629,6 +636,31 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         return "";
     };
 
+    const formatEventDate = (dateString: string): string => {
+        try {
+            // Try parsing as ISO date string
+            const date = new Date(dateString);
+            if (!isNaN(date.getTime())) {
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            }
+            // If ISO parse fails, try YYYY-MM-DD format
+            const parts = dateString.split('T')[0].split('-');
+            if (parts.length === 3) {
+                const yyyy = parseInt(parts[0]);
+                const mm = parseInt(parts[1]) - 1;
+                const dd = parseInt(parts[2]);
+                const dateObj = new Date(yyyy, mm, dd);
+                if (!isNaN(dateObj.getTime())) {
+                    return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                }
+            }
+            // Return original if can't parse
+            return dateString;
+        } catch {
+            return dateString;
+        }
+    };
+
     const filteredMenu = menuFilter === 'ALL' ? menu : menu.filter(m => m.category === menuFilter);
     const guestUsers = users.filter(u => u.role === UserRole.GUEST);
     const staffUsers = users.filter(u => u.role !== UserRole.GUEST);
@@ -745,7 +777,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
 
                         {tab === 'MENU' && (
                             <div className="flex bg-white rounded-lg border border-gray-200 p-1">
-                                <button onClick={() => setMenuFilter('ALL')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'ALL' ? 'bg-gray-100 font-bold' : 'text-gray-500'}`}>All</button>
+                                <button onClick={() => setMenuFilter('ALL')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'ALL' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500'}`}>All</button>
                                 <button onClick={() => setMenuFilter('Dining')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Dining' ? 'bg-orange-100 text-orange-800 font-bold' : 'text-gray-500'}`}>Dining</button>
                                 <button onClick={() => setMenuFilter('Spa')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Spa' ? 'bg-purple-100 text-purple-800 font-bold' : 'text-gray-500'}`}>Spa</button>
                             </div>
@@ -838,7 +870,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                         <textarea
                             value={aiInput}
                             onChange={(e) => setAiInput(e.target.value)}
-                            className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                            className="w-full border border-gray-300 rounded-lg p-3 text-sm bg-gray-50 text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                             rows={2}
                             placeholder={getPlaceholder()}
                         />
@@ -865,7 +897,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 <label className="block text-xs font-semibold text-gray-500 mb-1">Type Name</label>
                                 <input 
                                     type="text"
-                                    className="w-full border border-gray-300 rounded p-2 text-sm"
+                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
                                     value={newRoomType.name || ''}
                                     onChange={e => setNewRoomType({...newRoomType, name: e.target.value})}
                                     placeholder="e.g. Lagoon Villa"
@@ -874,7 +906,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                              <div>
                                 <label className="block text-xs font-semibold text-gray-500 mb-1">Linked Location (Optional)</label>
                                 <select 
-                                    className="w-full border border-gray-300 rounded p-2 text-sm"
+                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
                                     value={newRoomType.locationId || ''}
                                     onChange={e => setNewRoomType({...newRoomType, locationId: e.target.value})}
                                 >
@@ -888,7 +920,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 <label className="block text-xs font-semibold text-gray-500 mb-1">Description</label>
                                 <input 
                                     type="text"
-                                    className="w-full border border-gray-300 rounded p-2 text-sm"
+                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
                                     value={newRoomType.description || ''}
                                     onChange={e => setNewRoomType({...newRoomType, description: e.target.value})}
                                     placeholder="Brief description"
@@ -925,7 +957,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                         <label className="block text-xs font-semibold text-gray-500 mb-1">Room Number</label>
                                         <input 
                                             type="text" 
-                                            className="w-full border border-gray-300 rounded p-2 text-sm" 
+                                            className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900" 
                                             placeholder="e.g. 105" 
                                             value={newRoom.number} 
                                             onChange={e => setNewRoom({...newRoom, number: e.target.value})} 
@@ -934,7 +966,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                     <div className="col-span-2">
                                         <label className="block text-xs font-semibold text-gray-500 mb-1">Room Type</label>
                                         <select 
-                                            className="w-full border border-gray-300 rounded p-2 text-sm"
+                                            className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
                                             value={newRoom.typeId} 
                                             onChange={e => setNewRoom({...newRoom, typeId: e.target.value})}
                                         >
@@ -973,7 +1005,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 <label className="block text-xs font-semibold text-gray-500 mb-1">Display Name</label>
                                 <input 
                                     type="text"
-                                    className="w-full border border-gray-300 rounded p-2 text-sm"
+                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
                                     value={newUser.lastName || ''}
                                     onChange={e => setNewUser({...newUser, lastName: e.target.value})}
                                     placeholder="e.g. StaffName"
@@ -983,7 +1015,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 <label className="block text-xs font-semibold text-gray-500 mb-1">Username</label>
                                 <input 
                                     type="text"
-                                    className="w-full border border-gray-300 rounded p-2 text-sm"
+                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
                                     value={newUser.roomNumber || ''}
                                     onChange={e => setNewUser({...newUser, roomNumber: e.target.value})}
                                     placeholder="Login ID"
@@ -992,7 +1024,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                             <div>
                                 <label className="block text-xs font-semibold text-gray-500 mb-1">Role</label>
                                 <select 
-                                    className="w-full border border-gray-300 rounded p-2 text-sm"
+                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
                                     value={newUser.role}
                                     onChange={e => {
                                         const role = e.target.value as UserRole;
@@ -1009,7 +1041,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                             <div>
                                 <label className="block text-xs font-semibold text-gray-500 mb-1">Service Department</label>
                                 <select 
-                                    className="w-full border border-gray-300 rounded p-2 text-sm"
+                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
                                     value={newUser.department}
                                     disabled={newUser.role === UserRole.SUPERVISOR} 
                                     onChange={e => setNewUser({...newUser, department: e.target.value as Department})}
@@ -1041,12 +1073,12 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                             <div className="flex-1">
                                 <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase">Manual Guest Entry</h3>
                                 <div className="grid grid-cols-2 gap-4 mb-4">
-                                    <input type="text" className="border border-gray-300 rounded p-2 text-sm" placeholder="Last Name" value={newGuest.lastName} onChange={e => setNewGuest({...newGuest, lastName: e.target.value})} />
-                                    <input type="text" className="border border-gray-300 rounded p-2 text-sm" placeholder="Room Number" value={newGuest.room} onChange={e => setNewGuest({...newGuest, room: e.target.value})} />
+                                    <input type="text" className="border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900" placeholder="Last Name" value={newGuest.lastName} onChange={e => setNewGuest({...newGuest, lastName: e.target.value})} />
+                                    <input type="text" className="border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900" placeholder="Room Number" value={newGuest.room} onChange={e => setNewGuest({...newGuest, room: e.target.value})} />
                                     
                                     <div className="col-span-2">
                                         <select 
-                                            className="w-full border border-gray-300 rounded p-2 text-sm"
+                                            className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
                                             value={newGuest.type} 
                                             onChange={e => setNewGuest({...newGuest, type: e.target.value})}
                                         >
@@ -1059,7 +1091,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                     <div className="col-span-2">
                                         <label className="block text-[10px] uppercase text-gray-500 font-bold mb-1">Language</label>
                                         <select
-                                            className="w-full border border-gray-300 rounded p-2 text-sm"
+                                            className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
                                             value={newGuest.language}
                                             onChange={e => setNewGuest({...newGuest, language: e.target.value})}
                                         >
@@ -1076,11 +1108,11 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                     <div className="col-span-2 grid grid-cols-2 gap-2">
                                         <div>
                                             <label className="block text-[10px] uppercase text-gray-500 font-bold">Check In</label>
-                                            <input type="datetime-local" className="w-full border border-gray-300 rounded p-2 text-sm" value={newGuest.checkIn} onChange={e => setNewGuest({...newGuest, checkIn: e.target.value})} />
+                                            <input type="datetime-local" className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900" value={newGuest.checkIn} onChange={e => setNewGuest({...newGuest, checkIn: e.target.value})} />
                                         </div>
                                         <div>
                                             <label className="block text-[10px] uppercase text-gray-500 font-bold">Check Out</label>
-                                            <input type="datetime-local" className="w-full border border-gray-300 rounded p-2 text-sm" value={newGuest.checkOut} onChange={e => setNewGuest({...newGuest, checkOut: e.target.value})} />
+                                            <input type="datetime-local" className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900" value={newGuest.checkOut} onChange={e => setNewGuest({...newGuest, checkOut: e.target.value})} />
                                         </div>
                                     </div>
                                 </div>
@@ -1105,6 +1137,10 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
 
                  {/* Tables Section */}
                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    {isLoading ? (
+                        <Loading message="Loading data..." />
+                    ) : (
+                        <>
                     {/* LOCATIONS TABLE */}
                     {tab === 'LOCATIONS' && (
                         <table className="w-full text-left">
@@ -1172,7 +1208,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                  <div key={event.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
                                      <div>
                                          <div className="font-bold text-gray-800">{event.title}</div>
-                                         <div className="text-sm text-emerald-600">{event.date} • {event.time}</div>
+                                         <div className="text-sm text-emerald-600">{formatEventDate(event.date)} • {event.time}</div>
                                          <div className="text-xs text-gray-500 mt-1">{event.location}</div>
                                      </div>
                                      <button onClick={() => handleDelete(event.id, 'EVENT')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
@@ -1471,6 +1507,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                             )}
                         </>
                     )}
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -1482,7 +1520,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                         <p className="text-sm text-gray-500 mb-4">Enter new password for user.</p>
                         <input 
                             type="text" 
-                            className="w-full border border-gray-300 rounded p-2 mb-4"
+                            className="w-full border border-gray-300 rounded p-2 mb-4 bg-gray-50 text-gray-900"
                             placeholder="New Password"
                             value={resetNewPassword}
                             onChange={(e) => setResetNewPassword(e.target.value)}
