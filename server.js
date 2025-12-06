@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
-import routes from './api/routes/index.ts';
+import routes from './api/_routes/index.ts';
 
 dotenv.config();
 
