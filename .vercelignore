@@ -1,10 +1,7 @@
 # Only ignore files that are not needed for Vercel deployment
 # Keep api/index.ts as the only serverless function entry point
-# Ignore all subdirectories to prevent Vercel from detecting them as separate functions
-# These files will still be available as imports within api/index.ts
-api/config/**
-api/controllers/**
-api/models/**
-api/routes/**
+# NOTE: Do NOT ignore api/config, api/controllers, api/models, api/routes
+# because they are needed as imports. Instead, rename them to _config, _controllers, _models, _routes
+# to prevent Vercel from detecting them as separate functions
 api/server.ts
 api/tsconfig.json

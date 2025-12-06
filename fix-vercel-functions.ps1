@@ -19,20 +19,18 @@ $folders = @("config", "controllers", "models", "routes")
 
 foreach ($folder in $folders) {
     $oldPath = Join-Path $apiPath $folder
-    $newPath = Join-Path $apiPath "_$folder"
     
     if (Test-Path $oldPath) {
         try {
-            # Force rename by closing any handles first
             Rename-Item -Path $oldPath -NewName "_$folder" -Force -ErrorAction Stop
-            Write-Host "  ✓ Renamed $folder to _$folder" -ForegroundColor Green
+            Write-Host "  [OK] Renamed $folder to _$folder" -ForegroundColor Green
         } catch {
-            Write-Host "  ✗ Failed to rename $folder : $_" -ForegroundColor Red
+            Write-Host "  [ERROR] Failed to rename $folder : $_" -ForegroundColor Red
             Write-Host "  Please close your IDE and try again!" -ForegroundColor Yellow
             exit 1
         }
     } else {
-        Write-Host "  ⚠ $folder not found (may already be renamed)" -ForegroundColor Yellow
+        Write-Host "  [WARN] $folder not found (may already be renamed)" -ForegroundColor Yellow
     }
 }
 
@@ -47,20 +45,37 @@ foreach ($file in $files) {
     $original = $content
     
     # Update imports: ../config/ -> ../_config/
-    $content = $content -replace "from ['`"]\.\./(config)/", "from '../_$1/"
-    $content = $content -replace "from ['`"]\.\./(controllers)/", "from '../_$1/"
-    $content = $content -replace "from ['`"]\.\./(models)/", "from '../_$1/"
-    $content = $content -replace "from ['`"]\.\./(routes)/", "from '../_$1/"
+    $content = $content -replace "from '\.\./config/", "from '../_config/"
+    $content = $content -replace 'from "\.\./config/', 'from "../_config/'
+    $content = $content -replace "from '\.\./controllers/", "from '../_controllers/"
+    $content = $content -replace 'from "\.\./controllers/', 'from "../_controllers/'
+    $content = $content -replace "from '\.\./models/", "from '../_models/"
+    $content = $content -replace 'from "\.\./models/', 'from "../_models/'
+    $content = $content -replace "from '\.\./routes/", "from '../_routes/"
+    $content = $content -replace 'from "\.\./routes/', 'from "../_routes/'
     
     # Update imports: ./config/ -> ./_config/
-    $content = $content -replace "from ['`"]\./(config)/", "from './_$1/"
-    $content = $content -replace "from ['`"]\./(controllers)/", "from './_$1/"
-    $content = $content -replace "from ['`"]\./(models)/", "from './_$1/"
-    $content = $content -replace "from ['`"]\./(routes)/", "from './_$1/"
+    $replacement1 = "from './_config/"
+    $replacement2 = 'from "./_config/'
+    $replacement3 = "from './_controllers/"
+    $replacement4 = 'from "./_controllers/'
+    $replacement5 = "from './_models/"
+    $replacement6 = 'from "./_models/'
+    $replacement7 = "from './_routes/"
+    $replacement8 = 'from "./_routes/'
+    
+    $content = $content -replace "from '\./config/", $replacement1
+    $content = $content -replace 'from "\./config/', $replacement2
+    $content = $content -replace "from '\./controllers/", $replacement3
+    $content = $content -replace 'from "\./controllers/', $replacement4
+    $content = $content -replace "from '\./models/", $replacement5
+    $content = $content -replace 'from "\./models/', $replacement6
+    $content = $content -replace "from '\./routes/", $replacement7
+    $content = $content -replace 'from "\./routes/', $replacement8
     
     if ($content -ne $original) {
         Set-Content -Path $file.FullName -Value $content -NoNewline
-        Write-Host "  ✓ Updated $($file.Name)" -ForegroundColor Green
+        Write-Host "  [OK] Updated $($file.Name)" -ForegroundColor Green
         $updatedCount++
     }
 }
