@@ -200,7 +200,6 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     'end_call': 'Kết thúc cuộc gọi',
     'sorry_couldnt_process': 'Xin lỗi, tôi không thể xử lý điều đó.',
     'connection_error': 'Xin lỗi, nhưng tôi đang gặp sự cố kết nối. Vui lòng thử lại.',
-    'staff': 'Nhân viên',
   },
   Korean: {
     'welcome_back': '환영합니다,',
