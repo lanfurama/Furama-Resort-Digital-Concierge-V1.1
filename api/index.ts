@@ -24,7 +24,7 @@ app.get('/health', (req, res) => {
 app.use('/v1', routes);
 
 // Error handler
-app.use((err, req, res, next) => {
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Error:', err);
   res.status(err.status || 500).json({
     error: err.message || 'Internal server error',
@@ -32,7 +32,6 @@ app.use((err, req, res, next) => {
 });
 
 // Export handler for Vercel serverless functions
-export default (req, res) => {
+export default (req: express.Request, res: express.Response) => {
   return app(req, res);
 };
-

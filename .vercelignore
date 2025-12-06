@@ -1,6 +1,4 @@
-api/config
-api/controllers
-api/models
-api/routes
+# Only ignore files that are not needed for Vercel deployment
+# Keep api/ folder for serverless functions - DO NOT ignore api/config, api/controllers, api/models, api/routes
+# Only ignore the standalone server.ts file (used for local dev, not for Vercel)
 api/server.ts
-
