@@ -13,14 +13,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check endpoint
+// Health check - Vercel route /api/health đến đây, req.url = /health
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Furama Resort Digital Concierge API is running' });
 });
 
-// API routes - Vercel sẽ route /api/* to this file, so we use /v1 directly
-app.use('/api/v1', routes);
-app.use('/', routes);
+// API routes - Vercel sẽ route /api/* to this file
+// Khi request đến /api/v1/users, Vercel route đến đây và req.url = /v1/users
+// Nên chúng ta chỉ cần mount routes tại /v1
+app.use('/v1', routes);
 
 // Error handler
 app.use((err, req, res, next) => {

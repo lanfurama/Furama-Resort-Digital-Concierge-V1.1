@@ -4,8 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node check-api.js && vite",
-    "dev:api": "tsx server.js",
+    "dev": "tsx server.js",
     "build": "vite build",
     "preview": "vite preview"
   },

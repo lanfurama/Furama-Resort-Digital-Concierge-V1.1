@@ -1,16 +1,24 @@
 # Database Configuration
-DB_HOST=27.71.229.4
-DB_PORT=6243
-DB_NAME=furama_resort_digital_concierge
-DB_USER=postgres
-DB_PASSWORD=Satthuskt321@
+# ⚠️ IMPORTANT: Replace these with your actual database credentials
+# Never commit .env file to git!
+DB_HOST=your_database_host
+DB_PORT=your_database_port
+DB_NAME=your_database_name
+DB_USER=your_database_user
+DB_PASSWORD=your_database_password
+
+# SSL Configuration (optional)
+# Set to 'true' to enable SSL, 'false' to disable, or leave empty for auto
+DB_SSL=
 
 # Gemini API Key (for frontend - must have VITE_ prefix)
-VITE_GEMINI_API_KEY=AIzaSyBHkcO2JxFiPY-c4lRyMvvdZ1a1iwI9QCI
+# ⚠️ IMPORTANT: Replace with your actual Gemini API key
+VITE_GEMINI_API_KEY=your_gemini_api_key_here
 
-# Server Port (optional)
+# Server Port (optional, defaults to 3000)
 PORT=3000
 
 # Node Environment
+# Use 'production' for production, 'development' for development
 NODE_ENV=production
 

@@ -6,13 +6,19 @@ dotenv.config();
 const { Pool } = pg;
 
 // Database connection configuration
-// Try different SSL configurations based on server requirements
+// All credentials must come from environment variables for security
+// Never hardcode credentials in source code!
+if (!process.env.DB_HOST || !process.env.DB_PORT || !process.env.DB_NAME || 
+    !process.env.DB_USER || !process.env.DB_PASSWORD) {
+  throw new Error('Missing required database environment variables. Please set DB_HOST, DB_PORT, DB_NAME, DB_USER, and DB_PASSWORD in your .env file or Vercel environment variables.');
+}
+
 const dbConfig: any = {
-  host: process.env.DB_HOST || '27.71.229.4',
-  port: parseInt(process.env.DB_PORT || '6243'),
-  database: process.env.DB_NAME || 'furama_resort_digital_concierge',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'Satthuskt321@',
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT),
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
 };
 
 // If DB_SSL environment variable is set, use SSL

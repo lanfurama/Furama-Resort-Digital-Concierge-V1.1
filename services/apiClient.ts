@@ -1,6 +1,6 @@
 // API Client helper for making API calls
-// In development: use proxy from vite.config.ts (port 5173 -> 3000)
-// In production: use relative path (Vercel handles routing)
+// API and frontend run on the same port (3000), so we use relative paths
+// API endpoints are prefixed with /api/v1
 const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api/v1';
 
 async function apiRequest<T>(

@@ -38,11 +38,11 @@ Trong Vercel Dashboard → Settings → Environment Variables, thêm các biến
 
 **Database Configuration:**
 ```
-DB_HOST=27.71.229.4
-DB_PORT=6243
-DB_NAME=furama_resort_digital_concierge
-DB_USER=postgres
-DB_PASSWORD=Satthuskt321@
+DB_HOST=your_database_host
+DB_PORT=your_database_port
+DB_NAME=your_database_name
+DB_USER=your_database_user
+DB_PASSWORD=your_database_password
 ```
 
 **Gemini API Key (cho frontend - QUAN TRỌNG: phải có prefix VITE_):**
@@ -84,11 +84,7 @@ Click "Deploy" và Vercel sẽ tự động:
 
 - Frontend: `https://your-app.vercel.app`
 - API Health: `https://your-app.vercel.app/api/health`
-- API Users: `https://your-app.vercel.app/api/api/v1/users`
-
-**Lưu ý**: Với cấu hình hiện tại, API routes sẽ có path `/api/api/v1/...` vì Vercel route `/api/*` đến `api/index.js` và trong đó lại có `/api/v1`. 
-
-Nếu muốn API path là `/api/v1/...` trực tiếp, cần điều chỉnh routing trong `api/index.js`.
+- API Users: `https://your-app.vercel.app/api/v1/users`
 
 ## ⚠️ Auto-Deploy không hoạt động?
 
