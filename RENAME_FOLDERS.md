@@ -1,12 +1,19 @@
-# Hướng dẫn đổi tên các folder trong api/
+# Hướng dẫn sửa lỗi "No more than 12 Serverless Functions" trên Vercel
 
-Để tránh lỗi "No more than 12 Serverless Functions" trên Vercel Hobby plan, bạn cần đổi tên các folder trong `api/` thành bắt đầu bằng `_`.
+Để tránh lỗi này, bạn cần đổi tên các folder trong `api/` thành bắt đầu bằng `_`. Vercel sẽ tự động ignore các folder bắt đầu bằng `_`, nhưng vẫn có thể import được.
 
-## Cách 1: Chạy script tự động (KHUYẾN NGHỊ)
+## ⚠️ QUAN TRỌNG: Đóng IDE trước khi chạy script!
 
-1. **Đóng tất cả các file đang mở trong IDE** (VS Code, Cursor, etc.)
-2. **Chạy file `rename-api-folders.bat`** (double-click hoặc chạy từ terminal)
-3. Script sẽ tự động:
+## Cách 1: Chạy PowerShell script (KHUYẾN NGHỊ)
+
+1. **Đóng tất cả các file đang mở trong IDE** (VS Code, Cursor, etc.) - QUAN TRỌNG!
+2. **Mở PowerShell** (Run as Administrator nếu cần)
+3. **Chạy script:**
+   ```powershell
+   cd "C:\Users\Minimart\Desktop\python\Furama Projects\Furama Resort Digital Concierge"
+   .\fix-vercel-functions.ps1
+   ```
+4. Script sẽ tự động:
    - Đổi tên các folder: `config` → `_config`, `controllers` → `_controllers`, `models` → `_models`, `routes` → `_routes`
    - Cập nhật tất cả imports trong các file `.ts`
 
