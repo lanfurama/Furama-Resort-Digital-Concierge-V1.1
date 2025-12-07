@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Clock, Car, Navigation, Star, LocateFixed, XCircle, ZoomIn, ZoomOut } from 'lucide-react';
+import { MapPin, Clock, Car, Navigation, Star, LocateFixed, XCircle, ZoomIn, ZoomOut, ChevronUp, ChevronDown } from 'lucide-react';
 import { BuggyStatus, User, RideRequest, Location } from '../types';
 import { getLocations, requestRide, getActiveRideForUser, cancelRide } from '../services/dataService';
 import { THEME_COLORS, RESORT_CENTER } from '../constants';
@@ -20,6 +20,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoadingRide, setIsLoadingRide] = useState(true);
   const [elapsedTime, setElapsedTime] = useState<number>(0); // Time elapsed in seconds
+  const [isBookingFormVisible, setIsBookingFormVisible] = useState(true); // Toggle for booking form
   const userLocationRef = useRef<HTMLDivElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInnerRef = useRef<HTMLDivElement>(null);
@@ -101,6 +102,14 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   }, [activeRide]);
 
 
+  // Handler to set destination and show form
+  const handleSetDestination = (dest: string) => {
+    if (!activeRide) {
+      setDestination(dest);
+      setIsBookingFormVisible(true); // Auto-show form when destination is selected
+    }
+  };
+
   const handleBook = async () => {
     if (!destination) return;
     try {
@@ -171,6 +180,43 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const destinationToShow = activeRide?.destination || destination;
   const selectedLocation = locations.find(l => l.name === destinationToShow);
   const destPos = selectedLocation ? getPos(selectedLocation.lat, selectedLocation.lng) : null;
+
+  // Calculate distance and estimated time
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lng2 - lng1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c; // Distance in meters
+  };
+
+  const formatDistance = (meters: number): string => {
+    if (meters < 1000) {
+      return `${Math.round(meters)}m`;
+    }
+    return `${(meters / 1000).toFixed(1)}km`;
+  };
+
+  const calculateEstimatedTime = (distanceMeters: number): number => {
+    // Buggy average speed in resort: ~15 km/h = 4.17 m/s
+    // Add some buffer for stops, turns, etc.
+    const averageSpeedMps = 3.5; // meters per second (conservative estimate)
+    const timeSeconds = distanceMeters / averageSpeedMps;
+    return Math.ceil(timeSeconds / 60); // Convert to minutes and round up
+  };
+
+  const distanceInfo = selectedLocation ? (() => {
+    const distance = calculateDistance(userLat, userLng, selectedLocation.lat, selectedLocation.lng);
+    const estimatedTime = calculateEstimatedTime(distance);
+    return { distance, estimatedTime };
+  })() : null;
 
   // Zoom functions
   const handleZoomIn = useCallback(() => {
@@ -341,11 +387,11 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       `}</style>
       
       {/* Header */}
-      <div className={`p-4 text-white shadow-md ${THEME_COLORS.primary} flex items-center flex-shrink-0 relative z-0`}>
-        <button onClick={onBack} className="mr-4 text-white hover:text-gray-200">
-          <Navigation className="w-6 h-6 rotate-180" />
+      <div className={`p-2.5 text-white shadow-md ${THEME_COLORS.primary} flex items-center flex-shrink-0 relative z-0`}>
+        <button onClick={onBack} className="mr-3 text-white hover:text-gray-200">
+          <Navigation className="w-5 h-5 rotate-180" />
         </button>
-        <h2 className="text-xl font-serif">{t('buggy_service')}</h2>
+        <h2 className="text-lg font-serif">{t('buggy_service')}</h2>
       </div>
 
       {/* Interactive Map - Draggable and Zoomable */}
@@ -403,7 +449,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
               return (
                   <button
                       key={loc.id || `${loc.name}-${index}`}
-                      onClick={() => !activeRide && setDestination(loc.name)}
+                      onClick={() => handleSetDestination(loc.name)}
                       className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center transition-all duration-300 ${isSelected ? 'scale-110 z-15' : 'hover:scale-110 opacity-80 hover:opacity-100'}`}
                       style={{ top: pos.top, left: pos.left }}
                   >
@@ -488,6 +534,23 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
             <ZoomOut className="w-5 h-5 text-gray-700" />
           </button>
         </div>
+
+        {/* Toggle Booking Form Button - Bottom Left */}
+        {!activeRide && !isLoadingRide && (
+          <div className="absolute bottom-4 left-4 z-20">
+            <button
+              onClick={() => setIsBookingFormVisible(!isBookingFormVisible)}
+              className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200 flex items-center justify-center"
+              title={isBookingFormVisible ? "Hide booking form" : "Show booking form"}
+            >
+              {isBookingFormVisible ? (
+                <ChevronDown className="w-5 h-5 text-gray-700" />
+              ) : (
+                <ChevronUp className="w-5 h-5 text-gray-700" />
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Status card section - Separate section below map */}
@@ -572,43 +635,95 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
       {/* Booking Form (Only show if Idle and not loading) */}
       {!activeRide && !isLoadingRide && (
-        <div className="bg-white p-4 rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-10">
-            <h3 className="text-base font-bold mb-2 text-gray-800">{t('where_to')}</h3>
-            
-            <div className="space-y-2">
-                <div className="relative">
-                    <LocateFixed className="absolute left-2 top-2 text-emerald-600 w-4 h-4" />
-                    <input 
-                        type="text" 
-                        value={pickup}
-                        readOnly
-                        className="w-full pl-8 pr-3 py-2 text-sm bg-emerald-50 border border-emerald-100 rounded-lg text-gray-700 font-medium focus:outline-none"
-                    />
-                </div>
-                <div className="relative">
-                    <Navigation className="absolute left-2 top-2 text-amber-500 w-4 h-4" />
-                    <select 
-                        value={destination}
-                        onChange={(e) => setDestination(e.target.value)}
-                        className="w-full pl-8 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none text-gray-700"
+        <div 
+          className={`bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-10 transition-all duration-300 ease-in-out overflow-hidden ${
+            isBookingFormVisible 
+              ? 'p-4 max-h-[500px] opacity-100' 
+              : 'p-0 max-h-0 opacity-0'
+          }`}
+        >
+            <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-base font-bold text-gray-800">{t('where_to')}</h3>
+                    <button
+                        onClick={() => setIsBookingFormVisible(false)}
+                        className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                        title="Hide form"
                     >
-                        <option value="" disabled>{t('select_dest')}</option>
-                        {locations.map((loc) => (
-                            <option key={loc.name} value={loc.name}>{loc.name}</option>
-                        ))}
-                    </select>
+                        <ChevronDown className="w-5 h-5" />
+                    </button>
                 </div>
-            </div>
+                
+                <div className="space-y-2">
+                    <div className="relative">
+                        <LocateFixed className="absolute left-2 top-2 text-emerald-600 w-4 h-4" />
+                        <input 
+                            type="text" 
+                            value={pickup}
+                            readOnly
+                            className="w-full pl-8 pr-3 py-2 text-sm bg-emerald-50 border border-emerald-100 rounded-lg text-gray-700 font-medium focus:outline-none"
+                        />
+                    </div>
+                    <div className="relative">
+                        <Navigation className="absolute left-2 top-2 text-amber-500 w-4 h-4" />
+                        <select 
+                            value={destination}
+                            onChange={(e) => {
+                              handleSetDestination(e.target.value);
+                            }}
+                            className="w-full pl-8 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none text-gray-700"
+                        >
+                            <option value="" disabled>{t('select_dest')}</option>
+                            {locations.map((loc) => (
+                                <option key={loc.name} value={loc.name}>{loc.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
 
-            <button 
-                onClick={handleBook}
-                disabled={!destination}
-                className={`w-full mt-3 py-2.5 rounded-lg font-bold text-base shadow-lg transition transform active:scale-95 flex items-center justify-center space-x-2
-                    ${destination ? 'bg-emerald-800 text-white hover:bg-emerald-900' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
-                `}
+                {/* Distance and Time Info */}
+                {distanceInfo && destination && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2">
+                                <MapPin className="w-4 h-4 text-emerald-600" />
+                                <span className="text-sm font-semibold text-gray-700">
+                                    {formatDistance(distanceInfo.distance)}
+                                </span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Clock className="w-4 h-4 text-emerald-600" />
+                                <span className="text-sm font-semibold text-gray-700">
+                                    ~{distanceInfo.estimatedTime} {distanceInfo.estimatedTime === 1 ? 'min' : 'mins'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <button 
+                    onClick={handleBook}
+                    disabled={!destination}
+                    className={`w-full mt-3 py-2.5 rounded-lg font-bold text-base shadow-lg transition transform active:scale-95 flex items-center justify-center space-x-2
+                        ${destination ? 'bg-emerald-800 text-white hover:bg-emerald-900' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
+                    `}
+                >
+                    <Car className="w-5 h-5" />
+                    <span>{t('request_buggy')}</span>
+                </button>
+            </div>
+        </div>
+      )}
+
+      {/* Show Booking Form Button - When form is hidden */}
+      {!activeRide && !isLoadingRide && !isBookingFormVisible && (
+        <div className="bg-white p-3 rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-10 flex items-center justify-center">
+            <button
+                onClick={() => setIsBookingFormVisible(true)}
+                className="flex items-center space-x-2 text-emerald-600 hover:text-emerald-700 font-semibold text-sm transition-colors"
             >
-                <Car className="w-5 h-5" />
-                <span>{t('request_buggy')}</span>
+                <ChevronUp className="w-5 h-5" />
+                <span>{t('where_to')}</span>
             </button>
         </div>
       )}

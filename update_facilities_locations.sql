@@ -50,3 +50,4 @@ WHERE name = 'Furama Resort Danang' AND type = 'FACILITY';
 -- FROM public.locations 
 -- WHERE type IN ('FACILITY', 'RESTAURANT')
 -- ORDER BY type, name;
+
