@@ -157,7 +157,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
     return (
         <div className="min-h-screen bg-slate-900 text-white flex flex-col relative">
-            <header className="p-3 md:p-4 bg-slate-800 flex justify-between items-center border-b border-slate-700">
+            <header className="fixed md:relative top-0 left-0 right-0 p-3 md:p-4 bg-slate-800 flex justify-between items-center border-b border-slate-700 z-50 md:z-auto">
                 <div className="flex items-center space-x-2">
                     <div className="w-9 h-9 md:w-10 md:h-10 bg-emerald-500 rounded-full flex items-center justify-center text-black font-bold flex-shrink-0">
                         <Car size={18} className="md:w-5 md:h-5" />
@@ -174,7 +174,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             </header>
 
             {/* Tab Navigation */}
-            <div className="flex p-2 md:p-2 bg-slate-800 space-x-2 border-b border-slate-700">
+            <div className="fixed md:relative top-[60px] md:top-0 left-0 right-0 flex p-2 md:p-2 bg-slate-800 space-x-2 border-b border-slate-700 z-40 md:z-auto">
                 <button 
                     onClick={() => setViewMode('ACTIVE')}
                     className={`flex-1 py-2.5 md:py-3 rounded-lg font-bold flex items-center justify-center transition text-sm md:text-base ${viewMode === 'ACTIVE' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:bg-slate-700/50'}`}
@@ -189,7 +189,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 </button>
             </div>
 
-            <div className="flex-1 p-3 md:p-4 overflow-y-auto pb-24 md:pb-20" style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}>
+            <div className="flex-1 p-3 md:p-4 overflow-y-auto pb-24 md:pb-20 pt-[108px] md:pt-0" style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}>
                 {viewMode === 'ACTIVE' ? (
                     <>
                         {myCurrentRide ? (
