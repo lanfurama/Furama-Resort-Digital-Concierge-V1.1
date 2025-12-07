@@ -189,7 +189,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 </button>
             </div>
 
-            <div className="flex-1 p-3 md:p-4 overflow-y-auto pb-24 md:pb-20 pt-[108px] md:pt-0" style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}>
+            <div className="flex-1 p-3 md:p-4 overflow-y-auto pb-24 md:pb-20 pt-[130px] md:pt-0" style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}>
                 {viewMode === 'ACTIVE' ? (
                     <>
                         {myCurrentRide ? (
