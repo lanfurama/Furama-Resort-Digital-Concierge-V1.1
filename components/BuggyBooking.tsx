@@ -21,6 +21,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [isLoadingRide, setIsLoadingRide] = useState(true);
   const [elapsedTime, setElapsedTime] = useState<number>(0); // Time elapsed in seconds
   const [isBookingFormVisible, setIsBookingFormVisible] = useState(true); // Toggle for booking form
+  const [isStatusCardVisible, setIsStatusCardVisible] = useState(true); // Toggle for status card
   const userLocationRef = useRef<HTMLDivElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInnerRef = useRef<HTMLDivElement>(null);
@@ -33,6 +34,17 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     isDragging: false,
     dragStart: { x: 0, y: 0 }
   });
+  
+  // Refs for smooth dragging (avoid re-renders during drag)
+  const dragStateRef = useRef({
+    isDragging: false,
+    dragStart: { x: 0, y: 0 },
+    translateX: 0,
+    translateY: 0,
+    scale: 1
+  });
+  
+  const animationFrameRef = useRef<number | null>(null);
   
   const MAX_WAIT_TIME = 10 * 60; // 10 minutes in seconds
   const MIN_ZOOM = 0.5;
@@ -220,21 +232,37 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
   // Zoom functions
   const handleZoomIn = useCallback(() => {
-    setMapState(prev => ({
-      ...prev,
-      scale: Math.min(prev.scale + ZOOM_STEP, MAX_ZOOM)
-    }));
+    setMapState(prev => {
+      const newScale = Math.min(prev.scale + ZOOM_STEP, MAX_ZOOM);
+      dragStateRef.current.scale = newScale;
+      return {
+        ...prev,
+        scale: newScale
+      };
+    });
   }, []);
 
   const handleZoomOut = useCallback(() => {
-    setMapState(prev => ({
-      ...prev,
-      scale: Math.max(prev.scale - ZOOM_STEP, MIN_ZOOM)
-    }));
+    setMapState(prev => {
+      const newScale = Math.max(prev.scale - ZOOM_STEP, MIN_ZOOM);
+      dragStateRef.current.scale = newScale;
+      return {
+        ...prev,
+        scale: newScale
+      };
+    });
   }, []);
 
   // Locate user function - centers map on user location and resets zoom
   const handleLocateMe = useCallback(() => {
+    dragStateRef.current = {
+      scale: 1,
+      translateX: 0,
+      translateY: 0,
+      isDragging: false,
+      dragStart: { x: 0, y: 0 }
+    };
+    
     setMapState({
       scale: 1,
       translateX: 0,
@@ -266,11 +294,30 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   }, []);
 
   // Pan/Drag handlers
+  // Update transform directly for smooth dragging
+  const updateTransform = useCallback(() => {
+    if (!mapInnerRef.current) return;
+    const { translateX, translateY, scale } = dragStateRef.current;
+    mapInnerRef.current.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+  }, []);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return; // Only left mouse button
     // Don't drag if clicking on a button or interactive element
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('select') || target.closest('input')) return;
+    
+    const { translateX, translateY, scale } = mapState;
+    dragStateRef.current = {
+      isDragging: true,
+      dragStart: { 
+        x: e.clientX - translateX * scale, 
+        y: e.clientY - translateY * scale 
+      },
+      translateX,
+      translateY,
+      scale
+    };
     
     setMapState(prev => ({
       ...prev,
@@ -280,18 +327,43 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         y: e.clientY - prev.translateY * prev.scale 
       }
     }));
-  }, []);
+    
+    e.preventDefault();
+  }, [mapState]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!mapState.isDragging) return;
-    setMapState(prev => ({
-      ...prev,
-      translateX: (e.clientX - prev.dragStart.x) / prev.scale,
-      translateY: (e.clientY - prev.dragStart.y) / prev.scale
-    }));
-  }, [mapState.isDragging]);
+    if (!dragStateRef.current.isDragging) return;
+    
+    const { dragStart, scale } = dragStateRef.current;
+    const newTranslateX = (e.clientX - dragStart.x) / scale;
+    const newTranslateY = (e.clientY - dragStart.y) / scale;
+    
+    dragStateRef.current.translateX = newTranslateX;
+    dragStateRef.current.translateY = newTranslateY;
+    
+    // Use requestAnimationFrame for smooth updates
+    if (animationFrameRef.current === null) {
+      animationFrameRef.current = requestAnimationFrame(() => {
+        updateTransform();
+        // Sync with state after animation frame
+        setMapState(prev => ({
+          ...prev,
+          translateX: dragStateRef.current.translateX,
+          translateY: dragStateRef.current.translateY
+        }));
+        animationFrameRef.current = null;
+      });
+    }
+    
+    e.preventDefault();
+  }, [updateTransform]);
 
   const handleMouseUp = useCallback(() => {
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    dragStateRef.current.isDragging = false;
     setMapState(prev => ({ ...prev, isDragging: false }));
   }, []);
 
@@ -302,6 +374,18 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       if (target.closest('button') || target.closest('select') || target.closest('input')) return;
       
       const touch = e.touches[0];
+      const { translateX, translateY, scale } = mapState;
+      dragStateRef.current = {
+        isDragging: true,
+        dragStart: { 
+          x: touch.clientX - translateX * scale, 
+          y: touch.clientY - translateY * scale 
+        },
+        translateX,
+        translateY,
+        scale
+      };
+      
       setMapState(prev => ({
         ...prev,
         isDragging: true,
@@ -311,30 +395,78 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         }
       }));
     }
-  }, []);
+  }, [mapState]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!mapState.isDragging || e.touches.length !== 1) return;
+    if (!dragStateRef.current.isDragging || e.touches.length !== 1) return;
     const touch = e.touches[0];
-    setMapState(prev => ({
-      ...prev,
-      translateX: (touch.clientX - prev.dragStart.x) / prev.scale,
-      translateY: (touch.clientY - prev.dragStart.y) / prev.scale
-    }));
-  }, [mapState.isDragging]);
+    
+    const { dragStart, scale } = dragStateRef.current;
+    const newTranslateX = (touch.clientX - dragStart.x) / scale;
+    const newTranslateY = (touch.clientY - dragStart.y) / scale;
+    
+    dragStateRef.current.translateX = newTranslateX;
+    dragStateRef.current.translateY = newTranslateY;
+    
+    // Use requestAnimationFrame for smooth updates
+    if (animationFrameRef.current === null) {
+      animationFrameRef.current = requestAnimationFrame(() => {
+        updateTransform();
+        // Sync with state after animation frame
+        setMapState(prev => ({
+          ...prev,
+          translateX: dragStateRef.current.translateX,
+          translateY: dragStateRef.current.translateY
+        }));
+        animationFrameRef.current = null;
+      });
+    }
+    
+    e.preventDefault();
+  }, [updateTransform]);
 
   const handleTouchEnd = useCallback(() => {
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    dragStateRef.current.isDragging = false;
     setMapState(prev => ({ ...prev, isDragging: false }));
   }, []);
 
-  // Wheel zoom
+  // Wheel zoom with smooth animation
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
-    setMapState(prev => ({
-      ...prev,
-      scale: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, prev.scale + delta))
-    }));
+    setMapState(prev => {
+      const newScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, prev.scale + delta));
+      dragStateRef.current.scale = newScale;
+      return {
+        ...prev,
+        scale: newScale
+      };
+    });
+  }, []);
+
+  // Sync dragStateRef with mapState (especially for zoom changes)
+  useEffect(() => {
+    dragStateRef.current.scale = mapState.scale;
+    dragStateRef.current.translateX = mapState.translateX;
+    dragStateRef.current.translateY = mapState.translateY;
+    
+    // Update transform when not dragging (for zoom, locate, etc.)
+    if (!mapState.isDragging && mapInnerRef.current) {
+      mapInnerRef.current.style.transform = `translate3d(${mapState.translateX}px, ${mapState.translateY}px, 0) scale(${mapState.scale})`;
+    }
+  }, [mapState.scale, mapState.translateX, mapState.translateY, mapState.isDragging]);
+
+  // Cleanup animation frame on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
   }, []);
 
   // Auto-center on user location on mount
@@ -417,16 +549,20 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         onWheel={handleWheel}
       >
         {/* Map Container - Transformable */}
-        <div 
+        <div
           ref={mapInnerRef}
           className="relative z-0 origin-top-left"
-          style={{ 
-            minHeight: `${600 * mapState.scale}px`, 
+          style={{
+            minHeight: `${600 * mapState.scale}px`,
             minWidth: `${100 * mapState.scale}%`,
-            transform: `scale(${mapState.scale}) translate(${mapState.translateX}px, ${mapState.translateY}px)`,
-            transition: mapState.isDragging ? 'none' : 'transform 0.1s ease-out',
-            willChange: mapState.isDragging ? 'transform' : 'auto',
-            touchAction: 'none'
+            transform: `translate3d(${mapState.translateX}px, ${mapState.translateY}px, 0) scale(${mapState.scale})`,
+            transition: mapState.isDragging ? 'none' : 'transform 0.05s ease-out',
+            willChange: 'transform',
+            touchAction: 'none',
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            perspective: '1000px',
+            WebkitPerspective: '1000px'
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -517,7 +653,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         </div>
 
         {/* Map Controls - Zoom and Locate buttons */}
-        <div className="absolute bottom-20 right-4 z-30 flex flex-col gap-2 pointer-events-none">
+        <div className="absolute bottom-24 md:bottom-20 right-4 z-50 flex flex-col gap-2 pointer-events-none">
           <div className="flex flex-col gap-2 pointer-events-auto">
             {/* Locate Me Button */}
             <button
@@ -549,31 +685,81 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
             </button>
           </div>
         </div>
-
-        {/* Toggle Booking Form Button - Bottom Left */}
-        {!activeRide && !isLoadingRide && (
-          <div className="absolute bottom-20 left-4 z-30 pointer-events-none">
-            <button
-              onClick={() => setIsBookingFormVisible(!isBookingFormVisible)}
-              className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200 flex items-center justify-center pointer-events-auto"
-              title={isBookingFormVisible ? "Hide booking form" : "Show booking form"}
-            >
-              {isBookingFormVisible ? (
-                <ChevronDown className="w-5 h-5 text-gray-700" />
-              ) : (
-                <ChevronUp className="w-5 h-5 text-gray-700" />
-              )}
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* Toggle Booking Form Button - Outside map container, always visible */}
+      {!activeRide && !isLoadingRide && (
+        <div 
+          className="fixed left-4 z-[100] pointer-events-none" 
+          style={{ 
+            bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))',
+            paddingBottom: '0'
+          }}
+        >
+          <button
+            onClick={() => setIsBookingFormVisible(!isBookingFormVisible)}
+            className="bg-white p-3 rounded-full shadow-xl hover:bg-gray-50 active:bg-gray-100 transition-colors border-2 border-emerald-300 flex items-center justify-center pointer-events-auto"
+            title={isBookingFormVisible ? "Hide booking form" : "Show booking form"}
+            style={{
+              transform: 'translateZ(0)',
+              WebkitTransform: 'translateZ(0)',
+              willChange: 'transform',
+              minWidth: '44px',
+              minHeight: '44px'
+            }}
+          >
+            {isBookingFormVisible ? (
+              <ChevronDown className="w-5 h-5 text-emerald-700" />
+            ) : (
+              <ChevronUp className="w-5 h-5 text-emerald-700" />
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Toggle Status Card Button - Outside map container, always visible when status card is shown */}
+      {activeRide && isStatusCardVisible && (
+        <div 
+          className="fixed left-4 z-[100] pointer-events-none" 
+          style={{ 
+            bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))',
+            paddingBottom: '0'
+          }}
+        >
+          <button
+            onClick={() => setIsStatusCardVisible(false)}
+            className="bg-white p-3 rounded-full shadow-xl hover:bg-gray-50 active:bg-gray-100 transition-colors border-2 border-emerald-300 flex items-center justify-center pointer-events-auto"
+            title="Hide status card"
+            style={{
+              transform: 'translateZ(0)',
+              WebkitTransform: 'translateZ(0)',
+              willChange: 'transform',
+              minWidth: '44px',
+              minHeight: '44px'
+            }}
+          >
+            <ChevronDown className="w-5 h-5 text-emerald-700" />
+          </button>
+        </div>
+      )}
 
       {/* Status card section - Separate section below map */}
       {activeRide && (
-           <div className="bg-white p-4 shadow-lg border-t border-gray-100 flex-shrink-0 pb-24 md:pb-4">
-              <div className="flex justify-between items-center mb-2">
-                 <div>
-                    <h3 className="font-bold text-lg text-gray-800">
+        <div 
+          className={`bg-white shadow-lg border-t border-gray-100 flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
+            isStatusCardVisible 
+              ? 'px-1 pt-0.5 md:p-3 max-h-[200px] opacity-100' 
+              : 'p-0 max-h-0 opacity-0'
+          }`}
+          style={{ 
+            paddingBottom: isStatusCardVisible ? 'max(4rem, calc(4rem + env(safe-area-inset-bottom)))' : '0'
+          }}
+        >
+          {isStatusCardVisible && (
+            <>
+              <div className="flex justify-between items-center mb-0 md:mb-1.5">
+                 <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-[9px] md:text-lg text-gray-800 leading-none">
                         {activeRide.status === BuggyStatus.SEARCHING && t('finding_driver')}
                         {activeRide.status === BuggyStatus.ASSIGNED && t('driver_assigned')}
                         {activeRide.status === BuggyStatus.ARRIVING && t('driver_arriving')}
@@ -581,19 +767,19 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                         {activeRide.status === BuggyStatus.COMPLETED && t('arrived')}
                     </h3>
                     {activeRide.status !== BuggyStatus.SEARCHING && (
-                        <p className="text-sm text-gray-500 flex items-center">
-                            <Star className="w-3 h-3 text-yellow-400 mr-1 fill-current"/> Buggy #08
+                        <p className="text-[7px] md:text-sm text-gray-500 flex items-center leading-none">
+                            <Star className="w-1 h-1 md:w-3 md:h-3 text-yellow-400 mr-0.5 md:mr-1 fill-current"/> Buggy #08
                         </p>
                     )}
                  </div>
-                 <div className="text-right">
+                 <div className="flex items-center gap-0.5 md:gap-2 flex-shrink-0">
                     {activeRide.status !== BuggyStatus.SEARCHING && activeRide.status !== BuggyStatus.COMPLETED && activeRide.status !== BuggyStatus.ON_TRIP && (
                         <div className="flex flex-col items-end">
                             {activeRide.eta && (
-                                <div className="text-2xl font-bold text-emerald-600">{activeRide.eta} min</div>
+                                <div className="text-[10px] md:text-2xl font-bold text-emerald-600 leading-none">{activeRide.eta} min</div>
                             )}
                             {/* Countdown Timer */}
-                            <div className={`text-xs font-semibold mt-1 ${
+                            <div className={`text-[7px] md:text-xs font-semibold leading-none ${
                                 elapsedTime >= MAX_WAIT_TIME ? 'text-red-600' : 'text-gray-500'
                             }`}>
                                 {elapsedTime >= MAX_WAIT_TIME ? (
@@ -604,18 +790,25 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                             </div>
                         </div>
                     )}
+                    <button
+                        onClick={() => setIsStatusCardVisible(false)}
+                        className="text-gray-400 hover:text-gray-600 transition-colors p-0 flex-shrink-0"
+                        title="Hide status"
+                    >
+                        <ChevronDown className="w-2.5 h-2.5 md:w-5 md:h-5" />
+                    </button>
                  </div>
               </div>
               
-              <div className="flex items-center space-x-2 my-3">
-                 <div className="flex-col flex items-center space-y-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                    <div className="w-0.5 h-6 bg-gray-300"></div>
-                    <div className="w-2 h-2 bg-emerald-600 rounded-full"></div>
+              <div className="flex items-center space-x-0.5 md:space-x-2 my-0 md:my-2">
+                 <div className="flex-col flex items-center space-y-0 flex-shrink-0">
+                    <div className="w-0.5 h-0.5 md:w-2 md:h-2 bg-gray-400 rounded-full"></div>
+                    <div className="w-[1px] h-1.5 md:h-6 bg-gray-300"></div>
+                    <div className="w-0.5 h-0.5 md:w-2 md:h-2 bg-emerald-600 rounded-full"></div>
                  </div>
-                 <div className="flex-col flex space-y-3 w-full">
-                    <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded truncate">{activeRide.pickup}</div>
-                    <div className="text-sm font-semibold text-gray-800 bg-emerald-50 p-2 rounded border border-emerald-100 truncate">{activeRide.destination}</div>
+                 <div className="flex-col flex space-y-0 md:space-y-3 w-full min-w-0">
+                    <div className="text-[8px] md:text-sm text-gray-600 bg-gray-50 px-1 py-0.5 md:p-2 rounded truncate leading-none">{activeRide.pickup}</div>
+                    <div className="text-[8px] md:text-sm font-semibold text-gray-800 bg-emerald-50 px-1 py-0.5 md:p-2 rounded border border-emerald-100 truncate leading-none">{activeRide.destination}</div>
                  </div>
               </div>
 
@@ -623,13 +816,13 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
               {canCancel && (
                   <button 
                     onClick={handleCancel}
-                    className={`w-full py-3 font-semibold rounded-lg transition border flex items-center justify-center ${
+                    className={`w-full py-0 md:py-3 font-semibold rounded-lg transition border flex items-center justify-center text-[8px] md:text-base mt-0 md:mt-0 ${
                         elapsedTime >= MAX_WAIT_TIME 
                             ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200' 
                             : 'bg-red-50 text-red-600 hover:bg-red-100 border-red-100'
                     }`}
                   >
-                    <XCircle size={18} className="mr-2" />
+                    <XCircle size={8} className="md:w-[18px] md:h-[18px] mr-0.5 md:mr-2" />
                     {activeRide.status === BuggyStatus.SEARCHING 
                         ? t('cancel_request') 
                         : elapsedTime >= MAX_WAIT_TIME 
@@ -641,17 +834,37 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
               
               {/* Warning message if waiting but can't cancel yet */}
               {activeRide && (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && elapsedTime < MAX_WAIT_TIME && (
-                  <div className="mt-2 text-xs text-gray-500 text-center">
+                  <div className="mt-0 md:mt-2 text-[7px] md:text-xs text-gray-500 text-center leading-none">
                       You can cancel after waiting 10 minutes ({formatCountdown(elapsedTime)} remaining)
                   </div>
               )}
-           </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Show Status Card Button - When status card is hidden */}
+      {activeRide && !isStatusCardVisible && (
+        <div 
+          className="bg-white p-2 md:p-3 rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-20 flex items-center justify-center" 
+          style={{ 
+            paddingBottom: 'max(5rem, calc(5rem + env(safe-area-inset-bottom)))'
+          }}
+        >
+            <button
+                onClick={() => setIsStatusCardVisible(true)}
+                className="flex items-center space-x-2 text-emerald-600 hover:text-emerald-700 font-semibold text-xs md:text-sm transition-colors"
+            >
+                <ChevronUp className="w-4 h-4 md:w-5 md:h-5" />
+                <span>Show Status</span>
+            </button>
+        </div>
       )}
 
       {/* Booking Form (Only show if Idle and not loading) */}
       {!activeRide && !isLoadingRide && (
         <div 
-          className={`bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-10 transition-all duration-300 ease-in-out overflow-hidden ${
+          className={`bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-20 transition-all duration-300 ease-in-out overflow-hidden ${
             isBookingFormVisible 
               ? 'p-4 pb-24 md:pb-4 max-h-[500px] opacity-100' 
               : 'p-0 max-h-0 opacity-0'
@@ -732,7 +945,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
       {/* Show Booking Form Button - When form is hidden */}
       {!activeRide && !isLoadingRide && !isBookingFormVisible && (
-        <div className="bg-white p-3 pb-24 md:pb-3 rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-10 flex items-center justify-center">
+        <div className="bg-white p-3 pb-24 md:pb-3 rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-20 flex items-center justify-center">
             <button
                 onClick={() => setIsBookingFormVisible(true)}
                 className="flex items-center space-x-2 text-emerald-600 hover:text-emerald-700 font-semibold text-sm transition-colors"

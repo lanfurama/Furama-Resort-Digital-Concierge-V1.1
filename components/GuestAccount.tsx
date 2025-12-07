@@ -327,7 +327,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                 )}
                 
                 {/* Profile Card */}
-                <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mt-4">
                     <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wide mb-3">{t('reservation_details')}</h4>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
