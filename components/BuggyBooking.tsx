@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Clock, Car, Navigation, Star, LocateFixed, XCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { MapPin, Clock, Car, Navigation, Star, LocateFixed, XCircle, ZoomIn, ZoomOut } from 'lucide-react';
 import { BuggyStatus, User, RideRequest, Location } from '../types';
 import { getLocations, requestRide, getActiveRideForUser, cancelRide } from '../services/dataService';
 import { THEME_COLORS, RESORT_CENTER } from '../constants';
@@ -22,8 +22,21 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [elapsedTime, setElapsedTime] = useState<number>(0); // Time elapsed in seconds
   const userLocationRef = useRef<HTMLDivElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInnerRef = useRef<HTMLDivElement>(null);
+  
+  // Map pan and zoom state
+  const [mapState, setMapState] = useState({
+    scale: 1,
+    translateX: 0,
+    translateY: 0,
+    isDragging: false,
+    dragStart: { x: 0, y: 0 }
+  });
   
   const MAX_WAIT_TIME = 10 * 60; // 10 minutes in seconds
+  const MIN_ZOOM = 0.5;
+  const MAX_ZOOM = 3;
+  const ZOOM_STEP = 0.2;
   
   // Load locations on mount
   useEffect(() => {
@@ -132,18 +145,25 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   };
 
   // Helper to project Lat/Lng to % for the map container
-  // Bounding box roughly around Furama Danang
+  // Bounding box covering all villas in Furama Resort Danang
+  // Based on actual villa coordinates: 
+  // - Lat range: 16.0490 (Q-series) to 16.0569 (P07)
+  // - Lng range: 108.1865 (Q-series) to 108.2025 (P01)
   const mapBounds = {
-      minLat: 16.0375,
-      maxLat: 16.0420,
-      minLng: 108.2460,
-      maxLng: 108.2500
+      minLat: 16.0480,  // Slightly below Q-series (16.0490)
+      maxLat: 16.0580,  // Slightly above P-series (16.0569)
+      minLng: 108.1850, // Slightly below Q-series (108.1865)
+      maxLng: 108.2035  // Slightly above P-series (108.2025)
   };
 
   const getPos = (lat: number, lng: number) => {
       const y = ((mapBounds.maxLat - lat) / (mapBounds.maxLat - mapBounds.minLat)) * 100;
       const x = ((lng - mapBounds.minLng) / (mapBounds.maxLng - mapBounds.minLng)) * 100;
-      return { top: `${Math.max(5, Math.min(95, y))}%`, left: `${Math.max(5, Math.min(95, x))}%` };
+      // Remove clamping to allow full range, but keep within 0-100%
+      return { 
+        top: `${Math.max(0, Math.min(100, y))}%`, 
+        left: `${Math.max(0, Math.min(100, x))}%` 
+      };
   };
 
   const userPos = getPos(userLat, userLng);
@@ -152,31 +172,133 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const selectedLocation = locations.find(l => l.name === destinationToShow);
   const destPos = selectedLocation ? getPos(selectedLocation.lat, selectedLocation.lng) : null;
 
-  // Auto-scroll to user location on mount
+  // Zoom functions
+  const handleZoomIn = useCallback(() => {
+    setMapState(prev => ({
+      ...prev,
+      scale: Math.min(prev.scale + ZOOM_STEP, MAX_ZOOM)
+    }));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setMapState(prev => ({
+      ...prev,
+      scale: Math.max(prev.scale - ZOOM_STEP, MIN_ZOOM)
+    }));
+  }, []);
+
+  // Locate user function - centers map on user location and resets zoom
+  const handleLocateMe = useCallback(() => {
+    setMapState({
+      scale: 1,
+      translateX: 0,
+      translateY: 0,
+      isDragging: false,
+      dragStart: { x: 0, y: 0 }
+    });
+    
+    // Scroll to user location after a brief delay
+    setTimeout(() => {
+      if (userLocationRef.current && mapContainerRef.current) {
+        const container = mapContainerRef.current;
+        const userElement = userLocationRef.current;
+        
+        const containerRect = container.getBoundingClientRect();
+        const userRect = userElement.getBoundingClientRect();
+        
+        // Calculate scroll position to center user location
+        const scrollLeft = userRect.left - containerRect.left + container.scrollLeft - containerRect.width / 2;
+        const scrollTop = userRect.top - containerRect.top + container.scrollTop - containerRect.height / 2;
+        
+        container.scrollTo({
+          left: scrollLeft,
+          top: scrollTop,
+          behavior: 'smooth'
+        });
+      }
+    }, 100);
+  }, []);
+
+  // Pan/Drag handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Only left mouse button
+    // Don't drag if clicking on a button or interactive element
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('select') || target.closest('input')) return;
+    
+    setMapState(prev => ({
+      ...prev,
+      isDragging: true,
+      dragStart: { 
+        x: e.clientX - prev.translateX * prev.scale, 
+        y: e.clientY - prev.translateY * prev.scale 
+      }
+    }));
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!mapState.isDragging) return;
+    setMapState(prev => ({
+      ...prev,
+      translateX: (e.clientX - prev.dragStart.x) / prev.scale,
+      translateY: (e.clientY - prev.dragStart.y) / prev.scale
+    }));
+  }, [mapState.isDragging]);
+
+  const handleMouseUp = useCallback(() => {
+    setMapState(prev => ({ ...prev, isDragging: false }));
+  }, []);
+
+  // Touch handlers for mobile
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const target = e.target as HTMLElement;
+      if (target.closest('button') || target.closest('select') || target.closest('input')) return;
+      
+      const touch = e.touches[0];
+      setMapState(prev => ({
+        ...prev,
+        isDragging: true,
+        dragStart: { 
+          x: touch.clientX - prev.translateX * prev.scale, 
+          y: touch.clientY - prev.translateY * prev.scale 
+        }
+      }));
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!mapState.isDragging || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    setMapState(prev => ({
+      ...prev,
+      translateX: (touch.clientX - prev.dragStart.x) / prev.scale,
+      translateY: (touch.clientY - prev.dragStart.y) / prev.scale
+    }));
+  }, [mapState.isDragging]);
+
+  const handleTouchEnd = useCallback(() => {
+    setMapState(prev => ({ ...prev, isDragging: false }));
+  }, []);
+
+  // Wheel zoom
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+    setMapState(prev => ({
+      ...prev,
+      scale: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, prev.scale + delta))
+    }));
+  }, []);
+
+  // Auto-center on user location on mount
   useEffect(() => {
-      if (userLocationRef.current && mapContainerRef.current && !isLoadingRide) {
-          // Small delay to ensure layout is complete
+      if (!isLoadingRide) {
           setTimeout(() => {
-              const userElement = userLocationRef.current;
-              const container = mapContainerRef.current;
-              if (userElement && container) {
-                  // Get the position of user location relative to container
-                  const containerRect = container.getBoundingClientRect();
-                  const userRect = userElement.getBoundingClientRect();
-                  
-                  // Calculate scroll position to center user location
-                  const scrollLeft = userRect.left - containerRect.left + container.scrollLeft - containerRect.width / 2;
-                  const scrollTop = userRect.top - containerRect.top + container.scrollTop - containerRect.height / 2;
-                  
-                  container.scrollTo({
-                      left: scrollLeft,
-                      top: scrollTop,
-                      behavior: 'smooth'
-                  });
-              }
+              handleLocateMe();
           }, 200);
       }
-  }, [isLoadingRide]);
+  }, [isLoadingRide, handleLocateMe]);
 
   // Determine if ride can be cancelled
   // Can cancel if: searching OR (assigned/arriving AND elapsed time > 10 minutes)
@@ -207,6 +329,17 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
   return (
     <div className="flex flex-col h-full bg-gray-50 relative z-0">
+      {/* Hide scrollbar styles */}
+      <style>{`
+        .map-container::-webkit-scrollbar {
+          display: none;
+        }
+        .map-container {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
+      
       {/* Header */}
       <div className={`p-4 text-white shadow-md ${THEME_COLORS.primary} flex items-center flex-shrink-0 relative z-0`}>
         <button onClick={onBack} className="mr-4 text-white hover:text-gray-200">
@@ -215,10 +348,35 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         <h2 className="text-xl font-serif">{t('buggy_service')}</h2>
       </div>
 
-      {/* Interactive Map - Scrollable */}
-      <div ref={mapContainerRef} className="relative flex-1 bg-emerald-50 overflow-auto shadow-inner z-0">
-        {/* Map Container - Larger than viewport to allow scrolling */}
-        <div className="relative z-0" style={{ minHeight: '600px', minWidth: '100%' }}>
+      {/* Interactive Map - Draggable and Zoomable */}
+      <div 
+        ref={mapContainerRef} 
+        className="relative flex-1 bg-emerald-50 overflow-auto shadow-inner z-0 map-container"
+        style={{ 
+          cursor: mapState.isDragging ? 'grabbing' : 'default'
+        }}
+        onWheel={handleWheel}
+      >
+        {/* Map Container - Transformable */}
+        <div 
+          ref={mapInnerRef}
+          className="relative z-0 origin-top-left"
+          style={{ 
+            minHeight: `${600 * mapState.scale}px`, 
+            minWidth: `${100 * mapState.scale}%`,
+            transform: `scale(${mapState.scale}) translate(${mapState.translateX}px, ${mapState.translateY}px)`,
+            transition: mapState.isDragging ? 'none' : 'transform 0.1s ease-out',
+            willChange: mapState.isDragging ? 'transform' : 'auto',
+            touchAction: 'none'
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
 
           {/* User Location Pin - Always visible with high z-index */}
           <div 
@@ -234,12 +392,17 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
           </div>
 
           {/* Resort Locations Pins */}
-          {locations.map((loc) => {
+          {locations
+              .filter((loc, index, self) => 
+                  // Remove duplicates: keep first occurrence by name
+                  index === self.findIndex(l => l.name === loc.name)
+              )
+              .map((loc, index) => {
               const pos = getPos(loc.lat, loc.lng);
               const isSelected = destinationToShow === loc.name;
               return (
                   <button
-                      key={loc.name}
+                      key={loc.id || `${loc.name}-${index}`}
                       onClick={() => !activeRide && setDestination(loc.name)}
                       className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center transition-all duration-300 ${isSelected ? 'scale-110 z-15' : 'hover:scale-110 opacity-80 hover:opacity-100'}`}
                       style={{ top: pos.top, left: pos.left }}
@@ -292,6 +455,38 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                    </div>
                </div>
           )}
+        </div>
+
+        {/* Map Controls - Zoom and Locate buttons */}
+        <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2">
+          {/* Locate Me Button */}
+          <button
+            onClick={handleLocateMe}
+            className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200"
+            title="Locate Me"
+          >
+            <LocateFixed className="w-5 h-5 text-emerald-600" />
+          </button>
+          
+          {/* Zoom In Button */}
+          <button
+            onClick={handleZoomIn}
+            disabled={mapState.scale >= MAX_ZOOM}
+            className="bg-white p-3 rounded-t-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Zoom In"
+          >
+            <ZoomIn className="w-5 h-5 text-gray-700" />
+          </button>
+          
+          {/* Zoom Out Button */}
+          <button
+            onClick={handleZoomOut}
+            disabled={mapState.scale <= MIN_ZOOM}
+            className="bg-white p-3 rounded-b-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200 border-t-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Zoom Out"
+          >
+            <ZoomOut className="w-5 h-5 text-gray-700" />
+          </button>
         </div>
       </div>
 
@@ -377,25 +572,25 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
       {/* Booking Form (Only show if Idle and not loading) */}
       {!activeRide && !isLoadingRide && (
-        <div className="bg-white p-6 rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-10">
-            <h3 className="text-lg font-bold mb-4 text-gray-800">{t('where_to')}</h3>
+        <div className="bg-white p-4 rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-10">
+            <h3 className="text-base font-bold mb-2 text-gray-800">{t('where_to')}</h3>
             
-            <div className="space-y-4">
+            <div className="space-y-2">
                 <div className="relative">
-                    <LocateFixed className="absolute left-3 top-3 text-emerald-600 w-5 h-5" />
+                    <LocateFixed className="absolute left-2 top-2 text-emerald-600 w-4 h-4" />
                     <input 
                         type="text" 
                         value={pickup}
                         readOnly
-                        className="w-full pl-10 pr-4 py-3 bg-emerald-50 border border-emerald-100 rounded-lg text-gray-700 font-medium focus:outline-none"
+                        className="w-full pl-8 pr-3 py-2 text-sm bg-emerald-50 border border-emerald-100 rounded-lg text-gray-700 font-medium focus:outline-none"
                     />
                 </div>
                 <div className="relative">
-                    <Navigation className="absolute left-3 top-3 text-amber-500 w-5 h-5" />
+                    <Navigation className="absolute left-2 top-2 text-amber-500 w-4 h-4" />
                     <select 
                         value={destination}
                         onChange={(e) => setDestination(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none text-gray-700"
+                        className="w-full pl-8 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none text-gray-700"
                     >
                         <option value="" disabled>{t('select_dest')}</option>
                         {locations.map((loc) => (
@@ -408,11 +603,11 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
             <button 
                 onClick={handleBook}
                 disabled={!destination}
-                className={`w-full mt-6 py-4 rounded-xl font-bold text-lg shadow-lg transition transform active:scale-95 flex items-center justify-center space-x-2
+                className={`w-full mt-3 py-2.5 rounded-lg font-bold text-base shadow-lg transition transform active:scale-95 flex items-center justify-center space-x-2
                     ${destination ? 'bg-emerald-800 text-white hover:bg-emerald-900' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
                 `}
             >
-                <Car className="w-6 h-6" />
+                <Car className="w-5 h-5" />
                 <span>{t('request_buggy')}</span>
             </button>
         </div>
