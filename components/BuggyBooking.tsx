@@ -570,7 +570,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
       {/* Status card section - Separate section below map */}
       {activeRide && (
-           <div className="bg-white p-4 shadow-lg border-t border-gray-100 flex-shrink-0">
+           <div className="bg-white p-4 shadow-lg border-t border-gray-100 flex-shrink-0 pb-24 md:pb-4">
               <div className="flex justify-between items-center mb-2">
                  <div>
                     <h3 className="font-bold text-lg text-gray-800">
@@ -653,7 +653,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         <div 
           className={`bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-10 transition-all duration-300 ease-in-out overflow-hidden ${
             isBookingFormVisible 
-              ? 'p-4 max-h-[500px] opacity-100' 
+              ? 'p-4 pb-24 md:pb-4 max-h-[500px] opacity-100' 
               : 'p-0 max-h-0 opacity-0'
           }`}
         >
@@ -732,7 +732,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
       {/* Show Booking Form Button - When form is hidden */}
       {!activeRide && !isLoadingRide && !isBookingFormVisible && (
-        <div className="bg-white p-3 rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-10 flex items-center justify-center">
+        <div className="bg-white p-3 pb-24 md:pb-3 rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-10 flex items-center justify-center">
             <button
                 onClick={() => setIsBookingFormVisible(true)}
                 className="flex items-center space-x-2 text-emerald-600 hover:text-emerald-700 font-semibold text-sm transition-colors"
