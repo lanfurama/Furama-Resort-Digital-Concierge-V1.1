@@ -375,7 +375,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
   return (
     <div className="flex flex-col h-full bg-gray-50 relative z-0">
-      {/* Hide scrollbar styles */}
+      {/* Hide scrollbar styles and disable pinch zoom */}
       <style>{`
         .map-container::-webkit-scrollbar {
           display: none;
@@ -383,6 +383,19 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         .map-container {
           -ms-overflow-style: none;
           scrollbar-width: none;
+          touch-action: pan-x pan-y pinch-zoom;
+        }
+        /* Disable double-tap zoom */
+        * {
+          touch-action: manipulation;
+        }
+        /* Allow text selection in inputs and textareas */
+        input, textarea, select {
+          touch-action: auto;
+          -webkit-user-select: text;
+          -moz-user-select: text;
+          -ms-user-select: text;
+          user-select: text;
         }
       `}</style>
       
@@ -504,43 +517,45 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         </div>
 
         {/* Map Controls - Zoom and Locate buttons */}
-        <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-2">
-          {/* Locate Me Button */}
-          <button
-            onClick={handleLocateMe}
-            className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200"
-            title="Locate Me"
-          >
-            <LocateFixed className="w-5 h-5 text-emerald-600" />
-          </button>
-          
-          {/* Zoom In Button */}
-          <button
-            onClick={handleZoomIn}
-            disabled={mapState.scale >= MAX_ZOOM}
-            className="bg-white p-3 rounded-t-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Zoom In"
-          >
-            <ZoomIn className="w-5 h-5 text-gray-700" />
-          </button>
-          
-          {/* Zoom Out Button */}
-          <button
-            onClick={handleZoomOut}
-            disabled={mapState.scale <= MIN_ZOOM}
-            className="bg-white p-3 rounded-b-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200 border-t-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Zoom Out"
-          >
-            <ZoomOut className="w-5 h-5 text-gray-700" />
-          </button>
+        <div className="absolute bottom-20 right-4 z-30 flex flex-col gap-2 pointer-events-none">
+          <div className="flex flex-col gap-2 pointer-events-auto">
+            {/* Locate Me Button */}
+            <button
+              onClick={handleLocateMe}
+              className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200"
+              title="Locate Me"
+            >
+              <LocateFixed className="w-5 h-5 text-emerald-600" />
+            </button>
+            
+            {/* Zoom In Button */}
+            <button
+              onClick={handleZoomIn}
+              disabled={mapState.scale >= MAX_ZOOM}
+              className="bg-white p-3 rounded-t-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Zoom In"
+            >
+              <ZoomIn className="w-5 h-5 text-gray-700" />
+            </button>
+            
+            {/* Zoom Out Button */}
+            <button
+              onClick={handleZoomOut}
+              disabled={mapState.scale <= MIN_ZOOM}
+              className="bg-white p-3 rounded-b-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200 border-t-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Zoom Out"
+            >
+              <ZoomOut className="w-5 h-5 text-gray-700" />
+            </button>
+          </div>
         </div>
 
         {/* Toggle Booking Form Button - Bottom Left */}
         {!activeRide && !isLoadingRide && (
-          <div className="absolute bottom-4 left-4 z-20">
+          <div className="absolute bottom-20 left-4 z-30 pointer-events-none">
             <button
               onClick={() => setIsBookingFormVisible(!isBookingFormVisible)}
-              className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200 flex items-center justify-center"
+              className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200 flex items-center justify-center pointer-events-auto"
               title={isBookingFormVisible ? "Hide booking form" : "Show booking form"}
             >
               {isBookingFormVisible ? (
@@ -653,33 +668,33 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                         <ChevronDown className="w-5 h-5" />
                     </button>
                 </div>
-                
-                <div className="space-y-2">
-                    <div className="relative">
-                        <LocateFixed className="absolute left-2 top-2 text-emerald-600 w-4 h-4" />
-                        <input 
-                            type="text" 
-                            value={pickup}
-                            readOnly
-                            className="w-full pl-8 pr-3 py-2 text-sm bg-emerald-50 border border-emerald-100 rounded-lg text-gray-700 font-medium focus:outline-none"
-                        />
-                    </div>
-                    <div className="relative">
-                        <Navigation className="absolute left-2 top-2 text-amber-500 w-4 h-4" />
-                        <select 
-                            value={destination}
+            
+            <div className="space-y-2">
+                <div className="relative">
+                    <LocateFixed className="absolute left-2 top-2 text-emerald-600 w-4 h-4" />
+                    <input 
+                        type="text" 
+                        value={pickup}
+                        readOnly
+                        className="w-full pl-8 pr-3 py-2 text-sm bg-emerald-50 border border-emerald-100 rounded-lg text-gray-700 font-medium focus:outline-none"
+                    />
+                </div>
+                <div className="relative">
+                    <Navigation className="absolute left-2 top-2 text-amber-500 w-4 h-4" />
+                    <select 
+                        value={destination}
                             onChange={(e) => {
                               handleSetDestination(e.target.value);
                             }}
-                            className="w-full pl-8 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none text-gray-700"
-                        >
-                            <option value="" disabled>{t('select_dest')}</option>
-                            {locations.map((loc) => (
-                                <option key={loc.name} value={loc.name}>{loc.name}</option>
-                            ))}
-                        </select>
-                    </div>
+                        className="w-full pl-8 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none text-gray-700"
+                    >
+                        <option value="" disabled>{t('select_dest')}</option>
+                        {locations.map((loc) => (
+                            <option key={loc.name} value={loc.name}>{loc.name}</option>
+                        ))}
+                    </select>
                 </div>
+            </div>
 
                 {/* Distance and Time Info */}
                 {distanceInfo && destination && (
@@ -701,15 +716,15 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                     </div>
                 )}
 
-                <button 
-                    onClick={handleBook}
-                    disabled={!destination}
-                    className={`w-full mt-3 py-2.5 rounded-lg font-bold text-base shadow-lg transition transform active:scale-95 flex items-center justify-center space-x-2
-                        ${destination ? 'bg-emerald-800 text-white hover:bg-emerald-900' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
-                    `}
-                >
-                    <Car className="w-5 h-5" />
-                    <span>{t('request_buggy')}</span>
+            <button 
+                onClick={handleBook}
+                disabled={!destination}
+                className={`w-full mt-3 py-2.5 rounded-lg font-bold text-base shadow-lg transition transform active:scale-95 flex items-center justify-center space-x-2
+                    ${destination ? 'bg-emerald-800 text-white hover:bg-emerald-900' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
+                `}
+            >
+                <Car className="w-5 h-5" />
+                <span>{t('request_buggy')}</span>
                 </button>
             </div>
         </div>

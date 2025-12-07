@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Furama Resort Digital Concierge</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
@@ -21,6 +21,34 @@
       .scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
+      }
+      /* Disable pinch zoom on mobile */
+      html, body {
+          touch-action: manipulation;
+          -ms-touch-action: manipulation;
+      }
+      /* Fixed bottom navigation bar for mobile */
+      .safe-area-bottom {
+          padding-bottom: max(0.5rem, env(safe-area-inset-bottom)) !important;
+      }
+      /* Ensure bottom nav is always fixed on mobile */
+      @media (max-width: 768px) {
+          body {
+              padding-bottom: 0;
+          }
+          /* Prevent body scroll when bottom nav is visible */
+          body:has(.safe-area-bottom) {
+              overflow-x: hidden;
+          }
+          /* Ensure fixed positioning works on all mobile browsers */
+          .safe-area-bottom {
+              position: fixed !important;
+              bottom: 0 !important;
+              left: 0 !important;
+              right: 0 !important;
+              transform: translateZ(0);
+              -webkit-transform: translateZ(0);
+          }
       }
     </style>
   <script type="importmap">

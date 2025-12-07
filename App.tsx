@@ -455,8 +455,19 @@ const AppContent: React.FC = () => {
         {view === AppView.EVENTS && <EventsList onBack={() => setView(AppView.HOME)} />}
       </div>
 
-      {/* 3. Fixed Bottom Navigation Bar */}
-      <div className="bg-white border-t border-gray-200 h-20 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-40 flex justify-around items-center px-2 pb-2">
+      {/* 3. Fixed Bottom Navigation Bar - Always fixed on mobile */}
+      <div 
+        className="bg-white border-t border-gray-200 h-20 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-50 flex justify-around items-center px-2 safe-area-bottom" 
+        style={{ 
+          paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
+          position: 'fixed',
+          willChange: 'transform',
+          transform: 'translateZ(0)',
+          WebkitTransform: 'translateZ(0)',
+          backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden'
+        }}
+      >
            <NavButton 
                 active={view === AppView.HOME} 
                 onClick={() => setView(AppView.HOME)} 
