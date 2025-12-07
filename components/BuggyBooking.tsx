@@ -515,11 +515,15 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         .map-container {
           -ms-overflow-style: none;
           scrollbar-width: none;
-          touch-action: pan-x pan-y pinch-zoom;
+          touch-action: pan-x pan-y;
         }
         /* Disable double-tap zoom */
         * {
           touch-action: manipulation;
+        }
+        /* Prevent pinch zoom on map */
+        .map-container * {
+          touch-action: pan-x pan-y;
         }
         /* Allow text selection in inputs and textareas */
         input, textarea, select {

@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Furama Resort Digital Concierge</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
@@ -26,6 +26,33 @@
       html, body {
           touch-action: manipulation;
           -ms-touch-action: manipulation;
+          -webkit-touch-callout: none;
+          -webkit-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
+          user-select: none;
+      }
+      /* Allow text selection in inputs and textareas */
+      input, textarea, select {
+          -webkit-user-select: text;
+          -moz-user-select: text;
+          -ms-user-select: text;
+          user-select: text;
+      }
+      /* Prevent double-tap zoom */
+      * {
+          -webkit-tap-highlight-color: transparent;
+      }
+      @media (max-width: 768px) {
+          html {
+              touch-action: manipulation;
+              -ms-touch-action: manipulation;
+          }
+          body {
+              touch-action: manipulation;
+              -ms-touch-action: manipulation;
+              overflow-x: hidden;
+          }
       }
       /* Fixed bottom navigation bar for mobile */
       .safe-area-bottom {
