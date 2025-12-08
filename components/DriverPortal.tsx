@@ -255,7 +255,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 </div>
                 <div className="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
                      <NotificationBell userId="driver" />
-                     <button onClick={onLogout} className="text-slate-400 hover:text-white text-sm md:text-base px-2 md:px-0">Logout</button>
+                     <button onClick={onLogout} className="text-slate-400 text-sm md:text-base px-2 md:px-0">Logout</button>
                 </div>
             </header>
 
@@ -275,57 +275,57 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 </button>
             </div>
 
-            <div className="flex-1 p-3 md:p-4 overflow-y-auto pb-24 md:pb-20 pt-[130px] md:pt-0" style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}>
+            <div className="flex-1 p-3 md:p-3 overflow-y-auto pb-24 md:pb-16 pt-[130px] md:pt-0" style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}>
                 {viewMode === 'ACTIVE' ? (
                     <>
                         {myCurrentRide ? (
-                            <div className="bg-emerald-600 rounded-xl p-4 md:p-6 shadow-2xl animate-in zoom-in duration-300">
-                                <div className="flex justify-between items-start mb-4 md:mb-6">
+                            <div className="bg-emerald-600 rounded-xl p-4 md:p-4 shadow-lg">
+                                <div className="flex justify-between items-start mb-3 md:mb-3">
                                     <div className="flex-1 min-w-0">
-                                        <h2 className="text-xl md:text-2xl font-bold mb-1">{myCurrentRide.status === BuggyStatus.ON_TRIP ? 'On Trip' : 'Pick Up Guest'}</h2>
-                                        <p className="opacity-80 text-sm md:text-base">Ride #{myCurrentRide.id.slice(-4)}</p>
+                                        <h2 className="text-xl md:text-lg font-bold mb-1">{myCurrentRide.status === BuggyStatus.ON_TRIP ? 'On Trip' : 'Pick Up Guest'}</h2>
+                                        <p className="opacity-80 text-sm md:text-xs">Ride #{myCurrentRide.id.slice(-4)}</p>
                                     </div>
-                                    <div className="bg-white/20 p-1.5 md:p-2 rounded-lg flex-shrink-0 ml-2">
-                                        <Clock size={18} className="md:w-5 md:h-5 text-white" />
+                                    <div className="bg-white/20 p-1.5 md:p-1.5 rounded-lg flex-shrink-0 ml-2">
+                                        <Clock size={18} className="md:w-4 md:h-4 text-white" />
                                     </div>
                                 </div>
 
-                                <div className="space-y-3 md:space-y-4 mb-6 md:mb-8">
-                                     <div className="bg-black/20 p-3 md:p-4 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                <div className="space-y-3 md:space-y-2 mb-4 md:mb-4">
+                                     <div className="bg-black/20 p-3 md:p-2 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 md:gap-2">
                                         <div className="flex-1 min-w-0">
-                                            <label className="text-[10px] md:text-xs uppercase opacity-60 font-bold tracking-wider block">Guest</label>
-                                            <div className="text-base md:text-lg font-semibold truncate">{myCurrentRide.guestName}</div>
-                                            <div className="text-xs md:text-sm opacity-80">Room {myCurrentRide.roomNumber}</div>
+                                            <label className="text-[10px] md:text-[9px] uppercase opacity-60 font-bold tracking-wider block">Guest</label>
+                                            <div className="text-base md:text-sm font-semibold truncate">{myCurrentRide.guestName}</div>
+                                            <div className="text-xs md:text-[10px] opacity-80">Room {myCurrentRide.roomNumber}</div>
                                         </div>
                                         <button 
                                             onClick={() => {
                                                 setShowChat(true);
                                                 setHasUnreadChat(false);
                                             }}
-                                            className={`relative px-4 py-2.5 md:py-2 rounded-lg font-bold flex items-center justify-center shadow-md transition text-sm md:text-base w-full sm:w-auto min-h-[44px] ${
+                                            className={`relative px-4 py-2.5 md:px-3 md:py-1.5 rounded-lg font-bold flex items-center justify-center shadow-md text-sm md:text-xs w-full sm:w-auto min-h-[44px] md:min-h-[36px] ${
                                                 hasUnreadChat 
                                                 ? 'bg-white text-red-600 animate-pulse' 
-                                                : 'bg-emerald-800 text-emerald-100 hover:bg-emerald-900'
+                                                : 'bg-emerald-800 text-emerald-100'
                                             }`}
                                         >
-                                            <MessageSquare size={16} className="md:w-[18px] md:h-[18px] mr-2"/>
+                                            <MessageSquare size={16} className="md:w-3 md:h-3 mr-2"/>
                                             Chat
                                             {hasUnreadChat && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border border-white"></span>}
                                         </button>
                                      </div>
 
-                                     <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-                                        <div className="flex-1 bg-black/20 p-3 md:p-4 rounded-lg min-w-0">
-                                            <label className="text-[10px] md:text-xs uppercase opacity-60 font-bold tracking-wider mb-1 block">From</label>
-                                            <div className="font-medium flex items-center text-sm md:text-base truncate"><MapPin size={12} className="md:w-[14px] md:h-[14px] mr-1 flex-shrink-0"/> <span className="truncate">{myCurrentRide.pickup}</span></div>
+                                     <div className="flex flex-col sm:flex-row gap-3 md:gap-2">
+                                        <div className="flex-1 bg-black/20 p-3 md:p-2 rounded-lg min-w-0">
+                                            <label className="text-[10px] md:text-[9px] uppercase opacity-60 font-bold tracking-wider mb-1 block">From</label>
+                                            <div className="font-medium flex items-center text-sm md:text-xs truncate"><MapPin size={12} className="md:w-3 md:h-3 mr-1 flex-shrink-0"/> <span className="truncate">{myCurrentRide.pickup}</span></div>
                                         </div>
-                                        <div className="flex-1 bg-white text-emerald-900 p-3 md:p-4 rounded-lg shadow-lg min-w-0">
-                                            <label className="text-[10px] md:text-xs uppercase opacity-60 font-bold tracking-wider mb-1 block">To</label>
-                                            <div className="font-bold flex items-center text-sm md:text-base truncate"><Navigation size={12} className="md:w-[14px] md:h-[14px] mr-1 flex-shrink-0"/> <span className="truncate">{myCurrentRide.destination}</span></div>
+                                        <div className="flex-1 bg-white text-emerald-900 p-3 md:p-2 rounded-lg shadow-lg min-w-0">
+                                            <label className="text-[10px] md:text-[9px] uppercase opacity-60 font-bold tracking-wider mb-1 block">To</label>
+                                            <div className="font-bold flex items-center text-sm md:text-xs truncate"><Navigation size={12} className="md:w-3 md:h-3 mr-1 flex-shrink-0"/> <span className="truncate">{myCurrentRide.destination}</span></div>
                                         </div>
                                      </div>
                                      
-                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] md:text-xs opacity-70">
+                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] md:text-[9px] opacity-70">
                                          <div>Request: {formatTime(myCurrentRide.timestamp)}</div>
                                          {myCurrentRide.pickedUpAt && <div>Pickup: {formatTime(myCurrentRide.pickedUpAt)}</div>}
                                      </div>
@@ -334,55 +334,79 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                                 {myCurrentRide.status === BuggyStatus.ARRIVING || myCurrentRide.status === BuggyStatus.ASSIGNED ? (
                                     <button 
                                         onClick={() => pickUpGuest(myCurrentRide.id)}
-                                        className="w-full bg-white text-emerald-900 font-bold py-3.5 md:py-4 rounded-xl text-lg md:text-xl hover:bg-gray-100 active:bg-gray-200 transition shadow-lg min-h-[52px] md:min-h-[56px]"
+                                        className="w-full bg-white text-emerald-900 font-bold py-3.5 md:py-2.5 rounded-xl text-lg md:text-sm shadow-lg min-h-[52px] md:min-h-[40px]"
                                     >
                                         Guest Picked Up
                                     </button>
                                 ) : (
                                      <button 
                                         onClick={() => completeRide(myCurrentRide.id)}
-                                        className="w-full bg-emerald-900 text-white border border-emerald-400 font-bold py-3.5 md:py-4 rounded-xl text-lg md:text-xl hover:bg-emerald-800 active:bg-emerald-700 transition shadow-lg min-h-[52px] md:min-h-[56px] flex items-center justify-center"
+                                        className="w-full bg-emerald-900 text-white border border-emerald-400 font-bold py-3.5 md:py-2.5 rounded-xl text-lg md:text-sm shadow-lg min-h-[52px] md:min-h-[40px] flex items-center justify-center"
                                     >
-                                        <CheckCircle size={20} className="md:w-5 md:h-5 inline mr-2" /> Complete Trip
+                                        <CheckCircle size={20} className="md:w-4 md:h-4 inline mr-2" /> Complete Trip
                                     </button>
                                 )}
                             </div>
                         ) : (
                             <>
-                                <h2 className="text-slate-400 font-semibold mb-3 md:mb-4 uppercase tracking-wider text-xs md:text-sm">Available Requests ({pendingRides.length})</h2>
-                                <div className="space-y-3">
+                                <h2 className="text-slate-300 font-bold mb-4 md:mb-3 uppercase tracking-wider text-base md:text-sm">Available Requests ({pendingRides.length})</h2>
+                                <div className="space-y-4 md:space-y-3">
                                     {pendingRides.length === 0 ? (
                                         <div className="text-center py-10 opacity-50">
-                                            <p className="text-sm md:text-base">No active requests.</p>
+                                            <p className="text-base md:text-lg">No active requests.</p>
                                         </div>
                                     ) : (
                                         pendingRides.map(ride => (
-                                            <div key={ride.id} className="bg-slate-800 p-3 md:p-4 rounded-xl border border-slate-700 hover:border-emerald-500 transition group">
-                                                <div className="flex justify-between items-start mb-3 gap-2">
-                                                    <div className="flex-1 min-w-0">
-                                                        <span className="bg-emerald-500/10 text-emerald-400 text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-500/20 inline-block">NEW</span>
-                                                        <h3 className="font-bold text-base md:text-lg mt-1">Room {ride.roomNumber}</h3>
-                                                        <p className="text-slate-400 text-xs md:text-sm truncate">{ride.guestName}</p>
+                                            <div key={ride.id} className="bg-slate-800 p-4 md:p-3 rounded-xl border-2 border-slate-700 shadow-md">
+                                                {/* Header with Room and Time */}
+                                                <div className="flex justify-between items-center mb-3 md:mb-2 gap-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="bg-emerald-500 text-white text-xs md:text-[10px] font-bold px-3 md:px-2 py-1 md:py-0.5 rounded-full animate-pulse">NEW</span>
+                                                        <h3 className="font-bold text-lg md:text-sm text-white">Room {ride.roomNumber}</h3>
                                                     </div>
                                                     <div className="text-right flex-shrink-0">
-                                                        <span className="text-[10px] md:text-xs text-slate-500 whitespace-nowrap">{formatTime(ride.timestamp)}</span>
+                                                        <span className="text-xs md:text-[10px] text-slate-400 whitespace-nowrap">{formatTime(ride.timestamp)}</span>
                                                     </div>
                                                 </div>
                                                 
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 md:mb-4">
-                                                    <div className="bg-black/20 p-2 rounded min-w-0">
-                                                        <div className="text-[9px] md:text-[10px] uppercase text-slate-500">Pickup</div>
-                                                        <div className="text-xs md:text-sm truncate">{ride.pickup}</div>
+                                                {/* Guest Name - Smaller */}
+                                                <div className="mb-3 md:mb-2">
+                                                    <p className="text-slate-400 text-sm md:text-xs">{ride.guestName}</p>
+                                                </div>
+                                                
+                                                {/* Large PU and DO Display - Driver-Friendly */}
+                                                <div className="space-y-3 md:space-y-2 mb-4 md:mb-3">
+                                                    {/* PU - Pick Up */}
+                                                    <div className="bg-gradient-to-r from-blue-600/30 to-blue-500/20 border-2 border-blue-500/50 p-4 md:p-2.5 rounded-xl">
+                                                        <div className="flex items-center gap-3 md:gap-2 mb-2">
+                                                            <div className="bg-blue-500 text-white font-bold text-lg md:text-sm px-4 md:px-3 py-2 md:py-1.5 rounded-lg min-w-[60px] md:min-w-[50px] text-center">
+                                                                PU
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-blue-300 text-xs md:text-[10px] font-semibold uppercase tracking-wider mb-1">Pick Up</div>
+                                                                <div className="text-white text-lg md:text-sm font-bold break-words">{ride.pickup}</div>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div className="bg-black/20 p-2 rounded min-w-0">
-                                                        <div className="text-[9px] md:text-[10px] uppercase text-slate-500">Dropoff</div>
-                                                        <div className="text-xs md:text-sm truncate">{ride.destination}</div>
+                                                    
+                                                    {/* DO - Drop Off */}
+                                                    <div className="bg-gradient-to-r from-emerald-600/30 to-emerald-500/20 border-2 border-emerald-500/50 p-4 md:p-2.5 rounded-xl">
+                                                        <div className="flex items-center gap-3 md:gap-2 mb-2">
+                                                            <div className="bg-emerald-500 text-white font-bold text-lg md:text-sm px-4 md:px-3 py-2 md:py-1.5 rounded-lg min-w-[60px] md:min-w-[50px] text-center">
+                                                                DO
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-emerald-300 text-xs md:text-[10px] font-semibold uppercase tracking-wider mb-1">Drop Off</div>
+                                                                <div className="text-white text-lg md:text-sm font-bold break-words">{ride.destination}</div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
 
+                                                {/* Accept Button - Large and Prominent */}
                                                 <button 
                                                     onClick={() => acceptRide(ride.id)}
-                                                    className="w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold py-3 md:py-3 rounded-lg transition text-sm md:text-base min-h-[44px]"
+                                                    className="w-full bg-emerald-600 text-white font-bold py-4 md:py-2.5 rounded-xl text-base md:text-sm shadow-lg min-h-[56px] md:min-h-[40px]"
                                                 >
                                                     Accept Ride
                                                 </button>
@@ -395,46 +419,85 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                     </>
                 ) : (
                     /* HISTORY VIEW */
-                    <div className="space-y-3 md:space-y-4">
-                        <h2 className="text-slate-400 font-semibold mb-2 uppercase tracking-wider text-xs md:text-sm">Completed Trips</h2>
+                    <div className="space-y-4 md:space-y-3">
+                        <h2 className="text-slate-300 font-bold mb-4 md:mb-3 uppercase tracking-wider text-base md:text-sm">Completed Trips</h2>
                          {historyRides.length === 0 ? (
                             <div className="text-center py-10 opacity-50">
-                                <History size={40} className="md:w-12 md:h-12 mx-auto mb-2 opacity-50"/>
-                                <p className="text-sm md:text-base">No completed trips history.</p>
+                                <History size={40} className="md:w-10 md:h-10 mx-auto mb-2 opacity-50"/>
+                                <p className="text-base md:text-sm">No completed trips history.</p>
                             </div>
                         ) : (
                             historyRides.map(ride => (
-                                <div key={ride.id} className="bg-slate-800 p-3 md:p-4 rounded-xl border border-slate-700">
-                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 border-b border-slate-700 pb-2 gap-2">
+                                <div key={ride.id} className="bg-slate-800 p-4 md:p-3 rounded-xl border-2 border-slate-700 shadow-md">
+                                    {/* Header with Room and Status */}
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 md:mb-2 gap-3">
                                         <div className="flex-1 min-w-0">
-                                            <h3 className="font-bold text-sm md:text-base text-slate-200">Room {ride.roomNumber}</h3>
-                                            <p className="text-slate-500 text-[10px] md:text-xs truncate">{ride.guestName}</p>
+                                            <h3 className="font-bold text-lg md:text-sm text-white mb-1">Room {ride.roomNumber}</h3>
+                                            <p className="text-slate-400 text-sm md:text-xs">{ride.guestName}</p>
                                         </div>
-                                        <div className="text-right sm:text-left flex-shrink-0">
-                                            <span className="bg-slate-700 text-slate-300 text-[9px] md:text-[10px] font-bold px-2 py-0.5 rounded">COMPLETED</span>
+                                        <div className="flex-shrink-0">
+                                            <span className="bg-green-600/30 text-green-400 border border-green-500/50 text-xs md:text-[10px] font-bold px-3 md:px-2 py-1.5 md:py-1 rounded-lg">COMPLETED</span>
                                         </div>
                                     </div>
                                     
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 mb-3">
-                                        <div className="min-w-0">
-                                            <div className="text-[9px] md:text-[10px] uppercase text-slate-500">From</div>
-                                            <div className="text-xs md:text-sm text-slate-300 truncate">{ride.pickup}</div>
+                                    {/* Large PU and DO Display - Driver-Friendly */}
+                                    <div className="space-y-3 md:space-y-2 mb-3 md:mb-2">
+                                        {/* PU - Pick Up */}
+                                        <div className="bg-gradient-to-r from-blue-600/30 to-blue-500/20 border-2 border-blue-500/50 p-4 md:p-2.5 rounded-xl">
+                                            <div className="flex items-center gap-3 md:gap-2 mb-2">
+                                                <div className="bg-blue-500 text-white font-bold text-lg md:text-sm px-4 md:px-3 py-2 md:py-1.5 rounded-lg min-w-[60px] md:min-w-[50px] text-center">
+                                                    PU
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-blue-300 text-xs md:text-[10px] font-semibold uppercase tracking-wider mb-1">Pick Up</div>
+                                                    <div className="text-white text-lg md:text-sm font-bold break-words">{ride.pickup}</div>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="min-w-0">
-                                            <div className="text-[9px] md:text-[10px] uppercase text-slate-500">To</div>
-                                            <div className="text-xs md:text-sm text-slate-300 truncate">{ride.destination}</div>
+                                        
+                                        {/* DO - Drop Off */}
+                                        <div className="bg-gradient-to-r from-emerald-600/30 to-emerald-500/20 border-2 border-emerald-500/50 p-4 md:p-2.5 rounded-xl">
+                                            <div className="flex items-center gap-3 md:gap-2 mb-2">
+                                                <div className="bg-emerald-500 text-white font-bold text-lg md:text-sm px-4 md:px-3 py-2 md:py-1.5 rounded-lg min-w-[60px] md:min-w-[50px] text-center">
+                                                    DO
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-emerald-300 text-xs md:text-[10px] font-semibold uppercase tracking-wider mb-1">Drop Off</div>
+                                                    <div className="text-white text-lg md:text-sm font-bold break-words">{ride.destination}</div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="bg-black/20 rounded p-2 text-[9px] md:text-[10px] text-slate-400 flex flex-col sm:flex-row justify-between gap-1 sm:gap-0">
-                                        <span>Req: {formatDateTime(ride.timestamp)}</span>
-                                        <span>Pick: {formatDateTime(ride.pickedUpAt)}</span>
-                                        <span className="text-emerald-500">Drop: {formatDateTime(ride.completedAt)}</span>
+                                    {/* Timeline Info */}
+                                    <div className="bg-black/30 rounded-lg p-3 md:p-2 text-xs md:text-[10px] text-slate-300 flex flex-col sm:flex-row justify-between gap-2 sm:gap-3 md:gap-2 mb-3 md:mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <Clock size={14} className="md:w-3 md:h-3 text-slate-400 flex-shrink-0"/>
+                                            <span><span className="text-slate-400">Req:</span> {formatDateTime(ride.timestamp)}</span>
+                                        </div>
+                                        {ride.pickedUpAt && (
+                                            <div className="flex items-center gap-2">
+                                                <MapPin size={14} className="md:w-3 md:h-3 text-blue-400 flex-shrink-0"/>
+                                                <span><span className="text-slate-400">Pick:</span> {formatDateTime(ride.pickedUpAt)}</span>
+                                            </div>
+                                        )}
+                                        {ride.completedAt && (
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle size={14} className="md:w-3 md:h-3 text-emerald-400 flex-shrink-0"/>
+                                                <span className="text-emerald-400"><span className="text-slate-400">Drop:</span> {formatDateTime(ride.completedAt)}</span>
+                                            </div>
+                                        )}
                                     </div>
 
+                                    {/* Rating */}
                                     {ride.rating && (
-                                        <div className="mt-2 text-[10px] md:text-xs text-yellow-500">
-                                            Rating: {ride.rating}/5 {ride.feedback && ` - "${ride.feedback}"`}
+                                        <div className="mt-3 md:mt-2 pt-3 md:pt-2 border-t border-slate-700">
+                                            <div className="flex items-center gap-2 text-yellow-400 text-sm md:text-xs">
+                                                <span className="font-bold">Rating: {ride.rating}/5</span>
+                                                {ride.feedback && (
+                                                    <span className="text-slate-300 text-xs md:text-[10px]">- "{ride.feedback}"</span>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -448,13 +511,13 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             {!myCurrentRide && viewMode === 'ACTIVE' && (
                 <button 
                     onClick={() => setShowCreateModal(true)}
-                    className="fixed bottom-20 md:bottom-6 right-4 md:right-6 w-14 h-14 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 rounded-full shadow-lg flex items-center justify-center text-slate-900 transition transform hover:scale-105 active:scale-95 z-40"
+                    className="fixed bottom-20 md:bottom-4 right-4 md:right-4 w-14 h-14 md:w-12 md:h-12 bg-emerald-500 rounded-full shadow-lg flex items-center justify-center text-slate-900 z-40"
                     style={{ 
                         bottom: 'max(5rem, calc(5rem + env(safe-area-inset-bottom)))'
                     }}
                     title="Create Ride"
                 >
-                    <Plus size={28} className="md:w-8 md:h-8" />
+                    <Plus size={28} className="md:w-6 md:h-6" />
                 </button>
             )}
 
@@ -464,8 +527,8 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                     <div className="bg-slate-800 rounded-xl md:rounded-xl shadow-2xl w-full max-w-sm border border-slate-600 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-between items-center p-4 border-b border-slate-700 sticky top-0 bg-slate-800 z-10">
                             <h3 className="font-bold text-base md:text-lg">Create New Ride</h3>
-                            <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-white p-1 min-w-[44px] min-h-[44px] flex items-center justify-center">
-                                <X size={20} className="md:w-6 md:h-6" />
+                            <button onClick={() => setShowCreateModal(false)} className="text-slate-400 p-1 min-w-[44px] min-h-[44px] md:min-w-[32px] md:min-h-[32px] flex items-center justify-center">
+                                <X size={20} className="md:w-5 md:h-5" />
                             </button>
                         </div>
                         <div className="p-4 md:p-6 space-y-4">
@@ -510,7 +573,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                             <button 
                                 onClick={handleCreateManualRide}
                                 disabled={!manualRideData.pickup || !manualRideData.destination}
-                                className="w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold py-3.5 md:py-3 rounded-lg transition disabled:opacity-50 mt-4 text-sm md:text-base min-h-[52px]"
+                                className="w-full bg-emerald-600 text-white font-bold py-3.5 md:py-2 rounded-lg disabled:opacity-50 mt-4 text-sm md:text-xs min-h-[52px] md:min-h-[40px]"
                             >
                                 Start Trip
                             </button>

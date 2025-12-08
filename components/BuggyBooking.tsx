@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Clock, Car, Navigation, Star, LocateFixed, XCircle, ChevronUp, ChevronDown } from 'lucide-react';
+import { MapPin, Clock, Car, Navigation, Star, LocateFixed, XCircle, ChevronUp, ChevronDown, Search, Utensils, Coffee, Waves, Building2 } from 'lucide-react';
 import { BuggyStatus, User, RideRequest, Location } from '../types';
 import { getLocations, requestRide, getActiveRideForUser, cancelRide } from '../services/dataService';
 import { THEME_COLORS, RESORT_CENTER } from '../constants';
@@ -20,9 +20,9 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoadingRide, setIsLoadingRide] = useState(true);
   const [elapsedTime, setElapsedTime] = useState<number>(0); // Time elapsed in seconds
-  const [isBookingFormVisible, setIsBookingFormVisible] = useState(true); // Toggle for booking form
   const [isStatusCardVisible, setIsStatusCardVisible] = useState(true); // Toggle for status card
-  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const [searchQuery, setSearchQuery] = useState<string>(''); // Search query for locations
+  const [filterType, setFilterType] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('ALL'); // Filter by location type
   
   const MAX_WAIT_TIME = 10 * 60; // 10 minutes in seconds
   
@@ -95,11 +95,10 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   }, [activeRide]);
 
 
-  // Handler to set destination and show form
+  // Handler to set destination
   const handleSetDestination = (dest: string) => {
     if (!activeRide) {
       setDestination(dest);
-      setIsBookingFormVisible(true); // Auto-show form when destination is selected
     }
   };
 
@@ -146,17 +145,27 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       }
   };
 
-  // Sort locations alphabetically for fixed grid display
-  const sortedLocations = [...locations].sort((a, b) => {
-    // Remove duplicates by name
-    if (a.name === b.name) return 0;
-    return a.name.localeCompare(b.name);
-  }).filter((loc, index, self) => 
-    index === self.findIndex(l => l.name === loc.name)
-  );
-
   // Use activeRide destination if available, otherwise use selected destination
   const destinationToShow = activeRide?.destination || destination;
+
+  // Filter and search locations
+  const filteredLocations = locations.filter(loc => {
+    const matchesSearch = !searchQuery || loc.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFilter = filterType === 'ALL' || loc.type === filterType;
+    return matchesSearch && matchesFilter;
+  }).sort((a, b) => a.name.localeCompare(b.name));
+
+  // Get facilities for quick actions
+  const facilities = locations.filter(loc => loc.type === 'FACILITY' || loc.type === 'RESTAURANT');
+  const restaurants = facilities.filter(loc => loc.type === 'RESTAURANT');
+  const pools = facilities.filter(loc => loc.name.toLowerCase().includes('pool'));
+  const bars = facilities.filter(loc => loc.name.toLowerCase().includes('bar') || loc.name.toLowerCase().includes('lounge'));
+  const otherFacilities = facilities.filter(f => 
+    !f.name.toLowerCase().includes('pool') && 
+    !f.name.toLowerCase().includes('bar') && 
+    !f.name.toLowerCase().includes('lounge') &&
+    f.type === 'FACILITY'
+  );
 
 
   // Determine if ride can be cancelled
@@ -184,97 +193,6 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         <h2 className="text-lg font-serif">{t('buggy_service')}</h2>
       </div>
 
-      {/* Fixed Grid Layout for Locations */}
-      <div 
-        ref={mapContainerRef} 
-        className="relative flex-1 bg-emerald-50 overflow-auto shadow-inner z-0 p-4"
-      >
-        {/* User Location Card */}
-        <div className="mb-4 p-3 bg-red-50 border-2 border-red-200 rounded-lg shadow-sm">
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse"></div>
-            <span className="text-sm font-semibold text-gray-800">You (Villa {user.roomNumber})</span>
-          </div>
-        </div>
-
-        {/* Locations Grid */}
-        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-          {sortedLocations.map((loc) => {
-            const isSelected = destinationToShow === loc.name;
-            return (
-              <button
-                key={loc.id || loc.name}
-                onClick={() => handleSetDestination(loc.name)}
-                className={`p-2 md:p-2.5 rounded-md border transition-all duration-200 text-left min-h-[60px] md:min-h-[70px] flex items-start ${
-                  isSelected
-                    ? 'bg-amber-100 border-amber-500 shadow-md scale-105'
-                    : 'bg-white border-gray-200 hover:border-emerald-400 hover:shadow-sm'
-                }`}
-              >
-                <div className="flex items-start space-x-1.5 w-full">
-                  <MapPin className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 mt-0.5 ${
-                    isSelected ? 'text-amber-600 fill-amber-600' : 'text-emerald-600'
-                  }`} />
-                  <span className={`text-xs md:text-sm font-medium break-words leading-relaxed flex-1 ${
-                    isSelected ? 'text-amber-900' : 'text-gray-700'
-                  }`}>
-                    {loc.name}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Selected Route Info */}
-        {destinationToShow && (
-          <div className="mt-4 p-3 bg-white border border-emerald-200 rounded-lg shadow-sm">
-            <div className="flex items-center space-x-2 text-sm">
-              <div className="flex flex-col items-center space-y-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                <div className="w-[1px] h-4 bg-gray-300"></div>
-                <div className="w-2 h-2 bg-emerald-600 rounded-full"></div>
-              </div>
-              <div className="flex-1">
-                <div className="text-xs text-gray-500">From</div>
-                <div className="font-medium text-gray-700">{pickup}</div>
-                <div className="text-xs text-gray-500 mt-2">To</div>
-                <div className="font-semibold text-emerald-700">{destinationToShow}</div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Toggle Booking Form Button - Outside map container, always visible */}
-      {!activeRide && !isLoadingRide && (
-        <div 
-          className="fixed left-4 z-[100] pointer-events-none" 
-          style={{ 
-            bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))',
-            paddingBottom: '0'
-          }}
-        >
-          <button
-            onClick={() => setIsBookingFormVisible(!isBookingFormVisible)}
-            className="bg-white p-3 rounded-full shadow-xl hover:bg-gray-50 active:bg-gray-100 transition-colors border-2 border-emerald-300 flex items-center justify-center pointer-events-auto"
-            title={isBookingFormVisible ? "Hide booking form" : "Show booking form"}
-            style={{
-              transform: 'translateZ(0)',
-              WebkitTransform: 'translateZ(0)',
-              willChange: 'transform',
-              minWidth: '44px',
-              minHeight: '44px'
-            }}
-          >
-            {isBookingFormVisible ? (
-              <ChevronDown className="w-5 h-5 text-emerald-700" />
-            ) : (
-              <ChevronUp className="w-5 h-5 text-emerald-700" />
-            )}
-          </button>
-        </div>
-      )}
 
 
       {/* Status card section - Separate section below map */}
@@ -355,12 +273,12 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                   >
                     <XCircle size={16} className="md:w-[18px] md:h-[18px] flex-shrink-0" />
                     <span className="text-center break-words leading-tight">
-                      {activeRide.status === BuggyStatus.SEARCHING 
-                          ? t('cancel_request') 
-                          : elapsedTime >= MAX_WAIT_TIME 
-                              ? `${t('cancel_ride')} (Over 10 min)`
-                              : t('cancel_ride')
-                      }
+                    {activeRide.status === BuggyStatus.SEARCHING 
+                        ? t('cancel_request') 
+                        : elapsedTime >= MAX_WAIT_TIME 
+                            ? `${t('cancel_ride')} (Over 10 min)`
+                            : t('cancel_ride')
+                    }
                     </span>
                   </button>
               )}
@@ -394,78 +312,199 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         </div>
       )}
 
-      {/* Booking Form (Only show if Idle and not loading) */}
+      {/* Booking Form - Fixed, always visible when idle */}
       {!activeRide && !isLoadingRide && (
         <div 
-          className={`bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-20 transition-all duration-300 ease-in-out overflow-hidden ${
-            isBookingFormVisible 
-              ? 'p-4 pb-24 md:pb-4 max-h-[500px] opacity-100' 
-              : 'p-0 max-h-0 opacity-0'
-          }`}
+          className="bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] mt-2 relative z-10 p-3 pb-20 md:pb-3 flex-shrink-0 flex flex-col max-h-[80vh] overflow-hidden"
         >
-            <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-base font-bold text-gray-800">{t('where_to')}</h3>
-                    <button
-                        onClick={() => setIsBookingFormVisible(false)}
-                        className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-                        title="Hide form"
-                    >
-                        <ChevronDown className="w-5 h-5" />
-                    </button>
-                </div>
+            <div className="space-y-2 flex-shrink-0">
+                <h3 className="text-sm md:text-base font-bold text-gray-800">{t('where_to')}</h3>
             
-            <div className="space-y-2">
                 <div className="relative">
-                    <LocateFixed className="absolute left-2 top-2 text-emerald-600 w-4 h-4" />
+                    <LocateFixed className="absolute left-2 top-2 text-emerald-600 w-3 h-3 md:w-4 md:h-4" />
                     <input 
                         type="text" 
                         value={pickup}
                         readOnly
-                        className="w-full pl-8 pr-3 py-2 text-sm bg-emerald-50 border border-emerald-100 rounded-lg text-gray-700 font-medium focus:outline-none"
+                        className="w-full pl-7 md:pl-8 pr-3 py-1.5 md:py-2 text-xs md:text-sm bg-emerald-50 border border-emerald-100 rounded-lg text-gray-700 font-medium focus:outline-none"
                     />
                 </div>
-                <div className="relative">
-                    <Navigation className="absolute left-2 top-2 text-amber-500 w-4 h-4" />
-                    <select 
-                        value={destination}
-                            onChange={(e) => {
-                              handleSetDestination(e.target.value);
-                            }}
-                        className="w-full pl-8 pr-3 py-2 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 appearance-none text-gray-700"
-                    >
-                        <option value="" disabled>{t('select_dest')}</option>
-                        {locations.map((loc) => (
-                            <option key={loc.name} value={loc.name}>{loc.name}</option>
-                        ))}
-                    </select>
-                </div>
-            </div>
 
-            <button 
-                onClick={handleBook}
-                disabled={!destination}
-                className={`w-full mt-3 py-2.5 rounded-lg font-bold text-base shadow-lg transition transform active:scale-95 flex items-center justify-center space-x-2
-                    ${destination ? 'bg-emerald-800 text-white hover:bg-emerald-900' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
-                `}
-            >
-                <Car className="w-5 h-5" />
-                <span>{t('request_buggy')}</span>
+                {/* Search Bar */}
+                <div className="relative">
+                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3 md:w-4 md:h-4" />
+                    <input
+                        type="text"
+                        placeholder={t('search_locations') || "Search locations..."}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-7 md:pl-8 pr-3 py-1.5 md:py-2 text-xs md:text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                </div>
+
+                {/* Filter Buttons */}
+                <div className="flex flex-wrap gap-1.5">
+                    <button
+                        onClick={() => setFilterType('ALL')}
+                        className={`px-2 py-1 text-[10px] md:text-xs font-medium rounded-md transition-colors ${
+                            filterType === 'ALL'
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                    >
+                        All
+                    </button>
+                    <button
+                        onClick={() => setFilterType('VILLA')}
+                        className={`px-2 py-1 text-[10px] md:text-xs font-medium rounded-md transition-colors ${
+                            filterType === 'VILLA'
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                    >
+                        Villas
+                    </button>
+                    <button
+                        onClick={() => setFilterType('FACILITY')}
+                        className={`px-2 py-1 text-[10px] md:text-xs font-medium rounded-md transition-colors ${
+                            filterType === 'FACILITY'
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                    >
+                        Facilities
+                    </button>
+                    <button
+                        onClick={() => setFilterType('RESTAURANT')}
+                        className={`px-2 py-1 text-[10px] md:text-xs font-medium rounded-md transition-colors ${
+                            filterType === 'RESTAURANT'
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                    >
+                        Restaurants
+                    </button>
+                </div>
+
+                {/* Quick Actions */}
+                {(restaurants.length > 0 || pools.length > 0 || bars.length > 0 || otherFacilities.length > 0) && (
+                    <div className="space-y-1.5">
+                        <div className="text-[10px] font-semibold text-gray-600 uppercase">Quick Actions</div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
+                            {restaurants.length > 0 && (
+                                <button
+                                    onClick={() => {
+                                        setFilterType('RESTAURANT');
+                                        setSearchQuery('');
+                                    }}
+                                    className="flex items-center space-x-1.5 p-1.5 bg-orange-50 border border-orange-200 rounded-md hover:bg-orange-100 transition-colors"
+                                >
+                                    <Utensils className="w-3 h-3 md:w-4 md:h-4 text-orange-600 flex-shrink-0" />
+                                    <span className="text-[10px] md:text-xs font-medium text-orange-900">Restaurants</span>
+                                </button>
+                            )}
+                            {bars.length > 0 && (
+                                <button
+                                    onClick={() => {
+                                        setFilterType('FACILITY');
+                                        setSearchQuery('bar');
+                                    }}
+                                    className="flex items-center space-x-1.5 p-1.5 bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors"
+                                >
+                                    <Coffee className="w-3 h-3 md:w-4 md:h-4 text-purple-600 flex-shrink-0" />
+                                    <span className="text-[10px] md:text-xs font-medium text-purple-900">Bars</span>
+                                </button>
+                            )}
+                            {pools.length > 0 && (
+                                <button
+                                    onClick={() => {
+                                        setFilterType('FACILITY');
+                                        setSearchQuery('pool');
+                                    }}
+                                    className="flex items-center space-x-1.5 p-1.5 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+                                >
+                                    <Waves className="w-3 h-3 md:w-4 md:h-4 text-blue-600 flex-shrink-0" />
+                                    <span className="text-[10px] md:text-xs font-medium text-blue-900">Pools</span>
+                                </button>
+                            )}
+                            {otherFacilities.length > 0 && (
+                                <button
+                                    onClick={() => {
+                                        setFilterType('FACILITY');
+                                        setSearchQuery('');
+                                    }}
+                                    className="flex items-center space-x-1.5 p-1.5 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100 transition-colors"
+                                >
+                                    <Building2 className="w-3 h-3 md:w-4 md:h-4 text-emerald-600 flex-shrink-0" />
+                                    <span className="text-[10px] md:text-xs font-medium text-emerald-900">Facilities</span>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Filtered Locations List */}
+                <div className="space-y-1.5 flex-1 min-h-0 flex flex-col">
+                    <div className="text-[10px] font-semibold text-gray-600 uppercase flex-shrink-0">
+                        {filteredLocations.length} {filterType === 'ALL' ? 'Locations' : filterType.toLowerCase()}
+                    </div>
+                    <div className="flex-1 overflow-y-auto space-y-1 min-h-0 max-h-[200px]">
+                        {filteredLocations.map((loc) => (
+                            <button
+                                key={loc.id || loc.name}
+                                onClick={() => handleSetDestination(loc.name)}
+                                className={`w-full text-left p-1.5 md:p-2 rounded-md border transition-colors ${
+                                    destinationToShow === loc.name
+                                        ? 'bg-amber-50 border-amber-300'
+                                        : 'bg-white border-gray-200 hover:border-emerald-400 hover:bg-emerald-50'
+                                }`}
+                            >
+                                <div className="flex items-center space-x-1.5">
+                                    <MapPin className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 ${
+                                        destinationToShow === loc.name ? 'text-amber-600' : 'text-emerald-600'
+                                    }`} />
+                                    <span className={`text-xs md:text-sm font-medium ${
+                                        destinationToShow === loc.name ? 'text-amber-900' : 'text-gray-700'
+                                    }`}>
+                                        {loc.name}
+                                    </span>
+                                    {loc.type && (
+                                        <span className="ml-auto text-[10px] text-gray-500 capitalize">
+                                            {loc.type.toLowerCase()}
+                                        </span>
+                                    )}
+                                </div>
+                            </button>
+                        ))}
+                        {filteredLocations.length === 0 && (
+                            <div className="text-center py-3 text-xs text-gray-500">
+                                No locations found
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Selected Destination Display */}
+                {destination && (
+                    <div className="relative flex-shrink-0">
+                        <Navigation className="absolute left-2 top-2 text-amber-500 w-3 h-3 md:w-4 md:h-4" />
+                        <div className="w-full pl-7 md:pl-8 pr-3 py-1.5 md:py-2 text-xs md:text-sm bg-amber-50 border border-amber-200 rounded-lg text-gray-700 font-medium">
+                            {destination}
+                        </div>
+                    </div>
+                )}
+
+                <button 
+                    onClick={handleBook}
+                    disabled={!destination}
+                    className={`w-full mt-2 py-2 md:py-2.5 rounded-lg font-bold text-sm md:text-base shadow-lg transition transform active:scale-95 flex items-center justify-center space-x-2 flex-shrink-0
+                        ${destination ? 'bg-emerald-800 text-white hover:bg-emerald-900' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
+                    `}
+                >
+                    <Car className="w-4 h-4 md:w-5 md:h-5" />
+                    <span>{t('request_buggy')}</span>
                 </button>
             </div>
-        </div>
-      )}
-
-      {/* Show Booking Form Button - When form is hidden */}
-      {!activeRide && !isLoadingRide && !isBookingFormVisible && (
-        <div className="bg-white p-3 pb-24 md:pb-3 rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-20 flex items-center justify-center">
-            <button
-                onClick={() => setIsBookingFormVisible(true)}
-                className="flex items-center space-x-2 text-emerald-600 hover:text-emerald-700 font-semibold text-sm transition-colors"
-            >
-                <ChevronUp className="w-5 h-5" />
-                <span>{t('where_to')}</span>
-            </button>
         </div>
       )}
 
