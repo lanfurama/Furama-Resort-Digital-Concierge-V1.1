@@ -126,15 +126,15 @@ export const promotionModel = {
         matchValues.push(currentPromo.valid_until);
       } else {
         matchConditions.push(`(valid_until IS NULL OR valid_until = '')`);
-      }
-      
+    }
+
       if (currentPromo.image_color !== null && currentPromo.image_color !== undefined) {
         matchConditions.push(`image_color = $${matchParamCount++}`);
         matchValues.push(currentPromo.image_color);
       } else {
         matchConditions.push(`(image_color IS NULL OR image_color = '')`);
-      }
-      
+    }
+
       if (currentPromo.image_url !== null && currentPromo.image_url !== undefined) {
         matchConditions.push(`image_url = $${matchParamCount++}`);
         matchValues.push(currentPromo.image_url);

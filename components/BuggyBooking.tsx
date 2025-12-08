@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Clock, Car, Navigation, Star, LocateFixed, XCircle, ZoomIn, ZoomOut, ChevronUp, ChevronDown } from 'lucide-react';
+import { MapPin, Clock, Car, Navigation, Star, LocateFixed, XCircle, ChevronUp, ChevronDown } from 'lucide-react';
 import { BuggyStatus, User, RideRequest, Location } from '../types';
 import { getLocations, requestRide, getActiveRideForUser, cancelRide } from '../services/dataService';
 import { THEME_COLORS, RESORT_CENTER } from '../constants';
@@ -22,43 +22,15 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [elapsedTime, setElapsedTime] = useState<number>(0); // Time elapsed in seconds
   const [isBookingFormVisible, setIsBookingFormVisible] = useState(true); // Toggle for booking form
   const [isStatusCardVisible, setIsStatusCardVisible] = useState(true); // Toggle for status card
-  const userLocationRef = useRef<HTMLDivElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInnerRef = useRef<HTMLDivElement>(null);
-  
-  // Map pan and zoom state
-  const [mapState, setMapState] = useState({
-    scale: 1,
-    translateX: 0,
-    translateY: 0,
-    isDragging: false,
-    dragStart: { x: 0, y: 0 }
-  });
-  
-  // Refs for smooth dragging (avoid re-renders during drag)
-  const dragStateRef = useRef({
-    isDragging: false,
-    dragStart: { x: 0, y: 0 },
-    translateX: 0,
-    translateY: 0,
-    scale: 1
-  });
-  
-  const animationFrameRef = useRef<number | null>(null);
   
   const MAX_WAIT_TIME = 10 * 60; // 10 minutes in seconds
-  const MIN_ZOOM = 0.5;
-  const MAX_ZOOM = 3;
-  const ZOOM_STEP = 0.2;
   
   // Load locations on mount
   useEffect(() => {
     getLocations().then(setLocations).catch(console.error);
   }, []);
 
-  // Mock User Location (Fixed for demo purposes relative to center)
-  const userLat = RESORT_CENTER.lat - 0.0005; 
-  const userLng = RESORT_CENTER.lng - 0.0005;
 
   // Load active ride on mount and polling for ride updates
   useEffect(() => {
@@ -174,318 +146,18 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       }
   };
 
-  // Helper to project Lat/Lng to % for the map container
-  // Bounding box covering all villas in Furama Resort Danang
-  // Based on actual villa coordinates: 
-  // - Lat range: 16.0490 (Q-series) to 16.0569 (P07)
-  // - Lng range: 108.1865 (Q-series) to 108.2025 (P01)
-  const mapBounds = {
-      minLat: 16.0480,  // Slightly below Q-series (16.0490)
-      maxLat: 16.0580,  // Slightly above P-series (16.0569)
-      minLng: 108.1850, // Slightly below Q-series (108.1865)
-      maxLng: 108.2035  // Slightly above P-series (108.2025)
-  };
+  // Sort locations alphabetically for fixed grid display
+  const sortedLocations = [...locations].sort((a, b) => {
+    // Remove duplicates by name
+    if (a.name === b.name) return 0;
+    return a.name.localeCompare(b.name);
+  }).filter((loc, index, self) => 
+    index === self.findIndex(l => l.name === loc.name)
+  );
 
-  const getPos = (lat: number, lng: number) => {
-      const y = ((mapBounds.maxLat - lat) / (mapBounds.maxLat - mapBounds.minLat)) * 100;
-      const x = ((lng - mapBounds.minLng) / (mapBounds.maxLng - mapBounds.minLng)) * 100;
-      // Remove clamping to allow full range, but keep within 0-100%
-      return { 
-        top: `${Math.max(0, Math.min(100, y))}%`, 
-        left: `${Math.max(0, Math.min(100, x))}%` 
-      };
-  };
-
-  const userPos = getPos(userLat, userLng);
   // Use activeRide destination if available, otherwise use selected destination
   const destinationToShow = activeRide?.destination || destination;
-  const selectedLocation = locations.find(l => l.name === destinationToShow);
-  const destPos = selectedLocation ? getPos(selectedLocation.lat, selectedLocation.lng) : null;
 
-  // Calculate distance and estimated time
-  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-    const R = 6371e3; // Earth's radius in meters
-    const φ1 = lat1 * Math.PI / 180;
-    const φ2 = lat2 * Math.PI / 180;
-    const Δφ = (lat2 - lat1) * Math.PI / 180;
-    const Δλ = (lng2 - lng1) * Math.PI / 180;
-
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-    return R * c; // Distance in meters
-  };
-
-  const formatDistance = (meters: number): string => {
-    if (meters < 1000) {
-      return `${Math.round(meters)}m`;
-    }
-    return `${(meters / 1000).toFixed(1)}km`;
-  };
-
-  const calculateEstimatedTime = (distanceMeters: number): number => {
-    // Buggy average speed in resort: ~15 km/h = 4.17 m/s
-    // Add some buffer for stops, turns, etc.
-    const averageSpeedMps = 3.5; // meters per second (conservative estimate)
-    const timeSeconds = distanceMeters / averageSpeedMps;
-    return Math.ceil(timeSeconds / 60); // Convert to minutes and round up
-  };
-
-  const distanceInfo = selectedLocation ? (() => {
-    const distance = calculateDistance(userLat, userLng, selectedLocation.lat, selectedLocation.lng);
-    const estimatedTime = calculateEstimatedTime(distance);
-    return { distance, estimatedTime };
-  })() : null;
-
-  // Zoom functions
-  const handleZoomIn = useCallback(() => {
-    setMapState(prev => {
-      const newScale = Math.min(prev.scale + ZOOM_STEP, MAX_ZOOM);
-      dragStateRef.current.scale = newScale;
-      return {
-        ...prev,
-        scale: newScale
-      };
-    });
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    setMapState(prev => {
-      const newScale = Math.max(prev.scale - ZOOM_STEP, MIN_ZOOM);
-      dragStateRef.current.scale = newScale;
-      return {
-        ...prev,
-        scale: newScale
-      };
-    });
-  }, []);
-
-  // Locate user function - centers map on user location and resets zoom
-  const handleLocateMe = useCallback(() => {
-    dragStateRef.current = {
-      scale: 1,
-      translateX: 0,
-      translateY: 0,
-      isDragging: false,
-      dragStart: { x: 0, y: 0 }
-    };
-    
-    setMapState({
-      scale: 1,
-      translateX: 0,
-      translateY: 0,
-      isDragging: false,
-      dragStart: { x: 0, y: 0 }
-    });
-    
-    // Scroll to user location after a brief delay
-    setTimeout(() => {
-      if (userLocationRef.current && mapContainerRef.current) {
-        const container = mapContainerRef.current;
-        const userElement = userLocationRef.current;
-        
-        const containerRect = container.getBoundingClientRect();
-        const userRect = userElement.getBoundingClientRect();
-        
-        // Calculate scroll position to center user location
-        const scrollLeft = userRect.left - containerRect.left + container.scrollLeft - containerRect.width / 2;
-        const scrollTop = userRect.top - containerRect.top + container.scrollTop - containerRect.height / 2;
-        
-        container.scrollTo({
-          left: scrollLeft,
-          top: scrollTop,
-          behavior: 'smooth'
-        });
-      }
-    }, 100);
-  }, []);
-
-  // Pan/Drag handlers
-  // Update transform directly for smooth dragging
-  const updateTransform = useCallback(() => {
-    if (!mapInnerRef.current) return;
-    const { translateX, translateY, scale } = dragStateRef.current;
-    mapInnerRef.current.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
-  }, []);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return; // Only left mouse button
-    // Don't drag if clicking on a button or interactive element
-    const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('select') || target.closest('input')) return;
-    
-    const { translateX, translateY, scale } = mapState;
-    dragStateRef.current = {
-      isDragging: true,
-      dragStart: { 
-        x: e.clientX - translateX * scale, 
-        y: e.clientY - translateY * scale 
-      },
-      translateX,
-      translateY,
-      scale
-    };
-    
-    setMapState(prev => ({
-      ...prev,
-      isDragging: true,
-      dragStart: { 
-        x: e.clientX - prev.translateX * prev.scale, 
-        y: e.clientY - prev.translateY * prev.scale 
-      }
-    }));
-    
-    e.preventDefault();
-  }, [mapState]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragStateRef.current.isDragging) return;
-    
-    const { dragStart, scale } = dragStateRef.current;
-    const newTranslateX = (e.clientX - dragStart.x) / scale;
-    const newTranslateY = (e.clientY - dragStart.y) / scale;
-    
-    dragStateRef.current.translateX = newTranslateX;
-    dragStateRef.current.translateY = newTranslateY;
-    
-    // Use requestAnimationFrame for smooth updates
-    if (animationFrameRef.current === null) {
-      animationFrameRef.current = requestAnimationFrame(() => {
-        updateTransform();
-        // Sync with state after animation frame
-        setMapState(prev => ({
-          ...prev,
-          translateX: dragStateRef.current.translateX,
-          translateY: dragStateRef.current.translateY
-        }));
-        animationFrameRef.current = null;
-      });
-    }
-    
-    e.preventDefault();
-  }, [updateTransform]);
-
-  const handleMouseUp = useCallback(() => {
-    if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    dragStateRef.current.isDragging = false;
-    setMapState(prev => ({ ...prev, isDragging: false }));
-  }, []);
-
-  // Touch handlers for mobile
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      const target = e.target as HTMLElement;
-      if (target.closest('button') || target.closest('select') || target.closest('input')) return;
-      
-      const touch = e.touches[0];
-      const { translateX, translateY, scale } = mapState;
-      dragStateRef.current = {
-        isDragging: true,
-        dragStart: { 
-          x: touch.clientX - translateX * scale, 
-          y: touch.clientY - translateY * scale 
-        },
-        translateX,
-        translateY,
-        scale
-      };
-      
-      setMapState(prev => ({
-        ...prev,
-        isDragging: true,
-        dragStart: { 
-          x: touch.clientX - prev.translateX * prev.scale, 
-          y: touch.clientY - prev.translateY * prev.scale 
-        }
-      }));
-    }
-  }, [mapState]);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!dragStateRef.current.isDragging || e.touches.length !== 1) return;
-    const touch = e.touches[0];
-    
-    const { dragStart, scale } = dragStateRef.current;
-    const newTranslateX = (touch.clientX - dragStart.x) / scale;
-    const newTranslateY = (touch.clientY - dragStart.y) / scale;
-    
-    dragStateRef.current.translateX = newTranslateX;
-    dragStateRef.current.translateY = newTranslateY;
-    
-    // Use requestAnimationFrame for smooth updates
-    if (animationFrameRef.current === null) {
-      animationFrameRef.current = requestAnimationFrame(() => {
-        updateTransform();
-        // Sync with state after animation frame
-        setMapState(prev => ({
-          ...prev,
-          translateX: dragStateRef.current.translateX,
-          translateY: dragStateRef.current.translateY
-        }));
-        animationFrameRef.current = null;
-      });
-    }
-    
-    e.preventDefault();
-  }, [updateTransform]);
-
-  const handleTouchEnd = useCallback(() => {
-    if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    dragStateRef.current.isDragging = false;
-    setMapState(prev => ({ ...prev, isDragging: false }));
-  }, []);
-
-  // Wheel zoom with smooth animation
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
-    setMapState(prev => {
-      const newScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, prev.scale + delta));
-      dragStateRef.current.scale = newScale;
-      return {
-        ...prev,
-        scale: newScale
-      };
-    });
-  }, []);
-
-  // Sync dragStateRef with mapState (especially for zoom changes)
-  useEffect(() => {
-    dragStateRef.current.scale = mapState.scale;
-    dragStateRef.current.translateX = mapState.translateX;
-    dragStateRef.current.translateY = mapState.translateY;
-    
-    // Update transform when not dragging (for zoom, locate, etc.)
-    if (!mapState.isDragging && mapInnerRef.current) {
-      mapInnerRef.current.style.transform = `translate3d(${mapState.translateX}px, ${mapState.translateY}px, 0) scale(${mapState.scale})`;
-    }
-  }, [mapState.scale, mapState.translateX, mapState.translateY, mapState.isDragging]);
-
-  // Cleanup animation frame on unmount
-  useEffect(() => {
-    return () => {
-      if (animationFrameRef.current !== null) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, []);
-
-  // Auto-center on user location on mount
-  useEffect(() => {
-      if (!isLoadingRide) {
-          setTimeout(() => {
-              handleLocateMe();
-          }, 200);
-      }
-  }, [isLoadingRide, handleLocateMe]);
 
   // Determine if ride can be cancelled
   // Can cancel if: searching OR (assigned/arriving AND elapsed time > 10 minutes)
@@ -503,33 +175,6 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
   return (
     <div className="flex flex-col h-full bg-gray-50 relative z-0">
-      {/* Hide scrollbar styles and disable pinch zoom */}
-      <style>{`
-        .map-container::-webkit-scrollbar {
-          display: none;
-        }
-        .map-container {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-          touch-action: pan-x pan-y;
-        }
-        /* Disable double-tap zoom */
-        * {
-          touch-action: manipulation;
-        }
-        /* Prevent pinch zoom on map */
-        .map-container * {
-          touch-action: pan-x pan-y;
-        }
-        /* Allow text selection in inputs and textareas */
-        input, textarea, select {
-          touch-action: auto;
-          -webkit-user-select: text;
-          -moz-user-select: text;
-          -ms-user-select: text;
-          user-select: text;
-        }
-      `}</style>
       
       {/* Header */}
       <div className={`p-2.5 text-white shadow-md ${THEME_COLORS.primary} flex items-center flex-shrink-0 relative z-0`}>
@@ -539,152 +184,66 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         <h2 className="text-lg font-serif">{t('buggy_service')}</h2>
       </div>
 
-      {/* Interactive Map - Draggable and Zoomable */}
+      {/* Fixed Grid Layout for Locations */}
       <div 
         ref={mapContainerRef} 
-        className="relative flex-1 bg-emerald-50 overflow-auto shadow-inner z-0 map-container"
-        style={{ 
-          cursor: mapState.isDragging ? 'grabbing' : 'default'
-        }}
-        onWheel={handleWheel}
+        className="relative flex-1 bg-emerald-50 overflow-auto shadow-inner z-0 p-4"
       >
-        {/* Map Container - Transformable */}
-        <div
-          ref={mapInnerRef}
-          className="relative z-0 origin-top-left"
-          style={{
-            minHeight: `${600 * mapState.scale}px`,
-            minWidth: `${100 * mapState.scale}%`,
-            transform: `translate3d(${mapState.translateX}px, ${mapState.translateY}px, 0) scale(${mapState.scale})`,
-            transition: mapState.isDragging ? 'none' : 'transform 0.05s ease-out',
-            willChange: 'transform',
-            touchAction: 'none',
-            backfaceVisibility: 'hidden',
-            WebkitBackfaceVisibility: 'hidden',
-            perspective: '1000px',
-            WebkitPerspective: '1000px'
-          }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-
-          {/* User Location Pin - Always visible with high z-index */}
-          <div 
-              ref={userLocationRef}
-              className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center group"
-              style={{ top: userPos.top, left: userPos.left }}
-          >
-              <div className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg mb-1 whitespace-nowrap relative z-10">
-                  You (Villa {user.roomNumber})
-              </div>
-              <div className="w-5 h-5 bg-red-600 rounded-full border-3 border-white shadow-xl animate-pulse relative z-10"></div>
-              <div className="w-10 h-10 bg-red-600/30 rounded-full absolute top-6 animate-ping z-0 pointer-events-none"></div>
+        {/* User Location Card */}
+        <div className="mb-4 p-3 bg-red-50 border-2 border-red-200 rounded-lg shadow-sm">
+          <div className="flex items-center space-x-2">
+            <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse"></div>
+            <span className="text-sm font-semibold text-gray-800">You (Villa {user.roomNumber})</span>
           </div>
+        </div>
 
-          {/* Resort Locations Pins */}
-          {locations
-              .filter((loc, index, self) => 
-                  // Remove duplicates: keep first occurrence by name
-                  index === self.findIndex(l => l.name === loc.name)
-              )
-              .map((loc, index) => {
-              const pos = getPos(loc.lat, loc.lng);
-              const isSelected = destinationToShow === loc.name;
-              return (
-                  <button
-                      key={loc.id || `${loc.name}-${index}`}
-                      onClick={() => handleSetDestination(loc.name)}
-                      className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center transition-all duration-300 ${isSelected ? 'scale-110 z-15' : 'hover:scale-110 opacity-80 hover:opacity-100'}`}
-                      style={{ top: pos.top, left: pos.left }}
-                  >
-                      <div className={`text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm mb-1 whitespace-nowrap transition-colors ${isSelected ? 'bg-amber-500 text-white' : 'bg-white text-gray-600'}`}>
-                          {loc.name}
-                      </div>
-                      <MapPin 
-                          className={`w-6 h-6 drop-shadow-md transition-colors ${isSelected ? 'text-amber-500 fill-amber-500' : 'text-emerald-800 fill-white'}`} 
-                      />
-                  </button>
-              );
+        {/* Locations Grid */}
+        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+          {sortedLocations.map((loc) => {
+            const isSelected = destinationToShow === loc.name;
+            return (
+              <button
+                key={loc.id || loc.name}
+                onClick={() => handleSetDestination(loc.name)}
+                className={`p-2 md:p-2.5 rounded-md border transition-all duration-200 text-left min-h-[60px] md:min-h-[70px] flex items-start ${
+                  isSelected
+                    ? 'bg-amber-100 border-amber-500 shadow-md scale-105'
+                    : 'bg-white border-gray-200 hover:border-emerald-400 hover:shadow-sm'
+                }`}
+              >
+                <div className="flex items-start space-x-1.5 w-full">
+                  <MapPin className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 mt-0.5 ${
+                    isSelected ? 'text-amber-600 fill-amber-600' : 'text-emerald-600'
+                  }`} />
+                  <span className={`text-xs md:text-sm font-medium break-words leading-relaxed flex-1 ${
+                    isSelected ? 'text-amber-900' : 'text-gray-700'
+                  }`}>
+                    {loc.name}
+                  </span>
+                </div>
+              </button>
+            );
           })}
-
-          {/* Route Line (Only if destination selected) */}
-          {destPos && (
-               <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" style={{ minHeight: '600px', width: '100%' }}>
-                  <line 
-                      x1={userPos.left} 
-                      y1={userPos.top} 
-                      x2={destPos.left} 
-                      y2={destPos.top} 
-                      stroke={activeRide ? "#10b981" : "#e11d48"} 
-                      strokeWidth="3" 
-                      strokeDasharray="6"
-                      className={activeRide ? "animate-[dash_1s_linear_infinite]" : ""}
-                  />
-                   {/* Styles for svg animation */}
-                  <style>{`
-                      @keyframes dash {
-                          to {
-                              stroke-dashoffset: -12;
-                          }
-                      }
-                  `}</style>
-               </svg>
-          )}
-
-          {/* Moving Buggy Animation (If active) */}
-          {activeRide && activeRide.status !== BuggyStatus.SEARCHING && destPos && (
-               <div 
-                  className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10 transition-all duration-[3000ms] ease-linear"
-                  style={{ 
-                      top: activeRide.status === BuggyStatus.ON_TRIP ? destPos.top : userPos.top,
-                      left: activeRide.status === BuggyStatus.ON_TRIP ? destPos.left : userPos.left,
-                  }}
-               >
-                   <div className="bg-white p-1.5 rounded-full shadow-xl border border-gray-200">
-                       <Car className="text-emerald-600 w-5 h-5 fill-current" />
-                   </div>
-               </div>
-          )}
         </div>
 
-        {/* Map Controls - Zoom and Locate buttons */}
-        <div className="absolute bottom-24 md:bottom-20 right-4 z-50 flex flex-col gap-2 pointer-events-none">
-          <div className="flex flex-col gap-2 pointer-events-auto">
-            {/* Locate Me Button */}
-            <button
-              onClick={handleLocateMe}
-              className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200"
-              title="Locate Me"
-            >
-              <LocateFixed className="w-5 h-5 text-emerald-600" />
-            </button>
-            
-            {/* Zoom In Button */}
-            <button
-              onClick={handleZoomIn}
-              disabled={mapState.scale >= MAX_ZOOM}
-              className="bg-white p-3 rounded-t-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Zoom In"
-            >
-              <ZoomIn className="w-5 h-5 text-gray-700" />
-            </button>
-            
-            {/* Zoom Out Button */}
-            <button
-              onClick={handleZoomOut}
-              disabled={mapState.scale <= MIN_ZOOM}
-              className="bg-white p-3 rounded-b-full shadow-lg hover:bg-gray-50 transition-colors border border-gray-200 border-t-0 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Zoom Out"
-            >
-              <ZoomOut className="w-5 h-5 text-gray-700" />
-            </button>
+        {/* Selected Route Info */}
+        {destinationToShow && (
+          <div className="mt-4 p-3 bg-white border border-emerald-200 rounded-lg shadow-sm">
+            <div className="flex items-center space-x-2 text-sm">
+              <div className="flex flex-col items-center space-y-1">
+                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                <div className="w-[1px] h-4 bg-gray-300"></div>
+                <div className="w-2 h-2 bg-emerald-600 rounded-full"></div>
+              </div>
+              <div className="flex-1">
+                <div className="text-xs text-gray-500">From</div>
+                <div className="font-medium text-gray-700">{pickup}</div>
+                <div className="text-xs text-gray-500 mt-2">To</div>
+                <div className="font-semibold text-emerald-700">{destinationToShow}</div>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Toggle Booking Form Button - Outside map container, always visible */}

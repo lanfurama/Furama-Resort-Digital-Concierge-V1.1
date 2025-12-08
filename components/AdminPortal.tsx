@@ -257,7 +257,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                         setEditingPromotion(null);
                         alert(`Promotion "${result.title}" updated successfully!`);
                     } else {
-                        await addPromotion(result as Promotion);
+                    await addPromotion(result as Promotion);
                     }
                     // Refresh promotions specifically after adding/updating
                     try {
@@ -1367,17 +1367,17 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 </div>
                             )}
                             
-                            <div className="divide-y divide-gray-100">
-                                 {promotions.map((p) => (
-                                     <div key={p.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
-                                         <div className="flex-1">
-                                             <div className="flex items-center space-x-2">
-                                                 <span className="font-bold text-gray-800">{p.title}</span>
+                        <div className="divide-y divide-gray-100">
+                             {promotions.map((p) => (
+                                 <div key={p.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
+                                     <div className="flex-1">
+                                         <div className="flex items-center space-x-2">
+                                             <span className="font-bold text-gray-800">{p.title}</span>
                                                  {p.discount && <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{p.discount}</span>}
-                                             </div>
-                                             <div className="text-sm text-gray-500">{p.description}</div>
-                                             {p.validUntil && <div className="text-xs text-gray-400 mt-1">Valid: {p.validUntil}</div>}
                                          </div>
+                                         <div className="text-sm text-gray-500">{p.description}</div>
+                                             {p.validUntil && <div className="text-xs text-gray-400 mt-1">Valid: {p.validUntil}</div>}
+                                     </div>
                                          <div className="flex items-center space-x-1">
                                              <button 
                                                 onClick={() => {
@@ -1397,11 +1397,11 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                              >
                                                  <FileText size={16}/>
                                              </button>
-                                             <button onClick={() => handleDelete(p.id, 'PROMO')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
+                                     <button onClick={() => handleDelete(p.id, 'PROMO')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
                                          </div>
-                                     </div>
-                                 ))}
-                            </div>
+                                 </div>
+                             ))}
+                        </div>
                         </>
                     )}
                     

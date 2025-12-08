@@ -444,10 +444,10 @@ const AppContent: React.FC = () => {
                                         <h4 className="font-bold text-lg mb-1">{title}</h4>
                                         <p className="text-xs opacity-90 line-clamp-2">{desc}</p>
                                         <p className="text-[10px] mt-3 opacity-75">{promo.validUntil}</p>
-                                    </div>
+                    </div>
                                     <div className="absolute -bottom-4 -right-4 text-white/10">
                                         <Percent size={100} />
-                                    </div>
+                                </div>
                                 </div>
                             );
                         })}

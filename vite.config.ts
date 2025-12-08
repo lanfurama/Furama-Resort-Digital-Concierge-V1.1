@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
       // When using middleware mode in server.js, Vite config is still needed
       // but server settings are handled by Express
       // This config is used when Vite is created in middleware mode
+      base: './', // Important for Capacitor mobile app
       plugins: [react()],
       // Vite automatically exposes VITE_* env vars via import.meta.env
       // No need to manually define them here

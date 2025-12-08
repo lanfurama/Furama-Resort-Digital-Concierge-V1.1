@@ -131,13 +131,13 @@ const SupervisorDashboard: React.FC = () => {
 
                 <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-500">
                     <div className="flex justify-between items-start mb-3">
-                        <div>
+                    <div>
                             <p className="text-xs text-gray-500 uppercase font-bold">Buggy Status</p>
-                        </div>
+                    </div>
                         <div className="p-2 bg-amber-50 rounded-full text-amber-600">
                             <Car size={20} />
-                        </div>
                     </div>
+                </div>
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
                             <span className="text-[11px] text-gray-600">Waiting</span>
@@ -150,7 +150,7 @@ const SupervisorDashboard: React.FC = () => {
                         <div className="flex justify-between items-center">
                             <span className="text-[11px] text-gray-600">Completed</span>
                             <span className="text-lg font-bold text-green-600">{completedBuggies}</span>
-                        </div>
+                    </div>
                     </div>
                 </div>
 

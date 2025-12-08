@@ -1373,20 +1373,20 @@ export const getRides = async (): Promise<RideRequest[]> => {
       }
       
       return {
-        id: r.id.toString(),
-        guestName: r.guest_name || r.guestName || 'Guest',
-        roomNumber: r.room_number || r.roomNumber,
-        pickup: r.pickup,
-        destination: r.destination,
-        status: r.status as BuggyStatus,
+      id: r.id.toString(),
+      guestName: r.guest_name || r.guestName || 'Guest',
+      roomNumber: r.room_number || r.roomNumber,
+      pickup: r.pickup,
+      destination: r.destination,
+      status: r.status as BuggyStatus,
         timestamp: reqTimestamp,
-        driverId: r.driver_id ? r.driver_id.toString() : undefined,
-        eta: r.eta || undefined,
+      driverId: r.driver_id ? r.driver_id.toString() : undefined,
+      eta: r.eta || undefined,
         pickedUpAt: r.pick_timestamp ? new Date(r.pick_timestamp).getTime() : (r.picked_up_at ? new Date(r.picked_up_at).getTime() : undefined),
         completedAt: r.drop_timestamp ? new Date(r.drop_timestamp).getTime() : (r.completed_at ? new Date(r.completed_at).getTime() : undefined),
         confirmedAt: r.assigned_timestamp ? new Date(r.assigned_timestamp).getTime() : (r.assigned_at ? new Date(r.assigned_at).getTime() : undefined),
-        rating: r.rating || undefined,
-        feedback: r.feedback || undefined
+      rating: r.rating || undefined,
+      feedback: r.feedback || undefined
       };
     });
     
@@ -2329,7 +2329,7 @@ export const getServiceUnreadCount = async (roomNumber: string, service: string,
     } catch (error) {
         console.error('Failed to get unread count:', error);
         return 0;
-    }
+  }
 };
 
 export const sendServiceMessage = async (roomNumber: string, service: string, text: string, senderRole: 'user' | 'staff' = 'user'): Promise<void> => {

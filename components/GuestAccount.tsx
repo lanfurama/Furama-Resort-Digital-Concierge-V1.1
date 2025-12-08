@@ -308,8 +308,8 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                 {/* Back Button and Title Row */}
                 <div className="flex items-center justify-center relative mb-3">
                     <button onClick={onBack} className="absolute left-0 text-white hover:text-emerald-200">
-                        <ArrowLeft className="w-5 h-5" />
-                    </button>
+                    <ArrowLeft className="w-5 h-5" />
+                </button>
                     <h2 className="text-lg font-serif font-bold">{t('my_account')}</h2>
                 </div>
                 {/* User Info - Horizontal Layout */}

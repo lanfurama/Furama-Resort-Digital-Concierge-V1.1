@@ -17,3 +17,5 @@ if (Test-Path $htmlPath) {
     Write-Host "❌ Error: create-icons-simple.html not found!" -ForegroundColor Red
 }
 
+
+
