@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key } from 'lucide-react';
-import { getLocations, getLocationsSync, addLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, addUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory } from '../services/dataService';
+import { getLocations, getLocationsSync, addLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, updatePromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, addUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory } from '../services/dataService';
 import { parseAdminInput, generateTranslations } from '../services/geminiService';
 import { Location, MenuItem, ResortEvent, Promotion, KnowledgeItem, User, UserRole, Department, RoomType, Room } from '../types';
 import Loading from './Loading';
@@ -143,6 +143,11 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const [editingRoomType, setEditingRoomType] = useState<RoomType | null>(null);
     const [newRoomType, setNewRoomType] = useState<Partial<RoomType>>({ name: '', description: '', locationId: '' });
     
+    // Promotion Edit State
+    const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
+    const [showPromotionForm, setShowPromotionForm] = useState(false);
+    const [newPromotion, setNewPromotion] = useState<Partial<Promotion>>({ title: '', description: '', discount: '', validUntil: '', imageColor: 'bg-emerald-500', imageUrl: '' });
+    
     const [showRoomForm, setShowRoomForm] = useState(false);
     const [newRoom, setNewRoom] = useState<{number: string, typeId: string}>({ number: '', typeId: '' });
     const [roomCsvFile, setRoomCsvFile] = useState<File | null>(null);
@@ -247,14 +252,20 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     }
                 }
                 else if (tab === 'PROMOS') {
-                    await addPromotion(result as Promotion);
-                    // Refresh promotions specifically after adding
+                    if (editingPromotion) {
+                        await updatePromotion(editingPromotion.id, result as Promotion);
+                        setEditingPromotion(null);
+                        alert(`Promotion "${result.title}" updated successfully!`);
+                    } else {
+                        await addPromotion(result as Promotion);
+                    }
+                    // Refresh promotions specifically after adding/updating
                     try {
                         const refreshedPromotions = await getPromotions();
                         setPromotions(refreshedPromotions);
-                        console.log('Promotions refreshed after add:', refreshedPromotions);
+                        console.log('Promotions refreshed after add/update:', refreshedPromotions);
                     } catch (error) {
-                        console.error('Failed to refresh promotions after add:', error);
+                        console.error('Failed to refresh promotions after add/update:', error);
                     }
                 }
                 else if (tab === 'KNOWLEDGE') {
@@ -839,7 +850,36 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                         )}
 
                         {/* AI Button for other tabs */}
-                        {['LOCATIONS', 'MENU', 'EVENTS', 'PROMOS', 'KNOWLEDGE'].includes(tab) && (
+                        {['LOCATIONS', 'MENU', 'EVENTS', 'KNOWLEDGE'].includes(tab) && (
+                            <button 
+                                onClick={() => setShowAiInput(!showAiInput)}
+                                className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition flex-1 md:flex-none"
+                            >
+                                {showAiInput ? <X size={18}/> : <Plus size={18}/>}
+                                <span>{showAiInput ? 'Cancel' : 'Smart Add'}</span>
+                            </button>
+                        )}
+                        {tab === 'PROMOS' && (
+                            <button 
+                                onClick={() => {
+                                    if (showPromotionForm && !editingPromotion) {
+                                        setShowPromotionForm(false);
+                                        setNewPromotion({ title: '', description: '', discount: '', validUntil: '', imageColor: 'bg-emerald-500', imageUrl: '' });
+                                    } else {
+                                        setShowPromotionForm(!showPromotionForm);
+                                        if (!showPromotionForm) {
+                                            setEditingPromotion(null);
+                                            setNewPromotion({ title: '', description: '', discount: '', validUntil: '', imageColor: 'bg-emerald-500', imageUrl: '' });
+                                        }
+                                    }
+                                }}
+                                className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition flex-1 md:flex-none"
+                            >
+                                {showPromotionForm && !editingPromotion ? <X size={18}/> : <Plus size={18}/>}
+                                <span>{showPromotionForm && !editingPromotion ? 'Cancel' : 'Add Promotion'}</span>
+                            </button>
+                        )}
+                        {tab === 'PROMOS' && (
                             <button 
                                 onClick={() => setShowAiInput(!showAiInput)}
                                 className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition flex-1 md:flex-none"
@@ -1219,21 +1259,150 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
 
                     {/* PROMOTIONS TABLE */}
                     {tab === 'PROMOS' && (
-                        <div className="divide-y divide-gray-100">
-                             {promotions.map((p) => (
-                                 <div key={p.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
-                                     <div className="flex-1">
-                                         <div className="flex items-center space-x-2">
-                                             <span className="font-bold text-gray-800">{p.title}</span>
-                                             <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{p.discount}</span>
+                        <>
+                            {/* Promotion Edit Form */}
+                            {showPromotionForm && (
+                                <div className="bg-white p-4 rounded-xl shadow-lg border border-emerald-100 mb-6 animate-in slide-in-from-top-2">
+                                    <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase">{editingPromotion ? 'Edit Promotion' : 'Create Promotion'}</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                        <div className="col-span-1 md:col-span-2">
+                                            <label className="block text-xs font-semibold text-gray-500 mb-1">Title</label>
+                                            <input 
+                                                type="text"
+                                                className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                value={newPromotion.title || ''}
+                                                onChange={e => setNewPromotion({...newPromotion, title: e.target.value})}
+                                                placeholder="e.g. Happy Hour Special"
+                                            />
+                                        </div>
+                                        <div className="col-span-1 md:col-span-2">
+                                            <label className="block text-xs font-semibold text-gray-500 mb-1">Description</label>
+                                            <textarea 
+                                                className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                value={newPromotion.description || ''}
+                                                onChange={e => setNewPromotion({...newPromotion, description: e.target.value})}
+                                                placeholder="e.g. Enjoy refreshing cocktails and light bites by the pool."
+                                                rows={3}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-500 mb-1">Discount</label>
+                                            <input 
+                                                type="text"
+                                                className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                value={newPromotion.discount || ''}
+                                                onChange={e => setNewPromotion({...newPromotion, discount: e.target.value})}
+                                                placeholder="e.g. 30% OFF"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-500 mb-1">Valid Until</label>
+                                            <input 
+                                                type="text"
+                                                className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                value={newPromotion.validUntil || ''}
+                                                onChange={e => setNewPromotion({...newPromotion, validUntil: e.target.value})}
+                                                placeholder="e.g. Daily 14:00-16:00"
+                                            />
+                                        </div>
+                                        <div className="col-span-1 md:col-span-2">
+                                            <label className="block text-xs font-semibold text-gray-500 mb-1">Image URL (Optional)</label>
+                                            <input 
+                                                type="url"
+                                                className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                value={newPromotion.imageUrl || ''}
+                                                onChange={e => setNewPromotion({...newPromotion, imageUrl: e.target.value})}
+                                                placeholder="https://example.com/image.jpg"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end gap-2">
+                                        {editingPromotion && (
+                                            <button 
+                                                onClick={() => {
+                                                    setEditingPromotion(null);
+                                                    setNewPromotion({ title: '', description: '', discount: '', validUntil: '', imageColor: 'bg-emerald-500', imageUrl: '' });
+                                                    setShowPromotionForm(false);
+                                                }}
+                                                className="bg-gray-500 text-white px-6 py-2 rounded-lg text-sm font-bold"
+                                            >
+                                                Cancel
+                                            </button>
+                                        )}
+                                        <button 
+                                            onClick={async () => {
+                                                if (!newPromotion.title) {
+                                                    alert('Please enter a title.');
+                                                    return;
+                                                }
+                                                try {
+                                                    if (editingPromotion) {
+                                                        const updated = await updatePromotion(editingPromotion.id, newPromotion as Promotion);
+                                                        alert(`Promotion "${updated.title}" updated successfully!`);
+                                                        setEditingPromotion(null);
+                                                    } else {
+                                                        await addPromotion(newPromotion as Promotion);
+                                                        alert(`Promotion "${newPromotion.title}" created successfully!`);
+                                                    }
+                                                    setNewPromotion({ title: '', description: '', discount: '', validUntil: '', imageColor: 'bg-emerald-500', imageUrl: '' });
+                                                    setShowPromotionForm(false);
+                                                    // Refresh promotions
+                                                    try {
+                                                        const refreshedPromotions = await getPromotions();
+                                                        setPromotions(refreshedPromotions);
+                                                    } catch (error) {
+                                                        console.error('Failed to refresh promotions:', error);
+                                                    }
+                                                    await refreshData();
+                                                } catch (error: any) {
+                                                    console.error('Failed to save promotion:', error);
+                                                    alert(`Failed to save promotion: ${error?.message || 'Unknown error'}`);
+                                                }
+                                            }}
+                                            className="bg-emerald-800 text-white px-6 py-2 rounded-lg text-sm font-bold"
+                                        >
+                                            {editingPromotion ? 'Update Promotion' : 'Create Promotion'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            <div className="divide-y divide-gray-100">
+                                 {promotions.map((p) => (
+                                     <div key={p.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
+                                         <div className="flex-1">
+                                             <div className="flex items-center space-x-2">
+                                                 <span className="font-bold text-gray-800">{p.title}</span>
+                                                 {p.discount && <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{p.discount}</span>}
+                                             </div>
+                                             <div className="text-sm text-gray-500">{p.description}</div>
+                                             {p.validUntil && <div className="text-xs text-gray-400 mt-1">Valid: {p.validUntil}</div>}
                                          </div>
-                                         <div className="text-sm text-gray-500">{p.description}</div>
-                                         <div className="text-xs text-gray-400 mt-1">Valid: {p.validUntil}</div>
+                                         <div className="flex items-center space-x-1">
+                                             <button 
+                                                onClick={() => {
+                                                    setEditingPromotion(p);
+                                                    setNewPromotion({
+                                                        title: p.title,
+                                                        description: p.description,
+                                                        discount: p.discount || '',
+                                                        validUntil: p.validUntil || '',
+                                                        imageColor: p.imageColor || 'bg-emerald-500',
+                                                        imageUrl: p.imageUrl || ''
+                                                    });
+                                                    setShowPromotionForm(true);
+                                                }}
+                                                 className="text-emerald-600 hover:text-emerald-700 p-2" 
+                                                 title="Edit"
+                                             >
+                                                 <FileText size={16}/>
+                                             </button>
+                                             <button onClick={() => handleDelete(p.id, 'PROMO')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
+                                         </div>
                                      </div>
-                                     <button onClick={() => handleDelete(p.id, 'PROMO')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
-                                 </div>
-                             ))}
-                        </div>
+                                 ))}
+                            </div>
+                        </>
                     )}
                     
                     {/* KNOWLEDGE TABLE */}

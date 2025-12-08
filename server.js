@@ -19,6 +19,19 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Request logging middleware for API routes
+app.use('/api/v1', (req, res, next) => {
+  console.log(`[API Request] ${req.method} ${req.originalUrl || req.url}`, {
+    method: req.method,
+    url: req.url,
+    originalUrl: req.originalUrl,
+    body: req.body,
+    params: req.params,
+    query: req.query
+  });
+  next();
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Furama Resort Digital Concierge API is running' });

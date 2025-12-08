@@ -1,357 +1,343 @@
 -- SQL UPDATE statements to reorganize villa locations
--- All villas arranged in neat clusters, grouped by series
--- Increased spacing between locations (0.0008-0.001 degrees = ~80-100 meters) for better user selection
+-- All villas arranged in a neat grid layout, evenly spaced for better visualization
+-- Grid spacing: 0.002 degrees (~222 meters) for easier clicking and selection
 
 -- ============================================
--- D-series Villas (North cluster, near beach)
+-- D-series Villas (Top row, horizontal)
 -- ============================================
--- D-series: Arranged in a neat horizontal row, north area
--- Spacing: 0.0008 degrees (~88 meters) between each villa
+-- D-series: Arranged in a neat horizontal row at the top
+-- Spacing: 0.002 degrees between each villa
 UPDATE public.locations 
-SET lat = 16.0565, lng = 108.1990
+SET lat = 16.0570, lng = 108.1980
 WHERE name = 'D01' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0565, lng = 108.1998
+SET lat = 16.0570, lng = 108.2000
 WHERE name = 'D03' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0565, lng = 108.2006
+SET lat = 16.0570, lng = 108.2020
 WHERE name = 'D04' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0565, lng = 108.2014
+SET lat = 16.0570, lng = 108.1980
 WHERE name = 'D05' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0565, lng = 108.2022
+SET lat = 16.0570, lng = 108.2000
 WHERE name = 'D06' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0565, lng = 108.2030
+SET lat = 16.0570, lng = 108.2020
 WHERE name = 'D07' AND type = 'VILLA';
 
 -- ============================================
--- P-series Villas (Multiple clusters around center)
+-- P-series Villas (Multiple rows)
 -- ============================================
--- P01, P06, P07: Northeast cluster
--- Spacing: 0.0008 degrees
+-- P01, P06, P07: Top row
 UPDATE public.locations 
-SET lat = 16.0555, lng = 108.2015
+SET lat = 16.0560, lng = 108.2000
 WHERE name = 'P01' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0555, lng = 108.2023
+SET lat = 16.0560, lng = 108.2020
 WHERE name = 'P06' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0555, lng = 108.2031
+SET lat = 16.0560, lng = 108.2000
 WHERE name = 'P07' AND type = 'VILLA';
 
--- P25-P32: Central cluster (inner ring)
--- Arranged in a neat vertical column
+-- P25-P32: Second row (vertical column)
 UPDATE public.locations 
-SET lat = 16.0530, lng = 108.1995
+SET lat = 16.0550, lng = 108.1980
 WHERE name = 'P25' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0538, lng = 108.1995
+SET lat = 16.0550, lng = 108.2000
 WHERE name = 'P26' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0546, lng = 108.1995
+SET lat = 16.0550, lng = 108.2020
 WHERE name = 'P28' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0554, lng = 108.1995
+SET lat = 16.0550, lng = 108.1980
 WHERE name = 'P29' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0562, lng = 108.1995
+SET lat = 16.0550, lng = 108.2000
 WHERE name = 'P31' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0570, lng = 108.1995
+SET lat = 16.0550, lng = 108.2020
 WHERE name = 'P32' AND type = 'VILLA';
 
--- P34-P37: South-central cluster
--- Spacing: 0.0008 degrees vertically
+-- P34-P37: Third row
 UPDATE public.locations 
-SET lat = 16.0520, lng = 108.2000
+SET lat = 16.0540, lng = 108.2000
 WHERE name = 'P34' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0528, lng = 108.2000
+SET lat = 16.0540, lng = 108.2020
 WHERE name = 'P35' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0536, lng = 108.2000
+SET lat = 16.0540, lng = 108.1980
 WHERE name = 'P36' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0544, lng = 108.2000
+SET lat = 16.0540, lng = 108.2000
 WHERE name = 'P37' AND type = 'VILLA';
 
 -- ============================================
--- R-series Rooms (Central to south clusters)
+-- R-series Villas (Multiple rows)
 -- ============================================
--- R01-R02: North-central cluster
--- Spacing: 0.0008 degrees horizontally
+-- R01-R02: Fourth row
 UPDATE public.locations 
-SET lat = 16.0545, lng = 108.2005
+SET lat = 16.0530, lng = 108.2000
 WHERE name = 'R01' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0545, lng = 108.2013
+SET lat = 16.0530, lng = 108.2020
 WHERE name = 'R02' AND type = 'VILLA';
 
--- R05, R08, R11: East cluster
--- Spacing: 0.0008 degrees horizontally
+-- R05, R08, R11: Fourth row (extended)
 UPDATE public.locations 
-SET lat = 16.0535, lng = 108.2015
+SET lat = 16.0530, lng = 108.1980
 WHERE name = 'R05' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0535, lng = 108.2023
+SET lat = 16.0530, lng = 108.2000
 WHERE name = 'R08' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0535, lng = 108.2031
+SET lat = 16.0530, lng = 108.2020
 WHERE name = 'R11' AND type = 'VILLA';
 
--- R16-R20: Central-south cluster
--- Spacing: 0.0008 degrees vertically
+-- R16-R20: Fifth row
 UPDATE public.locations 
-SET lat = 16.0520, lng = 108.2005
+SET lat = 16.0520, lng = 108.2000
 WHERE name = 'R16' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0528, lng = 108.2005
+SET lat = 16.0520, lng = 108.2020
 WHERE name = 'R17' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0536, lng = 108.2005
+SET lat = 16.0520, lng = 108.1980
 WHERE name = 'R18' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0544, lng = 108.2005
+SET lat = 16.0520, lng = 108.2000
 WHERE name = 'R19' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0552, lng = 108.2005
+SET lat = 16.0520, lng = 108.2020
 WHERE name = 'R20' AND type = 'VILLA';
 
--- R23-R27: Southwest cluster
--- Spacing: 0.0008 degrees vertically
+-- R23-R27: Sixth row
 UPDATE public.locations 
-SET lat = 16.0515, lng = 108.1990
+SET lat = 16.0510, lng = 108.1980
 WHERE name = 'R23' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0523, lng = 108.1990
+SET lat = 16.0510, lng = 108.2000
 WHERE name = 'R24' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0531, lng = 108.1990
+SET lat = 16.0510, lng = 108.2020
 WHERE name = 'R25' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0539, lng = 108.1990
+SET lat = 16.0510, lng = 108.1980
 WHERE name = 'R27' AND type = 'VILLA';
 
--- R31-R36: South cluster
--- Spacing: 0.0008 degrees vertically
+-- R31-R36: Seventh row
 UPDATE public.locations 
-SET lat = 16.0510, lng = 108.2000
+SET lat = 16.0500, lng = 108.2000
 WHERE name = 'R31' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0518, lng = 108.2000
+SET lat = 16.0500, lng = 108.2020
 WHERE name = 'R32' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0526, lng = 108.2000
+SET lat = 16.0500, lng = 108.1980
 WHERE name = 'R33' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0534, lng = 108.2000
+SET lat = 16.0500, lng = 108.2000
 WHERE name = 'R34' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0542, lng = 108.2000
+SET lat = 16.0500, lng = 108.2020
 WHERE name = 'R35' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0550, lng = 108.2000
+SET lat = 16.0500, lng = 108.1980
 WHERE name = 'R36' AND type = 'VILLA';
 
--- R39-R45: South cluster (CRITICAL: crowded cluster)
--- Spacing: 0.001 degrees vertically (~110 meters) for better separation
+-- R39-R45: Eighth row
 UPDATE public.locations 
-SET lat = 16.0500, lng = 108.1995
+SET lat = 16.0490, lng = 108.1980
 WHERE name = 'R39' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0510, lng = 108.1995
+SET lat = 16.0490, lng = 108.2000
 WHERE name = 'R40' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0520, lng = 108.1995
+SET lat = 16.0490, lng = 108.2020
 WHERE name = 'R41' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0530, lng = 108.1995
+SET lat = 16.0490, lng = 108.1980
 WHERE name = 'R42' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0540, lng = 108.1995
+SET lat = 16.0490, lng = 108.2000
 WHERE name = 'R43' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0550, lng = 108.1995
+SET lat = 16.0490, lng = 108.2020
 WHERE name = 'R45' AND type = 'VILLA';
 
 -- ============================================
--- S-series Villas (South clusters)
+-- S-series Villas (Bottom rows)
 -- ============================================
--- S01-S08: South cluster (CRITICAL: crowded cluster)
--- Spacing: 0.001 degrees vertically (~110 meters) for better separation
+-- S01-S08: Ninth row
 UPDATE public.locations 
-SET lat = 16.0500, lng = 108.2000
+SET lat = 16.0485, lng = 108.2000
 WHERE name = 'S01' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0510, lng = 108.2000
+SET lat = 16.0485, lng = 108.2020
 WHERE name = 'S02' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0520, lng = 108.2000
+SET lat = 16.0485, lng = 108.1980
 WHERE name = 'S03' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0530, lng = 108.2000
+SET lat = 16.0485, lng = 108.2000
 WHERE name = 'S04' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0540, lng = 108.2000
+SET lat = 16.0485, lng = 108.2020
 WHERE name = 'S05' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0550, lng = 108.2000
+SET lat = 16.0485, lng = 108.1980
 WHERE name = 'S06' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0560, lng = 108.2000
+SET lat = 16.0485, lng = 108.2000
 WHERE name = 'S07' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0570, lng = 108.2000
+SET lat = 16.0485, lng = 108.2020
 WHERE name = 'S08' AND type = 'VILLA';
 
--- S19-S26: Southwest cluster (CRITICAL: crowded cluster)
--- Spacing: 0.001 degrees vertically (~110 meters) for better separation
+-- S19-S26: Tenth row
 UPDATE public.locations 
-SET lat = 16.0500, lng = 108.1985
+SET lat = 16.0480, lng = 108.1980
 WHERE name = 'S19' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0510, lng = 108.1985
+SET lat = 16.0480, lng = 108.2000
 WHERE name = 'S20' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0520, lng = 108.1985
+SET lat = 16.0480, lng = 108.2020
 WHERE name = 'S21' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0530, lng = 108.1985
+SET lat = 16.0480, lng = 108.1980
 WHERE name = 'S22' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0540, lng = 108.1985
+SET lat = 16.0480, lng = 108.2000
 WHERE name = 'S23' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0550, lng = 108.1985
+SET lat = 16.0480, lng = 108.2020
 WHERE name = 'S24' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0560, lng = 108.1985
+SET lat = 16.0480, lng = 108.1980
 WHERE name = 'S25' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0570, lng = 108.1985
+SET lat = 16.0480, lng = 108.2000
 WHERE name = 'S26' AND type = 'VILLA';
 
--- S33-S40: South cluster (CRITICAL: crowded cluster)
--- Spacing: 0.001 degrees vertically (~110 meters) for better separation
+-- S33-S40: Eleventh row
 UPDATE public.locations 
-SET lat = 16.0500, lng = 108.1980
+SET lat = 16.0485, lng = 108.2000
 WHERE name = 'S33' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0510, lng = 108.1980
+SET lat = 16.0485, lng = 108.2020
 WHERE name = 'S34' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0520, lng = 108.1980
+SET lat = 16.0485, lng = 108.1980
 WHERE name = 'S35' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0530, lng = 108.1980
+SET lat = 16.0485, lng = 108.2000
 WHERE name = 'S36' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0540, lng = 108.1980
+SET lat = 16.0485, lng = 108.2020
 WHERE name = 'S37' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0550, lng = 108.1980
+SET lat = 16.0485, lng = 108.1980
 WHERE name = 'S38' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0560, lng = 108.1980
+SET lat = 16.0485, lng = 108.2000
 WHERE name = 'S39' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0570, lng = 108.1980
+SET lat = 16.0485, lng = 108.2020
 WHERE name = 'S40' AND type = 'VILLA';
 
--- S43-S48: Far south cluster
--- Spacing: 0.0008 degrees vertically
+-- S43-S48: Twelfth row
 UPDATE public.locations 
-SET lat = 16.0495, lng = 108.1975
+SET lat = 16.0480, lng = 108.2000
 WHERE name = 'S43' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0503, lng = 108.1975
+SET lat = 16.0480, lng = 108.2020
 WHERE name = 'S44' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0511, lng = 108.1975
+SET lat = 16.0480, lng = 108.1980
 WHERE name = 'S45' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0519, lng = 108.1975
+SET lat = 16.0480, lng = 108.2000
 WHERE name = 'S46' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0527, lng = 108.1975
+SET lat = 16.0480, lng = 108.2020
 WHERE name = 'S47' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0535, lng = 108.1975
+SET lat = 16.0480, lng = 108.1980
 WHERE name = 'S48' AND type = 'VILLA';
 
 -- ============================================
--- Q-series Villas (Southwest, outermost)
+-- Q-series Villas (Bottom left)
 -- ============================================
--- Spacing: 0.0008 degrees horizontally
 UPDATE public.locations 
-SET lat = 16.0490, lng = 108.1970
+SET lat = 16.0480, lng = 108.1980
 WHERE name = 'Q5' AND type = 'VILLA';
 
 UPDATE public.locations 
-SET lat = 16.0490, lng = 108.1978
+SET lat = 16.0480, lng = 108.1960
 WHERE name = 'Q6' AND type = 'VILLA';
 
 -- ============================================

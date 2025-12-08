@@ -13,6 +13,8 @@ const SupervisorDashboard: React.FC = () => {
         pendingButler: 0,
         activeBuggies: 0,
         searchingBuggies: 0,
+        onTripBuggies: 0,
+        completedBuggies: 0,
         totalRevenue: 0,
         todayCompletedCount: 0,
         recentActivity: []
@@ -68,6 +70,8 @@ const SupervisorDashboard: React.FC = () => {
     const pendingPool = stats?.pendingPool || 0;
     const pendingButler = stats?.pendingButler || 0;
     const searchingBuggies = stats?.searchingBuggies || 0;
+    const onTripBuggies = stats?.onTripBuggies || 0;
+    const completedBuggies = stats?.completedBuggies || 0;
     const activeBuggies = stats?.activeBuggies || 0;
     const activeGuests = stats?.activeGuests || 0;
     const totalRevenue = stats?.totalRevenue || 0;
@@ -114,7 +118,7 @@ const SupervisorDashboard: React.FC = () => {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-emerald-500 flex justify-between items-center">
                     <div>
                         <p className="text-xs text-gray-500 uppercase font-bold">Total Guests</p>
@@ -125,25 +129,28 @@ const SupervisorDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-500 flex justify-between items-center">
-                    <div>
-                        <p className="text-xs text-gray-500 uppercase font-bold">Pending Actions</p>
-                        <h3 className="text-3xl font-bold text-gray-800">{totalPending + searchingBuggies}</h3>
-                        <p className="text-[10px] text-amber-600">{searchingBuggies} waiting for buggy</p>
+                <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-500">
+                    <div className="flex justify-between items-start mb-3">
+                        <div>
+                            <p className="text-xs text-gray-500 uppercase font-bold">Buggy Status</p>
+                        </div>
+                        <div className="p-2 bg-amber-50 rounded-full text-amber-600">
+                            <Car size={20} />
+                        </div>
                     </div>
-                    <div className="p-3 bg-amber-50 rounded-full text-amber-600">
-                        <AlertCircle size={24} />
-                    </div>
-                </div>
-
-                <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-blue-500 flex justify-between items-center">
-                    <div>
-                        <p className="text-xs text-gray-500 uppercase font-bold">Active Rides</p>
-                        <h3 className="text-3xl font-bold text-gray-800">{activeBuggies}</h3>
-                        <p className="text-[10px] text-blue-600">On trip or arriving</p>
-                    </div>
-                    <div className="p-3 bg-blue-50 rounded-full text-blue-600">
-                        <Car size={24} />
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <span className="text-[11px] text-gray-600">Waiting</span>
+                            <span className="text-lg font-bold text-amber-600">{searchingBuggies}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-[11px] text-gray-600">On Trip</span>
+                            <span className="text-lg font-bold text-blue-600">{onTripBuggies}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-[11px] text-gray-600">Completed</span>
+                            <span className="text-lg font-bold text-green-600">{completedBuggies}</span>
+                        </div>
                     </div>
                 </div>
 

@@ -423,16 +423,31 @@ const AppContent: React.FC = () => {
                             const discount = tr?.discount || promo.discount;
 
                             return (
-                                <div key={promo.id} className={`min-w-[260px] p-5 rounded-2xl ${promo.imageColor || 'bg-emerald-500'} text-white shadow-lg snap-center relative overflow-hidden shrink-0`}>
+                                <div 
+                                    key={promo.id} 
+                                    className={`min-w-[260px] p-5 rounded-2xl text-white shadow-lg snap-center relative overflow-hidden shrink-0 ${
+                                        promo.imageUrl ? '' : (promo.imageColor || 'bg-emerald-500')
+                                    }`}
+                                    style={promo.imageUrl ? {
+                                        backgroundImage: `url(${promo.imageUrl})`,
+                                        backgroundSize: 'cover',
+                                        backgroundPosition: 'center',
+                                        backgroundRepeat: 'no-repeat'
+                                    } : {}}
+                                >
+                                    {/* Overlay for better text readability when using image */}
+                                    {promo.imageUrl && (
+                                        <div className="absolute inset-0 bg-black/40 rounded-2xl"></div>
+                                    )}
                                     <div className="relative z-10">
                                         <div className="bg-white/20 w-fit px-2 py-1 rounded text-[10px] font-bold mb-2 backdrop-blur-sm">{discount}</div>
                                         <h4 className="font-bold text-lg mb-1">{title}</h4>
                                         <p className="text-xs opacity-90 line-clamp-2">{desc}</p>
                                         <p className="text-[10px] mt-3 opacity-75">{promo.validUntil}</p>
-                    </div>
+                                    </div>
                                     <div className="absolute -bottom-4 -right-4 text-white/10">
                                         <Percent size={100} />
-                                </div>
+                                    </div>
                                 </div>
                             );
                         })}

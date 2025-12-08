@@ -304,22 +304,27 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
     return (
         <div className="flex flex-col h-full bg-gray-50 relative">
             {/* Header */}
-            <div className="bg-emerald-900 text-white p-4 pb-6 rounded-b-[2.5rem] shadow-xl relative z-10">
-                {/* Back Button for consistency */}
-                <button onClick={onBack} className="absolute top-3 left-3 text-white hover:text-emerald-200">
-                    <ArrowLeft className="w-5 h-5" />
-                </button>
-                <h2 className="text-xl font-serif font-bold text-center">{t('my_account')}</h2>
-                <div className="mt-4 flex flex-col items-center">
-                    <div className="w-16 h-16 bg-emerald-700 rounded-full flex items-center justify-center border-4 border-emerald-800 shadow-inner">
-                        <span className="text-2xl font-serif text-emerald-200">{user.lastName.charAt(0)}</span>
+            <div className="bg-emerald-900 text-white p-3 pb-4 rounded-b-[2rem] shadow-xl relative z-10">
+                {/* Back Button and Title Row */}
+                <div className="flex items-center justify-center relative mb-3">
+                    <button onClick={onBack} className="absolute left-0 text-white hover:text-emerald-200">
+                        <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    <h2 className="text-lg font-serif font-bold">{t('my_account')}</h2>
+                </div>
+                {/* User Info - Horizontal Layout */}
+                <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-emerald-700 rounded-full flex items-center justify-center border-2 border-emerald-800 shadow-inner flex-shrink-0">
+                        <span className="text-lg font-serif text-emerald-200">{user.lastName.charAt(0)}</span>
                     </div>
-                    <h3 className="text-lg font-bold mt-2">Mr/Ms {user.lastName}</h3>
-                    <p className="text-emerald-300 text-xs">{t('room')} {user.roomNumber}</p>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-base font-bold truncate">Mr/Ms {user.lastName}</h3>
+                        <p className="text-emerald-300 text-[11px] mt-0.5">{t('room')} {user.roomNumber}</p>
+                    </div>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 -mt-4 relative z-20 pb-24">
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 -mt-2 relative z-20 pb-24">
                 {(isLoadingHistory || isLoadingReview || isLoadingUserData) && (
                     <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
                         <Loading size="md" message={t('loading') || 'Loading account data...'} />

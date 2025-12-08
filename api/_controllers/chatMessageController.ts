@@ -72,5 +72,37 @@ export const chatMessageController = {
       res.status(500).json({ error: error.message });
     }
   },
+
+  async markAsRead(req: Request, res: Response) {
+    try {
+      const { roomNumber } = req.params;
+      const { service_type, message_id, user_role } = req.body;
+      
+      if (!service_type || !message_id || !user_role) {
+        return res.status(400).json({ error: 'service_type, message_id, and user_role are required' });
+      }
+
+      await chatMessageModel.markAsRead(roomNumber, service_type, parseInt(message_id), user_role);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  async getUnreadCount(req: Request, res: Response) {
+    try {
+      const { roomNumber } = req.params;
+      const { service_type, user_role } = req.query;
+      
+      if (!service_type || !user_role) {
+        return res.status(400).json({ error: 'service_type and user_role are required' });
+      }
+
+      const count = await chatMessageModel.getUnreadCount(roomNumber, service_type as string, user_role as 'user' | 'staff');
+      res.json({ unreadCount: count });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
 };
 

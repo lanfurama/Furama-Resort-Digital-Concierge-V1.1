@@ -44,7 +44,8 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
         
         const details = cart.map(i => i.name).join(', ');
         try {
-            await addServiceRequest({
+            console.log('Placing order - Type:', type, 'Cart:', cart, 'User:', user);
+            const result = await addServiceRequest({
                 id: Date.now().toString(),
                 type: type,
                 status: 'PENDING',
@@ -54,13 +55,15 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                 timestamp: Date.now()
             });
             
+            console.log('Order placed successfully:', result);
             setIsOrderPlaced(true);
             setTimeout(() => {
                 onBack();
             }, 2000);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to place order:', error);
-            alert('Failed to place order. Please try again.');
+            const errorMessage = error?.message || error?.response?.data?.error || 'Unknown error';
+            alert(`Failed to place order: ${errorMessage}. Please check console for details.`);
         }
     };
 

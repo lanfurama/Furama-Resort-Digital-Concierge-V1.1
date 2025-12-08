@@ -1115,7 +1115,8 @@ export const getPromotions = async (): Promise<Promotion[]> => {
       description: promo.description || undefined,
       discount: promo.discount || undefined,
       validUntil: promo.valid_until || undefined,
-      imageColor: promo.image_color || 'bg-emerald-500'
+      imageColor: promo.image_color || 'bg-emerald-500',
+      imageUrl: promo.image_url || undefined
     }));
     
     console.log('Mapped promotions:', mapped);
@@ -1139,7 +1140,7 @@ export const addPromotion = async (promo: Promotion): Promise<void> => {
       discount: promo.discount || null,
       valid_until: promo.validUntil || null,
       image_color: promo.imageColor || 'bg-emerald-500',
-      image_url: null,
+      image_url: promo.imageUrl || null,
       language: language
     };
     
@@ -1157,7 +1158,8 @@ export const addPromotion = async (promo: Promotion): Promise<void> => {
       description: dbPromotion.description || undefined,
       discount: dbPromotion.discount || undefined,
       validUntil: dbPromotion.valid_until || undefined,
-      imageColor: dbPromotion.image_color || 'bg-emerald-500'
+      imageColor: dbPromotion.image_color || 'bg-emerald-500',
+      imageUrl: dbPromotion.image_url || undefined
     };
     
     promotions = [...promotions, mappedPromo];
@@ -1173,6 +1175,67 @@ export const addPromotion = async (promo: Promotion): Promise<void> => {
     console.warn('Falling back to local mock data. Promotion will NOT be saved to database!');
     // Fallback to local state
     promotions = [...promotions, { ...promo, id: Date.now().toString(), imageColor: 'bg-emerald-500' }];
+    throw error;
+  }
+};
+
+export const updatePromotion = async (id: string, promo: Partial<Promotion>): Promise<Promotion> => {
+  try {
+    const language = getCurrentLanguage();
+    const requestBody: any = {};
+    
+    // Text fields (language-specific)
+    if (promo.title !== undefined) requestBody.title = promo.title;
+    if (promo.description !== undefined) requestBody.description = promo.description || null;
+    requestBody.language = language;
+    
+    // Shared fields (will be updated for all languages)
+    if (promo.discount !== undefined) requestBody.discount = promo.discount || null;
+    if (promo.validUntil !== undefined) requestBody.valid_until = promo.validUntil || null;
+    if (promo.imageColor !== undefined) requestBody.image_color = promo.imageColor || 'bg-emerald-500';
+    if (promo.imageUrl !== undefined) requestBody.image_url = promo.imageUrl || null;
+    
+    console.log('Updating promotion via API - ID:', id);
+    console.log('Updating promotion via API - Request Body:', requestBody);
+    console.log('Note: Shared fields (discount, valid_until, image_color, image_url) will be updated for all languages');
+    
+    const dbPromotion = await apiClient.put<any>(`/promotions/${id}`, requestBody);
+    
+    console.log('Promotion updated successfully - API Response:', dbPromotion);
+    
+    // Refresh all promotions to get updated data for all languages
+    try {
+      const allPromotions = await getPromotions();
+      promotions = allPromotions;
+      console.log('All promotions refreshed after update');
+    } catch (refreshError) {
+      console.warn('Failed to refresh promotions, using single update result:', refreshError);
+    }
+    
+    // Update local cache
+    const mappedPromo: Promotion = {
+      id: dbPromotion.id.toString(),
+      title: dbPromotion.title,
+      description: dbPromotion.description || '',
+      discount: dbPromotion.discount || undefined,
+      validUntil: dbPromotion.valid_until || undefined,
+      imageColor: dbPromotion.image_color || 'bg-emerald-500',
+      imageUrl: dbPromotion.image_url || undefined,
+      translations: dbPromotion.translations || undefined
+    };
+    
+    promotions = promotions.map(p => p.id === id ? mappedPromo : p);
+    console.log('Promotion updated in local cache:', mappedPromo);
+    
+    return mappedPromo;
+  } catch (error: any) {
+    console.error('Failed to update promotion via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
     throw error;
   }
 };
@@ -1295,21 +1358,37 @@ export const getRides = async (): Promise<RideRequest[]> => {
     const dbRides = await apiClient.get<any[]>('/ride-requests');
     console.log('Rides API response:', dbRides);
     
-    const mapped = dbRides.map(r => ({
-      id: r.id.toString(),
-      guestName: r.guest_name || r.guestName || 'Guest',
-      roomNumber: r.room_number || r.roomNumber,
-      pickup: r.pickup,
-      destination: r.destination,
-      status: r.status as BuggyStatus,
-      timestamp: r.timestamp || (r.created_at ? new Date(r.created_at).getTime() : Date.now()),
-      driverId: r.driver_id ? r.driver_id.toString() : undefined,
-      eta: r.eta || undefined,
-      pickedUpAt: r.picked_up_at ? new Date(r.picked_up_at).getTime() : undefined,
-      completedAt: r.completed_at ? new Date(r.completed_at).getTime() : undefined,
-      rating: r.rating || undefined,
-      feedback: r.feedback || undefined
-    }));
+    const mapped = dbRides.map(r => {
+      // Handle timestamp: prefer timestamp (bigint), fallback to created_at, then Date.now()
+      let reqTimestamp: number;
+      if (r.timestamp && typeof r.timestamp === 'number' && r.timestamp > 0) {
+        reqTimestamp = r.timestamp;
+      } else if (r.created_at) {
+        const createdDate = new Date(r.created_at);
+        reqTimestamp = isNaN(createdDate.getTime()) ? Date.now() : createdDate.getTime();
+      } else {
+        // Fallback: use Date.now() if both are missing
+        console.warn(`[getRides] Missing timestamp for ride ${r.id}, using Date.now()`, { timestamp: r.timestamp, created_at: r.created_at });
+        reqTimestamp = Date.now();
+      }
+      
+      return {
+        id: r.id.toString(),
+        guestName: r.guest_name || r.guestName || 'Guest',
+        roomNumber: r.room_number || r.roomNumber,
+        pickup: r.pickup,
+        destination: r.destination,
+        status: r.status as BuggyStatus,
+        timestamp: reqTimestamp,
+        driverId: r.driver_id ? r.driver_id.toString() : undefined,
+        eta: r.eta || undefined,
+        pickedUpAt: r.pick_timestamp ? new Date(r.pick_timestamp).getTime() : (r.picked_up_at ? new Date(r.picked_up_at).getTime() : undefined),
+        completedAt: r.drop_timestamp ? new Date(r.drop_timestamp).getTime() : (r.completed_at ? new Date(r.completed_at).getTime() : undefined),
+        confirmedAt: r.assigned_timestamp ? new Date(r.assigned_timestamp).getTime() : (r.assigned_at ? new Date(r.assigned_at).getTime() : undefined),
+        rating: r.rating || undefined,
+        feedback: r.feedback || undefined
+      };
+    });
     
     console.log('Mapped rides:', mapped);
     // Update local cache
@@ -1447,8 +1526,7 @@ export const updateRideStatus = async (rideId: string, status: BuggyStatus, driv
   try {
     const ride = rides.find(r => r.id === rideId);
     if (!ride) {
-      console.warn(`Ride ${rideId} not found in local cache`);
-      return;
+      console.warn(`Ride ${rideId} not found in local cache, but will attempt API update anyway`);
     }
 
     const updateData: any = {
@@ -1462,14 +1540,6 @@ export const updateRideStatus = async (rideId: string, status: BuggyStatus, driv
       updateData.eta = eta;
     }
 
-    // Handle timestamp updates for status changes
-    if (status === BuggyStatus.ON_TRIP && !ride.pickedUpAt) {
-      // Note: picked_up_at might be handled by backend, but we can set it here if needed
-    }
-    if (status === BuggyStatus.COMPLETED && !ride.completedAt) {
-      // Note: completed_at might be handled by backend, but we can set it here if needed
-    }
-
     console.log('Updating ride status via API - Ride ID:', rideId);
     console.log('Updating ride status via API - Update Data:', updateData);
 
@@ -1478,33 +1548,54 @@ export const updateRideStatus = async (rideId: string, status: BuggyStatus, driv
     console.log('Ride status updated successfully - API Response:', dbRide);
 
     // Map database response to frontend format
+    // Handle timestamp: prefer timestamp (bigint), fallback to created_at, then existing ride timestamp, then Date.now()
+    let reqTimestamp: number;
+    if (dbRide.timestamp && typeof dbRide.timestamp === 'number' && dbRide.timestamp > 0) {
+      reqTimestamp = dbRide.timestamp;
+    } else if (dbRide.created_at) {
+      const createdDate = new Date(dbRide.created_at);
+      reqTimestamp = isNaN(createdDate.getTime()) ? (ride?.timestamp || Date.now()) : createdDate.getTime();
+    } else {
+      reqTimestamp = ride?.timestamp || Date.now();
+    }
+    
     const updatedRide: RideRequest = {
       id: dbRide.id.toString(),
-      guestName: dbRide.guest_name || ride.guestName,
-      roomNumber: dbRide.room_number || ride.roomNumber,
-      pickup: dbRide.pickup || ride.pickup,
-      destination: dbRide.destination || ride.destination,
+      guestName: dbRide.guest_name || ride?.guestName || 'Guest',
+      roomNumber: dbRide.room_number || ride?.roomNumber || '',
+      pickup: dbRide.pickup || ride?.pickup || '',
+      destination: dbRide.destination || ride?.destination || '',
       status: dbRide.status as BuggyStatus,
-      timestamp: dbRide.timestamp || ride.timestamp,
-      driverId: dbRide.driver_id ? dbRide.driver_id.toString() : (driverId || ride.driverId),
-      eta: dbRide.eta !== undefined ? dbRide.eta : (eta !== undefined ? eta : ride.eta),
-      pickedUpAt: dbRide.picked_up_at ? new Date(dbRide.picked_up_at).getTime() : (status === BuggyStatus.ON_TRIP && !ride.pickedUpAt ? Date.now() : ride.pickedUpAt),
-      completedAt: dbRide.completed_at ? new Date(dbRide.completed_at).getTime() : (status === BuggyStatus.COMPLETED && !ride.completedAt ? Date.now() : ride.completedAt),
-      rating: dbRide.rating || ride.rating,
-      feedback: dbRide.feedback || ride.feedback
+      timestamp: reqTimestamp,
+      driverId: dbRide.driver_id ? dbRide.driver_id.toString() : (driverId || ride?.driverId),
+      eta: dbRide.eta !== undefined ? dbRide.eta : (eta !== undefined ? eta : ride?.eta),
+      pickedUpAt: dbRide.pick_timestamp ? new Date(dbRide.pick_timestamp).getTime() : (dbRide.picked_up_at ? new Date(dbRide.picked_up_at).getTime() : (status === BuggyStatus.ON_TRIP && !ride?.pickedUpAt ? Date.now() : ride?.pickedUpAt)),
+      completedAt: dbRide.drop_timestamp ? new Date(dbRide.drop_timestamp).getTime() : (dbRide.completed_at ? new Date(dbRide.completed_at).getTime() : (status === BuggyStatus.COMPLETED && !ride?.completedAt ? Date.now() : ride?.completedAt)),
+      confirmedAt: dbRide.assigned_timestamp ? new Date(dbRide.assigned_timestamp).getTime() : (dbRide.assigned_at ? new Date(dbRide.assigned_at).getTime() : (status === BuggyStatus.ASSIGNED && !ride?.confirmedAt ? Date.now() : (status === BuggyStatus.ASSIGNED && ride?.confirmedAt ? ride.confirmedAt : (ride?.confirmedAt || undefined)))),
+      rating: dbRide.rating || ride?.rating,
+      feedback: dbRide.feedback || ride?.feedback
     };
 
     // Update local cache
-    rides = rides.map(r => r.id === rideId ? updatedRide : r);
+    const existingIndex = rides.findIndex(r => r.id === rideId);
+    if (existingIndex >= 0) {
+      rides = rides.map(r => r.id === rideId ? updatedRide : r);
+    } else {
+      // Add to cache if not found
+      rides = [updatedRide, ...rides];
+    }
     console.log('Ride updated in local cache:', updatedRide);
 
-    // Notify Guest of status change
-    if (status === BuggyStatus.ASSIGNED) {
-        sendNotification(ride.roomNumber, 'Buggy Assigned', `A driver is on the way. ETA: ${eta} mins.`, 'SUCCESS');
-    } else if (status === BuggyStatus.ARRIVING) {
-        sendNotification(ride.roomNumber, 'Buggy Arriving', `Your buggy has arrived at ${ride.pickup}.`, 'INFO');
-    } else if (status === BuggyStatus.COMPLETED) {
-        sendNotification(ride.roomNumber, 'Ride Completed', `You have arrived at ${ride.destination}. Have a nice day!`, 'SUCCESS');
+    // Notify Guest of status change (only if we have room number)
+    const roomNumber = updatedRide.roomNumber || ride?.roomNumber;
+    if (roomNumber) {
+      if (status === BuggyStatus.ASSIGNED) {
+        sendNotification(roomNumber, 'Buggy Assigned', `A driver is on the way. ETA: ${eta} mins.`, 'SUCCESS');
+      } else if (status === BuggyStatus.ARRIVING) {
+        sendNotification(roomNumber, 'Buggy Arriving', `Your buggy has arrived at ${updatedRide.pickup}.`, 'INFO');
+      } else if (status === BuggyStatus.COMPLETED) {
+        sendNotification(roomNumber, 'Ride Completed', `You have arrived at ${updatedRide.destination}. Have a nice day!`, 'SUCCESS');
+      }
     }
   } catch (error: any) {
     console.error('Failed to update ride status via API:', error);
@@ -1528,6 +1619,9 @@ export const updateRideStatus = async (rideId: string, status: BuggyStatus, driv
           eta: eta !== undefined ? eta : r.eta 
         };
 
+        if ((status === BuggyStatus.ASSIGNED || status === BuggyStatus.ARRIVING) && !updatedRide.confirmedAt) {
+            updatedRide.confirmedAt = Date.now();
+        }
         if (status === BuggyStatus.ON_TRIP && !updatedRide.pickedUpAt) {
             updatedRide.pickedUpAt = Date.now();
         }
@@ -1593,6 +1687,17 @@ export const getActiveRideForUser = async (roomNumber: string): Promise<RideRequ
     }
     
     // Map database format to frontend format
+    // Handle timestamp: prefer timestamp (bigint), fallback to created_at, then Date.now()
+    let reqTimestamp: number;
+    if (dbRide.timestamp && typeof dbRide.timestamp === 'number' && dbRide.timestamp > 0) {
+      reqTimestamp = dbRide.timestamp;
+    } else if (dbRide.created_at) {
+      const createdDate = new Date(dbRide.created_at);
+      reqTimestamp = isNaN(createdDate.getTime()) ? Date.now() : createdDate.getTime();
+    } else {
+      reqTimestamp = Date.now();
+    }
+    
     return {
       id: dbRide.id.toString(),
       guestName: dbRide.guest_name,
@@ -1600,14 +1705,22 @@ export const getActiveRideForUser = async (roomNumber: string): Promise<RideRequ
       pickup: dbRide.pickup,
       destination: dbRide.destination,
       status: dbRide.status as BuggyStatus,
-      timestamp: dbRide.timestamp,
+      timestamp: reqTimestamp,
       driverId: dbRide.driver_id ? dbRide.driver_id.toString() : undefined,
-      eta: dbRide.eta
+      eta: dbRide.eta,
+      confirmedAt: dbRide.assigned_timestamp ? new Date(dbRide.assigned_timestamp).getTime() : (dbRide.assigned_at ? new Date(dbRide.assigned_at).getTime() : (dbRide.status === 'ASSIGNED' && dbRide.updated_at ? new Date(dbRide.updated_at).getTime() : undefined)),
+      pickedUpAt: dbRide.pick_timestamp ? new Date(dbRide.pick_timestamp).getTime() : (dbRide.picked_up_at ? new Date(dbRide.picked_up_at).getTime() : undefined),
+      completedAt: dbRide.drop_timestamp ? new Date(dbRide.drop_timestamp).getTime() : (dbRide.completed_at ? new Date(dbRide.completed_at).getTime() : undefined)
     };
   } catch (error) {
     console.error('Failed to get active ride:', error);
     // Fallback to local
-    return rides.find(r => r.roomNumber === roomNumber && r.status !== BuggyStatus.COMPLETED);
+    const localRide = rides.find(r => r.roomNumber === roomNumber && r.status !== BuggyStatus.COMPLETED);
+    // Ensure confirmedAt is set for local rides if status is ASSIGNED/ARRIVING
+    if (localRide && (localRide.status === BuggyStatus.ASSIGNED || localRide.status === BuggyStatus.ARRIVING) && !localRide.confirmedAt) {
+      localRide.confirmedAt = Date.now();
+    }
+    return localRide;
   }
 };
 
@@ -1677,7 +1790,13 @@ export const addServiceRequest = async (req: ServiceRequest): Promise<ServiceReq
       timestamp: req.timestamp || Date.now()
     };
 
+    console.log('Adding service request via API - Input:', req);
+    console.log('Adding service request via API - Request Body:', requestBody);
+
     const dbRequest = await apiClient.post<any>('/service-requests', requestBody);
+    
+    console.log('Service request added successfully - API Response:', dbRequest);
+    
     const newRequest = mapServiceRequestToFrontend(dbRequest);
     
     // Update local state
@@ -1691,19 +1810,17 @@ export const addServiceRequest = async (req: ServiceRequest): Promise<ServiceReq
     notifyStaffByDepartment(readableType, 'New Service Request', `Room ${req.roomNumber}: ${req.details}`);
     
     return newRequest;
-  } catch (error) {
-    console.error('Failed to add service request:', error);
-    // Fallback to local
-    serviceRequests = [req, ...serviceRequests];
+  } catch (error: any) {
+    console.error('Failed to add service request via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.data || error?.response?.body
+    });
     
-    // Notify Guest
-    sendNotification(req.roomNumber, 'Order Received', `We have received your ${req.type.toLowerCase()} request.`, 'INFO');
-    
-    // Notify Staff of that Department
-    const readableType = req.type.charAt(0) + req.type.slice(1).toLowerCase();
-    await notifyStaffByDepartment(readableType, 'New Service Request', `Room ${req.roomNumber}: ${req.details}`);
-    
-    return req;
+    // Re-throw error so component can handle it
+    throw error;
   }
 };
 
@@ -2193,6 +2310,28 @@ export const getLastMessage = async (roomNumber: string, service: string): Promi
   }
 };
 
+export const markServiceMessagesAsRead = async (roomNumber: string, service: string, messageId: number, userRole: 'user' | 'staff'): Promise<void> => {
+    try {
+        await apiClient.post(`/chat-messages/room/${roomNumber}/mark-read`, {
+            service_type: service,
+            message_id: messageId,
+            user_role: userRole
+        });
+    } catch (error) {
+        console.error('Failed to mark messages as read:', error);
+    }
+};
+
+export const getServiceUnreadCount = async (roomNumber: string, service: string, userRole: 'user' | 'staff'): Promise<number> => {
+    try {
+        const response = await apiClient.get<{ unreadCount: number }>(`/chat-messages/room/${roomNumber}/unread?service_type=${service}&user_role=${userRole}`);
+        return response.unreadCount || 0;
+    } catch (error) {
+        console.error('Failed to get unread count:', error);
+        return 0;
+    }
+};
+
 export const sendServiceMessage = async (roomNumber: string, service: string, text: string, senderRole: 'user' | 'staff' = 'user'): Promise<void> => {
   try {
     // Get user ID if available
@@ -2273,6 +2412,9 @@ export const getDashboardStats = async () => {
     const allRides = await getRides().catch(() => getRidesSync());
     const activeBuggies = allRides.filter(r => r.status === BuggyStatus.ON_TRIP || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ASSIGNED).length;
     const searchingBuggies = allRides.filter(r => r.status === BuggyStatus.SEARCHING).length;
+    const onTripBuggies = allRides.filter(r => r.status === BuggyStatus.ON_TRIP || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ASSIGNED).length;
+    // Count all completed buggy rides (not just today)
+    const completedBuggies = allRides.filter(r => r.status === BuggyStatus.COMPLETED).length;
 
     // 4. Daily Revenue Estimation (Simple Mock)
     // In a real app, orders would have actual totals. Here we assume average order values.
@@ -2296,6 +2438,8 @@ export const getDashboardStats = async () => {
         pendingButler,
         activeBuggies,
         searchingBuggies,
+        onTripBuggies,
+        completedBuggies,
         totalRevenue,
         recentActivity,
         todayCompletedCount: todayCompleted.length

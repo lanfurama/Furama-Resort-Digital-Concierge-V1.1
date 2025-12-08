@@ -92,6 +92,7 @@ export interface Promotion {
   discount?: string;
   validUntil?: string;
   imageColor?: string; // For UI styling mock
+  imageUrl?: string; // Image URL for promotion banner
   translations?: ContentTranslation;
 }
 
@@ -125,6 +126,7 @@ export interface RideRequest {
   feedback?: string;
   pickedUpAt?: number;
   completedAt?: number;
+  confirmedAt?: number; // Timestamp when driver accepted the ride
 }
 
 export interface ServiceRequest {

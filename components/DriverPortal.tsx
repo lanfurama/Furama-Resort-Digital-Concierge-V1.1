@@ -45,11 +45,29 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 const allRides = await getRides();
                 setRides(allRides);
                 
-                // Check if I have an active ride
-                const active = allRides.find(r => 
-                    (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP) 
-                    // In a real app check driver ID, here we simulate single driver session
-                );
+                // Get current driver ID
+                const savedUser = localStorage.getItem('furama_user');
+                let currentDriverId: string | null = null;
+                if (savedUser) {
+                    try {
+                        const user = JSON.parse(savedUser);
+                        currentDriverId = user.id || null;
+                    } catch (e) {
+                        console.error('Failed to parse user from localStorage:', e);
+                    }
+                }
+                
+                // Check if I have an active ride (match by driverId)
+                const active = allRides.find(r => {
+                    if (r.status !== BuggyStatus.ASSIGNED && r.status !== BuggyStatus.ARRIVING && r.status !== BuggyStatus.ON_TRIP) {
+                        return false;
+                    }
+                    // If we have driver ID, match by it; otherwise show any active ride
+                    if (currentDriverId) {
+                        return r.driverId === currentDriverId || r.driverId === currentDriverId.toString();
+                    }
+                    return r.driverId !== undefined && r.driverId !== null;
+                });
                 
                 if (active) {
                     setMyRideId(active.id);
@@ -78,8 +96,20 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
     const acceptRide = async (id: string) => {
         try {
-            console.log('Accepting ride:', id);
-            await updateRideStatus(id, BuggyStatus.ARRIVING, 'driver-1', 5); // 5 min ETA mock
+            // Get current driver ID from localStorage
+            const savedUser = localStorage.getItem('furama_user');
+            let driverId: string | undefined = 'driver-1'; // Fallback
+            if (savedUser) {
+                try {
+                    const user = JSON.parse(savedUser);
+                    driverId = user.id || 'driver-1';
+                } catch (e) {
+                    console.error('Failed to parse user from localStorage:', e);
+                }
+            }
+            
+            console.log('Accepting ride:', id, 'with driverId:', driverId);
+            await updateRideStatus(id, BuggyStatus.ARRIVING, driverId, 5); // 5 min ETA mock
             console.log('Ride accepted successfully');
             // Refresh rides after update
             const allRides = await getRides();
@@ -123,9 +153,21 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         if (!manualRideData.pickup || !manualRideData.destination) return;
         
         try {
-            console.log('Creating manual ride:', manualRideData);
+            // Get current driver ID from localStorage
+            const savedUser = localStorage.getItem('furama_user');
+            let driverId: string = 'driver-1'; // Fallback
+            if (savedUser) {
+                try {
+                    const user = JSON.parse(savedUser);
+                    driverId = user.id || 'driver-1';
+                } catch (e) {
+                    console.error('Failed to parse user from localStorage:', e);
+                }
+            }
+            
+            console.log('Creating manual ride:', manualRideData, 'with driverId:', driverId);
             const newRide = await createManualRide(
-                'driver-1', 
+                driverId, 
                 manualRideData.roomNumber, 
                 manualRideData.pickup, 
                 manualRideData.destination
@@ -149,11 +191,55 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     };
 
     const pendingRides = rides.filter(r => r.status === BuggyStatus.SEARCHING);
-    // Filter history for this driver (mocked as 'driver-1')
-    const historyRides = rides.filter(r => r.status === BuggyStatus.COMPLETED && r.driverId === 'driver-1').sort((a,b) => b.timestamp - a.timestamp);
+    
+    // Get current driver ID from localStorage
+    const getCurrentDriverId = (): string | null => {
+        try {
+            const savedUser = localStorage.getItem('furama_user');
+            if (savedUser) {
+                const user = JSON.parse(savedUser);
+                return user.id || null;
+            }
+        } catch (error) {
+            console.error('Failed to get driver ID from localStorage:', error);
+        }
+        return null;
+    };
+    
+    const currentDriverId = getCurrentDriverId();
+    
+    // Filter history for this driver - show all completed rides that have a driverId set
+    // If we have currentDriverId, filter by it; otherwise show all completed rides with any driverId
+    const historyRides = rides.filter(r => {
+        if (r.status !== BuggyStatus.COMPLETED) return false;
+        if (currentDriverId) {
+            // Match by current driver ID (as string)
+            return r.driverId === currentDriverId || r.driverId === currentDriverId.toString();
+        }
+        // If no driver ID in localStorage, show all completed rides with any driverId
+        return r.driverId !== undefined && r.driverId !== null;
+    }).sort((a,b) => b.timestamp - a.timestamp);
+    
     const myCurrentRide = rides.find(r => r.id === myRideId);
 
     const formatTime = (ts?: number) => ts ? new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-';
+    
+    const formatDateTime = (ts?: number) => {
+        if (!ts || isNaN(ts) || ts <= 0) return '-';
+        try {
+            const date = new Date(ts);
+            if (isNaN(date.getTime())) return '-';
+            return date.toLocaleString([], { 
+                year: 'numeric', 
+                month: '2-digit', 
+                day: '2-digit', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+        } catch (e) {
+            return '-';
+        }
+    };
 
     return (
         <div className="min-h-screen bg-slate-900 text-white flex flex-col relative">
@@ -341,9 +427,9 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                                     </div>
 
                                     <div className="bg-black/20 rounded p-2 text-[9px] md:text-[10px] text-slate-400 flex flex-col sm:flex-row justify-between gap-1 sm:gap-0">
-                                        <span>Req: {formatTime(ride.timestamp)}</span>
-                                        <span>Pick: {formatTime(ride.pickedUpAt)}</span>
-                                        <span className="text-emerald-500">Drop: {formatTime(ride.completedAt)}</span>
+                                        <span>Req: {formatDateTime(ride.timestamp)}</span>
+                                        <span>Pick: {formatDateTime(ride.pickedUpAt)}</span>
+                                        <span className="text-emerald-500">Drop: {formatDateTime(ride.completedAt)}</span>
                                     </div>
 
                                     {ride.rating && (

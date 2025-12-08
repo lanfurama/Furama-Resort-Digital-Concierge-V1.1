@@ -14,6 +14,9 @@ export interface RideRequest {
   feedback?: string | null;
   created_at: Date;
   updated_at: Date;
+  assigned_timestamp?: Date;
+  pick_timestamp?: Date;
+  drop_timestamp?: Date;
 }
 
 export const rideRequestModel = {
@@ -96,31 +99,31 @@ export const rideRequestModel = {
       values.push(rideRequest.destination);
     }
     
-    // Handle status change and set appropriate timestamps
+    // Handle status change and set timestamps automatically
     if (rideRequest.status !== undefined) {
       fields.push(`status = $${paramCount++}`);
       values.push(rideRequest.status);
       
-      // Set timestamp columns based on status change
+      // Set timestamps based on status change
       const newStatus = rideRequest.status;
-      const now = new Date();
+      const oldStatus = currentRide.status;
       
-      if (newStatus === 'ASSIGNED' && currentRide.status !== 'ASSIGNED') {
-        fields.push(`assigned_at = $${paramCount++}`);
-        values.push(now);
+      // When driver accepts ride (ASSIGNED or ARRIVING)
+      if ((newStatus === 'ASSIGNED' || newStatus === 'ARRIVING') && oldStatus !== 'ASSIGNED' && oldStatus !== 'ARRIVING') {
+        fields.push(`assigned_timestamp = CURRENT_TIMESTAMP`);
       }
-      if (newStatus === 'ARRIVING' && currentRide.status !== 'ARRIVING') {
-        fields.push(`arriving_at = $${paramCount++}`);
-        values.push(now);
+      
+      // When driver picks up guest (ON_TRIP)
+      if (newStatus === 'ON_TRIP' && oldStatus !== 'ON_TRIP') {
+        fields.push(`pick_timestamp = CURRENT_TIMESTAMP`);
       }
-      if (newStatus === 'ON_TRIP' && currentRide.status !== 'ON_TRIP') {
-        fields.push(`picked_up_at = $${paramCount++}`);
-        values.push(now);
+      
+      // When ride is completed (COMPLETED)
+      if (newStatus === 'COMPLETED' && oldStatus !== 'COMPLETED') {
+        fields.push(`drop_timestamp = CURRENT_TIMESTAMP`);
       }
-      if (newStatus === 'COMPLETED' && currentRide.status !== 'COMPLETED') {
-        fields.push(`completed_at = $${paramCount++}`);
-        values.push(now);
-      }
+      
+      // Note: updated_at is automatically updated by database trigger
     }
     
     if (rideRequest.timestamp !== undefined) {

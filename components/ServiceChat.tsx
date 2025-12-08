@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, Send, X, User, Shield, Globe, Languages } from 'lucide-react';
 import { ChatMessage } from '../types';
-import { getServiceMessages, sendServiceMessage } from '../services/dataService';
+import { getServiceMessages, sendServiceMessage, markServiceMessagesAsRead, getServiceUnreadCount } from '../services/dataService';
 import { translateText } from '../services/geminiService';
 
 interface ServiceChatProps {
@@ -37,6 +37,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [unreadCount, setUnreadCount] = useState(0);
 
     // Translation State
     const [targetLang, setTargetLang] = useState('Original');
@@ -48,8 +49,10 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
         const fetch = async () => {
             try {
                 const msgs = await getServiceMessages(roomNumber, serviceType);
+                const currentCount = messages.length;
+                
             // Simple check to avoid tight loops if object ref changes but content is same
-                if (msgs.length !== messages.length || JSON.stringify(msgs) !== JSON.stringify(messages)) {
+                if (msgs.length !== currentCount || JSON.stringify(msgs) !== JSON.stringify(messages)) {
                 setMessages(msgs);
                 }
             } catch (error) {
@@ -61,6 +64,26 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
         const interval = setInterval(fetch, 3000); // Poll every 3 seconds
         return () => clearInterval(interval);
     }, [roomNumber, serviceType]);
+
+    // Poll for unread count when chat is closed
+    useEffect(() => {
+        if (!isOpen) {
+            const fetchUnread = async () => {
+                try {
+                    const count = await getServiceUnreadCount(roomNumber, serviceType, userRole);
+                    setUnreadCount(count);
+                } catch (error) {
+                    console.error('Failed to fetch unread count:', error);
+                }
+            };
+
+            fetchUnread();
+            const interval = setInterval(fetchUnread, 3000); // Poll every 3 seconds
+            return () => clearInterval(interval);
+        } else {
+            setUnreadCount(0); // Reset when chat is open
+        }
+    }, [roomNumber, serviceType, userRole, isOpen]);
 
     // Handle Auto-Translation when messages change or target language changes
     useEffect(() => {
@@ -90,12 +113,17 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
         translateIncoming();
     }, [messages, targetLang, userRole, translatedCache]);
 
-    // Auto-scroll
+    // Auto-scroll and mark as read when new messages arrive
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && messages.length > 0) {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            // Mark as read when new messages arrive and chat is open
+            const lastMessage = messages[messages.length - 1];
+            if (lastMessage && typeof lastMessage.id === 'number') {
+                markServiceMessagesAsRead(roomNumber, serviceType, lastMessage.id, userRole);
+            }
         }
-    }, [messages, isOpen]);
+    }, [messages, isOpen, roomNumber, serviceType, userRole]);
 
     const handleSend = async () => {
         if (!input.trim()) return;
@@ -112,14 +140,31 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
         }
     };
 
-    const handleClose = () => {
+    const handleClose = async () => {
         setIsOpen(false);
+        // Mark messages as read when closing chat (user has seen them)
+        if (messages.length > 0) {
+            const lastMessage = messages[messages.length - 1];
+            if (lastMessage && typeof lastMessage.id === 'number') {
+                await markServiceMessagesAsRead(roomNumber, serviceType, lastMessage.id, userRole);
+            }
+        }
         if (onClose) onClose();
     };
 
-    const toggleOpen = () => {
+    const toggleOpen = async () => {
         const newState = !isOpen;
         setIsOpen(newState);
+        
+        // Mark messages as read when opening chat
+        if (newState && messages.length > 0) {
+            const lastMessage = messages[messages.length - 1];
+            if (lastMessage && typeof lastMessage.id === 'number') {
+                await markServiceMessagesAsRead(roomNumber, serviceType, lastMessage.id, userRole);
+            }
+            setUnreadCount(0);
+        }
+        
         if (!newState && onClose) onClose();
     }
 
@@ -235,10 +280,16 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
             {!autoOpen && (
                 <button 
                     onClick={toggleOpen}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-full shadow-lg transition transform hover:scale-105 active:scale-95 pointer-events-auto flex items-center justify-center"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-full shadow-lg transition transform hover:scale-105 active:scale-95 pointer-events-auto flex items-center justify-center relative"
                     style={{ marginBottom: '0' }}
                 >
                     {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
+                    {/* Unread Badge */}
+                    {!isOpen && unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center border-2 border-white animate-pulse shadow-lg">
+                            {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                    )}
                 </button>
             )}
         </div>

@@ -69,12 +69,29 @@ export const rideRequestController = {
   async update(req: Request, res: Response) {
     try {
       const id = parseInt(req.params.id);
+      console.log(`[RideRequestController] UPDATE request received:`, {
+        id,
+        rideId: req.params.id,
+        body: req.body,
+        method: req.method,
+        url: req.url,
+        originalUrl: req.originalUrl
+      });
+      
       const ride = await rideRequestModel.update(id, req.body);
       if (!ride) {
+        console.log(`[RideRequestController] Ride ${id} not found`);
         return res.status(404).json({ error: 'Ride request not found' });
       }
+      
+      console.log(`[RideRequestController] Ride ${id} updated successfully:`, ride);
       res.json(ride);
     } catch (error: any) {
+      console.error(`[RideRequestController] Error updating ride:`, {
+        id: req.params.id,
+        error: error.message,
+        stack: error.stack
+      });
       res.status(400).json({ error: error.message });
     }
   },
