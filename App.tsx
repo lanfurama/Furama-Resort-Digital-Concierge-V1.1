@@ -14,7 +14,8 @@ import GuestAccount from './components/GuestAccount';
 import ActiveOrders from './components/ActiveOrders';
 import NotificationBell from './components/NotificationBell';
 import SupervisorDashboard from './components/SupervisorDashboard';
-import { findUserByCredentials, loginStaff, loginGuest, getPromotions, getActiveGuestOrders } from './services/dataService';
+import { findUserByCredentials, loginStaff, loginGuest, getPromotions, getActiveGuestOrders, getActiveRideForUser } from './services/dataService';
+import { BuggyStatus } from './types';
 import { User as UserIcon, LogOut, MessageSquare, Car, Percent, Lock, Eye, EyeOff, ShoppingCart, Home } from 'lucide-react';
 import { LanguageProvider, useTranslation } from './contexts/LanguageContext';
 
@@ -171,6 +172,7 @@ const AppContent: React.FC = () => {
   // Helper for Nav Bar Active State
   const isActive = (v: AppView) => view === v;
   const [activeOrderCount, setActiveOrderCount] = useState(0);
+  const [buggyWaitTime, setBuggyWaitTime] = useState<number>(0); // Wait time in seconds
   
   // Load active order count
   useEffect(() => {
@@ -183,6 +185,34 @@ const AppContent: React.FC = () => {
       return () => clearInterval(interval);
     } else {
       setActiveOrderCount(0);
+    }
+  }, [user]);
+
+  // Track buggy wait time for badge notification
+  useEffect(() => {
+    if (user && user.role === UserRole.GUEST) {
+      const checkBuggyStatus = async () => {
+        try {
+          const activeRide = await getActiveRideForUser(user.roomNumber);
+          if (activeRide && activeRide.status === BuggyStatus.SEARCHING) {
+            const now = Date.now();
+            const elapsed = Math.max(0, Math.floor((now - activeRide.timestamp) / 1000));
+            setBuggyWaitTime(elapsed);
+          } else {
+            setBuggyWaitTime(0);
+          }
+        } catch (error) {
+          console.error('Failed to check buggy status:', error);
+          setBuggyWaitTime(0);
+        }
+      };
+      
+      checkBuggyStatus();
+      // Poll every 3 seconds for real-time updates
+      const interval = setInterval(checkBuggyStatus, 3000);
+      return () => clearInterval(interval);
+    } else {
+      setBuggyWaitTime(0);
     }
   }, [user]);
 
@@ -437,7 +467,7 @@ const AppContent: React.FC = () => {
                                 >
                                     {/* Overlay for better text readability when using image */}
                                     {promo.imageUrl && (
-                                        <div className="absolute inset-0 bg-black/40 rounded-2xl"></div>
+                                        <div className="absolute inset-0 bg-black/40 rounded-2xl shadow-lg"></div>
                                     )}
                                     <div className="relative z-10">
                                         <div className="bg-white/20 w-fit px-2 py-1 rounded text-[10px] font-bold mb-2 backdrop-blur-sm">{discount}</div>
@@ -493,7 +523,8 @@ const AppContent: React.FC = () => {
                 active={view === AppView.BUGGY} 
                 onClick={() => setView(AppView.BUGGY)} 
                 icon={Car} 
-                label={t('buggy')} 
+                label={t('buggy')}
+                urgentBadge={buggyWaitTime >= 600} // Show urgent badge if waiting over 10 minutes
            />
            <NavButton 
                 active={view === AppView.CHAT} 
@@ -528,7 +559,8 @@ const NavButton: React.FC<{
     label: string; 
     special?: boolean;
     badge?: number;
-}> = ({ active, onClick, icon: Icon, label, special, badge }) => (
+    urgentBadge?: boolean; // Red urgent badge for critical alerts
+}> = ({ active, onClick, icon: Icon, label, special, badge, urgentBadge }) => (
     <button 
         onClick={onClick}
         className={`flex flex-col items-center justify-center w-full h-full relative ${
@@ -542,14 +574,18 @@ const NavButton: React.FC<{
         ) : (
             <div className="mb-1 relative">
                 <Icon size={24} strokeWidth={active ? 2.5 : 2} />
-                {badge && badge > 0 ? (
+                {urgentBadge ? (
+                    <span className="absolute -top-1 -right-1.5 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-pulse">
+                        !
+                    </span>
+                ) : badge && badge > 0 ? (
                     <span className="absolute -top-1 -right-1.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full border border-white">
                         {badge}
                     </span>
                 ) : null}
             </div>
         )}
-        <span className={`text-[10px] font-medium ${special ? '-mt-3' : ''}`}>
+        <span className={`text-[10px] font-medium ${special ? '-mt-3' : ''} ${urgentBadge ? 'text-red-600 font-bold' : ''}`}>
             {label}
         </span>
     </button>

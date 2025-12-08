@@ -140,7 +140,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
     return (
         <div className="flex flex-col h-full bg-gray-50 relative">
              {/* Header */}
-            <div className={`p-4 ${config.color} text-white shadow-md flex items-center justify-between z-10`}>
+            <div className={`p-2.5 ${config.color} text-white shadow-md flex items-center justify-between z-10`}>
                 <div className="flex items-center">
                     <button onClick={onBack} className="mr-4 text-white hover:text-gray-200">
                         <ArrowLeft className="w-6 h-6" />
