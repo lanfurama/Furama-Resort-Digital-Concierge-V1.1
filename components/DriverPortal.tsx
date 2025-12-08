@@ -190,7 +190,46 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         }
     };
 
-    const pendingRides = rides.filter(r => r.status === BuggyStatus.SEARCHING);
+    // Smart priority sorting function for ride requests
+    const calculatePriority = (ride: RideRequest): number => {
+        const now = Date.now();
+        const waitingTime = now - ride.timestamp; // milliseconds
+        const waitingMinutes = waitingTime / (1000 * 60); // convert to minutes
+        
+        // Base priority: older requests get higher priority (lower number = higher priority)
+        let priority = waitingMinutes;
+        
+        // Room type priority adjustment
+        const roomNumber = ride.roomNumber.toUpperCase();
+        const firstChar = roomNumber.charAt(0);
+        
+        // Villa series (D, P, S, Q) get slight priority boost (subtract 2 minutes)
+        // Room series (R) are standard priority
+        if (firstChar === 'D' || firstChar === 'P' || firstChar === 'S' || firstChar === 'Q') {
+            priority -= 2; // Villa requests appear slightly higher
+        }
+        
+        // Very old requests (> 10 minutes) get extra priority boost
+        if (waitingMinutes > 10) {
+            priority -= 5; // Urgent: waiting too long
+        }
+        
+        // Very recent requests (< 1 minute) get slight delay
+        if (waitingMinutes < 1) {
+            priority += 1; // Let older requests be processed first
+        }
+        
+        return priority;
+    };
+    
+    const pendingRides = rides
+        .filter(r => r.status === BuggyStatus.SEARCHING)
+        .sort((a, b) => {
+            // Sort by priority (lower number = higher priority)
+            const priorityA = calculatePriority(a);
+            const priorityB = calculatePriority(b);
+            return priorityA - priorityB;
+        });
     
     // Get current driver ID from localStorage
     const getCurrentDriverId = (): string | null => {
@@ -223,6 +262,31 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     const myCurrentRide = rides.find(r => r.id === myRideId);
 
     const formatTime = (ts?: number) => ts ? new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-';
+    
+    // Calculate waiting time in minutes
+    const getWaitingTime = (timestamp: number): number => {
+        const now = Date.now();
+        const waitingMs = now - timestamp;
+        return Math.floor(waitingMs / (1000 * 60)); // minutes
+    };
+    
+    // Get priority badge info
+    const getPriorityInfo = (ride: RideRequest) => {
+        const waitingMinutes = getWaitingTime(ride.timestamp);
+        const roomNumber = ride.roomNumber.toUpperCase();
+        const firstChar = roomNumber.charAt(0);
+        const isVilla = ['D', 'P', 'S', 'Q'].includes(firstChar);
+        
+        if (waitingMinutes > 10) {
+            return { label: 'URGENT', color: 'bg-red-500', textColor: 'text-white' };
+        } else if (waitingMinutes > 5) {
+            return { label: 'HIGH', color: 'bg-orange-500', textColor: 'text-white' };
+        } else if (isVilla) {
+            return { label: 'VILLA', color: 'bg-purple-500/20', textColor: 'text-purple-300', border: 'border-purple-500/50' };
+        } else {
+            return { label: 'NEW', color: 'bg-emerald-500', textColor: 'text-white' };
+        }
+    };
     
     const formatDateTime = (ts?: number) => {
         if (!ts || isNaN(ts) || ts <= 0) return '-';
@@ -356,16 +420,33 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                                             <p className="text-base md:text-lg">No active requests.</p>
                                         </div>
                                     ) : (
-                                        pendingRides.map(ride => (
-                                            <div key={ride.id} className="bg-slate-800 p-4 md:p-3 rounded-xl border-2 border-slate-700 shadow-md">
+                                        pendingRides.map((ride, index) => {
+                                            const priorityInfo = getPriorityInfo(ride);
+                                            const waitingMinutes = getWaitingTime(ride.timestamp);
+                                            const isTopPriority = index === 0;
+                                            
+                                            return (
+                                            <div key={ride.id} className={`bg-slate-800 p-4 md:p-3 rounded-xl border-2 shadow-md ${
+                                                isTopPriority ? 'border-emerald-500 ring-2 ring-emerald-500/30' : 'border-slate-700'
+                                            }`}>
                                                 {/* Header with Room and Time */}
                                                 <div className="flex justify-between items-center mb-3 md:mb-2 gap-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="bg-emerald-500 text-white text-xs md:text-[10px] font-bold px-3 md:px-2 py-1 md:py-0.5 rounded-full animate-pulse">NEW</span>
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className={`${priorityInfo.color} ${priorityInfo.textColor} text-xs md:text-[10px] font-bold px-3 md:px-2 py-1 md:py-0.5 rounded-full ${
+                                                            priorityInfo.label === 'URGENT' || priorityInfo.label === 'HIGH' ? 'animate-pulse' : ''
+                                                        } ${priorityInfo.border ? `border ${priorityInfo.border}` : ''}`}>
+                                                            {priorityInfo.label}
+                                                        </span>
+                                                        {isTopPriority && (
+                                                            <span className="bg-yellow-500 text-black text-[10px] md:text-[9px] font-bold px-2 md:px-1.5 py-0.5 rounded">#1 PRIORITY</span>
+                                                        )}
                                                         <h3 className="font-bold text-lg md:text-sm text-white">Room {ride.roomNumber}</h3>
                                                     </div>
                                                     <div className="text-right flex-shrink-0">
-                                                        <span className="text-xs md:text-[10px] text-slate-400 whitespace-nowrap">{formatTime(ride.timestamp)}</span>
+                                                        <div className="text-xs md:text-[10px] text-slate-400 whitespace-nowrap">{formatTime(ride.timestamp)}</div>
+                                                        <div className="text-[10px] md:text-[9px] text-slate-500 whitespace-nowrap">
+                                                            {waitingMinutes > 0 ? `Waiting: ${waitingMinutes}m` : 'Just now'}
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 
@@ -406,12 +487,17 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                                                 {/* Accept Button - Large and Prominent */}
                                                 <button 
                                                     onClick={() => acceptRide(ride.id)}
-                                                    className="w-full bg-emerald-600 text-white font-bold py-4 md:py-2.5 rounded-xl text-base md:text-sm shadow-lg min-h-[56px] md:min-h-[40px]"
+                                                    className={`w-full text-white font-bold py-4 md:py-2.5 rounded-xl text-base md:text-sm shadow-lg min-h-[56px] md:min-h-[40px] ${
+                                                        isTopPriority 
+                                                            ? 'bg-emerald-500 ring-2 ring-emerald-400' 
+                                                            : 'bg-emerald-600'
+                                                    }`}
                                                 >
-                                                    Accept Ride
+                                                    {isTopPriority ? '✓ Accept Priority Ride' : 'Accept Ride'}
                                                 </button>
                                             </div>
-                                        ))
+                                            );
+                                        })
                                     )}
                                 </div>
                             </>

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Clock, Car, Navigation, Star, LocateFixed, XCircle, ChevronUp, ChevronDown, Search, Utensils, Coffee, Waves, Building2 } from 'lucide-react';
+import { MapPin, Clock, Car, Navigation, Star, LocateFixed, XCircle, Search, Utensils, Coffee, Waves, Building2 } from 'lucide-react';
 import { BuggyStatus, User, RideRequest, Location } from '../types';
 import { getLocations, requestRide, getActiveRideForUser, cancelRide } from '../services/dataService';
 import { THEME_COLORS, RESORT_CENTER } from '../constants';
@@ -19,12 +19,14 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [destination, setDestination] = useState<string>('');
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoadingRide, setIsLoadingRide] = useState(true);
-  const [elapsedTime, setElapsedTime] = useState<number>(0); // Time elapsed in seconds
-  const [isStatusCardVisible, setIsStatusCardVisible] = useState(true); // Toggle for status card
+  const [elapsedTime, setElapsedTime] = useState<number>(0); // Time elapsed in seconds (for SEARCHING)
+  const [arrivingElapsedTime, setArrivingElapsedTime] = useState<number>(0); // Time elapsed since driver accepted (for ASSIGNED/ARRIVING)
   const [searchQuery, setSearchQuery] = useState<string>(''); // Search query for locations
   const [filterType, setFilterType] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('ALL'); // Filter by location type
   
-  const MAX_WAIT_TIME = 10 * 60; // 10 minutes in seconds
+  const MAX_WAIT_TIME = 10 * 60; // 10 minutes in seconds (for SEARCHING status)
+  const MAX_ARRIVING_WAIT_TIME = 15 * 60; // 15 minutes in seconds (for ASSIGNED/ARRIVING status - driver arriving too long)
+  const ARRIVING_WARNING_TIME = 5 * 60; // 5 minutes in seconds (for ASSIGNED/ARRIVING status - show red warning)
   
   // Load locations on mount
   useEffect(() => {
@@ -55,43 +57,71 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   }, [user.roomNumber]);
 
   // Countdown timer for ride waiting time
+  // Track time differently based on ride status:
+  // - SEARCHING: Track time from ride creation (timestamp)
+  // - ASSIGNED/ARRIVING: Track time from when driver accepted (confirmedAt)
   useEffect(() => {
-      if (!activeRide || activeRide.status === BuggyStatus.COMPLETED || activeRide.status === BuggyStatus.ON_TRIP) {
+      if (!activeRide) {
           setElapsedTime(0);
+          setArrivingElapsedTime(0);
           return;
       }
 
-      // Calculate elapsed time based on status:
-      // - SEARCHING: from timestamp (when ride was created)
-      // - ASSIGNED/ARRIVING: from confirmedAt (when driver accepted) - only count from this point
-      let startTime: number | undefined;
-      
+      // Track elapsed time when SEARCHING (waiting for driver)
       if (activeRide.status === BuggyStatus.SEARCHING) {
-          // While searching, count from when ride was created
-          startTime = activeRide.timestamp;
-      } else if (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) {
-          // When driver accepts, only count from confirmedAt (reset timer)
-          // If confirmedAt is not set, use current time as fallback (driver just accepted)
-          startTime = activeRide.confirmedAt || Date.now();
-      }
-      
-      // Safety check: if startTime seems invalid (too old or in the future), use current time
-      const now = Date.now();
-      if (!startTime || startTime > now || startTime < now - (24 * 60 * 60 * 1000)) {
-          // If timestamp is invalid or more than 24 hours ago, use current time
-          startTime = now;
-      }
-      
-      const updateElapsed = () => {
-          const currentTime = Date.now();
-          const elapsed = Math.max(0, Math.floor((currentTime - startTime!) / 1000)); // Convert to seconds, ensure non-negative
-          setElapsedTime(elapsed);
-      };
+          setArrivingElapsedTime(0); // Reset arriving timer
+          
+          // Count from timestamp (when ride was created)
+          let startTime: number | undefined = activeRide.timestamp;
+          
+          // Safety check: if startTime seems invalid (too old or in the future), use current time
+          const now = Date.now();
+          if (!startTime || startTime > now || startTime < now - (24 * 60 * 60 * 1000)) {
+              // If timestamp is invalid or more than 24 hours ago, use current time
+              startTime = now;
+          }
+          
+          const updateElapsed = () => {
+              const currentTime = Date.now();
+              const elapsed = Math.max(0, Math.floor((currentTime - startTime!) / 1000)); // Convert to seconds, ensure non-negative
+              setElapsedTime(elapsed);
+          };
 
-      updateElapsed(); // Update immediately
-      const timer = setInterval(updateElapsed, 1000); // Update every second
+          updateElapsed(); // Update immediately
+          const timer = setInterval(updateElapsed, 1000); // Update every second
+          
+          return () => clearInterval(timer);
+      }
       
-      return () => clearInterval(timer);
+      // Track elapsed time when ASSIGNED/ARRIVING (driver has accepted but not arrived)
+      if (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) {
+          setElapsedTime(0); // Reset searching timer
+          
+          // Count from confirmedAt (when driver accepted)
+          let startTime: number | undefined = activeRide.confirmedAt;
+          
+          // Safety check: if confirmedAt is missing or invalid, use current time
+          const now = Date.now();
+          if (!startTime || startTime > now || startTime < now - (24 * 60 * 60 * 1000)) {
+              // If confirmedAt is invalid or more than 24 hours ago, use current time
+              startTime = now;
+          }
+          
+          const updateArrivingElapsed = () => {
+              const currentTime = Date.now();
+              const elapsed = Math.max(0, Math.floor((currentTime - startTime!) / 1000)); // Convert to seconds, ensure non-negative
+              setArrivingElapsedTime(elapsed);
+          };
+
+          updateArrivingElapsed(); // Update immediately
+          const timer = setInterval(updateArrivingElapsed, 1000); // Update every second
+          
+          return () => clearInterval(timer);
+      }
+      
+      // Reset both timers for other statuses
+      setElapsedTime(0);
+      setArrivingElapsedTime(0);
   }, [activeRide]);
 
 
@@ -115,19 +145,47 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   };
 
   const handleCancel = async () => {
-      if (activeRide) {
-          // Prevent cancelling if already picked up
-          if (activeRide.status === BuggyStatus.ON_TRIP || activeRide.status === BuggyStatus.COMPLETED) {
-              alert("Cannot cancel ride. Driver has already picked you up.");
-              return;
+      if (!activeRide) return;
+
+      // Business Logic for Resort Buggy Service:
+      // 1. SEARCHING: Can cancel anytime (if waiting > 10 min, show warning)
+      // 2. ASSIGNED/ARRIVING: Can cancel ONLY if driver arriving too long (> 15 min) - exceptional case
+      // 3. ON_TRIP/COMPLETED: Cannot cancel (already in progress or done)
+      
+      // Prevent cancelling if already picked up or completed
+      if (activeRide.status === BuggyStatus.ON_TRIP || activeRide.status === BuggyStatus.COMPLETED) {
+          alert("Cannot cancel ride. Driver has already picked you up.");
+          return;
+      }
+      
+      // Allow canceling if driver has accepted BUT arriving too long (> 15 minutes)
+      // This is an exceptional case for resort service - if driver is delayed significantly
+      if (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) {
+          if (arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME) {
+              // Driver has been arriving for over 15 minutes - allow cancellation
+              const confirmMessage = `Driver has been arriving for over 15 minutes. Are you sure you want to cancel this ride?`;
+              if (window.confirm(confirmMessage)) {
+                  try {
+                      await cancelRide(activeRide.id);
+                      setActiveRide(undefined);
+                      setElapsedTime(0);
+                      setArrivingElapsedTime(0);
+                      setDestination(''); // Clear destination
+                  } catch (error) {
+                      console.error('Failed to cancel ride:', error);
+                      alert('Failed to cancel ride. Please try again.');
+                  }
+              }
+          } else {
+              // Driver accepted but hasn't been arriving too long yet
+              alert("Cannot cancel ride. Driver has already accepted your request.");
           }
-          
-          // Prevent cancelling if driver just accepted (button should be disabled, but double-check)
-          if ((activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && elapsedTime < MAX_WAIT_TIME) {
-              alert(`Cannot cancel ride yet. You can cancel after waiting 10 minutes from when driver accepted.`);
-              return;
-          }
-          
+          return;
+      }
+      
+      // Only allow canceling if status is SEARCHING (waiting for driver)
+      // If waiting too long (over 10 minutes), show warning message
+      if (activeRide.status === BuggyStatus.SEARCHING) {
           const confirmMessage = elapsedTime >= MAX_WAIT_TIME 
               ? `You have been waiting for over 10 minutes. Are you sure you want to cancel this ride?`
               : "Are you sure you want to cancel this ride?";
@@ -137,6 +195,8 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
               await cancelRide(activeRide.id);
               setActiveRide(undefined);
               setElapsedTime(0);
+              setArrivingElapsedTime(0);
+              setDestination(''); // Clear destination
             } catch (error) {
               console.error('Failed to cancel ride:', error);
               alert('Failed to cancel ride. Please try again.');
@@ -169,10 +229,13 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
 
   // Determine if ride can be cancelled
-  // Can cancel if: searching OR (assigned/arriving AND elapsed time > 10 minutes)
+  // Business Logic for Resort Buggy Service:
+  // - Can cancel when SEARCHING (waiting for driver, no commitment yet)
+  // - Can cancel when ASSIGNED/ARRIVING ONLY if driver arriving too long (> 15 min) - exceptional case
+  // - Cannot cancel when ON_TRIP/COMPLETED (service already in progress/done)
   const canCancel = activeRide && (
-    activeRide.status === BuggyStatus.SEARCHING || 
-    (elapsedTime >= MAX_WAIT_TIME && (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING))
+      activeRide.status === BuggyStatus.SEARCHING ||
+      ((activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME)
   );
 
   // Format countdown timer - show elapsed time in MM:SS format
@@ -195,20 +258,15 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
 
 
-      {/* Status card section - Separate section below map */}
+      {/* Status card section - Always visible when there's an active ride */}
       {activeRide && (
         <div 
-          className={`bg-white shadow-lg border-t border-gray-100 flex-shrink-0 transition-all duration-300 ease-in-out ${
-            isStatusCardVisible 
-              ? 'px-3 pt-2 pb-2 md:p-3 opacity-100 overflow-hidden' 
-              : 'p-0 max-h-0 opacity-0 overflow-hidden'
-          }`}
+          className="bg-white shadow-lg border-t border-gray-100 flex-shrink-0 px-3 pt-2 pb-2 md:p-3 overflow-hidden"
           style={{ 
-            paddingBottom: isStatusCardVisible ? 'max(1.4rem, calc(1.4rem + env(safe-area-inset-bottom)))' : '0'
+            paddingBottom: 'max(1.4rem, calc(1.4rem + env(safe-area-inset-bottom)))'
           }}
         >
-          {isStatusCardVisible && (
-            <div className="flex flex-col space-y-2 md:space-y-3">
+          <div className="flex flex-col space-y-2 md:space-y-3">
               {/* Header Section */}
               <div className="flex flex-row justify-between items-start gap-2 flex-shrink-0">
                  <div className="flex-1 min-w-0 pr-1">
@@ -231,19 +289,16 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                         <div className="flex flex-col items-end">
                             {activeRide.eta && (
                                 <div className="flex flex-col items-end">
-                                    <div className="text-sm md:text-2xl font-bold text-emerald-600 leading-none whitespace-nowrap">{activeRide.eta} min</div>
+                                    <div className={`text-sm md:text-2xl font-bold leading-none whitespace-nowrap ${
+                                        (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime >= ARRIVING_WARNING_TIME
+                                            ? 'text-red-600'
+                                            : 'text-emerald-600'
+                                    }`}>{activeRide.eta} min</div>
                                     <div className="text-[8px] md:text-xs text-gray-500 leading-none mt-0.5">{t('estimated')}</div>
                                 </div>
                             )}
                         </div>
                     )}
-                    <button
-                        onClick={() => setIsStatusCardVisible(false)}
-                        className="text-gray-400 hover:text-gray-600 transition-colors p-1 flex-shrink-0 touch-manipulation"
-                        title="Hide status"
-                    >
-                        <ChevronDown className="w-4 h-4 md:w-5 md:h-5" />
-                    </button>
                  </div>
               </div>
               
@@ -260,55 +315,62 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                  </div>
               </div>
 
-              {/* CANCEL BUTTON: Visible if Searching OR (Assigned/Arriving AND wait time >= 10 minutes) */}
+              {/* CANCEL BUTTON: Visible when SEARCHING or when driver arriving too long */}
+              {/* For resort service: Can cancel while searching, or if driver arriving > 15 min */}
               {canCancel && (
                   <button 
                     onClick={handleCancel}
-                    disabled={(activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && elapsedTime < MAX_WAIT_TIME}
                     className={`w-full py-2 md:py-3 font-semibold rounded-lg transition border flex flex-row items-center justify-center gap-1.5 md:gap-2 text-xs md:text-base flex-shrink-0 touch-manipulation min-h-[44px] ${
-                        elapsedTime >= MAX_WAIT_TIME 
-                            ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200' 
+                        (activeRide.status === BuggyStatus.SEARCHING && elapsedTime >= MAX_WAIT_TIME) ||
+                        ((activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME)
+                            ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200'
                             : 'bg-red-50 text-red-600 hover:bg-red-100 border-red-100'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    }`}
                   >
                     <XCircle size={16} className="md:w-[18px] md:h-[18px] flex-shrink-0" />
                     <span className="text-center break-words leading-tight">
-                    {activeRide.status === BuggyStatus.SEARCHING 
-                        ? t('cancel_request') 
-                        : elapsedTime >= MAX_WAIT_TIME 
-                            ? `${t('cancel_ride')} (Over 10 min)`
-                            : t('cancel_ride')
-                    }
+                        {activeRide.status === BuggyStatus.SEARCHING && elapsedTime >= MAX_WAIT_TIME 
+                            ? `${t('cancel_request')} (Over 10 min)`
+                            : (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME
+                            ? `${t('cancel_request')} (Driver delayed)`
+                            : t('cancel_request')
+                        }
                     </span>
                   </button>
               )}
-              
-              {/* Warning message if waiting but can't cancel yet */}
-              {activeRide && (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && elapsedTime < MAX_WAIT_TIME && (
+
+              {/* Info message when driver has accepted - cannot cancel yet (unless arriving too long) */}
+              {/* For resort service: Once driver commits, guest cannot cancel unless driver delayed > 15 min */}
+              {activeRide && (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime < ARRIVING_WARNING_TIME && (
                   <div className="mt-0 text-[10px] md:text-xs text-gray-500 text-center leading-tight px-1 flex-shrink-0">
-                      You can cancel after waiting 10 minutes from when driver accepted
+                      Driver has accepted your request. You cannot cancel this ride.
+                  </div>
+              )}
+              
+              {/* Warning message when driver arriving > 5 min but < 15 min - show red warning */}
+              {activeRide && (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime >= ARRIVING_WARNING_TIME && arrivingElapsedTime < MAX_ARRIVING_WAIT_TIME && (
+                  <div className="mt-0 text-[10px] md:text-xs text-red-600 text-center leading-tight px-1 flex-shrink-0 font-medium">
+                      Driver has been arriving for over 5 minutes. Please wait.
+                  </div>
+              )}
+              
+              {/* Warning message when driver arriving too long (> 15 min) - can cancel */}
+              {activeRide && (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME && (
+                  <div className="mt-0 text-[10px] md:text-xs text-red-600 text-center leading-tight px-1 flex-shrink-0 font-medium">
+                      Driver has been arriving for over 15 minutes. You can cancel if needed.
+                  </div>
+              )}
+              
+              {/* Info message when ride is in progress or completed */}
+              {activeRide && (activeRide.status === BuggyStatus.ON_TRIP || activeRide.status === BuggyStatus.COMPLETED) && (
+                  <div className="mt-0 text-[10px] md:text-xs text-gray-500 text-center leading-tight px-1 flex-shrink-0">
+                      {activeRide.status === BuggyStatus.ON_TRIP 
+                          ? "Ride is in progress. You cannot cancel."
+                          : "Ride completed. You cannot cancel."
+                      }
                   </div>
               )}
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Show Status Card Button - When status card is hidden */}
-      {activeRide && !isStatusCardVisible && (
-        <div 
-          className="bg-white p-2 md:p-3 rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] -mt-6 relative z-20 flex items-center justify-center" 
-          style={{ 
-            paddingBottom: 'max(1rem, calc(1rem + env(safe-area-inset-bottom)))'
-          }}
-        >
-            <button
-                onClick={() => setIsStatusCardVisible(true)}
-                className="flex items-center space-x-2 text-emerald-600 hover:text-emerald-700 font-semibold text-xs md:text-sm transition-colors"
-            >
-                <ChevronUp className="w-4 h-4 md:w-5 md:h-5" />
-                <span>Show Status</span>
-            </button>
         </div>
       )}
 
