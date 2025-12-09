@@ -5,7 +5,7 @@
 -- Dumped from database version 17.5
 -- Dumped by pg_dump version 17.5
 
--- Started on 2025-12-06 23:40:51
+-- Started on 2025-12-09 09:39:38
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -20,7 +20,7 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- TOC entry 877 (class 1247 OID 105600)
+-- TOC entry 879 (class 1247 OID 105600)
 -- Name: buggy_status; Type: TYPE; Schema: public; Owner: postgres
 --
 
@@ -37,7 +37,7 @@ CREATE TYPE public.buggy_status AS ENUM (
 ALTER TYPE public.buggy_status OWNER TO postgres;
 
 --
--- TOC entry 886 (class 1247 OID 105630)
+-- TOC entry 888 (class 1247 OID 105630)
 -- Name: location_type; Type: TYPE; Schema: public; Owner: postgres
 --
 
@@ -51,7 +51,7 @@ CREATE TYPE public.location_type AS ENUM (
 ALTER TYPE public.location_type OWNER TO postgres;
 
 --
--- TOC entry 889 (class 1247 OID 105638)
+-- TOC entry 891 (class 1247 OID 105638)
 -- Name: message_role; Type: TYPE; Schema: public; Owner: postgres
 --
 
@@ -64,7 +64,7 @@ CREATE TYPE public.message_role AS ENUM (
 ALTER TYPE public.message_role OWNER TO postgres;
 
 --
--- TOC entry 883 (class 1247 OID 105622)
+-- TOC entry 885 (class 1247 OID 105622)
 -- Name: service_request_status; Type: TYPE; Schema: public; Owner: postgres
 --
 
@@ -78,21 +78,23 @@ CREATE TYPE public.service_request_status AS ENUM (
 ALTER TYPE public.service_request_status OWNER TO postgres;
 
 --
--- TOC entry 880 (class 1247 OID 105614)
+-- TOC entry 882 (class 1247 OID 105614)
 -- Name: service_type; Type: TYPE; Schema: public; Owner: postgres
 --
 
 CREATE TYPE public.service_type AS ENUM (
     'DINING',
     'SPA',
-    'HOUSEKEEPING'
+    'HOUSEKEEPING',
+    'POOL',
+    'BUTLER'
 );
 
 
 ALTER TYPE public.service_type OWNER TO postgres;
 
 --
--- TOC entry 874 (class 1247 OID 105590)
+-- TOC entry 876 (class 1247 OID 105590)
 -- Name: user_role; Type: TYPE; Schema: public; Owner: postgres
 --
 
@@ -108,7 +110,7 @@ CREATE TYPE public.user_role AS ENUM (
 ALTER TYPE public.user_role OWNER TO postgres;
 
 --
--- TOC entry 245 (class 1255 OID 105184)
+-- TOC entry 247 (class 1255 OID 105184)
 -- Name: update_updated_at_column(); Type: FUNCTION; Schema: public; Owner: postgres
 --
 
@@ -147,6 +149,9 @@ CREATE TABLE public.ride_requests (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     rating integer,
     feedback text,
+    pick_timestamp timestamp without time zone,
+    drop_timestamp timestamp without time zone,
+    assigned_timestamp timestamp without time zone,
     CONSTRAINT ride_requests_rating_check CHECK (((rating >= 1) AND (rating <= 5)))
 );
 
@@ -154,7 +159,7 @@ CREATE TABLE public.ride_requests (
 ALTER TABLE public.ride_requests OWNER TO postgres;
 
 --
--- TOC entry 5006 (class 0 OID 0)
+-- TOC entry 5018 (class 0 OID 0)
 -- Dependencies: 230
 -- Name: COLUMN ride_requests.rating; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -163,12 +168,39 @@ COMMENT ON COLUMN public.ride_requests.rating IS 'Guest rating for the ride (1-5
 
 
 --
--- TOC entry 5007 (class 0 OID 0)
+-- TOC entry 5019 (class 0 OID 0)
 -- Dependencies: 230
 -- Name: COLUMN ride_requests.feedback; Type: COMMENT; Schema: public; Owner: postgres
 --
 
 COMMENT ON COLUMN public.ride_requests.feedback IS 'Guest feedback/comment for the ride';
+
+
+--
+-- TOC entry 5020 (class 0 OID 0)
+-- Dependencies: 230
+-- Name: COLUMN ride_requests.pick_timestamp; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ride_requests.pick_timestamp IS 'Timestamp when driver picked up the guest (status = ON_TRIP)';
+
+
+--
+-- TOC entry 5021 (class 0 OID 0)
+-- Dependencies: 230
+-- Name: COLUMN ride_requests.drop_timestamp; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ride_requests.drop_timestamp IS 'Timestamp when ride was completed (status = COMPLETED)';
+
+
+--
+-- TOC entry 5022 (class 0 OID 0)
+-- Dependencies: 230
+-- Name: COLUMN ride_requests.assigned_timestamp; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.ride_requests.assigned_timestamp IS 'Timestamp when driver accepted the ride (status = ASSIGNED/ARRIVING)';
 
 
 --
@@ -193,7 +225,7 @@ CREATE TABLE public.users (
 ALTER TABLE public.users OWNER TO postgres;
 
 --
--- TOC entry 5008 (class 0 OID 0)
+-- TOC entry 5023 (class 0 OID 0)
 -- Dependencies: 218
 -- Name: COLUMN users.password; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -202,7 +234,7 @@ COMMENT ON COLUMN public.users.password IS 'Password for staff/admin/driver/supe
 
 
 --
--- TOC entry 5009 (class 0 OID 0)
+-- TOC entry 5024 (class 0 OID 0)
 -- Dependencies: 218
 -- Name: COLUMN users.language; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -211,7 +243,7 @@ COMMENT ON COLUMN public.users.language IS 'Preferred language for the user (Eng
 
 
 --
--- TOC entry 5010 (class 0 OID 0)
+-- TOC entry 5025 (class 0 OID 0)
 -- Dependencies: 218
 -- Name: COLUMN users.notes; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -264,7 +296,7 @@ CREATE TABLE public.chat_messages (
 ALTER TABLE public.chat_messages OWNER TO postgres;
 
 --
--- TOC entry 5011 (class 0 OID 0)
+-- TOC entry 5026 (class 0 OID 0)
 -- Dependencies: 234
 -- Name: COLUMN chat_messages.service_type; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -289,7 +321,7 @@ CREATE SEQUENCE public.chat_messages_id_seq
 ALTER SEQUENCE public.chat_messages_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5012 (class 0 OID 0)
+-- TOC entry 5027 (class 0 OID 0)
 -- Dependencies: 233
 -- Name: chat_messages_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -318,7 +350,7 @@ CREATE TABLE public.hotel_reviews (
 ALTER TABLE public.hotel_reviews OWNER TO postgres;
 
 --
--- TOC entry 5013 (class 0 OID 0)
+-- TOC entry 5028 (class 0 OID 0)
 -- Dependencies: 244
 -- Name: TABLE hotel_reviews; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -327,7 +359,7 @@ COMMENT ON TABLE public.hotel_reviews IS 'Hotel reviews submitted by guests';
 
 
 --
--- TOC entry 5014 (class 0 OID 0)
+-- TOC entry 5029 (class 0 OID 0)
 -- Dependencies: 244
 -- Name: COLUMN hotel_reviews.category_ratings; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -336,7 +368,7 @@ COMMENT ON COLUMN public.hotel_reviews.category_ratings IS 'JSON array of catego
 
 
 --
--- TOC entry 5015 (class 0 OID 0)
+-- TOC entry 5030 (class 0 OID 0)
 -- Dependencies: 244
 -- Name: COLUMN hotel_reviews.average_rating; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -361,7 +393,7 @@ CREATE SEQUENCE public.hotel_reviews_id_seq
 ALTER SEQUENCE public.hotel_reviews_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5016 (class 0 OID 0)
+-- TOC entry 5031 (class 0 OID 0)
 -- Dependencies: 243
 -- Name: hotel_reviews_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -402,7 +434,7 @@ CREATE SEQUENCE public.knowledge_items_id_seq
 ALTER SEQUENCE public.knowledge_items_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5017 (class 0 OID 0)
+-- TOC entry 5032 (class 0 OID 0)
 -- Dependencies: 225
 -- Name: knowledge_items_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -445,7 +477,7 @@ CREATE SEQUENCE public.locations_id_seq
 ALTER SEQUENCE public.locations_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5018 (class 0 OID 0)
+-- TOC entry 5033 (class 0 OID 0)
 -- Dependencies: 219
 -- Name: locations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -473,7 +505,7 @@ CREATE TABLE public.menu_items (
 ALTER TABLE public.menu_items OWNER TO postgres;
 
 --
--- TOC entry 5019 (class 0 OID 0)
+-- TOC entry 5034 (class 0 OID 0)
 -- Dependencies: 222
 -- Name: COLUMN menu_items.language; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -498,7 +530,7 @@ CREATE SEQUENCE public.menu_items_id_seq
 ALTER SEQUENCE public.menu_items_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5020 (class 0 OID 0)
+-- TOC entry 5035 (class 0 OID 0)
 -- Dependencies: 221
 -- Name: menu_items_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -527,7 +559,7 @@ CREATE TABLE public.notifications (
 ALTER TABLE public.notifications OWNER TO postgres;
 
 --
--- TOC entry 5021 (class 0 OID 0)
+-- TOC entry 5036 (class 0 OID 0)
 -- Dependencies: 242
 -- Name: TABLE notifications; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -536,7 +568,7 @@ COMMENT ON TABLE public.notifications IS 'System notifications for guests and st
 
 
 --
--- TOC entry 5022 (class 0 OID 0)
+-- TOC entry 5037 (class 0 OID 0)
 -- Dependencies: 242
 -- Name: COLUMN notifications.recipient_id; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -545,7 +577,7 @@ COMMENT ON COLUMN public.notifications.recipient_id IS 'Room number for guests, 
 
 
 --
--- TOC entry 5023 (class 0 OID 0)
+-- TOC entry 5038 (class 0 OID 0)
 -- Dependencies: 242
 -- Name: COLUMN notifications.type; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -570,7 +602,7 @@ CREATE SEQUENCE public.notifications_id_seq
 ALTER SEQUENCE public.notifications_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5024 (class 0 OID 0)
+-- TOC entry 5039 (class 0 OID 0)
 -- Dependencies: 241
 -- Name: notifications_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -601,7 +633,7 @@ CREATE TABLE public.service_requests (
 ALTER TABLE public.service_requests OWNER TO postgres;
 
 --
--- TOC entry 5025 (class 0 OID 0)
+-- TOC entry 5040 (class 0 OID 0)
 -- Dependencies: 232
 -- Name: COLUMN service_requests.rating; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -610,7 +642,7 @@ COMMENT ON COLUMN public.service_requests.rating IS 'Guest rating for the servic
 
 
 --
--- TOC entry 5026 (class 0 OID 0)
+-- TOC entry 5041 (class 0 OID 0)
 -- Dependencies: 232
 -- Name: COLUMN service_requests.feedback; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -664,7 +696,7 @@ CREATE TABLE public.promotions (
 ALTER TABLE public.promotions OWNER TO postgres;
 
 --
--- TOC entry 5027 (class 0 OID 0)
+-- TOC entry 5042 (class 0 OID 0)
 -- Dependencies: 224
 -- Name: COLUMN promotions.language; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -689,7 +721,7 @@ CREATE SEQUENCE public.promotions_id_seq
 ALTER SEQUENCE public.promotions_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5028 (class 0 OID 0)
+-- TOC entry 5043 (class 0 OID 0)
 -- Dependencies: 223
 -- Name: promotions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -718,7 +750,7 @@ CREATE TABLE public.resort_events (
 ALTER TABLE public.resort_events OWNER TO postgres;
 
 --
--- TOC entry 5029 (class 0 OID 0)
+-- TOC entry 5044 (class 0 OID 0)
 -- Dependencies: 228
 -- Name: COLUMN resort_events.language; Type: COMMENT; Schema: public; Owner: postgres
 --
@@ -743,7 +775,7 @@ CREATE SEQUENCE public.resort_events_id_seq
 ALTER SEQUENCE public.resort_events_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5030 (class 0 OID 0)
+-- TOC entry 5045 (class 0 OID 0)
 -- Dependencies: 227
 -- Name: resort_events_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -768,7 +800,7 @@ CREATE SEQUENCE public.ride_requests_id_seq
 ALTER SEQUENCE public.ride_requests_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5031 (class 0 OID 0)
+-- TOC entry 5046 (class 0 OID 0)
 -- Dependencies: 229
 -- Name: ride_requests_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -810,7 +842,7 @@ CREATE SEQUENCE public.room_types_id_seq
 ALTER SEQUENCE public.room_types_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5032 (class 0 OID 0)
+-- TOC entry 5047 (class 0 OID 0)
 -- Dependencies: 237
 -- Name: room_types_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -853,7 +885,7 @@ CREATE SEQUENCE public.rooms_id_seq
 ALTER SEQUENCE public.rooms_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5033 (class 0 OID 0)
+-- TOC entry 5048 (class 0 OID 0)
 -- Dependencies: 239
 -- Name: rooms_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -878,12 +910,62 @@ CREATE SEQUENCE public.service_requests_id_seq
 ALTER SEQUENCE public.service_requests_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5034 (class 0 OID 0)
+-- TOC entry 5049 (class 0 OID 0)
 -- Dependencies: 231
 -- Name: service_requests_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
 ALTER SEQUENCE public.service_requests_id_seq OWNED BY public.service_requests.id;
+
+
+--
+-- TOC entry 246 (class 1259 OID 107010)
+-- Name: user_read_messages; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.user_read_messages (
+    id integer NOT NULL,
+    identifier character varying(100) NOT NULL,
+    service_type character varying(50) NOT NULL,
+    last_read_message_id integer NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+ALTER TABLE public.user_read_messages OWNER TO postgres;
+
+--
+-- TOC entry 5050 (class 0 OID 0)
+-- Dependencies: 246
+-- Name: TABLE user_read_messages; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON TABLE public.user_read_messages IS 'Tracks the last read message ID for each user (guest or staff) in each service chat';
+
+
+--
+-- TOC entry 245 (class 1259 OID 107009)
+-- Name: user_read_messages_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.user_read_messages_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.user_read_messages_id_seq OWNER TO postgres;
+
+--
+-- TOC entry 5051 (class 0 OID 0)
+-- Dependencies: 245
+-- Name: user_read_messages_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.user_read_messages_id_seq OWNED BY public.user_read_messages.id;
 
 
 --
@@ -903,7 +985,7 @@ CREATE SEQUENCE public.users_id_seq
 ALTER SEQUENCE public.users_id_seq OWNER TO postgres;
 
 --
--- TOC entry 5035 (class 0 OID 0)
+-- TOC entry 5052 (class 0 OID 0)
 -- Dependencies: 217
 -- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
@@ -912,7 +994,7 @@ ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
 
 
 --
--- TOC entry 4759 (class 2604 OID 105741)
+-- TOC entry 4764 (class 2604 OID 105741)
 -- Name: chat_messages id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -920,7 +1002,7 @@ ALTER TABLE ONLY public.chat_messages ALTER COLUMN id SET DEFAULT nextval('publi
 
 
 --
--- TOC entry 4772 (class 2604 OID 106857)
+-- TOC entry 4777 (class 2604 OID 106857)
 -- Name: hotel_reviews id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -928,7 +1010,7 @@ ALTER TABLE ONLY public.hotel_reviews ALTER COLUMN id SET DEFAULT nextval('publi
 
 
 --
--- TOC entry 4744 (class 2604 OID 105690)
+-- TOC entry 4749 (class 2604 OID 105690)
 -- Name: knowledge_items id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -936,7 +1018,7 @@ ALTER TABLE ONLY public.knowledge_items ALTER COLUMN id SET DEFAULT nextval('pub
 
 
 --
--- TOC entry 4733 (class 2604 OID 105659)
+-- TOC entry 4738 (class 2604 OID 105659)
 -- Name: locations id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -944,7 +1026,7 @@ ALTER TABLE ONLY public.locations ALTER COLUMN id SET DEFAULT nextval('public.lo
 
 
 --
--- TOC entry 4736 (class 2604 OID 105668)
+-- TOC entry 4741 (class 2604 OID 105668)
 -- Name: menu_items id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -952,7 +1034,7 @@ ALTER TABLE ONLY public.menu_items ALTER COLUMN id SET DEFAULT nextval('public.m
 
 
 --
--- TOC entry 4768 (class 2604 OID 105836)
+-- TOC entry 4773 (class 2604 OID 105836)
 -- Name: notifications id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -960,7 +1042,7 @@ ALTER TABLE ONLY public.notifications ALTER COLUMN id SET DEFAULT nextval('publi
 
 
 --
--- TOC entry 4740 (class 2604 OID 105679)
+-- TOC entry 4745 (class 2604 OID 105679)
 -- Name: promotions id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -968,7 +1050,7 @@ ALTER TABLE ONLY public.promotions ALTER COLUMN id SET DEFAULT nextval('public.p
 
 
 --
--- TOC entry 4747 (class 2604 OID 105701)
+-- TOC entry 4752 (class 2604 OID 105701)
 -- Name: resort_events id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -976,7 +1058,7 @@ ALTER TABLE ONLY public.resort_events ALTER COLUMN id SET DEFAULT nextval('publi
 
 
 --
--- TOC entry 4751 (class 2604 OID 105712)
+-- TOC entry 4756 (class 2604 OID 105712)
 -- Name: ride_requests id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -984,7 +1066,7 @@ ALTER TABLE ONLY public.ride_requests ALTER COLUMN id SET DEFAULT nextval('publi
 
 
 --
--- TOC entry 4761 (class 2604 OID 105791)
+-- TOC entry 4766 (class 2604 OID 105791)
 -- Name: room_types id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -992,7 +1074,7 @@ ALTER TABLE ONLY public.room_types ALTER COLUMN id SET DEFAULT nextval('public.r
 
 
 --
--- TOC entry 4764 (class 2604 OID 105809)
+-- TOC entry 4769 (class 2604 OID 105809)
 -- Name: rooms id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -1000,7 +1082,7 @@ ALTER TABLE ONLY public.rooms ALTER COLUMN id SET DEFAULT nextval('public.rooms_
 
 
 --
--- TOC entry 4755 (class 2604 OID 105729)
+-- TOC entry 4760 (class 2604 OID 105729)
 -- Name: service_requests id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -1008,7 +1090,15 @@ ALTER TABLE ONLY public.service_requests ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
--- TOC entry 4728 (class 2604 OID 105647)
+-- TOC entry 4780 (class 2604 OID 107013)
+-- Name: user_read_messages id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_read_messages ALTER COLUMN id SET DEFAULT nextval('public.user_read_messages_id_seq'::regclass);
+
+
+--
+-- TOC entry 4733 (class 2604 OID 105647)
 -- Name: users id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -1016,7 +1106,7 @@ ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_
 
 
 --
--- TOC entry 4811 (class 2606 OID 105746)
+-- TOC entry 4818 (class 2606 OID 105746)
 -- Name: chat_messages chat_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1025,7 +1115,7 @@ ALTER TABLE ONLY public.chat_messages
 
 
 --
--- TOC entry 4834 (class 2606 OID 106863)
+-- TOC entry 4841 (class 2606 OID 106863)
 -- Name: hotel_reviews hotel_reviews_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1034,7 +1124,7 @@ ALTER TABLE ONLY public.hotel_reviews
 
 
 --
--- TOC entry 4836 (class 2606 OID 106865)
+-- TOC entry 4843 (class 2606 OID 106865)
 -- Name: hotel_reviews hotel_reviews_room_number_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1043,7 +1133,7 @@ ALTER TABLE ONLY public.hotel_reviews
 
 
 --
--- TOC entry 4796 (class 2606 OID 105696)
+-- TOC entry 4803 (class 2606 OID 105696)
 -- Name: knowledge_items knowledge_items_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1052,7 +1142,7 @@ ALTER TABLE ONLY public.knowledge_items
 
 
 --
--- TOC entry 4787 (class 2606 OID 105663)
+-- TOC entry 4794 (class 2606 OID 105663)
 -- Name: locations locations_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1061,7 +1151,7 @@ ALTER TABLE ONLY public.locations
 
 
 --
--- TOC entry 4791 (class 2606 OID 105674)
+-- TOC entry 4798 (class 2606 OID 105674)
 -- Name: menu_items menu_items_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1070,7 +1160,7 @@ ALTER TABLE ONLY public.menu_items
 
 
 --
--- TOC entry 4832 (class 2606 OID 105844)
+-- TOC entry 4839 (class 2606 OID 105844)
 -- Name: notifications notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1079,7 +1169,7 @@ ALTER TABLE ONLY public.notifications
 
 
 --
--- TOC entry 4794 (class 2606 OID 105685)
+-- TOC entry 4801 (class 2606 OID 105685)
 -- Name: promotions promotions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1088,7 +1178,7 @@ ALTER TABLE ONLY public.promotions
 
 
 --
--- TOC entry 4799 (class 2606 OID 105707)
+-- TOC entry 4806 (class 2606 OID 105707)
 -- Name: resort_events resort_events_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1097,7 +1187,7 @@ ALTER TABLE ONLY public.resort_events
 
 
 --
--- TOC entry 4804 (class 2606 OID 105719)
+-- TOC entry 4811 (class 2606 OID 105719)
 -- Name: ride_requests ride_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1106,7 +1196,7 @@ ALTER TABLE ONLY public.ride_requests
 
 
 --
--- TOC entry 4818 (class 2606 OID 105799)
+-- TOC entry 4825 (class 2606 OID 105799)
 -- Name: room_types room_types_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1115,7 +1205,7 @@ ALTER TABLE ONLY public.room_types
 
 
 --
--- TOC entry 4820 (class 2606 OID 105797)
+-- TOC entry 4827 (class 2606 OID 105797)
 -- Name: room_types room_types_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1124,7 +1214,7 @@ ALTER TABLE ONLY public.room_types
 
 
 --
--- TOC entry 4825 (class 2606 OID 105817)
+-- TOC entry 4832 (class 2606 OID 105817)
 -- Name: rooms rooms_number_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1133,7 +1223,7 @@ ALTER TABLE ONLY public.rooms
 
 
 --
--- TOC entry 4827 (class 2606 OID 105815)
+-- TOC entry 4834 (class 2606 OID 105815)
 -- Name: rooms rooms_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1142,7 +1232,7 @@ ALTER TABLE ONLY public.rooms
 
 
 --
--- TOC entry 4809 (class 2606 OID 105736)
+-- TOC entry 4816 (class 2606 OID 105736)
 -- Name: service_requests service_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1151,7 +1241,25 @@ ALTER TABLE ONLY public.service_requests
 
 
 --
--- TOC entry 4782 (class 2606 OID 105652)
+-- TOC entry 4848 (class 2606 OID 107018)
+-- Name: user_read_messages user_read_messages_identifier_service_type_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_read_messages
+    ADD CONSTRAINT user_read_messages_identifier_service_type_key UNIQUE (identifier, service_type);
+
+
+--
+-- TOC entry 4850 (class 2606 OID 107016)
+-- Name: user_read_messages user_read_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_read_messages
+    ADD CONSTRAINT user_read_messages_pkey PRIMARY KEY (id);
+
+
+--
+-- TOC entry 4789 (class 2606 OID 105652)
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1160,7 +1268,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- TOC entry 4784 (class 2606 OID 105654)
+-- TOC entry 4791 (class 2606 OID 105654)
 -- Name: users users_room_number_last_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1169,7 +1277,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- TOC entry 4812 (class 1259 OID 105763)
+-- TOC entry 4819 (class 1259 OID 105763)
 -- Name: idx_chat_messages_created_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1177,7 +1285,7 @@ CREATE INDEX idx_chat_messages_created_at ON public.chat_messages USING btree (c
 
 
 --
--- TOC entry 4813 (class 1259 OID 105849)
+-- TOC entry 4820 (class 1259 OID 105849)
 -- Name: idx_chat_messages_room_service; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1185,7 +1293,7 @@ CREATE INDEX idx_chat_messages_room_service ON public.chat_messages USING btree 
 
 
 --
--- TOC entry 4814 (class 1259 OID 105848)
+-- TOC entry 4821 (class 1259 OID 105848)
 -- Name: idx_chat_messages_service_type; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1193,7 +1301,7 @@ CREATE INDEX idx_chat_messages_service_type ON public.chat_messages USING btree 
 
 
 --
--- TOC entry 4815 (class 1259 OID 105762)
+-- TOC entry 4822 (class 1259 OID 105762)
 -- Name: idx_chat_messages_user_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1201,7 +1309,7 @@ CREATE INDEX idx_chat_messages_user_id ON public.chat_messages USING btree (user
 
 
 --
--- TOC entry 4837 (class 1259 OID 106867)
+-- TOC entry 4844 (class 1259 OID 106867)
 -- Name: idx_hotel_reviews_created_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1209,7 +1317,7 @@ CREATE INDEX idx_hotel_reviews_created_at ON public.hotel_reviews USING btree (c
 
 
 --
--- TOC entry 4838 (class 1259 OID 106866)
+-- TOC entry 4845 (class 1259 OID 106866)
 -- Name: idx_hotel_reviews_room_number; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1217,7 +1325,7 @@ CREATE INDEX idx_hotel_reviews_room_number ON public.hotel_reviews USING btree (
 
 
 --
--- TOC entry 4785 (class 1259 OID 105754)
+-- TOC entry 4792 (class 1259 OID 105754)
 -- Name: idx_locations_name; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1225,7 +1333,7 @@ CREATE INDEX idx_locations_name ON public.locations USING btree (name);
 
 
 --
--- TOC entry 4788 (class 1259 OID 105755)
+-- TOC entry 4795 (class 1259 OID 105755)
 -- Name: idx_menu_items_category; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1233,7 +1341,7 @@ CREATE INDEX idx_menu_items_category ON public.menu_items USING btree (category)
 
 
 --
--- TOC entry 4789 (class 1259 OID 106850)
+-- TOC entry 4796 (class 1259 OID 106850)
 -- Name: idx_menu_items_language; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1241,7 +1349,7 @@ CREATE INDEX idx_menu_items_language ON public.menu_items USING btree (language)
 
 
 --
--- TOC entry 4828 (class 1259 OID 105847)
+-- TOC entry 4835 (class 1259 OID 105847)
 -- Name: idx_notifications_created_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1249,7 +1357,7 @@ CREATE INDEX idx_notifications_created_at ON public.notifications USING btree (c
 
 
 --
--- TOC entry 4829 (class 1259 OID 105846)
+-- TOC entry 4836 (class 1259 OID 105846)
 -- Name: idx_notifications_is_read; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1257,7 +1365,7 @@ CREATE INDEX idx_notifications_is_read ON public.notifications USING btree (is_r
 
 
 --
--- TOC entry 4830 (class 1259 OID 105845)
+-- TOC entry 4837 (class 1259 OID 105845)
 -- Name: idx_notifications_recipient_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1265,7 +1373,7 @@ CREATE INDEX idx_notifications_recipient_id ON public.notifications USING btree 
 
 
 --
--- TOC entry 4792 (class 1259 OID 106851)
+-- TOC entry 4799 (class 1259 OID 106851)
 -- Name: idx_promotions_language; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1273,7 +1381,7 @@ CREATE INDEX idx_promotions_language ON public.promotions USING btree (language)
 
 
 --
--- TOC entry 4797 (class 1259 OID 106852)
+-- TOC entry 4804 (class 1259 OID 106852)
 -- Name: idx_resort_events_language; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1281,7 +1389,7 @@ CREATE INDEX idx_resort_events_language ON public.resort_events USING btree (lan
 
 
 --
--- TOC entry 4800 (class 1259 OID 105758)
+-- TOC entry 4807 (class 1259 OID 105758)
 -- Name: idx_ride_requests_driver_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1289,7 +1397,7 @@ CREATE INDEX idx_ride_requests_driver_id ON public.ride_requests USING btree (dr
 
 
 --
--- TOC entry 4801 (class 1259 OID 105756)
+-- TOC entry 4808 (class 1259 OID 105756)
 -- Name: idx_ride_requests_room_number; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1297,7 +1405,7 @@ CREATE INDEX idx_ride_requests_room_number ON public.ride_requests USING btree (
 
 
 --
--- TOC entry 4802 (class 1259 OID 105757)
+-- TOC entry 4809 (class 1259 OID 105757)
 -- Name: idx_ride_requests_status; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1305,7 +1413,7 @@ CREATE INDEX idx_ride_requests_status ON public.ride_requests USING btree (statu
 
 
 --
--- TOC entry 4816 (class 1259 OID 105826)
+-- TOC entry 4823 (class 1259 OID 105826)
 -- Name: idx_room_types_location_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1313,7 +1421,7 @@ CREATE INDEX idx_room_types_location_id ON public.room_types USING btree (locati
 
 
 --
--- TOC entry 4821 (class 1259 OID 105824)
+-- TOC entry 4828 (class 1259 OID 105824)
 -- Name: idx_rooms_number; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1321,7 +1429,7 @@ CREATE INDEX idx_rooms_number ON public.rooms USING btree (number);
 
 
 --
--- TOC entry 4822 (class 1259 OID 105825)
+-- TOC entry 4829 (class 1259 OID 105825)
 -- Name: idx_rooms_status; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1329,7 +1437,7 @@ CREATE INDEX idx_rooms_status ON public.rooms USING btree (status);
 
 
 --
--- TOC entry 4823 (class 1259 OID 105823)
+-- TOC entry 4830 (class 1259 OID 105823)
 -- Name: idx_rooms_type_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1337,7 +1445,7 @@ CREATE INDEX idx_rooms_type_id ON public.rooms USING btree (type_id);
 
 
 --
--- TOC entry 4805 (class 1259 OID 105759)
+-- TOC entry 4812 (class 1259 OID 105759)
 -- Name: idx_service_requests_room_number; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1345,7 +1453,7 @@ CREATE INDEX idx_service_requests_room_number ON public.service_requests USING b
 
 
 --
--- TOC entry 4806 (class 1259 OID 105760)
+-- TOC entry 4813 (class 1259 OID 105760)
 -- Name: idx_service_requests_status; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1353,7 +1461,7 @@ CREATE INDEX idx_service_requests_status ON public.service_requests USING btree 
 
 
 --
--- TOC entry 4807 (class 1259 OID 105761)
+-- TOC entry 4814 (class 1259 OID 105761)
 -- Name: idx_service_requests_type; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1361,7 +1469,15 @@ CREATE INDEX idx_service_requests_type ON public.service_requests USING btree (t
 
 
 --
--- TOC entry 4779 (class 1259 OID 105753)
+-- TOC entry 4846 (class 1259 OID 107019)
+-- Name: idx_user_read_messages_lookup; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_user_read_messages_lookup ON public.user_read_messages USING btree (identifier, service_type);
+
+
+--
+-- TOC entry 4786 (class 1259 OID 105753)
 -- Name: idx_users_role; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1369,7 +1485,7 @@ CREATE INDEX idx_users_role ON public.users USING btree (role);
 
 
 --
--- TOC entry 4780 (class 1259 OID 105752)
+-- TOC entry 4787 (class 1259 OID 105752)
 -- Name: idx_users_room_number; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1377,7 +1493,7 @@ CREATE INDEX idx_users_room_number ON public.users USING btree (room_number);
 
 
 --
--- TOC entry 4853 (class 2620 OID 106868)
+-- TOC entry 4865 (class 2620 OID 106868)
 -- Name: hotel_reviews update_hotel_reviews_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1385,7 +1501,7 @@ CREATE TRIGGER update_hotel_reviews_updated_at BEFORE UPDATE ON public.hotel_rev
 
 
 --
--- TOC entry 4847 (class 2620 OID 105768)
+-- TOC entry 4859 (class 2620 OID 105768)
 -- Name: knowledge_items update_knowledge_items_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1393,7 +1509,7 @@ CREATE TRIGGER update_knowledge_items_updated_at BEFORE UPDATE ON public.knowled
 
 
 --
--- TOC entry 4844 (class 2620 OID 105765)
+-- TOC entry 4856 (class 2620 OID 105765)
 -- Name: locations update_locations_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1401,7 +1517,7 @@ CREATE TRIGGER update_locations_updated_at BEFORE UPDATE ON public.locations FOR
 
 
 --
--- TOC entry 4845 (class 2620 OID 105766)
+-- TOC entry 4857 (class 2620 OID 105766)
 -- Name: menu_items update_menu_items_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1409,7 +1525,7 @@ CREATE TRIGGER update_menu_items_updated_at BEFORE UPDATE ON public.menu_items F
 
 
 --
--- TOC entry 4846 (class 2620 OID 105767)
+-- TOC entry 4858 (class 2620 OID 105767)
 -- Name: promotions update_promotions_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1417,7 +1533,7 @@ CREATE TRIGGER update_promotions_updated_at BEFORE UPDATE ON public.promotions F
 
 
 --
--- TOC entry 4848 (class 2620 OID 105769)
+-- TOC entry 4860 (class 2620 OID 105769)
 -- Name: resort_events update_resort_events_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1425,7 +1541,7 @@ CREATE TRIGGER update_resort_events_updated_at BEFORE UPDATE ON public.resort_ev
 
 
 --
--- TOC entry 4849 (class 2620 OID 105770)
+-- TOC entry 4861 (class 2620 OID 105770)
 -- Name: ride_requests update_ride_requests_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1433,7 +1549,7 @@ CREATE TRIGGER update_ride_requests_updated_at BEFORE UPDATE ON public.ride_requ
 
 
 --
--- TOC entry 4851 (class 2620 OID 105827)
+-- TOC entry 4863 (class 2620 OID 105827)
 -- Name: room_types update_room_types_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1441,7 +1557,7 @@ CREATE TRIGGER update_room_types_updated_at BEFORE UPDATE ON public.room_types F
 
 
 --
--- TOC entry 4852 (class 2620 OID 105828)
+-- TOC entry 4864 (class 2620 OID 105828)
 -- Name: rooms update_rooms_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1449,7 +1565,7 @@ CREATE TRIGGER update_rooms_updated_at BEFORE UPDATE ON public.rooms FOR EACH RO
 
 
 --
--- TOC entry 4850 (class 2620 OID 105771)
+-- TOC entry 4862 (class 2620 OID 105771)
 -- Name: service_requests update_service_requests_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1457,7 +1573,7 @@ CREATE TRIGGER update_service_requests_updated_at BEFORE UPDATE ON public.servic
 
 
 --
--- TOC entry 4843 (class 2620 OID 105764)
+-- TOC entry 4855 (class 2620 OID 105764)
 -- Name: users update_users_updated_at; Type: TRIGGER; Schema: public; Owner: postgres
 --
 
@@ -1465,7 +1581,7 @@ CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON public.users FOR EACH RO
 
 
 --
--- TOC entry 4840 (class 2606 OID 105747)
+-- TOC entry 4852 (class 2606 OID 105747)
 -- Name: chat_messages chat_messages_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1474,7 +1590,7 @@ ALTER TABLE ONLY public.chat_messages
 
 
 --
--- TOC entry 4839 (class 2606 OID 105720)
+-- TOC entry 4851 (class 2606 OID 105720)
 -- Name: ride_requests ride_requests_driver_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1483,7 +1599,7 @@ ALTER TABLE ONLY public.ride_requests
 
 
 --
--- TOC entry 4841 (class 2606 OID 105800)
+-- TOC entry 4853 (class 2606 OID 105800)
 -- Name: room_types room_types_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1492,7 +1608,7 @@ ALTER TABLE ONLY public.room_types
 
 
 --
--- TOC entry 4842 (class 2606 OID 105818)
+-- TOC entry 4854 (class 2606 OID 105818)
 -- Name: rooms rooms_type_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1500,7 +1616,7 @@ ALTER TABLE ONLY public.rooms
     ADD CONSTRAINT rooms_type_id_fkey FOREIGN KEY (type_id) REFERENCES public.room_types(id) ON DELETE RESTRICT;
 
 
--- Completed on 2025-12-06 23:40:51
+-- Completed on 2025-12-09 09:39:39
 
 --
 -- PostgreSQL database dump complete

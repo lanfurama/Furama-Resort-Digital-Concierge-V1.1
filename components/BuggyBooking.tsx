@@ -526,16 +526,6 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                     </div>
                 </div>
 
-                {/* Selected Destination Display */}
-                {destination && (
-                    <div className="relative flex-shrink-0">
-                        <Navigation className="absolute left-2 top-2 text-amber-500 w-3 h-3 md:w-4 md:h-4" />
-                        <div className="w-full pl-7 md:pl-8 pr-3 py-1.5 md:py-2 text-xs md:text-sm bg-amber-50 border border-amber-200 rounded-lg text-gray-700 font-medium">
-                            {destination}
-                        </div>
-                    </div>
-                )}
-
                 <button 
                     onClick={handleBook}
                     disabled={!destination}
