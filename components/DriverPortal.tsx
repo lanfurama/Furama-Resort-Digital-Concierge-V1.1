@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { getRides, updateRideStatus, getLastMessage, createManualRide, getLocations } from '../services/dataService';
 import { RideRequest, BuggyStatus } from '../types';
-import { Car, MapPin, Navigation, CheckCircle, Clock, MessageSquare, History, List, Plus, X } from 'lucide-react';
+import { Car, MapPin, Navigation, CheckCircle, Clock, MessageSquare, History, List, Plus, X, Loader2 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ServiceChat from './ServiceChat';
 
@@ -10,6 +10,9 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     const [rides, setRides] = useState<RideRequest[]>([]);
     const [myRideId, setMyRideId] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
+    
+    // Loading states for better UX
+    const [loadingAction, setLoadingAction] = useState<string | null>(null);
     
     // Chat State
     const [showChat, setShowChat] = useState(false);
@@ -95,6 +98,9 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     }, []);
 
     const acceptRide = async (id: string) => {
+        if (loadingAction) return; // Prevent double-click
+        
+        setLoadingAction(id);
         try {
             // Get current driver ID from localStorage
             const savedUser = localStorage.getItem('furama_user');
@@ -108,44 +114,86 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 }
             }
             
+            // Optimistic update: immediately update UI
+            setRides(prevRides => prevRides.map(ride => 
+                ride.id === id 
+                    ? { ...ride, status: BuggyStatus.ARRIVING, driverId: driverId }
+                    : ride
+            ));
+            setMyRideId(id);
+            
             console.log('Accepting ride:', id, 'with driverId:', driverId);
             await updateRideStatus(id, BuggyStatus.ARRIVING, driverId, 5); // 5 min ETA mock
             console.log('Ride accepted successfully');
-            // Refresh rides after update
+            
+            // Refresh rides after update to ensure consistency
             const allRides = await getRides();
             setRides(allRides);
         } catch (error) {
             console.error('Failed to accept ride:', error);
+            // Revert optimistic update on error
+            const allRides = await getRides();
+            setRides(allRides);
+            setMyRideId(null);
             alert('Failed to accept ride. Please try again.');
+        } finally {
+            setLoadingAction(null);
         }
     };
 
     const pickUpGuest = async (id: string) => {
+        if (loadingAction) return; // Prevent double-click
+        
+        setLoadingAction(`pickup-${id}`);
         try {
+            // Optimistic update
+            setRides(prevRides => prevRides.map(ride => 
+                ride.id === id 
+                    ? { ...ride, status: BuggyStatus.ON_TRIP, pickedUpAt: Date.now() }
+                    : ride
+            ));
+            
             console.log('Picking up guest for ride:', id);
             await updateRideStatus(id, BuggyStatus.ON_TRIP);
             console.log('Guest picked up successfully');
+            
             // Refresh rides after update
             const allRides = await getRides();
             setRides(allRides);
         } catch (error) {
             console.error('Failed to pick up guest:', error);
+            // Revert optimistic update on error
+            const allRides = await getRides();
+            setRides(allRides);
             alert('Failed to update ride status. Please try again.');
+        } finally {
+            setLoadingAction(null);
         }
     };
 
     const completeRide = async (id: string) => {
+        if (loadingAction) return; // Prevent double-click
+        
+        setLoadingAction(`complete-${id}`);
         try {
             console.log('Completing ride:', id);
             await updateRideStatus(id, BuggyStatus.COMPLETED);
             console.log('Ride completed successfully');
+            
             setShowChat(false);
+            setMyRideId(null);
+            
             // Refresh rides after update
             const allRides = await getRides();
             setRides(allRides);
         } catch (error) {
             console.error('Failed to complete ride:', error);
+            // Revert on error
+            const allRides = await getRides();
+            setRides(allRides);
             alert('Failed to complete ride. Please try again.');
+        } finally {
+            setLoadingAction(null);
         }
     };
 
@@ -343,7 +391,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 {viewMode === 'ACTIVE' ? (
                     <>
                         {myCurrentRide ? (
-                            <div className="bg-emerald-600 rounded-xl p-4 md:p-4 shadow-lg">
+                            <div className="bg-emerald-600 rounded-xl p-4 md:p-4 shadow-lg fade-in">
                                 <div className="flex justify-between items-start mb-3 md:mb-3">
                                     <div className="flex-1 min-w-0">
                                         <h2 className="text-xl md:text-lg font-bold mb-1">{myCurrentRide.status === BuggyStatus.ON_TRIP ? 'On Trip' : 'Pick Up Guest'}</h2>
@@ -398,16 +446,34 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                                 {myCurrentRide.status === BuggyStatus.ARRIVING || myCurrentRide.status === BuggyStatus.ASSIGNED ? (
                                     <button 
                                         onClick={() => pickUpGuest(myCurrentRide.id)}
-                                        className="w-full bg-white text-emerald-900 font-bold py-3.5 md:py-2.5 rounded-xl text-lg md:text-sm shadow-lg min-h-[52px] md:min-h-[40px]"
+                                        disabled={loadingAction === `pickup-${myCurrentRide.id}`}
+                                        className="w-full bg-white text-emerald-900 font-bold py-3.5 md:py-2.5 rounded-xl text-lg md:text-sm shadow-lg min-h-[52px] md:min-h-[40px] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
                                     >
-                                        Guest Picked Up
+                                        {loadingAction === `pickup-${myCurrentRide.id}` ? (
+                                            <>
+                                                <Loader2 size={20} className="md:w-4 md:h-4 mr-2 animate-spin" />
+                                                Processing...
+                                            </>
+                                        ) : (
+                                            'Guest Picked Up'
+                                        )}
                                     </button>
                                 ) : (
                                      <button 
                                         onClick={() => completeRide(myCurrentRide.id)}
-                                        className="w-full bg-emerald-900 text-white border border-emerald-400 font-bold py-3.5 md:py-2.5 rounded-xl text-lg md:text-sm shadow-lg min-h-[52px] md:min-h-[40px] flex items-center justify-center"
+                                        disabled={loadingAction === `complete-${myCurrentRide.id}`}
+                                        className="w-full bg-emerald-900 text-white border border-emerald-400 font-bold py-3.5 md:py-2.5 rounded-xl text-lg md:text-sm shadow-lg min-h-[52px] md:min-h-[40px] flex items-center justify-center transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
                                     >
-                                        <CheckCircle size={20} className="md:w-4 md:h-4 inline mr-2" /> Complete Trip
+                                        {loadingAction === `complete-${myCurrentRide.id}` ? (
+                                            <>
+                                                <Loader2 size={20} className="md:w-4 md:h-4 mr-2 animate-spin" />
+                                                Completing...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircle size={20} className="md:w-4 md:h-4 inline mr-2" /> Complete Trip
+                                            </>
+                                        )}
                                     </button>
                                 )}
                             </div>
@@ -416,30 +482,18 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                                 <h2 className="text-slate-300 font-bold mb-4 md:mb-3 uppercase tracking-wider text-base md:text-sm">Available Requests ({pendingRides.length})</h2>
                                 <div className="space-y-4 md:space-y-3">
                                     {pendingRides.length === 0 ? (
-                                        <div className="text-center py-10 opacity-50">
+                                        <div className="text-center py-10 opacity-50 transition-opacity duration-300">
                                             <p className="text-base md:text-lg">No active requests.</p>
                                         </div>
                                     ) : (
-                                        pendingRides.map((ride, index) => {
-                                            const priorityInfo = getPriorityInfo(ride);
+                                        pendingRides.map((ride) => {
                                             const waitingMinutes = getWaitingTime(ride.timestamp);
-                                            const isTopPriority = index === 0;
                                             
                                             return (
-                                            <div key={ride.id} className={`bg-slate-800 p-4 md:p-3 rounded-xl border-2 shadow-md ${
-                                                isTopPriority ? 'border-emerald-500 ring-2 ring-emerald-500/30' : 'border-slate-700'
-                                            }`}>
+                                            <div key={ride.id} className="bg-slate-800 p-4 md:p-3 rounded-xl border-2 border-slate-700 shadow-md transition-all duration-300 hover:shadow-lg">
                                                 {/* Header with Room and Time */}
                                                 <div className="flex justify-between items-center mb-3 md:mb-2 gap-3">
                                                     <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className={`${priorityInfo.color} ${priorityInfo.textColor} text-xs md:text-[10px] font-bold px-3 md:px-2 py-1 md:py-0.5 rounded-full ${
-                                                            priorityInfo.label === 'URGENT' || priorityInfo.label === 'HIGH' ? 'animate-pulse' : ''
-                                                        } ${priorityInfo.border ? `border ${priorityInfo.border}` : ''}`}>
-                                                            {priorityInfo.label}
-                                                        </span>
-                                                        {isTopPriority && (
-                                                            <span className="bg-yellow-500 text-black text-[10px] md:text-[9px] font-bold px-2 md:px-1.5 py-0.5 rounded">#1 PRIORITY</span>
-                                                        )}
                                                         <h3 className="font-bold text-lg md:text-sm text-white">Room {ride.roomNumber}</h3>
                                                     </div>
                                                     <div className="text-right flex-shrink-0">
@@ -487,13 +541,17 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                                                 {/* Accept Button - Large and Prominent */}
                                                 <button 
                                                     onClick={() => acceptRide(ride.id)}
-                                                    className={`w-full text-white font-bold py-4 md:py-2.5 rounded-xl text-base md:text-sm shadow-lg min-h-[56px] md:min-h-[40px] ${
-                                                        isTopPriority 
-                                                            ? 'bg-emerald-500 ring-2 ring-emerald-400' 
-                                                            : 'bg-emerald-600'
-                                                    }`}
+                                                    disabled={loadingAction === ride.id || loadingAction !== null}
+                                                    className="w-full text-white font-bold py-4 md:py-2.5 rounded-xl text-base md:text-sm shadow-lg min-h-[56px] md:min-h-[40px] bg-emerald-500 ring-2 ring-emerald-400 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
                                                 >
-                                                    {isTopPriority ? '✓ Accept Priority Ride' : 'Accept Ride'}
+                                                    {loadingAction === ride.id ? (
+                                                        <>
+                                                            <Loader2 size={18} className="md:w-4 md:h-4 mr-2 animate-spin" />
+                                                            Accepting...
+                                                        </>
+                                                    ) : (
+                                                        'Accept Ride'
+                                                    )}
                                                 </button>
                                             </div>
                                             );

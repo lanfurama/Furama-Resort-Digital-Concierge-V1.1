@@ -215,18 +215,6 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     return matchesSearch && matchesFilter;
   }).sort((a, b) => a.name.localeCompare(b.name));
 
-  // Get facilities for quick actions
-  const facilities = locations.filter(loc => loc.type === 'FACILITY' || loc.type === 'RESTAURANT');
-  const restaurants = facilities.filter(loc => loc.type === 'RESTAURANT');
-  const pools = facilities.filter(loc => loc.name.toLowerCase().includes('pool'));
-  const bars = facilities.filter(loc => loc.name.toLowerCase().includes('bar') || loc.name.toLowerCase().includes('lounge'));
-  const otherFacilities = facilities.filter(f => 
-    !f.name.toLowerCase().includes('pool') && 
-    !f.name.toLowerCase().includes('bar') && 
-    !f.name.toLowerCase().includes('lounge') &&
-    f.type === 'FACILITY'
-  );
-
 
   // Determine if ride can be cancelled
   // Business Logic for Resort Buggy Service:
@@ -245,6 +233,27 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Format timestamp to readable time
+  const formatRequestTime = (timestamp: number): string => {
+      const date = new Date(timestamp);
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
+  };
+
+  // Format waiting time
+  const formatWaitingTime = (seconds: number): string => {
+      const mins = Math.floor(seconds / 60);
+      if (mins === 0) {
+          return `${seconds}s`;
+      }
+      const secs = seconds % 60;
+      if (secs === 0) {
+          return `${mins}m`;
+      }
+      return `${mins}m ${secs}s`;
+  };
+
   return (
     <div className="flex flex-col h-full bg-gray-50 relative z-0">
       
@@ -261,7 +270,11 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       {/* Status card section - Always visible when there's an active ride */}
       {activeRide && (
         <div 
-          className="bg-white shadow-lg border-t border-gray-100 flex-shrink-0 px-3 pt-2 pb-2 md:p-3 overflow-hidden"
+          className={`bg-white shadow-lg border-t flex-shrink-0 px-3 pt-2 pb-2 md:p-3 overflow-hidden ${
+            activeRide.status === BuggyStatus.SEARCHING && elapsedTime >= MAX_WAIT_TIME
+              ? 'border-red-500 border-2 shake'
+              : 'border-gray-100'
+          }`}
           style={{ 
             paddingBottom: 'max(1.4rem, calc(1.4rem + env(safe-area-inset-bottom)))'
           }}
@@ -277,6 +290,20 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                         {activeRide.status === BuggyStatus.ON_TRIP && t('en_route')}
                         {activeRide.status === BuggyStatus.COMPLETED && t('arrived')}
                     </h3>
+                    {/* Request Info */}
+                    <div className="flex flex-col gap-0.5 mt-1">
+                        <p className="text-[10px] md:text-xs text-gray-500 leading-tight">
+                            <span className="font-medium">Room:</span> {activeRide.roomNumber} • <span className="font-medium">Guest:</span> {activeRide.guestName}
+                        </p>
+                        <div className="flex items-center gap-2 text-[10px] md:text-xs text-gray-500">
+                            <span><span className="font-medium">Requested:</span> {formatRequestTime(activeRide.timestamp)}</span>
+                            {activeRide.status === BuggyStatus.SEARCHING && elapsedTime > 0 && (
+                                <span className={`${elapsedTime >= MAX_WAIT_TIME ? 'text-red-600 font-bold' : ''}`}>
+                                    • <span className="font-medium">Waiting:</span> {formatWaitingTime(elapsedTime)}
+                                </span>
+                            )}
+                        </div>
+                    </div>
                     {activeRide.status !== BuggyStatus.SEARCHING && (
                         <p className="text-[10px] md:text-sm text-gray-500 flex items-center leading-tight mt-0.5">
                             <Star className="w-3 h-3 md:w-3 md:h-3 text-yellow-400 mr-1 md:mr-1 fill-current flex-shrink-0"/> 
@@ -285,6 +312,16 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                     )}
                  </div>
                  <div className="flex flex-row items-start gap-1.5 md:gap-2 flex-shrink-0">
+                    {activeRide.status === BuggyStatus.SEARCHING && elapsedTime > 0 && (
+                        <div className="flex flex-col items-end">
+                            <div className={`text-sm md:text-xl font-bold leading-none whitespace-nowrap ${
+                                elapsedTime >= MAX_WAIT_TIME ? 'text-red-600' : 'text-gray-600'
+                            }`}>
+                                {formatWaitingTime(elapsedTime)}
+                            </div>
+                            <div className="text-[8px] md:text-xs text-gray-500 leading-none mt-0.5">Waiting</div>
+                        </div>
+                    )}
                     {activeRide.status !== BuggyStatus.SEARCHING && activeRide.status !== BuggyStatus.COMPLETED && activeRide.status !== BuggyStatus.ON_TRIP && (
                         <div className="flex flex-col items-end">
                             {activeRide.eta && (
@@ -323,7 +360,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                     className={`w-full py-2 md:py-3 font-semibold rounded-lg transition border flex flex-row items-center justify-center gap-1.5 md:gap-2 text-xs md:text-base flex-shrink-0 touch-manipulation min-h-[44px] ${
                         (activeRide.status === BuggyStatus.SEARCHING && elapsedTime >= MAX_WAIT_TIME) ||
                         ((activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME)
-                            ? 'bg-red-50 text-red-600 hover:bg-red-100 border-red-200'
+                            ? 'bg-red-500 text-white hover:bg-red-600 border-red-600'
                             : 'bg-red-50 text-red-600 hover:bg-red-100 border-red-100'
                     }`}
                   >
@@ -397,7 +434,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                     <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3 md:w-4 md:h-4" />
                     <input
                         type="text"
-                        placeholder={t('search_locations') || "Search locations..."}
+                        placeholder={t('search_locations')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full pl-7 md:pl-8 pr-3 py-1.5 md:py-2 text-xs md:text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
@@ -447,63 +484,6 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                         Restaurants
                     </button>
                 </div>
-
-                {/* Quick Actions */}
-                {(restaurants.length > 0 || pools.length > 0 || bars.length > 0 || otherFacilities.length > 0) && (
-                    <div className="space-y-1.5">
-                        <div className="text-[10px] font-semibold text-gray-600 uppercase">Quick Actions</div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-1.5">
-                            {restaurants.length > 0 && (
-                                <button
-                                    onClick={() => {
-                                        setFilterType('RESTAURANT');
-                                        setSearchQuery('');
-                                    }}
-                                    className="flex items-center space-x-1.5 p-1.5 bg-orange-50 border border-orange-200 rounded-md hover:bg-orange-100 transition-colors"
-                                >
-                                    <Utensils className="w-3 h-3 md:w-4 md:h-4 text-orange-600 flex-shrink-0" />
-                                    <span className="text-[10px] md:text-xs font-medium text-orange-900">Restaurants</span>
-                                </button>
-                            )}
-                            {bars.length > 0 && (
-                                <button
-                                    onClick={() => {
-                                        setFilterType('FACILITY');
-                                        setSearchQuery('bar');
-                                    }}
-                                    className="flex items-center space-x-1.5 p-1.5 bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors"
-                                >
-                                    <Coffee className="w-3 h-3 md:w-4 md:h-4 text-purple-600 flex-shrink-0" />
-                                    <span className="text-[10px] md:text-xs font-medium text-purple-900">Bars</span>
-                                </button>
-                            )}
-                            {pools.length > 0 && (
-                                <button
-                                    onClick={() => {
-                                        setFilterType('FACILITY');
-                                        setSearchQuery('pool');
-                                    }}
-                                    className="flex items-center space-x-1.5 p-1.5 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
-                                >
-                                    <Waves className="w-3 h-3 md:w-4 md:h-4 text-blue-600 flex-shrink-0" />
-                                    <span className="text-[10px] md:text-xs font-medium text-blue-900">Pools</span>
-                                </button>
-                            )}
-                            {otherFacilities.length > 0 && (
-                                <button
-                                    onClick={() => {
-                                        setFilterType('FACILITY');
-                                        setSearchQuery('');
-                                    }}
-                                    className="flex items-center space-x-1.5 p-1.5 bg-emerald-50 border border-emerald-200 rounded-md hover:bg-emerald-100 transition-colors"
-                                >
-                                    <Building2 className="w-3 h-3 md:w-4 md:h-4 text-emerald-600 flex-shrink-0" />
-                                    <span className="text-[10px] md:text-xs font-medium text-emerald-900">Facilities</span>
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                )}
 
                 {/* Filtered Locations List */}
                 <div className="space-y-1.5 flex-1 min-h-0 flex flex-col">
