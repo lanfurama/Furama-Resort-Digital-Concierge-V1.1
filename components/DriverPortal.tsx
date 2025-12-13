@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { getRides, updateRideStatus, getLastMessage, createManualRide, getLocations } from '../services/dataService';
 import { RideRequest, BuggyStatus } from '../types';
-import { Car, MapPin, Navigation, CheckCircle, Clock, MessageSquare, History, List, Plus, X, Loader2, User, Star, Volume2, Grid, LayoutGrid, Zap } from 'lucide-react';
+import { Car, MapPin, Navigation, CheckCircle, Clock, MessageSquare, History, List, Plus, X, Loader2, User, Star, Volume2, VolumeX, Grid, LayoutGrid, Zap } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ServiceChat from './ServiceChat';
 
@@ -23,6 +23,39 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     // Chat State
     const [showChat, setShowChat] = useState(false);
     const [hasUnreadChat, setHasUnreadChat] = useState(false);
+
+    // Sound/Notification State
+    const [soundEnabled, setSoundEnabled] = useState(() => {
+        const saved = localStorage.getItem('driver_sound_enabled');
+        return saved !== null ? saved === 'true' : true; // Default to enabled
+    });
+    const [previousRideId, setPreviousRideId] = useState<string | null>(null);
+
+    // Helper: Play notification sound
+    const playNotificationSound = () => {
+        if (!soundEnabled) return;
+        
+        try {
+            // Create audio context for a simple beep sound
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800; // Frequency in Hz
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+        } catch (error) {
+            console.error('Failed to play notification sound:', error);
+        }
+    };
 
     // Create Manual Ride State
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -96,17 +129,26 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 });
                 
                 if (active) {
+                    // Check if this is a new ride assignment (different from previous)
+                    if (previousRideId !== active.id && previousRideId !== null) {
+                        // New ride assigned - play sound notification
+                        playNotificationSound();
+                    }
+                    setPreviousRideId(active.id);
                     setMyRideId(active.id);
                     // Check for unread messages from Guest for this ride
                     const lastMsg = await getLastMessage(active.roomNumber, 'BUGGY');
                     // If last message exists and was sent by 'user' (Guest), it's unread for the Driver
                     if (lastMsg && lastMsg.role === 'user') {
                         setHasUnreadChat(true);
+                        // Play sound for new message
+                        playNotificationSound();
                     }
                 } else {
                     setMyRideId(null);
                     setShowChat(false);
                     setHasUnreadChat(false);
+                    setPreviousRideId(null);
                 }
             } catch (error) {
                 console.error('Failed to load rides:', error);
@@ -444,13 +486,21 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                     </button>
                     <button 
                         onClick={() => {
-                            // Toggle sound/notifications - can be implemented later
-                            console.log('Toggle sound');
+                            const newState = !soundEnabled;
+                            setSoundEnabled(newState);
+                            localStorage.setItem('driver_sound_enabled', String(newState));
+                            
+                            // Play a test sound if enabling
+                            if (newState) {
+                                playNotificationSound();
+                            }
                         }}
-                        className="p-1.5 rounded-lg hover:bg-gray-100 transition-all text-emerald-600"
-                        title="Sound"
+                        className={`p-1.5 rounded-lg hover:bg-gray-100 transition-all ${
+                            soundEnabled ? 'text-emerald-600' : 'text-gray-400'
+                        }`}
+                        title={soundEnabled ? 'Sound On - Click to mute' : 'Sound Off - Click to unmute'}
                     >
-                        <Volume2 size={18} />
+                        {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
                     </button>
                     <button 
                         onClick={onLogout}
