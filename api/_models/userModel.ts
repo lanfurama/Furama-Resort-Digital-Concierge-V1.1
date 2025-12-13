@@ -5,7 +5,7 @@ export interface User {
   last_name: string;
   room_number: string;
   villa_type?: string;
-  role: 'GUEST' | 'ADMIN' | 'DRIVER' | 'STAFF' | 'SUPERVISOR';
+  role: 'GUEST' | 'ADMIN' | 'DRIVER' | 'STAFF' | 'SUPERVISOR' | 'RECEPTION';
   password?: string;
   language?: string | null;
   notes?: string | null;

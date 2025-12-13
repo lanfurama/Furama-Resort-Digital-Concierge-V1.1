@@ -119,6 +119,20 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
           return () => clearInterval(timer);
       }
       
+      // Track trip duration when ON_TRIP (already picked up)
+      if (activeRide.status === BuggyStatus.ON_TRIP && activeRide.pickedUpAt) {
+          setElapsedTime(0); // Reset searching timer
+          setArrivingElapsedTime(0); // Reset arriving timer
+          
+          // Force re-render every second to update trip duration display
+          const timer = setInterval(() => {
+              // Trigger re-render by updating state (component will recalculate trip duration)
+              setElapsedTime(prev => prev === 0 ? 1 : 0); // Toggle to trigger re-render
+          }, 1000);
+          
+          return () => clearInterval(timer);
+      }
+      
       // Reset both timers for other statuses
       setElapsedTime(0);
       setArrivingElapsedTime(0);
@@ -255,14 +269,21 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 relative z-0">
+    <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative z-0">
       
-      {/* Header */}
-      <div className={`p-2.5 text-white shadow-md ${THEME_COLORS.primary} flex items-center flex-shrink-0 relative z-0`}>
-        <button onClick={onBack} className="mr-3 text-white hover:text-gray-200">
-          <Navigation className="w-5 h-5 rotate-180" />
+      {/* Header with gradient and glassmorphism */}
+      <div className={`p-3 text-white shadow-lg backdrop-blur-md bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 flex items-center flex-shrink-0 relative z-10 border-b border-white/20`}>
+        <button 
+          onClick={onBack} 
+          className="mr-2.5 text-white/90 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-all duration-300"
+        >
+          <Navigation className="w-4 h-4 rotate-180" />
         </button>
-        <h2 className="text-lg font-serif">{t('buggy_service')}</h2>
+        <div className="flex-1">
+          <h2 className="text-lg font-bold tracking-tight">{t('buggy_service')}</h2>
+          <p className="text-[10px] text-white/80 mt-0.5">Fast & Convenient Transportation</p>
+        </div>
+        <Car className="w-5 h-5 text-white/20" />
       </div>
 
 
@@ -270,102 +291,245 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       {/* Status card section - Always visible when there's an active ride */}
       {activeRide && (
         <div 
-          className={`bg-white shadow-lg border-t flex-shrink-0 px-3 pt-2 pb-2 md:p-3 overflow-hidden ${
+          className={`mx-3 mt-3 rounded-2xl shadow-xl backdrop-blur-lg bg-white/90 border flex-shrink-0 p-4 overflow-hidden transition-all duration-500 ${
             activeRide.status === BuggyStatus.SEARCHING && elapsedTime >= MAX_WAIT_TIME
-              ? 'border-red-500 border-2 shake'
-              : 'border-gray-100'
+              ? 'border-red-400 border-2 animate-pulse ring-4 ring-red-200'
+              : 'border-white/60'
           }`}
           style={{ 
-            paddingBottom: 'max(1.4rem, calc(1.4rem + env(safe-area-inset-bottom)))'
+            paddingBottom: 'max(1rem, calc(1rem + env(safe-area-inset-bottom)))',
+            boxShadow: '0 20px 60px -15px rgba(0,0,0,0.3)'
           }}
         >
-          <div className="flex flex-col space-y-2 md:space-y-3">
-              {/* Header Section */}
-              <div className="flex flex-row justify-between items-start gap-2 flex-shrink-0">
-                 <div className="flex-1 min-w-0 pr-1">
-                    <h3 className="font-bold text-sm md:text-lg text-gray-800 leading-tight break-words">
-                        {activeRide.status === BuggyStatus.SEARCHING && t('finding_driver')}
-                        {activeRide.status === BuggyStatus.ASSIGNED && t('driver_assigned')}
-                        {activeRide.status === BuggyStatus.ARRIVING && t('driver_arriving')}
-                        {activeRide.status === BuggyStatus.ON_TRIP && t('en_route')}
-                        {activeRide.status === BuggyStatus.COMPLETED && t('arrived')}
-                    </h3>
-                    {/* Request Info */}
-                    <div className="flex flex-col gap-0.5 mt-1">
-                        <p className="text-[10px] md:text-xs text-gray-500 leading-tight">
-                            <span className="font-medium">Room:</span> {activeRide.roomNumber} • <span className="font-medium">Guest:</span> {activeRide.guestName}
-                        </p>
-                        <div className="flex items-center gap-2 text-[10px] md:text-xs text-gray-500">
-                            <span><span className="font-medium">Requested:</span> {formatRequestTime(activeRide.timestamp)}</span>
-                            {activeRide.status === BuggyStatus.SEARCHING && elapsedTime > 0 && (
-                                <span className={`${elapsedTime >= MAX_WAIT_TIME ? 'text-red-600 font-bold' : ''}`}>
-                                    • <span className="font-medium">Waiting:</span> {formatWaitingTime(elapsedTime)}
-                                </span>
-                            )}
-                        </div>
+          <div className="flex flex-col space-y-3">
+              {/* Status & ETA - Simplified Header */}
+              <div className="flex items-center justify-between gap-3">
+                {/* Status Badge */}
+                <div className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 ${
+                  activeRide.status === BuggyStatus.SEARCHING 
+                    ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                    : activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING
+                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                    : activeRide.status === BuggyStatus.ON_TRIP
+                    ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                    : 'bg-green-100 text-green-700 border border-green-200'
+                }`}>
+                  <div className={`w-2 h-2 rounded-full ${
+                    activeRide.status === BuggyStatus.SEARCHING ? 'bg-blue-500' :
+                    activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING ? 'bg-emerald-500 animate-pulse' :
+                    'bg-gray-400'
+                  }`}></div>
+                  {activeRide.status === BuggyStatus.SEARCHING && t('finding_driver')}
+                  {activeRide.status === BuggyStatus.ASSIGNED && t('driver_assigned')}
+                  {activeRide.status === BuggyStatus.ARRIVING && t('driver_arriving')}
+                  {activeRide.status === BuggyStatus.ON_TRIP && t('en_route')}
+                  {activeRide.status === BuggyStatus.COMPLETED && t('arrived')}
+                </div>
+                
+                {/* ETA - Large & Clear */}
+                {(activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && activeRide.eta && (
+                  <div className="flex flex-col items-center bg-emerald-50 px-4 py-2.5 rounded-xl border-2 border-emerald-300">
+                    <div className="text-2xl font-black text-emerald-700 leading-none">{activeRide.eta}</div>
+                    <div className="text-[9px] text-gray-600 font-semibold mt-0.5">MIN</div>
+                  </div>
+                )}
+                
+                {/* Trip Duration for ON_TRIP */}
+                {activeRide.status === BuggyStatus.ON_TRIP && activeRide.pickedUpAt && (() => {
+                  const tripDuration = Math.floor((Date.now() - activeRide.pickedUpAt) / 1000);
+                  return (
+                    <div className="flex flex-col items-center bg-purple-50 px-4 py-2.5 rounded-xl border-2 border-purple-300">
+                      <div className="text-2xl font-black text-purple-700 leading-none">{formatWaitingTime(tripDuration)}</div>
+                      <div className="text-[9px] text-gray-600 font-semibold mt-0.5">EN ROUTE</div>
                     </div>
-                    {activeRide.status !== BuggyStatus.SEARCHING && (
-                        <p className="text-[10px] md:text-sm text-gray-500 flex items-center leading-tight mt-0.5">
-                            <Star className="w-3 h-3 md:w-3 md:h-3 text-yellow-400 mr-1 md:mr-1 fill-current flex-shrink-0"/> 
-                            <span className="whitespace-nowrap">Buggy #08</span>
-                        </p>
-                    )}
-                 </div>
-                 <div className="flex flex-row items-start gap-1.5 md:gap-2 flex-shrink-0">
-                    {activeRide.status === BuggyStatus.SEARCHING && elapsedTime > 0 && (
-                        <div className="flex flex-col items-end">
-                            <div className={`text-sm md:text-xl font-bold leading-none whitespace-nowrap ${
-                                elapsedTime >= MAX_WAIT_TIME ? 'text-red-600' : 'text-gray-600'
-                            }`}>
-                                {formatWaitingTime(elapsedTime)}
-                            </div>
-                            <div className="text-[8px] md:text-xs text-gray-500 leading-none mt-0.5">Waiting</div>
-                        </div>
-                    )}
-                    {activeRide.status !== BuggyStatus.SEARCHING && activeRide.status !== BuggyStatus.COMPLETED && activeRide.status !== BuggyStatus.ON_TRIP && (
-                        <div className="flex flex-col items-end">
-                            {activeRide.eta && (
-                                <div className="flex flex-col items-end">
-                                    <div className={`text-sm md:text-2xl font-bold leading-none whitespace-nowrap ${
-                                        (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime >= ARRIVING_WARNING_TIME
-                                            ? 'text-red-600'
-                                            : 'text-emerald-600'
-                                    }`}>{activeRide.eta} min</div>
-                                    <div className="text-[8px] md:text-xs text-gray-500 leading-none mt-0.5">{t('estimated')}</div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                 </div>
+                  );
+                })()}
+                
+                {/* Waiting Time for SEARCHING */}
+                {activeRide.status === BuggyStatus.SEARCHING && elapsedTime > 0 && (
+                  <div className="flex flex-col items-center bg-blue-50 px-4 py-2.5 rounded-xl border border-blue-200">
+                    <div className={`text-2xl font-black leading-none ${
+                      elapsedTime >= MAX_WAIT_TIME ? 'text-red-600' : 'text-blue-600'
+                    }`}>
+                      {formatWaitingTime(elapsedTime)}
+                    </div>
+                    <div className="text-[9px] text-gray-600 font-semibold mt-0.5">WAIT</div>
+                  </div>
+                )}
               </div>
               
-              {/* Route Section */}
-              <div className="flex flex-row items-start gap-2 md:gap-2 flex-shrink-0">
-                 <div className="flex flex-col items-center space-y-0 flex-shrink-0 pt-0.5">
-                    <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-gray-400 rounded-full"></div>
-                    <div className="w-[1px] h-3 md:h-6 bg-gray-300 my-0.5"></div>
-                    <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-emerald-600 rounded-full"></div>
-                 </div>
-                 <div className="flex flex-col space-y-1.5 md:space-y-3 w-full min-w-0 flex-1">
-                    <div className="text-xs md:text-sm text-gray-600 bg-gray-50 px-2.5 py-1.5 md:p-2 rounded break-words leading-tight">{activeRide.pickup}</div>
-                    <div className="text-xs md:text-sm font-semibold text-gray-800 bg-emerald-50 px-2.5 py-1.5 md:p-2 rounded border border-emerald-100 break-words leading-tight">{activeRide.destination}</div>
-                 </div>
+              {/* Route Section - With Animated Buggy */}
+              <div className="bg-gray-50 rounded-xl p-3 border border-gray-200 relative overflow-hidden">
+                {/* Pickup */}
+                <div className="mb-2">
+                  <div className="text-[10px] font-bold text-gray-500 uppercase mb-1.5">From</div>
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 ${
+                    activeRide.status === BuggyStatus.ON_TRIP
+                      ? 'bg-purple-50 border-purple-300 ring-2 ring-purple-200'
+                      : 'bg-white border-gray-200'
+                  }`}>
+                    <div className={`w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm ${
+                      activeRide.status === BuggyStatus.ON_TRIP
+                        ? 'bg-purple-500'
+                        : 'bg-gray-400'
+                    }`}></div>
+                    <span className="text-sm font-semibold text-gray-800 flex-1">{activeRide.pickup}</span>
+                    {activeRide.status === BuggyStatus.ON_TRIP && (
+                      <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-bold">
+                        Picked Up
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Route Line with Animated Buggy */}
+                <div className="relative my-3 mx-2">
+                  {/* Route Line */}
+                  <div className={`absolute left-0 right-0 top-1/2 -translate-y-1/2 h-0.5 ${
+                    activeRide.status === BuggyStatus.ON_TRIP
+                      ? 'bg-gradient-to-r from-purple-300 via-purple-400 to-purple-500'
+                      : 'bg-gradient-to-r from-gray-300 via-emerald-300 to-emerald-500'
+                  }`}></div>
+                  
+                  {/* Animated Buggy Moving - Coming to pickup */}
+                  {(activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && (
+                    <div 
+                      className="absolute top-1/2 -translate-y-1/2 z-10 transition-all duration-1000 ease-out"
+                      style={{
+                        left: `${Math.min(95, Math.max(5, 5 + (arrivingElapsedTime / Math.max(1, (activeRide.eta ? activeRide.eta * 60 : 300))) * 90))}%`,
+                        transform: 'translate(-50%, -50%)'
+                      }}
+                    >
+                      <div className="relative">
+                        {/* Glow trail */}
+                        <div className="absolute -left-2 -right-2 top-1/2 -translate-y-1/2 h-1 bg-emerald-400 blur-sm opacity-50"></div>
+                        {/* Buggy icon */}
+                        <div className="relative bg-emerald-600 p-1.5 rounded-lg shadow-lg border-2 border-white">
+                          <Car size={14} className="text-white" strokeWidth={2.5} />
+                        </div>
+                        {/* Moving dots effect */}
+                        <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-1 bg-emerald-400 rounded-full animate-ping"></div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Animated Buggy Moving - On trip (from pickup to destination) */}
+                  {activeRide.status === BuggyStatus.ON_TRIP && activeRide.pickedUpAt && (() => {
+                    const tripDuration = Math.floor((Date.now() - activeRide.pickedUpAt) / 1000);
+                    const estimatedTripTime = activeRide.eta ? activeRide.eta * 60 : 300; // Default 5 minutes
+                    const progress = Math.min(95, Math.max(5, 5 + (tripDuration / estimatedTripTime) * 90));
+                    return (
+                      <div 
+                        className="absolute top-1/2 -translate-y-1/2 z-10 transition-all duration-1000 ease-out"
+                        style={{
+                          left: `${progress}%`,
+                          transform: 'translate(-50%, -50%)'
+                        }}
+                      >
+                        <div className="relative">
+                          {/* Glow trail */}
+                          <div className="absolute -left-2 -right-2 top-1/2 -translate-y-1/2 h-1 bg-purple-400 blur-sm opacity-50"></div>
+                          {/* Buggy icon with passengers */}
+                          <div className="relative bg-purple-600 p-1.5 rounded-lg shadow-lg border-2 border-white">
+                            <Car size={14} className="text-white" strokeWidth={2.5} />
+                          </div>
+                          {/* Moving dots effect */}
+                          <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-1 bg-purple-400 rounded-full animate-ping"></div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+                
+                {/* Destination */}
+                <div>
+                  <div className={`text-[10px] font-bold uppercase mb-1.5 ${
+                    activeRide.status === BuggyStatus.ON_TRIP ? 'text-purple-700' : 'text-emerald-700'
+                  }`}>To</div>
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 ${
+                    activeRide.status === BuggyStatus.ON_TRIP
+                      ? 'bg-purple-50 border-purple-300 ring-2 ring-purple-200'
+                      : (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING)
+                      ? 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-200'
+                      : 'bg-white border-gray-200'
+                  }`}>
+                    <div className={`w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm ${
+                      activeRide.status === BuggyStatus.ON_TRIP
+                        ? 'bg-purple-500 animate-pulse'
+                        : (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING)
+                        ? 'bg-emerald-500 animate-pulse'
+                        : 'bg-emerald-500'
+                    }`}></div>
+                    <span className="text-sm font-bold text-gray-900 flex-1">{activeRide.destination}</span>
+                  </div>
+                </div>
+                
+                {/* Progress Bar - When arriving */}
+                {(activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-bold text-emerald-700">Progress</span>
+                      <span className="text-[10px] font-semibold text-gray-600">
+                        {activeRide.eta ? `${activeRide.eta} min` : 'Calculating...'}
+                      </span>
+                    </div>
+                    <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div 
+                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-1000"
+                        style={{
+                          width: `${Math.min(100, Math.max(15, 100 - (arrivingElapsedTime / Math.max(1, (activeRide.eta ? activeRide.eta * 60 : 300))) * 85))}%`
+                        }}
+                      >
+                        {/* Shimmer effect */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Progress Bar - When on trip */}
+                {activeRide.status === BuggyStatus.ON_TRIP && activeRide.pickedUpAt && (() => {
+                  const tripDuration = Math.floor((Date.now() - activeRide.pickedUpAt) / 1000);
+                  const estimatedTripTime = activeRide.eta ? activeRide.eta * 60 : 300;
+                  const progress = Math.min(100, Math.max(10, (tripDuration / estimatedTripTime) * 100));
+                  return (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-bold text-purple-700">Trip Progress</span>
+                        <span className="text-[10px] font-semibold text-gray-600">
+                          {formatWaitingTime(tripDuration)}
+                        </span>
+                      </div>
+                      <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full transition-all duration-1000"
+                          style={{ width: `${progress}%` }}
+                        >
+                          {/* Shimmer effect */}
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
-              {/* CANCEL BUTTON: Visible when SEARCHING or when driver arriving too long */}
-              {/* For resort service: Can cancel while searching, or if driver arriving > 15 min */}
+              {/* CANCEL BUTTON: Modern design with glow effect */}
               {canCancel && (
                   <button 
                     onClick={handleCancel}
-                    className={`w-full py-2 md:py-3 font-semibold rounded-lg transition border flex flex-row items-center justify-center gap-1.5 md:gap-2 text-xs md:text-base flex-shrink-0 touch-manipulation min-h-[44px] ${
+                    className={`group relative w-full py-3.5 font-bold rounded-2xl transition-all duration-300 flex flex-row items-center justify-center gap-2 text-sm overflow-hidden touch-manipulation min-h-[52px] shadow-lg hover:shadow-2xl ${
                         (activeRide.status === BuggyStatus.SEARCHING && elapsedTime >= MAX_WAIT_TIME) ||
                         ((activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME)
-                            ? 'bg-red-500 text-white hover:bg-red-600 border-red-600'
-                            : 'bg-red-50 text-red-600 hover:bg-red-100 border-red-100'
+                            ? 'bg-gradient-to-r from-red-500 via-red-600 to-pink-600 text-white hover:from-red-600 hover:via-red-700 hover:to-pink-700 shadow-red-300/50'
+                            : 'bg-gradient-to-r from-red-50 to-pink-50 text-red-600 hover:from-red-100 hover:to-pink-100 border-2 border-red-200'
                     }`}
                   >
-                    <XCircle size={16} className="md:w-[18px] md:h-[18px] flex-shrink-0" />
-                    <span className="text-center break-words leading-tight">
+                    {/* Glow effect on hover */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                    
+                    <XCircle className="w-5 h-5 flex-shrink-0 relative z-10" />
+                    <span className="relative z-10 text-center break-words leading-tight">
                         {activeRide.status === BuggyStatus.SEARCHING && elapsedTime >= MAX_WAIT_TIME 
                             ? `${t('cancel_request')} (Over 10 min)`
                             : (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME
@@ -376,165 +540,256 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                   </button>
               )}
 
-              {/* Info message when driver has accepted - cannot cancel yet (unless arriving too long) */}
-              {/* For resort service: Once driver commits, guest cannot cancel unless driver delayed > 15 min */}
+              {/* Simple notification when driver accepted */}
               {activeRide && (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime < ARRIVING_WARNING_TIME && (
-                  <div className="mt-0 text-[10px] md:text-xs text-gray-500 text-center leading-tight px-1 flex-shrink-0">
-                      Driver has accepted your request. You cannot cancel this ride.
+                  <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-lg border border-emerald-200">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                      <p className="text-xs font-semibold text-emerald-700">
+                          Buggy is on the way to pick you up
+                      </p>
                   </div>
               )}
               
-              {/* Warning message when driver arriving > 5 min but < 15 min - show red warning */}
               {activeRide && (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime >= ARRIVING_WARNING_TIME && arrivingElapsedTime < MAX_ARRIVING_WAIT_TIME && (
-                  <div className="mt-0 text-[10px] md:text-xs text-red-600 text-center leading-tight px-1 flex-shrink-0 font-medium">
-                      Driver has been arriving for over 5 minutes. Please wait.
+                  <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-orange-50 to-red-50 rounded-xl border border-orange-300 animate-pulse">
+                      <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                      <p className="text-xs text-orange-700 font-semibold">
+                          Driver has been arriving for over 5 minutes. Please wait.
+                      </p>
                   </div>
               )}
               
-              {/* Warning message when driver arriving too long (> 15 min) - can cancel */}
               {activeRide && (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME && (
-                  <div className="mt-0 text-[10px] md:text-xs text-red-600 text-center leading-tight px-1 flex-shrink-0 font-medium">
-                      Driver has been arriving for over 15 minutes. You can cancel if needed.
+                  <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-red-50 to-pink-50 rounded-xl border-2 border-red-400">
+                      <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></div>
+                      <p className="text-xs text-red-700 font-bold">
+                          Driver has been arriving for over 15 minutes. You can cancel if needed.
+                      </p>
                   </div>
               )}
               
-              {/* Info message when ride is in progress or completed */}
-              {activeRide && (activeRide.status === BuggyStatus.ON_TRIP || activeRide.status === BuggyStatus.COMPLETED) && (
-                  <div className="mt-0 text-[10px] md:text-xs text-gray-500 text-center leading-tight px-1 flex-shrink-0">
-                      {activeRide.status === BuggyStatus.ON_TRIP 
-                          ? "Ride is in progress. You cannot cancel."
-                          : "Ride completed. You cannot cancel."
-                      }
+              {/* Notification when picked up and on trip */}
+              {activeRide && activeRide.status === BuggyStatus.ON_TRIP && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 rounded-lg border border-purple-200">
+                      <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></div>
+                      <p className="text-xs font-semibold text-purple-700">
+                          ✓ You're on the way to {activeRide.destination}
+                      </p>
+                  </div>
+              )}
+              
+              {activeRide && activeRide.status === BuggyStatus.COMPLETED && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      <p className="text-xs font-semibold text-green-700">
+                          ✓ Arrived at {activeRide.destination}
+                      </p>
                   </div>
               )}
             </div>
         </div>
       )}
 
-      {/* Booking Form - Fixed, always visible when idle */}
+      {/* Booking Form - Modern glassmorphism design */}
       {!activeRide && !isLoadingRide && (
         <div 
-          className="bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] mt-2 relative z-10 p-3 pb-20 md:pb-3 flex-shrink-0 flex flex-col max-h-[80vh] overflow-hidden"
+          className="mx-3 mt-3 mb-20 rounded-3xl shadow-2xl backdrop-blur-lg bg-white/95 border border-white/60 flex-shrink-0 flex flex-col overflow-hidden"
+          style={{
+            boxShadow: '0 25px 70px -20px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.5)',
+            maxHeight: 'calc(100vh - 200px)'
+          }}
         >
-            <div className="space-y-2 flex-shrink-0">
-                <h3 className="text-sm md:text-base font-bold text-gray-800">{t('where_to')}</h3>
+            {/* Fixed Header Section */}
+            <div className="p-5 pb-4 flex-shrink-0 space-y-4">
+                {/* Title with icon */}
+                <div className="flex items-center gap-2">
+                    <div className="w-1 h-8 bg-gradient-to-b from-emerald-500 to-teal-600 rounded-full"></div>
+                    <h3 className="text-lg font-bold text-gray-800">{t('where_to')}</h3>
+                    <MapPin className="w-5 h-5 text-emerald-600 ml-auto" />
+                </div>
             
-                <div className="relative">
-                    <LocateFixed className="absolute left-2 top-2 text-emerald-600 w-3 h-3 md:w-4 md:h-4" />
-                    <input 
-                        type="text" 
-                        value={pickup}
-                        readOnly
-                        className="w-full pl-7 md:pl-8 pr-3 py-1.5 md:py-2 text-xs md:text-sm bg-emerald-50 border border-emerald-100 rounded-lg text-gray-700 font-medium focus:outline-none"
-                    />
+                {/* Pickup location with modern styling */}
+                <div className="relative group">
+                    <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Your Location</label>
+                    <div className="relative">
+                        <LocateFixed className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 w-4 h-4" />
+                        <input 
+                            type="text" 
+                            value={pickup}
+                            readOnly
+                            className="w-full pl-10 pr-4 py-3 text-sm bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-xl text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all cursor-default"
+                        />
+                    </div>
                 </div>
 
-                {/* Search Bar */}
-                <div className="relative">
-                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3 md:w-4 md:h-4" />
-                    <input
-                        type="text"
-                        placeholder={t('search_locations')}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-7 md:pl-8 pr-3 py-1.5 md:py-2 text-xs md:text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                    />
+                {/* Search Bar with modern design */}
+                <div className="relative group">
+                    <label className="text-xs font-semibold text-gray-600 mb-1.5 block">Search Destination</label>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 group-hover:text-emerald-500 transition-colors" />
+                        <input
+                            type="text"
+                            placeholder={t('search_locations')}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all hover:border-gray-300 caret-emerald-600"
+                            style={{ caretColor: '#10b981' }}
+                        />
+                    </div>
                 </div>
 
-                {/* Filter Buttons */}
-                <div className="flex flex-wrap gap-1.5">
-                    <button
-                        onClick={() => setFilterType('ALL')}
-                        className={`px-2 py-1 text-[10px] md:text-xs font-medium rounded-md transition-colors ${
-                            filterType === 'ALL'
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                    >
-                        All
-                    </button>
-                    <button
-                        onClick={() => setFilterType('VILLA')}
-                        className={`px-2 py-1 text-[10px] md:text-xs font-medium rounded-md transition-colors ${
-                            filterType === 'VILLA'
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                    >
-                        Villas
-                    </button>
-                    <button
-                        onClick={() => setFilterType('FACILITY')}
-                        className={`px-2 py-1 text-[10px] md:text-xs font-medium rounded-md transition-colors ${
-                            filterType === 'FACILITY'
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                    >
-                        Facilities
-                    </button>
-                    <button
-                        onClick={() => setFilterType('RESTAURANT')}
-                        className={`px-2 py-1 text-[10px] md:text-xs font-medium rounded-md transition-colors ${
-                            filterType === 'RESTAURANT'
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                    >
-                        Restaurants
-                    </button>
+                {/* Filter Buttons with modern pill design */}
+                <div>
+                    <label className="text-xs font-semibold text-gray-600 mb-2 block">Category</label>
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            onClick={() => setFilterType('ALL')}
+                            className={`px-4 py-2 text-xs font-bold rounded-full transition-all duration-300 ${
+                                filterType === 'ALL'
+                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-300/50'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                        >
+                            All Locations
+                        </button>
+                        <button
+                            onClick={() => setFilterType('VILLA')}
+                            className={`px-4 py-2 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-1.5 ${
+                                filterType === 'VILLA'
+                                    ? 'bg-gradient-to-r from-blue-500 to-cyan-600 text-white shadow-lg shadow-blue-300/50'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                        >
+                            <Building2 className="w-3.5 h-3.5" />
+                            Villas
+                        </button>
+                        <button
+                            onClick={() => setFilterType('FACILITY')}
+                            className={`px-4 py-2 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-1.5 ${
+                                filterType === 'FACILITY'
+                                    ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-300/50'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                        >
+                            <Waves className="w-3.5 h-3.5" />
+                            Facilities
+                        </button>
+                        <button
+                            onClick={() => setFilterType('RESTAURANT')}
+                            className={`px-4 py-2 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-1.5 ${
+                                filterType === 'RESTAURANT'
+                                    ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg shadow-orange-300/50'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                        >
+                            <Utensils className="w-3.5 h-3.5" />
+                            Restaurants
+                        </button>
+                    </div>
                 </div>
+            </div>
 
-                {/* Filtered Locations List */}
-                <div className="space-y-1.5 flex-1 min-h-0 flex flex-col">
-                    <div className="text-[10px] font-semibold text-gray-600 uppercase flex-shrink-0">
+            {/* Scrollable Locations List */}
+            <div className="flex-1 min-h-0 flex flex-col px-5 pb-4">
+                <div className="flex items-center gap-2 mb-2">
+                    <div className="text-xs font-bold text-gray-700 uppercase tracking-wide">
                         {filteredLocations.length} {filterType === 'ALL' ? 'Locations' : filterType.toLowerCase()}
                     </div>
-                    <div className="flex-1 overflow-y-auto space-y-1 min-h-0 max-h-[200px]">
-                        {filteredLocations.map((loc) => (
-                            <button
-                                key={loc.id || loc.name}
-                                onClick={() => handleSetDestination(loc.name)}
-                                className={`w-full text-left p-1.5 md:p-2 rounded-md border transition-colors ${
-                                    destinationToShow === loc.name
-                                        ? 'bg-amber-50 border-amber-300'
-                                        : 'bg-white border-gray-200 hover:border-emerald-400 hover:bg-emerald-50'
-                                }`}
-                            >
-                                <div className="flex items-center space-x-1.5">
-                                    <MapPin className={`w-3 h-3 md:w-4 md:h-4 flex-shrink-0 ${
-                                        destinationToShow === loc.name ? 'text-amber-600' : 'text-emerald-600'
+                    <div className="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent"></div>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin scrollbar-thumb-emerald-300 scrollbar-track-gray-100">
+                    {filteredLocations.map((loc) => (
+                        <button
+                            key={loc.id || loc.name}
+                            onClick={() => handleSetDestination(loc.name)}
+                            className={`group w-full text-left p-3 rounded-xl border-2 transition-all duration-300 ${
+                                destinationToShow === loc.name
+                                    ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-400 shadow-lg shadow-amber-200/50'
+                                    : 'bg-white border-gray-200 hover:border-emerald-400 hover:bg-gradient-to-r hover:from-emerald-50 hover:to-teal-50 hover:shadow-md'
+                            }`}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                                    destinationToShow === loc.name 
+                                        ? 'bg-gradient-to-br from-amber-400 to-orange-500 shadow-lg' 
+                                        : 'bg-gradient-to-br from-emerald-100 to-teal-100 group-hover:from-emerald-200 group-hover:to-teal-200'
+                                }`}>
+                                    <MapPin className={`w-5 h-5 ${
+                                        destinationToShow === loc.name ? 'text-white' : 'text-emerald-700'
                                     }`} />
-                                    <span className={`text-xs md:text-sm font-medium ${
-                                        destinationToShow === loc.name ? 'text-amber-900' : 'text-gray-700'
+                                </div>
+                                
+                                <div className="flex-1 min-w-0">
+                                    <div className={`text-sm font-bold ${
+                                        destinationToShow === loc.name ? 'text-amber-900' : 'text-gray-800'
                                     }`}>
                                         {loc.name}
-                                    </span>
+                                    </div>
                                     {loc.type && (
-                                        <span className="ml-auto text-[10px] text-gray-500 capitalize">
+                                        <div className={`text-xs mt-0.5 font-medium capitalize ${
+                                            destinationToShow === loc.name ? 'text-amber-600' : 'text-gray-500'
+                                        }`}>
                                             {loc.type.toLowerCase()}
-                                        </span>
+                                        </div>
                                     )}
                                 </div>
-                            </button>
-                        ))}
-                        {filteredLocations.length === 0 && (
-                            <div className="text-center py-3 text-xs text-gray-500">
-                                No locations found
+                                
+                                {destinationToShow === loc.name && (
+                                    <div className="flex-shrink-0 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center">
+                                        <div className="w-2 h-2 bg-white rounded-full"></div>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
+                        </button>
+                    ))}
+                    {filteredLocations.length === 0 && (
+                        <div className="text-center py-8 px-4">
+                            <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                            <p className="text-sm text-gray-500 font-medium">No locations found</p>
+                            <p className="text-xs text-gray-400 mt-1">Try a different search or filter</p>
+                        </div>
+                    )}
                 </div>
+            </div>
 
+            {/* Fixed Footer Section - Selected Destination & Book Button */}
+            <div className="p-5 pt-4 flex-shrink-0 space-y-3 border-t border-gray-100 bg-gradient-to-b from-white/50 to-white/95">
+                {/* Selected Destination Display */}
+                {destination && (
+                    <div className="relative group animate-in slide-in-from-bottom duration-300">
+                        <label className="text-xs font-semibold text-amber-600 mb-1.5 block">Selected Destination</label>
+                        <div className="relative overflow-hidden">
+                            <Navigation className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-600 w-4 h-4 group-hover:rotate-12 transition-transform" />
+                            <div className="w-full pl-10 pr-4 py-3 text-sm bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-2 border-amber-300 rounded-xl text-gray-800 font-bold shadow-md">
+                                {destination}
+                            </div>
+                            {/* Animated shine effect */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Book Button with modern gradient and hover effects */}
                 <button 
                     onClick={handleBook}
                     disabled={!destination}
-                    className={`w-full mt-2 py-2 md:py-2.5 rounded-lg font-bold text-sm md:text-base shadow-lg transition transform active:scale-95 flex items-center justify-center space-x-2 flex-shrink-0
-                        ${destination ? 'bg-emerald-800 text-white hover:bg-emerald-900' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
-                    `}
+                    className={`group relative w-full py-4 rounded-2xl font-bold text-base shadow-2xl transition-all duration-300 flex items-center justify-center gap-2.5 overflow-hidden ${
+                        destination 
+                            ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white hover:shadow-emerald-400/50 cursor-pointer' 
+                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    }`}
                 >
-                    <Car className="w-4 h-4 md:w-5 md:h-5" />
-                    <span>{t('request_buggy')}</span>
+                    {destination && (
+                        <>
+                            {/* Animated gradient overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                            {/* Glow effect */}
+                            <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors duration-300"></div>
+                        </>
+                    )}
+                    <Car className="w-5 h-5 relative z-10" />
+                    <span className="relative z-10">{t('request_buggy')}</span>
                 </button>
             </div>
         </div>

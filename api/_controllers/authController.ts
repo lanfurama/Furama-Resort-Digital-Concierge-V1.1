@@ -81,7 +81,7 @@ export const authController = {
         });
       }
 
-      // Check if user is staff/admin/driver/supervisor
+      // Check if user is staff/admin/driver/supervisor/reception
       if (user.role === 'GUEST') {
         return res.status(403).json({ 
           success: false,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Mic, MapPin, Volume2, X, Navigation, ExternalLink } from 'lucide-react';
+import { Send, Mic, MapPin, Volume2, X, Navigation, ExternalLink, MessageSquare } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { createChatSession, speakText, connectLiveSession, encode } from '../services/geminiService';
 import { GenerateContentResponse, LiveServerMessage } from '@google/genai';
@@ -76,24 +76,24 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
   };
   
   const MapCard: React.FC<{ url: string; title: string }> = ({ url, title }) => (
-    <a href={url} target="_blank" rel="noreferrer" className="block mt-3 group w-full max-w-sm">
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
+    <a href={url} target="_blank" rel="noreferrer" className="block mt-2 group w-full max-w-sm">
+        <div className="bg-white/95 backdrop-blur-sm border-2 border-gray-200 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300">
             {/* Visual Abstract Map Pattern */}
-            <div className="h-24 bg-slate-50 relative flex items-center justify-center overflow-hidden bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]">
-                <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent"></div>
-                <div className="bg-white p-2 rounded-full shadow-lg z-10 animate-bounce">
-                    <MapPin className="text-red-500 w-6 h-6 fill-current" />
+            <div className="h-20 bg-gradient-to-br from-blue-50 to-cyan-50 relative flex items-center justify-center overflow-hidden bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:16px_16px]">
+                <div className="absolute inset-0 bg-gradient-to-t from-blue-100/30 to-transparent"></div>
+                <div className="bg-white p-2 rounded-xl shadow-lg z-10 border-2 border-blue-200">
+                    <MapPin className="text-red-500 w-5 h-5 fill-current" />
                 </div>
             </div>
-            <div className="p-3 bg-white flex justify-between items-center group-hover:bg-gray-50 transition-colors">
+            <div className="p-3 bg-white flex justify-between items-center group-hover:bg-emerald-50/50 transition-colors">
                 <div className="flex-1 min-w-0 pr-2">
                     <h4 className="font-bold text-sm text-gray-800 truncate">{title}</h4>
-                    <p className="text-xs text-emerald-600 flex items-center mt-0.5 font-medium">
+                    <p className="text-xs text-emerald-600 flex items-center mt-1 font-semibold">
                         <Navigation size={10} className="mr-1 fill-current"/> {t('get_directions')}
                     </p>
                 </div>
-                <div className="bg-emerald-100 text-emerald-700 p-2 rounded-full transform group-hover:rotate-45 transition-transform duration-300">
-                    <Navigation size={16} /> 
+                <div className="bg-emerald-100 text-emerald-700 p-2 rounded-lg border border-emerald-200 group-hover:bg-emerald-200 transition-all duration-300">
+                    <Navigation size={16} strokeWidth={2.5} /> 
                 </div>
             </div>
         </div>
@@ -396,34 +396,61 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white relative">
-      {/* Header */}
-      <div className="p-4 bg-emerald-900 text-white flex justify-between items-center shadow-md z-10">
-        <h2 className="text-xl font-serif">{t('concierge_ai')}</h2>
-        <button onClick={onClose}><X /></button>
+    <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative">
+      {/* Header - Modern Design */}
+      <div className="p-3 text-white shadow-lg backdrop-blur-md bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 flex justify-between items-center z-10 border-b border-white/20"
+        style={{
+          boxShadow: '0 4px 20px -5px rgba(0,0,0,0.2)'
+        }}
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+            <MessageSquare className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold tracking-tight">{t('concierge_ai')}</h2>
+            <p className="text-[10px] text-white/80">AI Assistant</p>
+          </div>
+        </div>
+        <button 
+          onClick={onClose}
+          className="p-1.5 rounded-lg text-white/90 hover:text-white hover:bg-white/10 transition-all"
+        >
+          <X size={20} />
+        </button>
       </div>
 
       {mode === 'TEXT' ? (
         <>
            {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-transparent scrollbar-hide">
             {messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-2xl p-4 shadow-sm ${msg.role === 'user' ? 'bg-emerald-700 text-white' : 'bg-white text-gray-800 border border-gray-100'}`}>
-                  <p className="whitespace-pre-wrap">{msg.text}</p>
+                <div className={`max-w-[85%] rounded-xl p-3 shadow-md backdrop-blur-sm ${
+                  msg.role === 'user' 
+                    ? 'bg-gradient-to-br from-emerald-600 to-teal-600 text-white' 
+                    : 'bg-white/95 text-gray-800 border border-gray-200/60'
+                }`}
+                style={{
+                  boxShadow: msg.role === 'user' 
+                    ? '0 4px 20px -5px rgba(16, 185, 129, 0.3)' 
+                    : '0 2px 10px -5px rgba(0,0,0,0.1)'
+                }}
+                >
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.text}</p>
                   
                   {/* Grounding Sources (Maps/Search) */}
                   {msg.groundingUrls && (
-                      <div className="mt-3 pt-2 border-t border-gray-100">
+                      <div className="mt-3 pt-3 border-t border-gray-200/60">
                           {msg.groundingUrls.some(u => u.type !== 'MAP') && (
-                              <div className="mb-2">
-                                  <p className="text-[10px] uppercase font-bold text-gray-400 mb-1 flex items-center">
-                                      <ExternalLink className="w-3 h-3 mr-1"/> {t('sources')}
+                              <div className="mb-3">
+                                  <p className="text-[10px] uppercase font-bold text-gray-500 mb-2 flex items-center gap-1.5">
+                                      <ExternalLink className="w-3 h-3"/> {t('sources')}
                                   </p>
-                                  <ul className="space-y-1">
+                                  <ul className="space-y-1.5">
                                       {msg.groundingUrls.filter(u => u.type !== 'MAP').map((url, i) => (
                                           <li key={i}>
-                                              <a href={url.uri} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline flex items-start">
+                                              <a href={url.uri} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:text-blue-700 hover:underline flex items-start font-medium bg-blue-50 px-2 py-1.5 rounded border border-blue-100">
                                                   <span className="truncate">{url.title}</span>
                                               </a>
                                           </li>
@@ -446,11 +473,11 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
                       <button 
                         type="button"
                         onClick={() => handleTTS(msg.text)} 
-                        className="mt-2 p-2 rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-800 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                        className="mt-2 p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center border border-emerald-200"
                         disabled={isPlayingAudio}
                         title={t('play_audio') || 'Play audio'}
                       >
-                         <Volume2 size={16} />
+                         <Volume2 size={16} strokeWidth={2.5} />
                       </button>
                   )}
                 </div>
@@ -458,24 +485,29 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
             ))}
             {isLoading && (
                <div className="flex justify-start">
-                   <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
+                   <div className="bg-white/95 backdrop-blur-sm p-3 rounded-xl shadow-md border border-gray-200/60 flex space-x-1.5">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
                    </div>
                </div>
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area */}
-          <div className="p-4 bg-white border-t border-gray-100 flex items-center space-x-2">
+          {/* Input Area - Modern Design */}
+          <div className="p-3 backdrop-blur-xl bg-white/95 border-t-2 border-gray-200/60 flex items-center space-x-2 safe-area-bottom"
+            style={{
+              boxShadow: '0 -10px 40px -10px rgba(0,0,0,0.1)',
+              paddingBottom: 'max(0.75rem, calc(0.75rem + env(safe-area-inset-bottom)))'
+            }}
+          >
              <button 
                type="button"
                onClick={toggleLiveMode}
-               className="p-3 rounded-full bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition cursor-pointer"
+               className="p-2.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all cursor-pointer border border-emerald-200"
              >
-                <Mic size={20} />
+                <Mic size={18} strokeWidth={2.5} />
              </button>
              <input 
                 type="text" 
@@ -483,36 +515,47 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 placeholder={t('ask_placeholder')}
-                className="flex-1 bg-gray-100 rounded-full px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="flex-1 bg-gray-50 rounded-xl px-4 py-2.5 text-gray-900 text-sm border-2 border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all placeholder:text-gray-400"
              />
              <button 
                 type="button"
                 onClick={handleSend}
-                disabled={!input.trim()}
-                className="p-3 rounded-full bg-emerald-800 text-white hover:bg-emerald-900 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
+                disabled={!input.trim() || isLoading}
+                className="p-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer shadow-lg disabled:shadow-none"
              >
-                <Send size={20} />
+                <Send size={18} strokeWidth={2.5} />
              </button>
           </div>
         </>
       ) : (
-        /* Voice Mode UI */
-        <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-emerald-900 to-emerald-800 text-white p-6">
-            <div className={`w-32 h-32 rounded-full flex items-center justify-center mb-8 transition-all duration-500 ${isLiveConnected ? 'bg-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.5)] animate-pulse' : 'bg-gray-600'}`}>
-                <Mic size={48} className="text-white" />
+        /* Voice Mode UI - Modern Design */
+        <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-emerald-600 via-teal-600 to-emerald-700 text-white p-6 relative overflow-hidden">
+            {/* Animated background pattern */}
+            <div className="absolute inset-0 opacity-10">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1)_1px,transparent_1px)] [background-size:32px_32px]"></div>
             </div>
             
-            <h3 className="text-2xl font-serif mb-2">{t('live_concierge')}</h3>
-            <p className="text-emerald-200 mb-8 text-center max-w-xs">
-                {isLiveConnected ? t('listening') : t('connecting_voice')}
-            </p>
+            <div className="relative z-10 flex flex-col items-center">
+                <div className={`w-28 h-28 rounded-2xl flex items-center justify-center mb-6 transition-all duration-500 shadow-2xl ${
+                    isLiveConnected 
+                        ? 'bg-white text-emerald-600 shadow-emerald-300/50 animate-pulse' 
+                        : 'bg-white/20 backdrop-blur-sm border-2 border-white/30'
+                }`}>
+                    <Mic size={40} className={isLiveConnected ? 'text-emerald-600' : 'text-white'} strokeWidth={2.5} />
+                </div>
+                
+                <h3 className="text-2xl font-bold mb-2">{t('live_concierge')}</h3>
+                <p className="text-white/90 mb-8 text-center max-w-xs text-sm">
+                    {isLiveConnected ? t('listening') : t('connecting_voice')}
+                </p>
 
-            <button 
-                onClick={toggleLiveMode}
-                className="px-8 py-3 bg-red-500/20 border border-red-400/50 text-red-100 rounded-full hover:bg-red-500/30 transition flex items-center"
-            >
-                <X className="mr-2" size={18} /> {t('end_call')}
-            </button>
+                <button 
+                    onClick={toggleLiveMode}
+                    className="px-6 py-3 bg-white/20 backdrop-blur-sm border-2 border-white/30 text-white rounded-xl hover:bg-white/30 transition-all flex items-center gap-2 font-semibold shadow-lg"
+                >
+                    <X size={18} strokeWidth={2.5} /> {t('end_call')}
+                </button>
+            </div>
         </div>
       )}
     </div>

@@ -10,6 +10,7 @@ import EventsList from './components/EventsList';
 import AdminPortal from './components/AdminPortal';
 import DriverPortal from './components/DriverPortal';
 import StaffPortal from './components/StaffPortal';
+import ReceptionPortal from './components/ReceptionPortal';
 import GuestAccount from './components/GuestAccount';
 import ActiveOrders from './components/ActiveOrders';
 import NotificationBell from './components/NotificationBell';
@@ -64,6 +65,7 @@ const AppContent: React.FC = () => {
             setView(AppView.DRIVER_DASHBOARD);
             break;
           case UserRole.STAFF:
+          case UserRole.RECEPTION:
             setView(AppView.STAFF_DASHBOARD);
             break;
           default:
@@ -108,11 +110,11 @@ const AppContent: React.FC = () => {
                 return;
             }
         } else {
-             // Admin/Staff/Driver/Supervisor Login: Username + Password - Calls API
+             // Admin/Staff/Driver/Supervisor/Reception Login: Username + Password - Calls API
              foundUser = await authenticateStaff(usernameInput, passwordInput);
              
              if (!foundUser) {
-                 setAuthError('Invalid staff credentials. Please check Username and Password.');
+                 setAuthError('Invalid credentials. Please check Username and Password.');
         setIsAuthLoading(false);
                  return;
              }
@@ -134,6 +136,7 @@ const AppContent: React.FC = () => {
                 case UserRole.SUPERVISOR: setView(AppView.ADMIN_DASHBOARD); break; // Supervisors use Admin Dashboard (Restricted)
             case UserRole.DRIVER: setView(AppView.DRIVER_DASHBOARD); break;
             case UserRole.STAFF: setView(AppView.STAFF_DASHBOARD); break;
+            case UserRole.RECEPTION: setView(AppView.STAFF_DASHBOARD); break; // Reception uses Staff Dashboard
             default: setView(AppView.HOME); break;
         }
         } else {
@@ -173,6 +176,7 @@ const AppContent: React.FC = () => {
   const isActive = (v: AppView) => view === v;
   const [activeOrderCount, setActiveOrderCount] = useState(0);
   const [buggyWaitTime, setBuggyWaitTime] = useState<number>(0); // Wait time in seconds
+  const [buggyStatus, setBuggyStatus] = useState<BuggyStatus | null>(null); // Current buggy status
   
   // Load active order count
   useEffect(() => {
@@ -188,21 +192,28 @@ const AppContent: React.FC = () => {
     }
   }, [user]);
 
-  // Track buggy wait time for badge notification
+  // Track buggy wait time and status for badge notification
   useEffect(() => {
     if (user && user.role === UserRole.GUEST) {
       const checkBuggyStatus = async () => {
         try {
           const activeRide = await getActiveRideForUser(user.roomNumber);
-          if (activeRide && activeRide.status === BuggyStatus.SEARCHING) {
-            const now = Date.now();
-            const elapsed = Math.max(0, Math.floor((now - activeRide.timestamp) / 1000));
-            setBuggyWaitTime(elapsed);
+          if (activeRide) {
+            setBuggyStatus(activeRide.status);
+            if (activeRide.status === BuggyStatus.SEARCHING) {
+              const now = Date.now();
+              const elapsed = Math.max(0, Math.floor((now - activeRide.timestamp) / 1000));
+              setBuggyWaitTime(elapsed);
+            } else {
+              setBuggyWaitTime(0);
+            }
           } else {
+            setBuggyStatus(null);
             setBuggyWaitTime(0);
           }
         } catch (error) {
           console.error('Failed to check buggy status:', error);
+          setBuggyStatus(null);
           setBuggyWaitTime(0);
         }
       };
@@ -212,6 +223,7 @@ const AppContent: React.FC = () => {
       const interval = setInterval(checkBuggyStatus, 3000);
       return () => clearInterval(interval);
     } else {
+      setBuggyStatus(null);
       setBuggyWaitTime(0);
     }
   }, [user]);
@@ -231,22 +243,24 @@ const AppContent: React.FC = () => {
 
             <form onSubmit={handleLogin} className="space-y-4">
                 {/* Role Switcher (For Demo) */}
-                <div className="flex bg-gray-100 p-1 rounded-lg mb-6">
-                    {Object.values(UserRole).map((role) => (
-                        <button
-                            key={role}
-                            type="button"
-                            onClick={() => {
-                                setSelectedRole(role);
-                                setAuthError('');
-                                setUsernameInput('');
-                                setPasswordInput('');
-                            }}
-                            className={`flex-1 py-2 text-[10px] font-bold rounded-md transition ${selectedRole === role ? 'bg-white text-emerald-800 shadow-sm' : 'text-gray-400'}`}
-                        >
-                            {role}
-                        </button>
-                    ))}
+                <div className="flex bg-gray-100 p-1 rounded-lg mb-6 overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    <div className="flex gap-1 min-w-max">
+                        {Object.values(UserRole).map((role) => (
+                            <button
+                                key={role}
+                                type="button"
+                                onClick={() => {
+                                    setSelectedRole(role);
+                                    setAuthError('');
+                                    setUsernameInput('');
+                                    setPasswordInput('');
+                                }}
+                                className={`flex-shrink-0 px-3 py-2 text-[10px] font-bold rounded-md transition whitespace-nowrap min-w-fit ${selectedRole === role ? 'bg-white text-emerald-800 shadow-sm' : 'text-gray-400'}`}
+                            >
+                                {role}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 {selectedRole === UserRole.GUEST ? (
@@ -276,7 +290,7 @@ const AppContent: React.FC = () => {
                         </div>
                     </>
                 ) : (
-                    /* STAFF/ADMIN LOGIN FORM */
+                    /* STAFF/ADMIN/DRIVER/SUPERVISOR/RECEPTION LOGIN FORM */
                     <>
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Username</label>
@@ -376,6 +390,9 @@ const AppContent: React.FC = () => {
 
   // STAFF VIEW
   if (view === AppView.STAFF_DASHBOARD) {
+      if (user.role === UserRole.RECEPTION) {
+          return <ReceptionPortal user={user} onLogout={handleLogout} />;
+      }
       return <StaffPortal user={user} onLogout={handleLogout} />;
   }
 
@@ -383,21 +400,42 @@ const AppContent: React.FC = () => {
   return (
     <div className="flex flex-col h-screen bg-gray-50 max-w-md mx-auto shadow-2xl overflow-hidden relative">
       
-      {/* 1. Compact Header */}
-      <div className="bg-emerald-900 text-white pt-4 pb-4 px-5 flex justify-between items-center shadow-md z-30 shrink-0">
-          <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center border border-white/20">
-                   <span className="font-serif text-lg font-bold">{user.lastName.charAt(0)}</span>
+      {/* 1. Modern Header with Gradient & Glassmorphism */}
+      <div 
+        className="backdrop-blur-md bg-gradient-to-r from-emerald-700 via-emerald-800 to-teal-800 text-white pt-3 pb-3 px-4 flex justify-between items-center shadow-xl z-30 shrink-0 border-b border-white/10"
+        style={{
+          boxShadow: '0 4px 20px -5px rgba(0,0,0,0.3)'
+        }}
+      >
+          <div className="flex items-center space-x-2.5 flex-1 min-w-0">
+              {/* Modern Avatar */}
+              <div className="relative flex-shrink-0">
+                  <div className="w-10 h-10 bg-gradient-to-br from-white/20 to-white/10 rounded-xl flex items-center justify-center border-2 border-white/30 shadow-lg backdrop-blur-sm">
+                      <span className="font-bold text-lg text-white">{user.lastName.charAt(0)}</span>
+                  </div>
+                  {/* Active indicator */}
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-emerald-800 shadow-md"></div>
               </div>
-              <div>
-                  <p className="text-[10px] text-emerald-300 uppercase tracking-widest">{t('welcome_back')}</p>
-                  <h1 className="font-bold text-lg leading-tight truncate max-w-[150px]">{user.lastName}</h1>
+              
+              {/* Welcome Text */}
+              <div className="flex-1 min-w-0">
+                  <p className="text-[9px] text-emerald-200 uppercase tracking-wider font-semibold mb-0.5">{t('welcome_back')}</p>
+                  <h1 className="font-bold text-base leading-tight truncate text-white">{user.lastName}</h1>
+                  {user.roomNumber && (
+                      <p className="text-[10px] text-emerald-200/80 mt-0.5">Room {user.roomNumber}</p>
+                  )}
               </div>
           </div>
-          <div className="flex items-center space-x-2">
+          
+          {/* Action Buttons */}
+          <div className="flex items-center space-x-1.5 flex-shrink-0 ml-2">
                <NotificationBell userId={user.roomNumber} />
-               <button onClick={handleLogout} className="p-2 rounded-full hover:bg-white/10 text-emerald-200 hover:text-white transition" title="Logout">
-                  <LogOut size={20} />
+               <button 
+                   onClick={handleLogout} 
+                   className="p-2 rounded-xl hover:bg-white/10 text-white/90 hover:text-white transition-all duration-300 border border-white/10 hover:border-white/20 backdrop-blur-sm" 
+                   title="Logout"
+               >
+                  <LogOut size={17} strokeWidth={2.5} />
                </button>
           </div>
       </div>
@@ -500,9 +538,9 @@ const AppContent: React.FC = () => {
         {view === AppView.EVENTS && <EventsList onBack={() => setView(AppView.HOME)} />}
       </div>
 
-      {/* 3. Fixed Bottom Navigation Bar - Always fixed on mobile */}
+      {/* 3. Fixed Bottom Navigation Bar - Modern glassmorphism design */}
       <div 
-        className="bg-white border-t border-gray-200 h-20 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-50 flex justify-around items-center px-2 safe-area-bottom" 
+        className="backdrop-blur-xl bg-white/95 border-t-2 border-gray-200/60 h-20 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-50 flex justify-around items-center px-2 safe-area-bottom" 
         style={{ 
           paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
           position: 'fixed',
@@ -510,7 +548,8 @@ const AppContent: React.FC = () => {
           transform: 'translateZ(0)',
           WebkitTransform: 'translateZ(0)',
           backfaceVisibility: 'hidden',
-          WebkitBackfaceVisibility: 'hidden'
+          WebkitBackfaceVisibility: 'hidden',
+          boxShadow: '0 -10px 40px -10px rgba(0,0,0,0.15)'
         }}
       >
            <NavButton 
@@ -525,6 +564,15 @@ const AppContent: React.FC = () => {
                 icon={Car} 
                 label={t('buggy')}
                 urgentBadge={buggyWaitTime >= 600} // Show urgent badge if waiting over 10 minutes
+                statusLabel={
+                    buggyStatus === BuggyStatus.SEARCHING 
+                        ? t('finding_driver') 
+                        : (buggyStatus === BuggyStatus.ASSIGNED || buggyStatus === BuggyStatus.ARRIVING)
+                            ? t('driver_arriving')
+                            : buggyStatus === BuggyStatus.ON_TRIP
+                                ? t('en_route')
+                                : undefined
+                }
            />
            <NavButton 
                 active={view === AppView.CHAT} 
@@ -551,7 +599,7 @@ const AppContent: React.FC = () => {
   );
 };
 
-// Helper Component for Bottom Nav Buttons
+// Helper Component for Bottom Nav Buttons - Modern 2025 Design
 const NavButton: React.FC<{ 
     active: boolean; 
     onClick: () => void; 
@@ -560,34 +608,81 @@ const NavButton: React.FC<{
     special?: boolean;
     badge?: number;
     urgentBadge?: boolean; // Red urgent badge for critical alerts
-}> = ({ active, onClick, icon: Icon, label, special, badge, urgentBadge }) => (
+    statusLabel?: string; // Status label to show when active (e.g., "Finding Driver")
+}> = ({ active, onClick, icon: Icon, label, special, badge, urgentBadge, statusLabel }) => (
     <button 
         onClick={onClick}
-        className={`flex flex-col items-center justify-center w-full h-full relative ${
-            active ? 'text-emerald-700' : 'text-gray-400 hover:text-gray-600'
+        className={`group flex flex-col items-center justify-center w-full h-full relative transition-all duration-300 ${
+            active ? 'text-emerald-600' : 'text-gray-400'
         }`}
     >
         {special ? (
-            <div className={`p-3 rounded-full mb-1 shadow-lg transform -translate-y-4 border-4 border-gray-50 transition ${active ? 'bg-emerald-700 text-white' : 'bg-emerald-600 text-white'}`}>
-                <Icon size={24} />
+            // Special center button with modern design
+            <div className="relative mb-1">
+                <div className={`p-3.5 rounded-2xl shadow-2xl transform -translate-y-4 border-2 transition-all duration-300 ${
+                    active 
+                        ? 'bg-gradient-to-br from-emerald-600 to-teal-600 text-white border-emerald-400 shadow-emerald-300/50' 
+                        : 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white border-emerald-300 shadow-emerald-200/30'
+                }`}>
+                    <Icon size={22} strokeWidth={2.5} />
+                </div>
+                {/* Glow effect when active */}
+                {active && (
+                    <div className="absolute inset-0 -translate-y-4 rounded-2xl bg-emerald-400/20 blur-xl -z-10 animate-pulse"></div>
+                )}
             </div>
         ) : (
+            // Regular nav buttons
             <div className="mb-1 relative">
-                <Icon size={24} strokeWidth={active ? 2.5 : 2} />
+                <div className={`p-2 rounded-xl transition-all duration-300 ${
+                    active 
+                        ? 'bg-gradient-to-br from-emerald-50 to-teal-50' 
+                        : 'group-hover:bg-gray-50'
+                }`}>
+                    <Icon 
+                        size={22} 
+                        strokeWidth={active ? 2.5 : 2} 
+                        className={`transition-all duration-300 ${
+                            active ? 'text-emerald-600' : 'text-gray-500 group-hover:text-gray-600'
+                        }`}
+                    />
+                </div>
+                
+                {/* Badge indicators */}
                 {urgentBadge ? (
-                    <span className="absolute -top-1 -right-1.5 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white animate-pulse">
+                    <span className="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-red-500 to-pink-600 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-lg animate-pulse">
                         !
                     </span>
                 ) : badge && badge > 0 ? (
-                    <span className="absolute -top-1 -right-1.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full border border-white">
-                        {badge}
+                    <span className="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-red-500 to-pink-600 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-lg">
+                        {badge > 9 ? '9+' : badge}
                     </span>
                 ) : null}
+                
+                {/* Active indicator dot */}
+                {active && (
+                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-emerald-600 rounded-full"></div>
+                )}
             </div>
         )}
-        <span className={`text-[10px] font-medium ${special ? '-mt-3' : ''} ${urgentBadge ? 'text-red-600 font-bold' : ''}`}>
-            {label}
-        </span>
+        
+        {/* Label with modern typography */}
+        <div className={`flex flex-col items-center transition-all duration-300 ${special ? '-mt-3' : ''}`}>
+            <span className={`text-[10px] font-semibold transition-all duration-300 ${
+                active 
+                    ? 'text-emerald-600' 
+                    : urgentBadge 
+                        ? 'text-red-600 font-bold' 
+                        : 'text-gray-500 group-hover:text-gray-600'
+            }`}>
+                {label}
+            </span>
+            {statusLabel && !active && (
+                <span className="text-[9px] font-bold text-orange-600 mt-0.5 animate-pulse">
+                    {statusLabel}
+                </span>
+            )}
+        </div>
     </button>
 );
 

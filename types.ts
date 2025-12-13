@@ -25,7 +25,8 @@ export enum UserRole {
   ADMIN = 'ADMIN',
   DRIVER = 'DRIVER',
   STAFF = 'STAFF',
-  SUPERVISOR = 'SUPERVISOR'
+  SUPERVISOR = 'SUPERVISOR',
+  RECEPTION = 'RECEPTION'
 }
 
 export type Department = 'All' | 'Buggy' | 'Dining' | 'Spa' | 'Pool' | 'Butler' | 'FrontDesk';

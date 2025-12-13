@@ -302,56 +302,87 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
     const averageRatingDisplay = existingReview ? existingReview.averageRating : (ratings.reduce((a,b)=>a+b.value,0)/ratings.length).toFixed(1);
 
     return (
-        <div className="flex flex-col h-full bg-gray-50 relative">
-            {/* Header */}
-            <div className="bg-emerald-900 text-white p-4 pb-6 rounded-b-[2.5rem] shadow-xl relative z-10">
-                {/* Back Button for consistency */}
-                <button onClick={onBack} className="absolute top-3 left-3 text-white hover:text-emerald-200">
-                    <ArrowLeft className="w-5 h-5" />
+        <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative">
+            {/* Modern Header with Gradient & Glassmorphism */}
+            <div 
+                className="backdrop-blur-md bg-gradient-to-r from-emerald-700 via-emerald-800 to-teal-800 text-white p-3 pb-4 rounded-b-3xl shadow-2xl relative z-10"
+                style={{
+                    boxShadow: '0 10px 40px -10px rgba(0,0,0,0.3)'
+                }}
+            >
+                {/* Back Button */}
+                <button 
+                    onClick={onBack} 
+                    className="absolute top-2.5 left-2.5 text-white/90 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-all duration-300"
+                >
+                    <ArrowLeft className="w-5 h-5" strokeWidth={2.5} />
                 </button>
-                <h2 className="text-xl font-serif font-bold text-center">{t('my_account')}</h2>
-                <div className="mt-4 flex flex-col items-center">
-                    <div className="w-16 h-16 bg-emerald-700 rounded-full flex items-center justify-center border-4 border-emerald-800 shadow-inner">
-                        <span className="text-2xl font-serif text-emerald-200">{user.lastName.charAt(0)}</span>
+                
+                <h2 className="text-lg font-bold text-center tracking-tight">{t('my_account')}</h2>
+                
+                <div className="mt-3 flex flex-col items-center">
+                    <div className="relative">
+                        <div className="w-14 h-14 bg-gradient-to-br from-white/20 to-white/10 rounded-2xl flex items-center justify-center border-2 border-white/30 shadow-xl backdrop-blur-sm">
+                            <span className="text-2xl font-bold text-white">{user.lastName.charAt(0)}</span>
+                        </div>
+                        {/* Active indicator */}
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-emerald-800 shadow-md"></div>
                     </div>
-                    <h3 className="text-lg font-bold mt-2">Mr/Ms {user.lastName}</h3>
-                    <p className="text-emerald-300 text-xs">{t('room')} {user.roomNumber}</p>
+                    <h3 className="text-base font-bold mt-2 text-white">Mr/Ms {user.lastName}</h3>
+                    <div className="mt-1 px-2.5 py-0.5 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
+                        <p className="text-emerald-200 text-[10px] font-semibold">{t('room')} {user.roomNumber}</p>
+                    </div>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 -mt-4 relative z-20 pb-24">
+            <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4 -mt-4 relative z-20 pb-24">
                 {(isLoadingHistory || isLoadingReview || isLoadingUserData) && (
                     <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
                         <Loading size="md" message={t('loading') || 'Loading account data...'} />
                     </div>
                 )}
                 
-                {/* Profile Card */}
-                <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-                    <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wide mb-3">{t('reservation_details')}</h4>
+                {/* Profile Card - Modern Design */}
+                <div className="backdrop-blur-lg bg-white/95 p-5 rounded-3xl shadow-xl border border-white/60"
+                    style={{
+                        boxShadow: '0 10px 40px -10px rgba(0,0,0,0.15)'
+                    }}
+                >
+                    <div className="flex items-center gap-2 mb-4">
+                        <div className="w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-600 rounded-full"></div>
+                        <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{t('reservation_details')}</h4>
+                    </div>
+                    
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <p className="text-xs text-gray-500">{t('villa_type')}</p>
-                            <p className="font-semibold text-gray-800">{user.villaType || 'Standard Room'}</p>
+                        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-3 rounded-xl border border-blue-100">
+                            <p className="text-xs text-gray-600 font-medium mb-1">{t('villa_type')}</p>
+                            <p className="font-bold text-gray-800 text-sm">{user.villaType || 'Standard Room'}</p>
                         </div>
-                        <div>
-                            <p className="text-xs text-gray-500">{t('stay_duration')}</p>
-                            <p className="font-semibold text-gray-800">
+                        <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-3 rounded-xl border border-purple-100">
+                            <p className="text-xs text-gray-600 font-medium mb-1">{t('stay_duration')}</p>
+                            <p className="font-bold text-gray-800 text-sm">
                                 {user.checkIn ? new Date(user.checkIn).toLocaleDateString(undefined, {month:'short', day:'numeric'}) : 'N/A'} - 
                                 {user.checkOut ? new Date(user.checkOut).toLocaleDateString(undefined, {month:'short', day:'numeric'}) : 'N/A'}
                             </p>
                         </div>
                         
                         {/* Language Selector */}
-                        <div className="col-span-2 mt-2 pt-2 border-t border-gray-50">
-                            <div className="flex justify-between items-center mb-2">
-                                <p className="text-xs text-gray-500 flex items-center"><Globe size={12} className="mr-1"/> {t('app_language')}</p>
-                                {isLangSaving && <span className="text-[10px] text-emerald-600 font-bold animate-pulse">Updating...</span>}
+                        <div className="col-span-2 mt-2 pt-4 border-t-2 border-gray-100">
+                            <div className="flex justify-between items-center mb-3">
+                                <p className="text-xs text-gray-600 font-semibold flex items-center gap-1.5">
+                                    <Globe size={14} className="text-emerald-600"/> 
+                                    {t('app_language')}
+                                </p>
+                                {isLangSaving && (
+                                    <span className="text-[10px] text-emerald-600 font-bold animate-pulse bg-emerald-50 px-2 py-1 rounded-full">
+                                        Updating...
+                                    </span>
+                                )}
                             </div>
                             <select 
                                 value={selectedLang}
                                 onChange={(e) => handleLanguageChange(e.target.value)}
-                                className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-sm text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                className="w-full bg-gradient-to-r from-gray-50 to-blue-50 border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                             >
                                 {SUPPORTED_LANGUAGES.map(lang => (
                                     <option key={lang} value={lang}>{lang}</option>
@@ -361,16 +392,24 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                     </div>
                 </div>
 
-                {/* Hotel Rating Card */}
-                <div className="bg-gradient-to-br from-emerald-50 to-white p-5 rounded-2xl shadow-sm border border-emerald-100">
+                {/* Hotel Rating Card - Modern Design */}
+                <div className="backdrop-blur-lg bg-gradient-to-br from-emerald-50 via-teal-50 to-white p-5 rounded-3xl shadow-xl border-2 border-emerald-100/60"
+                    style={{
+                        boxShadow: '0 10px 40px -10px rgba(16, 185, 129, 0.2)'
+                    }}
+                >
                      <div className="flex justify-between items-center mb-4">
-                        <h4 className="text-sm font-bold text-emerald-800 uppercase tracking-wide flex items-center">
-                            <Hotel size={16} className="mr-2"/> {t('experience_feedback')}
-                        </h4>
+                        <div className="flex items-center gap-2">
+                            <div className="w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-600 rounded-full"></div>
+                            <h4 className="text-sm font-bold text-emerald-800 uppercase tracking-wide flex items-center gap-2">
+                                <Hotel size={16} className="text-emerald-600"/> 
+                                {t('experience_feedback')}
+                            </h4>
+                        </div>
                         {isHotelReviewSubmitted && !isLoadingReview && (
-                            <div className="flex items-center bg-white px-2 py-1 rounded-lg border border-emerald-100 shadow-sm">
-                                <Star size={12} className="fill-amber-400 text-amber-400 mr-1"/>
-                                <span className="text-xs font-bold text-gray-800">{averageRatingDisplay}</span>
+                            <div className="flex items-center bg-gradient-to-r from-amber-50 to-yellow-50 px-3 py-1.5 rounded-xl border-2 border-amber-200 shadow-md">
+                                <Star size={14} className="fill-amber-400 text-amber-400 mr-1.5"/>
+                                <span className="text-sm font-black text-gray-800">{averageRatingDisplay}</span>
                             </div>
                         )}
                      </div>
@@ -380,9 +419,13 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                      ) : !showHotelReview && !isHotelReviewSubmitted ? (
                          <button 
                             onClick={() => setShowHotelReview(true)}
-                            className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-md hover:bg-emerald-700 transition"
+                            className="group relative w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden"
                         >
-                            {t('rate_stay')}
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                            <span className="relative z-10 flex items-center justify-center gap-2">
+                                <Star className="w-5 h-5" />
+                                {t('rate_stay')}
+                            </span>
                          </button>
                      ) : showHotelReview ? (
                          <div className="animate-in fade-in slide-in-from-top-2">
@@ -390,18 +433,18 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                  
                                  <div className="space-y-3 mb-4">
                                      {ratings.map((item) => (
-                                         <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-2 rounded-lg border border-gray-50 shadow-sm">
-                                             <span className="text-xs font-bold text-gray-700 mb-1 sm:mb-0">{item.label}</span>
-                                             <div className="flex space-x-2">
+                                         <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white/80 backdrop-blur-sm p-3 rounded-xl border-2 border-gray-100 shadow-md hover:shadow-lg transition-all">
+                                             <span className="text-xs font-bold text-gray-800 mb-2 sm:mb-0">{item.label}</span>
+                                             <div className="flex space-x-1.5">
                                                  {[1,2,3,4,5].map(star => (
                                                      <button 
                                                         key={star} 
                                                         onClick={() => handleCategoryRate(item.id, star)}
-                                                        className="focus:outline-none transition transform active:scale-95"
+                                                        className="focus:outline-none transition-all duration-200 hover:scale-110"
                                                      >
                                                          <Star 
-                                                             size={20} 
-                                                             className={`${star <= item.value ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} 
+                                                             size={22} 
+                                                             className={`transition-all ${star <= item.value ? 'fill-amber-400 text-amber-400 drop-shadow-sm' : 'text-gray-200'}`} 
                                                          />
                                                      </button>
                                                  ))}
@@ -411,7 +454,8 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                  </div>
 
                                  <textarea 
-                                    className="w-full bg-white border border-gray-200 rounded-lg p-3 text-sm text-gray-800 mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    className="w-full bg-white border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-900 placeholder:text-gray-400 mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all caret-emerald-600"
+                                    style={{ caretColor: '#10b981' }}
                                     rows={3}
                                     placeholder="Any additional comments or suggestions?"
                                     value={hotelComment}
@@ -422,14 +466,14 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                      <button 
                                         onClick={() => setShowHotelReview(false)} 
                                         disabled={isSubmittingReview}
-                                        className="flex-1 py-3 text-gray-500 text-xs font-bold hover:bg-gray-100 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                        className="flex-1 py-3 text-gray-600 text-xs font-bold hover:bg-gray-100 rounded-xl border-2 border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                                      >
                                         {t('cancel')}
                                      </button>
                                      <button 
                                         onClick={handleSubmitHotelReview} 
                                         disabled={isSubmittingReview}
-                                        className="flex-1 py-3 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-md hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center"
+                                        className="group relative flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all overflow-hidden flex items-center justify-center"
                                      >
                                         {isSubmittingReview ? (
                                             <>
@@ -437,23 +481,26 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                                 {t('submitting') || 'Submitting...'}
                                             </>
                                         ) : (
-                                            t('submit')
+                                            <>
+                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                                                <span className="relative z-10">{t('submit')}</span>
+                                            </>
                                         )}
                                      </button>
                                  </div>
                              </div>
                      ) : (
-                         <div className="bg-white/50 rounded-xl p-2">
-                             <div className="text-center mb-3">
-                                 <p className="text-sm text-gray-600 italic">"{hotelComment || existingReview?.comment || 'Thank you for your valuable feedback!'}"</p>
+                         <div className="bg-gradient-to-br from-white/80 to-emerald-50/50 rounded-2xl p-4 border-2 border-emerald-100 shadow-md">
+                             <div className="text-center mb-4">
+                                 <p className="text-sm text-gray-700 italic font-medium leading-relaxed">"{hotelComment || existingReview?.comment || 'Thank you for your valuable feedback!'}"</p>
                              </div>
                              {/* Mini Breakdown Display */}
-                             <div className="grid grid-cols-2 gap-2">
+                             <div className="grid grid-cols-2 gap-2 mb-3">
                                  {existingReview?.categoryRatings.map((cat, idx) => (
-                                     <div key={idx} className="flex justify-between items-center text-[10px] text-gray-500">
-                                         <span className="truncate mr-1">{cat.category}</span>
-                                         <span className="flex items-center font-bold text-amber-500">
-                                             {cat.rating} <Star size={8} className="fill-current ml-0.5"/>
+                                     <div key={idx} className="flex justify-between items-center bg-white/60 backdrop-blur-sm px-2 py-1.5 rounded-lg border border-gray-200">
+                                         <span className="truncate mr-1 text-[10px] font-semibold text-gray-700">{cat.category}</span>
+                                         <span className="flex items-center font-bold text-amber-600 gap-0.5">
+                                             {cat.rating} <Star size={10} className="fill-current"/>
                                          </span>
                                      </div>
                                  ))}
@@ -475,7 +522,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                          setHotelComment(existingReview.comment || '');
                                      }
                                  }} 
-                                 className="w-full text-center text-[10px] text-emerald-600 underline mt-3 hover:text-emerald-800 transition"
+                                 className="w-full text-center text-xs text-emerald-700 font-bold bg-emerald-50 hover:bg-emerald-100 py-2 rounded-xl border border-emerald-200 transition-all"
                              >
                                  Edit Review
                              </button>
@@ -483,14 +530,26 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                      )}
                 </div>
 
-                {/* Personal Notes */}
-                <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-                    <div className="flex justify-between items-center mb-2">
-                        <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wide">{t('personal_notes')}</h4>
-                        {isSaving && <span className="text-xs text-emerald-600 font-bold animate-pulse">Saved!</span>}
+                {/* Personal Notes - Modern Design */}
+                <div className="backdrop-blur-lg bg-white/95 p-5 rounded-3xl shadow-xl border border-white/60"
+                    style={{
+                        boxShadow: '0 10px 40px -10px rgba(0,0,0,0.15)'
+                    }}
+                >
+                    <div className="flex justify-between items-center mb-3">
+                        <div className="flex items-center gap-2">
+                            <div className="w-1 h-6 bg-gradient-to-b from-amber-500 to-orange-600 rounded-full"></div>
+                            <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{t('personal_notes')}</h4>
+                        </div>
+                        {isSaving && (
+                            <span className="text-xs text-emerald-600 font-bold animate-pulse bg-emerald-50 px-2 py-1 rounded-full">
+                                Saved!
+                            </span>
+                        )}
                     </div>
                     <textarea 
-                        className="w-full bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm text-gray-700 focus:ring-2 focus:ring-yellow-400 focus:outline-none resize-none"
+                        className="w-full bg-gradient-to-br from-yellow-50 to-amber-50 border-2 border-yellow-200 rounded-xl p-3 text-sm text-gray-900 placeholder:text-gray-500 focus:ring-2 focus:ring-yellow-400 focus:outline-none resize-none transition-all caret-yellow-600"
+                        style={{ caretColor: '#d97706' }}
                         rows={3}
                         placeholder="e.g. Extra pillows, No nuts in food..."
                         value={notes}
@@ -498,45 +557,55 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                     ></textarea>
                     <button 
                         onClick={handleSaveNotes}
-                        className="mt-2 w-full py-2 bg-emerald-50 text-emerald-700 font-bold text-xs rounded-lg hover:bg-emerald-100 transition flex items-center justify-center"
+                        className="group relative mt-3 w-full py-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 font-bold text-xs rounded-xl hover:from-emerald-100 hover:to-teal-100 transition-all border-2 border-emerald-200 hover:border-emerald-300 flex items-center justify-center shadow-md"
                     >
-                        <Save size={14} className="mr-1" /> {t('save_notes')}
+                        <Save size={14} className="mr-1.5" /> 
+                        {t('save_notes')}
                     </button>
                 </div>
 
                 {/* Completed Order History */}
                 <div>
-                    <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wide mb-3 px-2">{t('completed_orders')}</h4>
+                    <div className="flex items-center gap-2 mb-3 px-2">
+                        <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-cyan-600 rounded-full"></div>
+                        <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{t('completed_orders')}</h4>
+                    </div>
                     {isLoadingHistory ? (
                         <Loading size="sm" message={t('loading') || 'Loading history...'} />
                     ) : history.length === 0 ? (
-                        <div className="text-center py-8 text-gray-400">
-                            <ShoppingBag className="mx-auto w-10 h-10 mb-2 opacity-20"/>
-                            <p className="text-sm">No completed orders yet.</p>
+                        <div className="text-center py-12 px-4">
+                            <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                                <ShoppingBag className="w-8 h-8 text-gray-400"/>
+                            </div>
+                            <p className="text-gray-500 font-medium text-sm">No completed orders yet</p>
                         </div>
                     ) : (
                         <div className="space-y-3">
                             {history.map((req, i) => (
-                                <div key={i} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col">
-                                    <div className="flex items-start">
-                                        <div className={`p-2 rounded-full mr-3 ${
-                                            req.type === 'DINING' ? 'bg-orange-100 text-orange-600' :
-                                            req.type === 'SPA' ? 'bg-purple-100 text-purple-600' :
-                                            req.type === 'BUGGY' ? 'bg-emerald-100 text-emerald-600' :
-                                            'bg-blue-100 text-blue-600'
+                                <div key={i} className="backdrop-blur-sm bg-white/95 p-4 rounded-2xl shadow-lg border-2 border-gray-100/60 flex flex-col transition-all hover:shadow-xl"
+                                    style={{
+                                        boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1)'
+                                    }}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        <div className={`p-2.5 rounded-xl flex-shrink-0 shadow-md border-2 ${
+                                            req.type === 'DINING' ? 'bg-gradient-to-br from-orange-100 to-red-100 text-orange-600 border-orange-200' :
+                                            req.type === 'SPA' ? 'bg-gradient-to-br from-purple-100 to-pink-100 text-purple-600 border-purple-200' :
+                                            req.type === 'BUGGY' ? 'bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-600 border-emerald-200' :
+                                            'bg-gradient-to-br from-blue-100 to-cyan-100 text-blue-600 border-blue-200'
                                         }`}>
                                             {getIcon(req.type)}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex justify-between items-start">
+                                            <div className="flex justify-between items-start mb-1">
                                                 <p className="font-bold text-gray-800 text-sm">{req.type === 'BUGGY' ? t('buggy') : t(req.type.toLowerCase())}</p>
-                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${getColor(req.status)}`}>
+                                                <span className={`text-[10px] font-bold px-2 py-1 rounded-full border-2 ${getColor(req.status)} shadow-sm`}>
                                                     {t(req.status)}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-gray-500 mt-1 line-clamp-1">{getTranslatedDetails(req)}</p>
-                                            <p className="text-[10px] text-gray-400 mt-2 flex items-center">
-                                                <Clock size={10} className="mr-1" />
+                                            <p className="text-xs text-gray-600 mt-1 line-clamp-1 font-medium">{getTranslatedDetails(req)}</p>
+                                            <p className="text-[10px] text-gray-500 mt-2 flex items-center gap-1">
+                                                <Clock size={11} className="text-gray-400" />
                                                 {new Date(req.timestamp).toLocaleString()}
                                             </p>
                                         </div>
@@ -544,28 +613,29 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
 
                                     {/* RATING AREA (Only for Completed Orders) */}
                                     {req.status === 'COMPLETED' && (
-                                        <div className="mt-3 pt-3 border-t border-gray-50">
+                                        <div className="mt-3 pt-3 border-t-2 border-gray-100">
                                             {req.rating ? (
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex text-amber-400">
-                                                        {[...Array(req.rating)].map((_, i) => <Star key={i} size={12} fill="currentColor" />)}
+                                                <div className="flex items-center justify-between bg-gradient-to-r from-amber-50 to-yellow-50 p-2 rounded-xl border border-amber-200">
+                                                    <div className="flex text-amber-400 gap-0.5">
+                                                        {[...Array(req.rating)].map((_, i) => <Star key={i} size={14} fill="currentColor" className="drop-shadow-sm" />)}
                                                     </div>
-                                                    {req.feedback && <span className="text-xs text-gray-500 italic">"{req.feedback}"</span>}
+                                                    {req.feedback && <span className="text-xs text-gray-600 italic font-medium">"{req.feedback}"</span>}
                                                 </div>
                                             ) : (
                                                 activeRatingId === req.id ? (
-                                                    <div className="animate-in fade-in">
-                                                        <div className="flex items-center justify-center space-x-2 mb-2">
+                                                    <div className="animate-in fade-in bg-gradient-to-br from-gray-50 to-blue-50 p-3 rounded-xl border-2 border-gray-200">
+                                                        <div className="flex items-center justify-center space-x-2 mb-3">
                                                             {[1,2,3,4,5].map(star => (
-                                                                <button key={star} onClick={() => setServiceRatingValue(star)}>
-                                                                    <Star size={20} className={`${star <= serviceRatingValue ? 'fill-amber-400 text-amber-400' : 'text-gray-200'}`} />
+                                                                <button key={star} onClick={() => setServiceRatingValue(star)} className="transition-all hover:scale-110">
+                                                                    <Star size={22} className={`${star <= serviceRatingValue ? 'fill-amber-400 text-amber-400 drop-shadow-sm' : 'text-gray-200'}`} />
                                                                 </button>
                                                             ))}
                                                         </div>
                                                         <input 
                                                             type="text" 
                                                             placeholder="Comments (optional)..."
-                                                            className="w-full text-xs bg-gray-50 border border-gray-200 rounded p-2 mb-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                                            className="w-full text-xs bg-white border-2 border-gray-200 rounded-xl p-2.5 mb-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all caret-emerald-600"
+                                                            style={{ caretColor: '#10b981' }}
                                                             value={serviceCommentValue}
                                                             onChange={(e) => setServiceCommentValue(e.target.value)}
                                                         />
@@ -577,14 +647,14 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                                                     setServiceCommentValue('');
                                                                 }} 
                                                                 disabled={isSubmittingRating}
-                                                                className="flex-1 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                                                className="flex-1 py-2 text-xs text-gray-600 hover:bg-gray-100 rounded-xl border-2 border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold"
                                                             >
                                                                 {t('cancel')}
                                                             </button>
                                                             <button 
                                                                 onClick={() => handleSubmitServiceRating(req.id, req.type)} 
                                                                 disabled={isSubmittingRating}
-                                                                className="flex-1 py-1 text-xs bg-emerald-600 text-white rounded font-bold disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center"
+                                                                className="group relative flex-1 py-2 text-xs bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center shadow-lg overflow-hidden"
                                                             >
                                                                 {isSubmittingRating ? (
                                                                     <>
@@ -592,7 +662,10 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                                                         {t('submitting') || 'Submitting...'}
                                                                     </>
                                                                 ) : (
-                                                                    t('submit')
+                                                                    <>
+                                                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                                                                        <span className="relative z-10">{t('submit')}</span>
+                                                                    </>
                                                                 )}
                                                             </button>
                                                         </div>
@@ -600,9 +673,10 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                                 ) : (
                                                     <button 
                                                         onClick={() => setActiveRatingId(req.id)}
-                                                        className="w-full py-1.5 flex items-center justify-center text-xs text-emerald-600 font-bold bg-emerald-50 hover:bg-emerald-100 rounded-lg transition"
+                                                        className="w-full py-2 flex items-center justify-center text-xs text-emerald-700 font-bold bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 rounded-xl transition-all border-2 border-emerald-200 hover:border-emerald-300 shadow-md"
                                                     >
-                                                        <ThumbsUp size={14} className="mr-1"/> {t('rate_service')}
+                                                        <ThumbsUp size={14} className="mr-1.5"/> 
+                                                        {t('rate_service')}
                                                     </button>
                                                 )
                                             )}

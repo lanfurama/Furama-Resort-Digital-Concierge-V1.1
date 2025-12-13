@@ -44,6 +44,30 @@
           -ms-user-select: text;
           user-select: text;
       }
+      
+      /* Ensure text color and cursor visibility in inputs */
+      input[type="text"],
+      input[type="email"],
+      input[type="password"],
+      input[type="search"],
+      input[type="tel"],
+      input[type="number"],
+      textarea {
+          color: #111827 !important; /* text-gray-900 */
+          caret-color: #10b981 !important; /* emerald-600 */
+      }
+      
+      input::placeholder,
+      textarea::placeholder {
+          color: #9ca3af !important; /* text-gray-400 */
+          opacity: 1;
+      }
+      
+      /* Ensure cursor is visible on focus */
+      input:focus,
+      textarea:focus {
+          caret-color: #10b981 !important;
+      }
       /* Prevent double-tap zoom */
       * {
           -webkit-tap-highlight-color: transparent;
@@ -107,6 +131,113 @@
       }
       .shake-once {
           animation: shake 0.5s ease-in-out;
+      }
+      
+      /* Modern 2025 UX/UI Enhancements */
+      /* Smooth scroll for better UX */
+      * {
+          scroll-behavior: smooth;
+      }
+      
+      /* Custom thin scrollbar for modern look */
+      .scrollbar-thin::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+      }
+      .scrollbar-thin::-webkit-scrollbar-track {
+          background: transparent;
+      }
+      .scrollbar-thin::-webkit-scrollbar-thumb {
+          background: #d1d5db;
+          border-radius: 10px;
+      }
+      .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+          background: #9ca3af;
+      }
+      .scrollbar-thumb-emerald-300::-webkit-scrollbar-thumb {
+          background: #6ee7b7;
+      }
+      .scrollbar-track-gray-100::-webkit-scrollbar-track {
+          background: #f3f4f6;
+      }
+      
+      /* Glassmorphism effect */
+      .glass {
+          background: rgba(255, 255, 255, 0.9);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+      }
+      
+      /* Slide in animation */
+      @keyframes slideInFromBottom {
+          from {
+              opacity: 0;
+              transform: translateY(20px);
+          }
+          to {
+              opacity: 1;
+              transform: translateY(0);
+          }
+      }
+      .animate-in {
+          animation: slideInFromBottom 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+      .slide-in-from-bottom {
+          animation: slideInFromBottom 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+      
+      /* Pulse animation for status indicators */
+      @keyframes pulse-slow {
+          0%, 100% {
+              opacity: 1;
+          }
+          50% {
+              opacity: 0.5;
+          }
+      }
+      .animate-pulse-slow {
+          animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+      
+      /* Shimmer animation for progress bars */
+      @keyframes shimmer {
+          0% {
+              transform: translateX(-100%);
+          }
+          100% {
+              transform: translateX(100%);
+          }
+      }
+      .animate-shimmer {
+          animation: shimmer 2s infinite;
+      }
+      
+      /* Hover glow effect */
+      .hover-glow {
+          transition: all 0.3s ease;
+      }
+      .hover-glow:hover {
+          filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.5));
+      }
+      
+      /* Smooth transitions for all interactive elements */
+      button, a, input, select, textarea {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      /* Focus visible for better accessibility */
+      *:focus-visible {
+          outline: 2px solid #10b981;
+          outline-offset: 2px;
+          border-radius: 4px;
+      }
+      
+      /* Prevent text selection on buttons for better mobile UX */
+      button {
+          -webkit-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
+          user-select: none;
       }
     </style>
   <script type="importmap">
