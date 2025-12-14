@@ -15,7 +15,7 @@ import GuestAccount from './components/GuestAccount';
 import ActiveOrders from './components/ActiveOrders';
 import NotificationBell from './components/NotificationBell';
 import SupervisorDashboard from './components/SupervisorDashboard';
-import { findUserByCredentials, loginStaff, loginGuest, getPromotions, getActiveGuestOrders, getActiveRideForUser } from './services/dataService';
+import { findUserByCredentials, loginStaff, loginGuest, getPromotions, getActiveGuestOrders, getActiveRideForUser, markDriverOffline } from './services/dataService';
 import { BuggyStatus } from './types';
 import { User as UserIcon, LogOut, MessageSquare, Car, Percent, Lock, Eye, EyeOff, ShoppingCart, Home } from 'lucide-react';
 import { LanguageProvider, useTranslation } from './contexts/LanguageContext';
@@ -151,6 +151,22 @@ const AppContent: React.FC = () => {
   };
 
   const handleLogout = () => {
+      // Mark driver as offline before clearing user state
+      // Get user from localStorage in case state is already cleared
+      const savedUser = localStorage.getItem('furama_user');
+      if (savedUser) {
+        try {
+          const userData = JSON.parse(savedUser);
+          if (userData.role === UserRole.DRIVER && userData.id) {
+            markDriverOffline(String(userData.id)).catch(err => {
+              console.error('Failed to mark driver offline on logout:', err);
+            });
+          }
+        } catch (e) {
+          console.error('Failed to parse user from localStorage:', e);
+        }
+      }
+      
       setUser(null);
       setView(AppView.LOGIN);
       setUsernameInput('');
@@ -243,7 +259,30 @@ const AppContent: React.FC = () => {
 
             <form onSubmit={handleLogin} className="space-y-4">
                 {/* Role Switcher (For Demo) */}
-                <div className="flex bg-gray-100 p-1 rounded-lg mb-6 overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
+                <div 
+                    className="flex bg-gray-100 p-1 rounded-lg mb-6 overflow-x-auto" 
+                    style={{ 
+                        WebkitOverflowScrolling: 'touch',
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: '#10b981 #e5e7eb'
+                    }}
+                >
+                    <style>{`
+                        div::-webkit-scrollbar {
+                            height: 3px;
+                        }
+                        div::-webkit-scrollbar-track {
+                            background: #e5e7eb;
+                            border-radius: 10px;
+                        }
+                        div::-webkit-scrollbar-thumb {
+                            background: #10b981;
+                            border-radius: 10px;
+                        }
+                        div::-webkit-scrollbar-thumb:hover {
+                            background: #059669;
+                        }
+                    `}</style>
                     <div className="flex gap-1 min-w-max">
                         {Object.values(UserRole).map((role) => (
                             <button

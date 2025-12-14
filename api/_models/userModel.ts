@@ -85,24 +85,106 @@ export const userModel = {
       values.push(user.notes || null);
     }
 
+    // Always update updated_at timestamp, even if no other fields are being updated
+    // This is useful for heartbeat/ping mechanisms
+    // We explicitly set updated_at to NOW() to ensure it's always updated
+    // If trigger is BEFORE UPDATE, we need to disable it temporarily or use a different approach
     if (fields.length === 0) {
-      console.log('No fields to update, returning existing user');
-      return this.getById(id);
+      // Force an update by directly setting updated_at to NOW()
+      // Temporarily disable trigger to ensure our value is used
+      // Then re-enable it
+      try {
+        // Disable trigger temporarily
+        await pool.query('ALTER TABLE users DISABLE TRIGGER update_users_updated_at');
+        
+        const query = `UPDATE users SET updated_at = NOW() WHERE id = $1 RETURNING *`;
+        console.log('[userModel.update] Heartbeat query:', query);
+        console.log('[userModel.update] Driver ID:', id);
+        console.log('[userModel.update] Current timestamp:', new Date().toISOString());
+        
+        const result = await pool.query(query, [id]);
+        const updatedUser = result.rows[0];
+        
+        // Re-enable trigger
+        await pool.query('ALTER TABLE users ENABLE TRIGGER update_users_updated_at');
+        
+        console.log('[userModel.update] Heartbeat result updated_at:', updatedUser?.updated_at);
+        console.log('[userModel.update] Heartbeat result full:', updatedUser);
+        
+        // Verify the timestamp is recent (within last minute)
+        if (updatedUser?.updated_at) {
+          const dbTime = new Date(updatedUser.updated_at);
+          const now = new Date();
+          const diffMs = now.getTime() - dbTime.getTime();
+          console.log('[userModel.update] Time difference:', diffMs, 'ms');
+          if (diffMs > 60000) {
+            console.warn('[userModel.update] WARNING: updated_at is more than 1 minute old!');
+          } else {
+            console.log('[userModel.update] ✅ updated_at is fresh!');
+          }
+        } else {
+          console.error('[userModel.update] ERROR: updated_at is missing from result!');
+        }
+        
+        return updatedUser || null;
+      } catch (error) {
+        // Make sure to re-enable trigger even if there's an error
+        try {
+          await pool.query('ALTER TABLE users ENABLE TRIGGER update_users_updated_at');
+        } catch (e) {
+          console.error('[userModel.update] Failed to re-enable trigger:', e);
+        }
+        throw error;
+      }
     }
 
+    // Normal update with fields
     values.push(id);
-    const query = `UPDATE users SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount} RETURNING *`;
-    console.log('Executing query:', query);
-    console.log('Query values:', values);
+    const query = `UPDATE users SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${paramCount} RETURNING *`;
+    console.log('[userModel.update] Executing query:', query);
+    console.log('[userModel.update] Query values:', values);
+    console.log('[userModel.update] Current timestamp:', new Date().toISOString());
     
     const result = await pool.query(query, values);
-    console.log('Query result:', result.rows[0]);
-    return result.rows[0] || null;
+    const updatedUser = result.rows[0];
+    console.log('[userModel.update] Query result updated_at:', updatedUser?.updated_at);
+    console.log('[userModel.update] Query result full:', updatedUser);
+    return updatedUser || null;
   },
 
   async delete(id: number): Promise<boolean> {
     const result = await pool.query('DELETE FROM users WHERE id = $1', [id]);
     return result.rowCount > 0;
+  },
+
+  // Mark driver as offline by setting updated_at to a past timestamp (3 minutes ago)
+  // This ensures the driver is immediately considered offline
+  async markOffline(id: number): Promise<User | null> {
+    try {
+      // Disable trigger temporarily to set updated_at to a past time
+      await pool.query('ALTER TABLE users DISABLE TRIGGER update_users_updated_at');
+      
+      // Set updated_at to 3 minutes ago to ensure driver is considered offline
+      const query = `UPDATE users SET updated_at = NOW() - INTERVAL '3 minutes' WHERE id = $1 RETURNING *`;
+      console.log('[userModel.markOffline] Marking driver offline:', id);
+      
+      const result = await pool.query(query, [id]);
+      const updatedUser = result.rows[0];
+      
+      // Re-enable trigger
+      await pool.query('ALTER TABLE users ENABLE TRIGGER update_users_updated_at');
+      
+      console.log('[userModel.markOffline] Driver marked offline, updated_at:', updatedUser?.updated_at);
+      return updatedUser || null;
+    } catch (error) {
+      // Make sure to re-enable trigger even if there's an error
+      try {
+        await pool.query('ALTER TABLE users ENABLE TRIGGER update_users_updated_at');
+      } catch (e) {
+        console.error('[userModel.markOffline] Failed to re-enable trigger:', e);
+      }
+      throw error;
+    }
   },
 };
 

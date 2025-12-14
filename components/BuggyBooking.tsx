@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Clock, Car, Navigation, Star, LocateFixed, XCircle, Search, Utensils, Coffee, Waves, Building2, CheckCircle, Sparkles } from 'lucide-react';
+import { MapPin, Clock, Car, Navigation, Star, LocateFixed, XCircle, Search, Utensils, Coffee, Waves, Building2, CheckCircle, Sparkles, Loader2 } from 'lucide-react';
 import { BuggyStatus, User, RideRequest, Location } from '../types';
 import { getLocations, requestRide, getActiveRideForUser, cancelRide, rateServiceRequest, getRides } from '../services/dataService';
 import { THEME_COLORS, RESORT_CENTER } from '../constants';
@@ -23,6 +23,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [arrivingElapsedTime, setArrivingElapsedTime] = useState<number>(0); // Time elapsed since driver accepted (for ASSIGNED/ARRIVING)
   const [searchQuery, setSearchQuery] = useState<string>(''); // Search query for locations
   const [filterType, setFilterType] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('ALL'); // Filter by location type
+  const [isBooking, setIsBooking] = useState(false); // Prevent double-click/multiple submissions
   
   // Completion Modal & Rating State
   const [showCompletionModal, setShowCompletionModal] = useState(false);
@@ -65,6 +66,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
               if (previousStatus === BuggyStatus.ON_TRIP && !ride && activeRide) {
                   // Check if we've already shown modal for this ride (including if user skipped it)
                   const rideId = activeRide.id;
+                  // IMPORTANT: Check if this ride ID was already handled (skipped or submitted)
                   if (rideId && rideId !== completedRideIdRef.current) {
                       // Ride was completed - show modal
                       // Use the last known activeRide data to create completed ride object
@@ -84,8 +86,10 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                       return; // Exit early to prevent further processing
                   } else {
                       // This ride was already handled (skipped or shown), clear activeRide
+                      // IMPORTANT: Clear these even if rideId matches completedRideIdRef to prevent re-triggering
                       setActiveRide(undefined);
                       setPreviousStatus(null);
+                      return; // Exit early to prevent any further processing
                   }
               }
               
@@ -251,7 +255,9 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   };
 
   const handleBook = async () => {
-    if (!destination) return;
+    if (!destination || isBooking) return; // Prevent multiple submissions
+    
+    setIsBooking(true); // Set booking state immediately to prevent double-click
     try {
       const newRide = await requestRide(user.lastName, user.roomNumber, pickup, destination);
       setActiveRide(newRide);
@@ -259,6 +265,11 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     } catch (error) {
       console.error('Failed to request ride:', error);
       alert('Failed to request ride. Please try again.');
+    } finally {
+      // Reset booking state after a short delay to prevent rapid re-clicks
+      setTimeout(() => {
+        setIsBooking(false);
+      }, 1000);
     }
   };
 
@@ -332,9 +343,13 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
        
        setIsSubmittingRating(true);
        try {
-           await rateServiceRequest(completedRide.id, rating, feedback, 'BUGGY');
-           // Mark as handled and clear activeRide to prevent re-triggering
-           completedRideIdRef.current = completedRide.id;
+           const rideId = completedRide.id;
+           // Mark as handled FIRST before any async operations to prevent race conditions
+           completedRideIdRef.current = rideId;
+           
+           await rateServiceRequest(rideId, rating, feedback, 'BUGGY');
+           
+           // Clear all state to prevent re-triggering
            setActiveRide(undefined);
            setPreviousStatus(null);
            setShowCompletionModal(false);
@@ -345,6 +360,10 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
        } catch (error) {
            console.error('Failed to submit rating:', error);
            alert('Failed to submit rating. Please try again.');
+           // Even on error, mark as handled to prevent showing modal again
+           if (completedRide) {
+               completedRideIdRef.current = completedRide.id;
+           }
        } finally {
            setIsSubmittingRating(false);
        }
@@ -353,9 +372,11 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
    // Skip rating (close modal without rating)
    const handleSkipRating = () => {
        if (completedRide) {
-           // Mark this ride as "skipped" so we don't show modal again
-           completedRideIdRef.current = completedRide.id;
-           // Clear activeRide and previousStatus to prevent re-triggering
+           // Mark this ride as "skipped" FIRST so we don't show modal again
+           const rideId = completedRide.id;
+           completedRideIdRef.current = rideId;
+           
+           // Clear all state to prevent re-triggering
            setActiveRide(undefined);
            setPreviousStatus(null);
        }
@@ -961,14 +982,14 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                 {/* Book Button with modern gradient and hover effects */}
                 <button 
                     onClick={handleBook}
-                    disabled={!destination}
+                    disabled={!destination || isBooking}
                     className={`group relative w-full py-4 rounded-2xl font-bold text-base shadow-2xl transition-all duration-300 flex items-center justify-center gap-2.5 overflow-hidden ${
-                        destination 
+                        destination && !isBooking
                             ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white hover:shadow-emerald-400/50 cursor-pointer' 
                             : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     }`}
                 >
-                    {destination && (
+                    {destination && !isBooking && (
                         <>
                             {/* Animated gradient overlay */}
                             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
@@ -976,8 +997,17 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                             <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors duration-300"></div>
                         </>
                     )}
-                    <Car className="w-5 h-5 relative z-10" />
-                    <span className="relative z-10">{t('request_buggy')}</span>
+                    {isBooking ? (
+                        <>
+                            <Loader2 className="w-5 h-5 relative z-10 animate-spin" />
+                            <span className="relative z-10">Requesting...</span>
+                        </>
+                    ) : (
+                        <>
+                            <Car className="w-5 h-5 relative z-10" />
+                            <span className="relative z-10">{t('request_buggy')}</span>
+                        </>
+                    )}
                 </button>
             </div>
         </div>

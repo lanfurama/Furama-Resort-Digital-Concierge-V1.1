@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key, Car, Settings, RefreshCw, Zap, Grid3x3, CheckCircle } from 'lucide-react';
-import { getLocations, getLocationsSync, addLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, updatePromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, addUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory, getRides, getRidesSync, updateRideStatus } from '../services/dataService';
+import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key, Car, Settings, RefreshCw, Zap, Grid3x3, CheckCircle, Map, AlertCircle, Info, Brain, ArrowRight, Loader2 } from 'lucide-react';
+import { getLocations, getLocationsSync, addLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, updatePromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, getUsersSync, addUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory, getRides, getRidesSync, updateRideStatus } from '../services/dataService';
 import { parseAdminInput, generateTranslations } from '../services/geminiService';
 import { Location, MenuItem, ResortEvent, Promotion, KnowledgeItem, User, UserRole, Department, RoomType, Room, RideRequest, BuggyStatus } from '../types';
 import Loading from './Loading';
+import ReceptionPortal from './ReceptionPortal';
 
 interface AdminPortalProps {
     onLogout: () => void;
@@ -32,6 +33,13 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         maxWaitTimeBeforeAutoAssign: 300, // seconds
         autoAssignEnabled: true
     });
+    
+    // Fleet UI State
+    const [driverViewMode, setDriverViewMode] = useState<'LIST' | 'MAP'>('LIST');
+    const [showAIAssignment, setShowAIAssignment] = useState(false);
+    const [aiAssignmentData, setAIAssignmentData] = useState<any>(null);
+    const lastAutoAssignRef = React.useRef<number>(0);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     
     // Loading state
     const [isLoading, setIsLoading] = useState(true);
@@ -163,6 +171,36 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         
         return () => clearInterval(refreshInterval);
     }, [tab]);
+
+    // Auto-assign logic: Automatically assign rides that have been waiting too long
+    useEffect(() => {
+        if (!fleetConfig.autoAssignEnabled || tab !== 'FLEET') return;
+
+        const checkAndAutoAssign = async () => {
+            const pendingRides = rides.filter(r => r.status === BuggyStatus.SEARCHING);
+            if (pendingRides.length === 0) return;
+
+            const now = Date.now();
+            if (now - lastAutoAssignRef.current < 10000) {
+                return;
+            }
+
+            const ridesToAutoAssign = pendingRides.filter(ride => {
+                const waitTime = Math.floor((now - ride.timestamp) / 1000);
+                return waitTime >= fleetConfig.maxWaitTimeBeforeAutoAssign;
+            });
+
+            if (ridesToAutoAssign.length > 0) {
+                console.log(`[Auto-Assign] Found ${ridesToAutoAssign.length} ride(s) waiting over ${fleetConfig.maxWaitTimeBeforeAutoAssign}s, triggering auto-assign...`);
+                lastAutoAssignRef.current = now;
+                await handleAutoAssign(true);
+            }
+        };
+
+        const autoAssignInterval = setInterval(checkAndAutoAssign, 5000);
+        
+        return () => clearInterval(autoAssignInterval);
+    }, [rides, fleetConfig.autoAssignEnabled, fleetConfig.maxWaitTimeBeforeAutoAssign, tab]);
     
     // UI State
     const [isParsing, setIsParsing] = useState(false);
@@ -242,75 +280,320 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         }
     };
 
-    // AI Auto-Assign Logic (similar to BuggyFleetManager)
-    const handleAutoAssign = async () => {
-        const pendingRidesList = rides.filter(r => r.status === BuggyStatus.SEARCHING);
-        const driverUsers = users.filter(u => u.role === UserRole.DRIVER);
+    // Helper: Resolve location coordinates from location name
+    const resolveLocationCoordinates = (locationName: string): { lat: number; lng: number } | null => {
+        if (!locationName || locationName === "Unknown Location") return null;
         
-        if (pendingRidesList.length === 0) {
-            alert('No pending rides to assign.');
-            return;
+        if (locationName.startsWith("GPS:")) {
+            const parts = locationName.replace("GPS:", "").split(",");
+            if (parts.length === 2) {
+                const lat = parseFloat(parts[0]);
+                const lng = parseFloat(parts[1]);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    return { lat, lng };
+                }
+            }
         }
+        
+        let loc = locations.find(l => 
+            locationName.toLowerCase().trim() === l.name.toLowerCase().trim()
+        );
+        
+        if (!loc) {
+            loc = locations.find(l => 
+                locationName.toLowerCase().includes(l.name.toLowerCase()) || 
+                l.name.toLowerCase().includes(locationName.toLowerCase())
+            );
+        }
+        
+        if (loc) {
+            return { lat: loc.lat, lng: loc.lng };
+        }
+        
+        return null;
+    };
 
-        // Get available drivers (drivers without active rides)
-        const availableDrivers = driverUsers.filter(driver => {
+    // Helper: Calculate distance between two coordinates using Haversine formula (in meters)
+    const calculateDistance = (coord1: { lat: number; lng: number }, coord2: { lat: number; lng: number }): number => {
+        const R = 6371000; // Earth radius in meters
+        const dLat = (coord2.lat - coord1.lat) * Math.PI / 180;
+        const dLng = (coord2.lng - coord1.lng) * Math.PI / 180;
+        const a = 
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(coord1.lat * Math.PI / 180) * Math.cos(coord2.lat * Math.PI / 180) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c; // Distance in meters
+    };
+
+    // Helper: Get driver's current or expected location
+    const getDriverLocation = (driver: User): string => {
+        const driverIdStr = driver.id ? String(driver.id) : '';
+        
+        const driverActiveRides = rides.filter(r => {
+            const rideDriverId = r.driverId ? String(r.driverId) : '';
+            return rideDriverId === driverIdStr && 
+                (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
+        });
+        
+        if (driverActiveRides.length > 0) {
+            return driverActiveRides[0].destination;
+        }
+        
+        if (locations.length > 0) {
+            const driverLocation = locations[parseInt(driver.id || '0') % locations.length];
+            return driverLocation?.name || "Unknown Location";
+        }
+        
+        return "Unknown Location";
+    };
+
+    // Helper: Get online drivers count
+    const getOnlineDriversCount = (): number => {
+        const driverUsers = users.filter(u => u.role === UserRole.DRIVER);
+        return driverUsers.filter(driver => {
             const driverIdStr = driver.id ? String(driver.id) : '';
             const hasActiveRide = rides.some(r => {
                 const rideDriverId = r.driverId ? String(r.driverId) : '';
                 return rideDriverId === driverIdStr && 
                     (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
             });
-            return !hasActiveRide;
-        });
+            if (hasActiveRide) return true;
+            
+            if (driver.updatedAt) {
+                const timeSinceUpdate = Date.now() - driver.updatedAt;
+                if (timeSinceUpdate < 120000) { // 2 minutes
+                    return true;
+                }
+                return false;
+            }
+            
+            return false;
+        }).length;
+    };
 
-        if (availableDrivers.length === 0) {
-            alert('No available drivers at the moment.');
+    // Helper: Get pending requests count
+    const getPendingRequestsCount = (): number => {
+        return rides.filter(r => r.status === BuggyStatus.SEARCHING).length;
+    };
+
+    // Helper: Calculate cost for a (driver, ride) pair
+    const calculateAssignmentCost = (driver: User, ride: RideRequest): number => {
+        const driverIdStr = driver.id ? String(driver.id) : '';
+        
+        const driverLocationName = getDriverLocation(driver);
+        const driverCoords = resolveLocationCoordinates(driverLocationName);
+        const pickupCoords = resolveLocationCoordinates(ride.pickup);
+        
+        if (!driverCoords || !pickupCoords) {
+            return 1000000;
+        }
+        
+        let distance = calculateDistance(driverCoords, pickupCoords);
+        
+        const driverActiveRides = rides.filter(r => {
+            const rideDriverId = r.driverId ? String(r.driverId) : '';
+            return rideDriverId === driverIdStr && 
+                (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
+        });
+        const isAvailable = driverActiveRides.length === 0;
+        const currentRide = driverActiveRides[0];
+        
+        const waitTimeSeconds = Math.floor((Date.now() - ride.timestamp) / 1000);
+        const waitTimeBonus = waitTimeSeconds * 10;
+        
+        let cost = distance;
+        
+        if (isAvailable) {
+            cost -= 5000;
+        } else if (currentRide) {
+            const dropoffCoords = resolveLocationCoordinates(currentRide.destination);
+            if (dropoffCoords) {
+                const chainDistance = calculateDistance(dropoffCoords, pickupCoords);
+                if (chainDistance < 200) {
+                    cost = chainDistance - 10000;
+                } else {
+                    cost += 10000;
+                }
+            } else {
+                cost += 10000;
+            }
+        }
+        
+        cost -= waitTimeBonus;
+        
+        return cost;
+    };
+
+    // AI Auto-Assign Logic with Cost-Based Algorithm
+    const handleAutoAssign = async (isAutoTriggered: boolean = false) => {
+        const pendingRidesList = rides.filter(r => r.status === BuggyStatus.SEARCHING);
+        const driverUsers = users.filter(u => u.role === UserRole.DRIVER);
+        const totalDrivers = driverUsers.length;
+        
+        // Show modal with error if no pending rides (only if manual trigger)
+        if (pendingRidesList.length === 0) {
+            if (!isAutoTriggered) {
+                setAIAssignmentData({
+                    status: 'error',
+                    pendingRides: [],
+                    onlineDrivers: [],
+                    assignments: [],
+                    errorMessage: `⚠️ Không có yêu cầu nào đang chờ được gán.\n\n⚠️ No pending rides to assign.\n\n📊 Trạng thái / Status:\n- Pending Requests: 0\n- Total Drivers: ${totalDrivers}\n- Online Drivers: ${getOnlineDriversCount()}`
+                });
+                setShowAIAssignment(true);
+            }
             return;
         }
 
-        // Sort drivers: Priority AVAILABLE > BUSY, then alphabetically (similar to BuggyFleetManager)
-        const sortedDrivers = availableDrivers.sort((a, b) => {
-            const aIdStr = a.id ? String(a.id) : '';
-            const bIdStr = b.id ? String(b.id) : '';
-            const aHasActive = rides.some(r => {
+        // Get all drivers (including busy ones for chain trip opportunities)
+        const allDrivers = driverUsers;
+        
+        if (allDrivers.length === 0) {
+            if (!isAutoTriggered) {
+                setAIAssignmentData({
+                    status: 'error',
+                    pendingRides: pendingRidesList,
+                    onlineDrivers: [],
+                    assignments: [],
+                    errorMessage: `❌ Không có tài xế nào trong hệ thống.\n\n❌ No drivers available at the moment.\n\n📊 Trạng thái / Status:\n- Pending Requests: ${pendingRidesList.length}\n- Total Drivers: 0\n- Online Drivers: 0`
+                });
+                setShowAIAssignment(true);
+            }
+            return;
+        }
+        
+        // Check if there are any online drivers
+        const onlineDrivers = allDrivers.filter(driver => {
+            const driverIdStr = driver.id ? String(driver.id) : '';
+            const hasActiveRide = rides.some(r => {
                 const rideDriverId = r.driverId ? String(r.driverId) : '';
-                return rideDriverId === aIdStr && (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
+                return rideDriverId === driverIdStr && 
+                    (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
             });
-            const bHasActive = rides.some(r => {
-                const rideDriverId = r.driverId ? String(r.driverId) : '';
-                return rideDriverId === bIdStr && (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
-            });
+            if (hasActiveRide) return true;
             
-            // Priority: no active ride (available) > has active ride (busy)
-            if (aHasActive !== bHasActive) {
-                return aHasActive ? 1 : -1;
+            if (driver.updatedAt) {
+                const timeSinceUpdate = Date.now() - driver.updatedAt;
+                if (timeSinceUpdate < 120000) {
+                    return true;
+                }
             }
             
-            // Then sort alphabetically by lastName
-            return a.lastName.localeCompare(b.lastName);
+            return false;
         });
+        
+        const offlineDrivers = totalDrivers - onlineDrivers.length;
+        
+        if (onlineDrivers.length === 0) {
+            if (!isAutoTriggered) {
+                setAIAssignmentData({
+                    status: 'error',
+                    pendingRides: pendingRidesList,
+                    onlineDrivers: [],
+                    assignments: [],
+                    errorMessage: `⚠️ Tất cả tài xế đang offline.\n\n⚠️ All drivers are offline.\n\n📊 Trạng thái / Status:\n- Pending Requests: ${pendingRidesList.length}\n- Total Drivers: ${totalDrivers}\n- Online Drivers: 0\n- Offline Drivers: ${offlineDrivers}`
+                });
+                setShowAIAssignment(true);
+            }
+            return;
+        }
 
-        // Assign pending rides to available drivers (round-robin style)
-        let assignmentCount = 0;
-        for (let i = 0; i < pendingRidesList.length && i < sortedDrivers.length; i++) {
-            const ride = pendingRidesList[i];
-            const driver = sortedDrivers[i % sortedDrivers.length];
+        // Show modal with analyzing status (only if manual trigger)
+        if (!isAutoTriggered) {
+            setAIAssignmentData({
+                status: 'analyzing',
+                pendingRides: pendingRidesList,
+                onlineDrivers: onlineDrivers,
+                assignments: []
+            });
+            setShowAIAssignment(true);
+        }
+
+        // Simulate AI analysis delay (only if showing modal)
+        if (!isAutoTriggered) {
+            await new Promise(resolve => setTimeout(resolve, 800));
+        }
+
+        // Calculate cost for all (driver, ride) pairs
+        const assignments: Array<{ driver: User; ride: RideRequest; cost: number }> = [];
+        
+        for (const ride of pendingRidesList) {
+            for (const driver of allDrivers) {
+                const cost = calculateAssignmentCost(driver, ride);
+                assignments.push({ driver, ride, cost });
+            }
+        }
+        
+        // Sort by cost (lowest first)
+        assignments.sort((a, b) => a.cost - b.cost);
+        
+        // Update to matching status (only if showing modal)
+        if (!isAutoTriggered) {
+            setAIAssignmentData(prev => prev ? { ...prev, status: 'matching' } : null);
+            await new Promise(resolve => setTimeout(resolve, 600));
+        }
+        
+        // Greedy assignment: assign each ride to the best available driver
+        const assignedRides = new Set<string>();
+        const assignedDrivers = new Set<string>();
+        const finalAssignments: Array<{ driver: User; ride: RideRequest; cost: number; isChainTrip?: boolean }> = [];
+        
+        for (const assignment of assignments) {
+            const rideId = assignment.ride.id;
+            const driverId = assignment.driver.id ? String(assignment.driver.id) : '';
             
+            if (assignedRides.has(rideId) || assignedDrivers.has(driverId)) {
+                continue;
+            }
+            
+            const driverActiveRides = rides.filter(r => {
+                const rideDriverId = r.driverId ? String(r.driverId) : '';
+                return rideDriverId === driverId && 
+                    (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
+            });
+            
+            let isChainTrip = false;
+            if (driverActiveRides.length > 0) {
+                if (assignment.cost > -5000) {
+                    continue;
+                }
+                isChainTrip = true;
+            }
+            
+            assignedRides.add(rideId);
+            assignedDrivers.add(driverId);
+            finalAssignments.push({ ...assignment, isChainTrip });
+        }
+
+        // Update modal with assignments (only if showing modal)
+        if (!isAutoTriggered) {
+            setAIAssignmentData(prev => prev ? { ...prev, status: 'matching', assignments: finalAssignments } : null);
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        // Execute assignments
+        let assignmentCount = 0;
+        for (const { driver, ride } of finalAssignments) {
             try {
-                await updateRideStatus(ride.id, BuggyStatus.ASSIGNED, driver.id, 5); // 5 min ETA
+                await updateRideStatus(ride.id, BuggyStatus.ASSIGNED, driver.id, 5);
                 assignmentCount++;
             } catch (error) {
                 console.error(`Failed to assign ride ${ride.id} to driver ${driver.id}:`, error);
             }
         }
 
+        // Update to completed status (only if showing modal)
+        if (!isAutoTriggered) {
+            setAIAssignmentData(prev => prev ? { ...prev, status: 'completed' } : null);
+        } else {
+            console.log(`[Auto-Assign] Successfully assigned ${assignmentCount} ride(s) automatically`);
+        }
+
         // Refresh data after assignments
         try {
             const refreshedRides = await getRides();
             setRides(refreshedRides);
-            if (assignmentCount > 0) {
-                alert(`Successfully assigned ${assignmentCount} ride(s) to available drivers.`);
-            }
         } catch (error) {
             console.error('Failed to refresh rides after assignment:', error);
             setRides(getRidesSync());
@@ -1807,6 +2090,13 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
 
                     {/* FLEET SECTION */}
                     {tab === 'FLEET' && (
+                        <ReceptionPortal 
+                            user={user} 
+                            onLogout={onLogout}
+                            embedded={true}
+                        />
+                    )}
+                    {false && tab === 'FLEET_OLD' && (
                         <div className="space-y-4">
                             {/* Fleet Header */}
                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4 px-4 py-3">
@@ -1819,7 +2109,27 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                         <p className="text-xs text-gray-500">Manage real-time buggy requests and driver fleet.</p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-1.5">
+                                {/* Status Indicator */}
+                                <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-1.5 border border-gray-200 shadow-sm">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="flex items-center gap-1">
+                                            <AlertCircle size={14} className="text-orange-500" />
+                                            <span className="text-xs font-semibold text-gray-700">
+                                                {getPendingRequestsCount()}
+                                            </span>
+                                            <span className="text-[10px] text-gray-500">Pending</span>
+                                        </div>
+                                        <div className="w-px h-4 bg-gray-300"></div>
+                                        <div className="flex items-center gap-1">
+                                            <Users size={14} className="text-green-500" />
+                                            <span className="text-xs font-semibold text-gray-700">
+                                                {getOnlineDriversCount()}
+                                            </span>
+                                            <span className="text-[10px] text-gray-500">Online</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 relative z-30">
                                     <button 
                                         onClick={() => setShowFleetSettings(!showFleetSettings)}
                                         className={`p-1.5 rounded-md transition ${showFleetSettings ? 'bg-gray-200 text-gray-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
@@ -1827,7 +2137,11 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                         <Settings size={18} />
                                     </button>
                                     <button 
-                                        onClick={async () => {
+                                        onClick={async (e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            if (isRefreshing) return;
+                                            setIsRefreshing(true);
                                             try {
                                                 const [refreshedRides, refreshedUsers] = await Promise.all([
                                                     getRides(),
@@ -1839,30 +2153,108 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                                 console.error('Failed to refresh data:', error);
                                                 setRides(getRidesSync());
                                                 setUsers(getUsersSync());
+                                            } finally {
+                                                setIsRefreshing(false);
                                             }
                                         }}
-                                        className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition"
+                                        disabled={isRefreshing}
+                                        className={`p-1.5 rounded-md transition ${
+                                            isRefreshing 
+                                                ? 'text-gray-400 cursor-not-allowed' 
+                                                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                                        }`}
+                                        title="Refresh data"
                                     >
-                                        <RefreshCw size={18} />
+                                        <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
                                     </button>
-                                    <button 
-                                        onClick={async () => {
-                                            await handleAutoAssign();
-                                        }}
-                                        disabled={rides.filter(r => r.status === BuggyStatus.SEARCHING).length === 0}
-                                        className="bg-blue-600 text-white px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <Zap size={16} />
-                                        <span>Assign by AI</span>
-                                    </button>
+                                    <div className="relative group">
+                                        <button 
+                                            onClick={async () => {
+                                                await handleAutoAssign();
+                                            }}
+                                            disabled={(() => {
+                                                const hasPendingRides = getPendingRequestsCount() > 0;
+                                                const hasOnlineDrivers = getOnlineDriversCount() > 0;
+                                                return !hasPendingRides || !hasOnlineDrivers;
+                                            })()}
+                                            className="bg-blue-600 text-white px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed relative"
+                                        >
+                                            <Zap size={16} />
+                                            <span>Assign by AI</span>
+                                        </button>
+                                        {/* Enhanced Tooltip */}
+                                        {(() => {
+                                            const hasPendingRides = getPendingRequestsCount() > 0;
+                                            const hasOnlineDrivers = getOnlineDriversCount() > 0;
+                                            const pendingCount = getPendingRequestsCount();
+                                            const onlineCount = getOnlineDriversCount();
+                                            
+                                            if (!hasPendingRides || !hasOnlineDrivers) {
+                                                return (
+                                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-xl whitespace-nowrap z-[9999] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-0">
+                                                            <div className="border-4 border-transparent border-b-gray-900"></div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Info size={14} />
+                                                            <div>
+                                                                {!hasPendingRides && (
+                                                                    <div>⚠️ Không có yêu cầu đang chờ</div>
+                                                                )}
+                                                                {!hasOnlineDrivers && (
+                                                                    <div>⚠️ Không có tài xế online ({users.filter(u => u.role === UserRole.DRIVER).length} offline)</div>
+                                                                )}
+                                                                <div className="text-[10px] text-gray-300 mt-1">
+                                                                    {!hasPendingRides && "No pending requests"}
+                                                                    {!hasOnlineDrivers && " / No online drivers"}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-xl whitespace-nowrap z-[9999] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-0">
+                                                        <div className="border-4 border-transparent border-b-gray-900"></div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Zap size={14} />
+                                                        <div>
+                                                            <div>✅ Sẵn sàng gán tự động</div>
+                                                            <div className="text-[10px] text-gray-300 mt-1">
+                                                                {pendingCount} requests • {onlineCount} drivers online
+                                                            </div>
+                                                            <div className="text-[10px] text-gray-300">
+                                                                Ready to assign • Cost-based algorithm
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Dispatch Configuration Modal */}
                             {showFleetSettings && (
-                                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in">
-                                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-96 p-6 animate-in slide-in-from-top-5">
-                                        <h3 className="font-bold text-lg text-gray-800 mb-4 flex items-center">
+                                <div 
+                                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in"
+                                    onClick={() => setShowFleetSettings(false)}
+                                >
+                                    <div 
+                                        className="bg-white rounded-xl shadow-2xl border border-gray-200 w-96 p-6 animate-in slide-in-from-top-5 relative"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <button
+                                            onClick={() => setShowFleetSettings(false)}
+                                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                                            aria-label="Close"
+                                        >
+                                            <X size={20} />
+                                        </button>
+                                        <h3 className="font-bold text-lg text-gray-800 mb-4 flex items-center pr-8">
                                             <Settings size={18} className="mr-2"/> Dispatch Configuration
                                         </h3>
                                         <div className="space-y-4">
@@ -1888,7 +2280,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                             </div>
                                             <button 
                                                 onClick={() => {
-                                                    // Save to localStorage
                                                     localStorage.setItem('fleetConfig', JSON.stringify(fleetConfig));
                                                     setShowFleetSettings(false);
                                                 }}
@@ -1900,6 +2291,241 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                     </div>
                                 </div>
                             )}
+
+                    {/* AI Assignment Modal */}
+                    {showAIAssignment && aiAssignmentData && (
+                        <div 
+                            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 animate-in fade-in"
+                            onClick={() => {
+                                if (aiAssignmentData.status === 'completed' || aiAssignmentData.status === 'error') {
+                                    setShowAIAssignment(false);
+                                    setAIAssignmentData(null);
+                                }
+                            }}
+                        >
+                            <div 
+                                className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[90vw] max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in slide-in-from-top-5 relative"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {/* Header */}
+                                <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                                            <Brain size={24} className="text-white" />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg">AI Assignment Engine</h3>
+                                            <p className="text-xs text-blue-100">Intelligent ride-driver matching</p>
+                                        </div>
+                                    </div>
+                                    {(aiAssignmentData.status === 'completed' || aiAssignmentData.status === 'error') && (
+                                        <button
+                                            onClick={() => {
+                                                setShowAIAssignment(false);
+                                                setAIAssignmentData(null);
+                                            }}
+                                            className="text-white/80 hover:text-white transition-colors"
+                                            aria-label="Close"
+                                        >
+                                            <X size={24} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Content */}
+                                <div className="flex-1 overflow-y-auto p-6">
+                                    {aiAssignmentData.status === 'analyzing' && (
+                                        <div className="flex flex-col items-center justify-center py-12">
+                                            <Loader2 size={48} className="text-blue-600 animate-spin mb-4" />
+                                            <h4 className="text-xl font-bold text-gray-800 mb-2">Analyzing Requests...</h4>
+                                            <p className="text-gray-600 text-center max-w-md">
+                                                AI is analyzing {aiAssignmentData.pendingRides.length} pending request(s) and {aiAssignmentData.onlineDrivers.length} available driver(s)
+                                            </p>
+                                            <div className="mt-6 flex gap-2">
+                                                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {aiAssignmentData.status === 'matching' && (
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <Loader2 size={24} className="text-blue-600 animate-spin" />
+                                                <h4 className="text-lg font-bold text-gray-800">Matching Drivers to Requests...</h4>
+                                            </div>
+                                            
+                                            {aiAssignmentData.assignments.length > 0 ? (
+                                                <div className="space-y-3">
+                                                    {aiAssignmentData.assignments.map((assignment: any, idx: number) => {
+                                                        const driverLocation = getDriverLocation(assignment.driver);
+                                                        const waitTime = Math.floor((Date.now() - assignment.ride.timestamp) / 1000 / 60);
+                                                        
+                                                        return (
+                                                            <div 
+                                                                key={`${assignment.driver.id}-${assignment.ride.id}`}
+                                                                className="bg-gradient-to-r from-blue-50 to-emerald-50 border-2 border-blue-200 rounded-lg p-4 animate-in fade-in slide-in-from-left"
+                                                                style={{ animationDelay: `${idx * 100}ms` }}
+                                                            >
+                                                                <div className="flex items-start gap-4">
+                                                                    {/* Driver Info */}
+                                                                    <div className="flex-1 bg-white rounded-lg p-3 border border-blue-200">
+                                                                        <div className="flex items-center gap-2 mb-2">
+                                                                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                                                                <Users size={16} className="text-blue-600" />
+                                                                            </div>
+                                                                            <div>
+                                                                                <div className="font-bold text-sm text-gray-800">{assignment.driver.lastName}</div>
+                                                                                <div className="text-xs text-gray-500 flex items-center gap-1">
+                                                                                    <MapPin size={10} />
+                                                                                    {driverLocation}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        {assignment.isChainTrip && (
+                                                                            <div className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-semibold">
+                                                                                🔗 Chain Trip
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+
+                                                                    {/* Arrow */}
+                                                                    <div className="flex items-center pt-2">
+                                                                        <ArrowRight size={24} className="text-blue-600" />
+                                                                    </div>
+
+                                                                    {/* Ride Info */}
+                                                                    <div className="flex-1 bg-white rounded-lg p-3 border border-emerald-200">
+                                                                        <div className="flex items-center gap-2 mb-2">
+                                                                            <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+                                                                                <Car size={16} className="text-emerald-600" />
+                                                                            </div>
+                                                                            <div>
+                                                                                <div className="font-bold text-sm text-gray-800">Room {assignment.ride.roomNumber}</div>
+                                                                                <div className="text-xs text-gray-500">{assignment.ride.guestName}</div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="space-y-1 text-xs">
+                                                                            <div className="flex items-center gap-1 text-gray-600">
+                                                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                                                                                <span className="truncate">{assignment.ride.pickup}</span>
+                                                                            </div>
+                                                                            <div className="flex items-center gap-1 text-gray-600">
+                                                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                                                                                <span className="truncate">{assignment.ride.destination}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="mt-2 flex items-center gap-2 text-[10px]">
+                                                                            <div className="flex items-center gap-1 text-orange-600">
+                                                                                <Clock size={10} />
+                                                                                {waitTime}m wait
+                                                                            </div>
+                                                                            <div className="text-gray-500">
+                                                                                Cost: {Math.round(assignment.cost)}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <div className="text-center py-8 text-gray-500">
+                                                    <Loader2 size={32} className="animate-spin mx-auto mb-3 text-blue-600" />
+                                                    <p>Calculating optimal matches...</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {aiAssignmentData.status === 'completed' && (
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <CheckCircle size={32} className="text-green-600" />
+                                                <div>
+                                                    <h4 className="text-lg font-bold text-gray-800">Assignments Completed!</h4>
+                                                    <p className="text-sm text-gray-600">
+                                                        Successfully assigned {aiAssignmentData.assignments.length} ride(s)
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {aiAssignmentData.assignments.map((assignment: any) => {
+                                                    const driverLocation = getDriverLocation(assignment.driver);
+                                                    
+                                                    return (
+                                                        <div 
+                                                            key={`${assignment.driver.id}-${assignment.ride.id}`}
+                                                            className="bg-green-50 border-2 border-green-200 rounded-lg p-3"
+                                                        >
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <CheckCircle size={16} className="text-green-600" />
+                                                                    <span className="font-bold text-sm text-gray-800">
+                                                                        {assignment.driver.lastName} → Room {assignment.ride.roomNumber}
+                                                                    </span>
+                                                                </div>
+                                                                {assignment.isChainTrip && (
+                                                                    <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-semibold">
+                                                                        Chain
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-xs text-gray-600 space-y-0.5">
+                                                                <div className="truncate">{assignment.ride.pickup} → {assignment.ride.destination}</div>
+                                                                <div className="text-gray-500">Driver at: {driverLocation}</div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            <div className="mt-4 pt-4 border-t border-gray-200">
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <span className="text-gray-600">Total Assignments:</span>
+                                                    <span className="font-bold text-gray-800">{aiAssignmentData.assignments.length}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-sm mt-1">
+                                                    <span className="text-gray-600">Chain Trips:</span>
+                                                    <span className="font-bold text-purple-600">
+                                                        {aiAssignmentData.assignments.filter((a: any) => a.isChainTrip).length}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {aiAssignmentData.status === 'error' && (
+                                        <div className="flex flex-col items-center justify-center py-12">
+                                            <AlertCircle size={48} className="text-red-600 mb-4" />
+                                            <h4 className="text-xl font-bold text-gray-800 mb-2">Assignment Failed</h4>
+                                            <p className="text-gray-600 text-center whitespace-pre-line max-w-md">
+                                                {aiAssignmentData.errorMessage}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Footer */}
+                                {(aiAssignmentData.status === 'completed' || aiAssignmentData.status === 'error') && (
+                                    <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-end">
+                                        <button
+                                            onClick={() => {
+                                                setShowAIAssignment(false);
+                                                setAIAssignmentData(null);
+                                            }}
+                                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                             {/* Three Columns Layout */}
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
