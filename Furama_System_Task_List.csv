@@ -1,0 +1,207 @@
+Module,Feature ID,Feature Name,Description,Status,Priority,Notes,Component/Service
+Authentication,AUTH-001,Guest Login,Login với Room Number và Last Name,Completed,High,App.tsx
+Authentication,AUTH-002,Staff Login,Login với Username và Password,Completed,High,App.tsx
+Authentication,AUTH-003,Admin Login,Login với Admin credentials,Completed,High,App.tsx
+Authentication,AUTH-004,Driver Login,Login với Driver credentials,Completed,High,App.tsx
+Authentication,AUTH-005,Supervisor Login,Login với Supervisor credentials,Completed,High,App.tsx
+Authentication,AUTH-006,Reception Login,Login với Reception credentials,Completed,High,App.tsx
+Authentication,AUTH-007,Logout Functionality,Logout và clear session,Completed,High,All portals
+Authentication,AUTH-008,Session Management,Quản lý session và localStorage,Completed,High,App.tsx
+Guest Portal,GUEST-001,Home Screen,Hiển thị menu chính cho guest,Completed,High,ServiceMenu.tsx
+Guest Portal,GUEST-002,Service Navigation,Điều hướng đến các dịch vụ,Completed,High,ServiceMenu.tsx
+Guest Portal,GUEST-003,Language Selection,Chọn ngôn ngữ (7 ngôn ngữ),Completed,High,LanguageContext.tsx
+Guest Portal,GUEST-004,Notification Bell,Hiển thị thông báo đơn hàng,Completed,Medium,NotificationBell.tsx
+Guest Portal,GUEST-005,Guest Account,Quản lý thông tin tài khoản,Completed,Medium,GuestAccount.tsx
+Guest Portal,GUEST-006,Reservation Details,Hiển thị thông tin đặt phòng,Completed,Medium,GuestAccount.tsx
+Buggy Service,BUGGY-001,Buggy Booking,Đặt xe buggy với pickup và destination,Completed,High,BuggyBooking.tsx
+Buggy Service,BUGGY-002,Location Search,Tìm kiếm địa điểm trong resort,Completed,High,BuggyBooking.tsx
+Buggy Service,BUGGY-003,Location Filter,Lọc theo Villa/Facility/Restaurant,Completed,High,BuggyBooking.tsx
+Buggy Service,BUGGY-004,Ride Status Tracking,Theo dõi trạng thái chuyến đi,Completed,High,BuggyBooking.tsx
+Buggy Service,BUGGY-005,Real-time Updates,Cập nhật trạng thái real-time (3s),Completed,High,BuggyBooking.tsx
+Buggy Service,BUGGY-006,Ride Cancellation,Hủy chuyến đi (theo business rules),Completed,High,BuggyBooking.tsx
+Buggy Service,BUGGY-007,Waiting Time Display,Hiển thị thời gian chờ,Completed,Medium,BuggyBooking.tsx
+Buggy Service,BUGGY-008,ETA Display,Hiển thị thời gian đến dự kiến,Completed,Medium,BuggyBooking.tsx
+Buggy Service,BUGGY-009,Route Visualization,Hiển thị tuyến đường với animation,Completed,Medium,BuggyBooking.tsx
+Buggy Service,BUGGY-010,Driver Chat,Chat với driver trong chuyến đi,Completed,Medium,ServiceChat.tsx
+Buggy Service,BUGGY-011,Sound Notifications,Âm thanh thông báo trạng thái,Completed,Low,BuggyBooking.tsx
+Buggy Service,BUGGY-012,Completion Modal,Modal đánh giá sau khi hoàn thành,Completed,Low,BuggyBooking.tsx
+Service Booking,SVC-001,Dining Order,Đặt món ăn trong phòng,Completed,High,ServiceBooking.tsx
+Service Booking,SVC-002,Spa Booking,Đặt dịch vụ spa,Completed,High,ServiceBooking.tsx
+Service Booking,SVC-003,Pool Service,Đặt dịch vụ hồ bơi,Completed,High,ServiceBooking.tsx
+Service Booking,SVC-004,Butler Request,Yêu cầu butler,Completed,High,ServiceBooking.tsx
+Service Booking,SVC-005,Menu Display,Hiển thị menu với giá và mô tả,Completed,High,ServiceBooking.tsx
+Service Booking,SVC-006,Add to Cart,Thêm món vào giỏ hàng,Completed,High,ServiceBooking.tsx
+Service Booking,SVC-007,Multi-language Menu,Menu đa ngôn ngữ,Completed,Medium,ServiceBooking.tsx
+Service Booking,SVC-008,Item Translations,Translation cho từng món,Completed,Medium,ServiceBooking.tsx
+Service Booking,SVC-009,Order Notes,Thêm ghi chú cho đơn hàng,Completed,Medium,ServiceBooking.tsx
+Service Booking,SVC-010,Order Submission,Gửi đơn hàng,Completed,High,ServiceBooking.tsx
+Active Orders,ORDER-001,Active Orders List,Danh sách đơn hàng đang hoạt động,Completed,High,ActiveOrders.tsx
+Active Orders,ORDER-002,Order Status Display,Hiển thị trạng thái đơn hàng,Completed,High,ActiveOrders.tsx
+Active Orders,ORDER-003,Order Details,Chi tiết đơn hàng với items list,Completed,High,ActiveOrders.tsx
+Active Orders,ORDER-004,Service Chat,Chat với staff theo loại dịch vụ,Completed,High,ServiceChat.tsx
+Active Orders,ORDER-005,Order History,Lịch sử đơn hàng,Completed,Medium,ActiveOrders.tsx
+Active Orders,ORDER-006,Order Filtering,Lọc theo loại dịch vụ,Completed,Medium,ActiveOrders.tsx
+Active Orders,ORDER-007,Real-time Order Updates,Cập nhật đơn hàng real-time,Completed,High,ActiveOrders.tsx
+Concierge Chat,CHAT-001,AI Concierge Chat,Chat với AI concierge (Gemini),Completed,High,ConciergeChat.tsx
+Concierge Chat,CHAT-002,Text Chat Mode,Chat bằng text,Completed,High,ConciergeChat.tsx
+Concierge Chat,CHAT-003,Voice Chat Mode,Chat bằng giọng nói (Live API),Completed,High,ConciergeChat.tsx
+Concierge Chat,CHAT-004,Knowledge Base Integration,Tích hợp knowledge base của resort,Completed,High,ConciergeChat.tsx
+Concierge Chat,CHAT-005,Events Integration,Tích hợp thông tin events,Completed,High,ConciergeChat.tsx
+Concierge Chat,CHAT-006,Promotions Integration,Tích hợp promotions,Completed,High,ConciergeChat.tsx
+Concierge Chat,CHAT-007,Google Maps Integration,Tích hợp Google Maps grounding,Completed,Medium,ConciergeChat.tsx
+Concierge Chat,CHAT-008,Map Cards Display,Hiển thị map cards trong chat,Completed,Medium,ConciergeChat.tsx
+Concierge Chat,CHAT-009,Text-to-Speech,TTS cho câu trả lời AI,Completed,Medium,ConciergeChat.tsx
+Concierge Chat,CHAT-010,Chat History,Lưu lịch sử chat vào database,Completed,High,ConciergeChat.tsx
+Concierge Chat,CHAT-011,Error Handling & Retry,Xử lý lỗi và retry kết nối,Completed,Medium,ConciergeChat.tsx
+Concierge Chat,CHAT-012,Session Management,Quản lý chat session,Completed,Medium,ConciergeChat.tsx
+Events & Promotions,EVENT-001,Events List,Danh sách sự kiện resort,Completed,High,EventsList.tsx
+Events & Promotions,EVENT-002,Event Details,Chi tiết sự kiện,Completed,High,EventsList.tsx
+Events & Promotions,EVENT-003,Promotions Display,Hiển thị promotions,Completed,High,ServiceMenu.tsx
+Events & Promotions,EVENT-004,Event Filtering,Lọc sự kiện theo ngày,Completed,Medium,EventsList.tsx
+Events & Promotions,EVENT-005,Multi-language Events,Events đa ngôn ngữ,Completed,Medium,EventsList.tsx
+Admin Portal,ADMIN-001,Locations Management,Quản lý địa điểm (CRUD),Completed,High,AdminPortal.tsx
+Admin Portal,ADMIN-002,Menu Management,Quản lý menu (CRUD),Completed,High,AdminPortal.tsx
+Admin Portal,ADMIN-003,Events Management,Quản lý events (CRUD),Completed,High,AdminPortal.tsx
+Admin Portal,ADMIN-004,Promotions Management,Quản lý promotions (CRUD),Completed,High,AdminPortal.tsx
+Admin Portal,ADMIN-005,Knowledge Base Management,Quản lý knowledge base (CRUD),Completed,High,AdminPortal.tsx
+Admin Portal,ADMIN-006,Users Management,Quản lý users (CRUD),Completed,High,AdminPortal.tsx
+Admin Portal,ADMIN-007,Room Types Management,Quản lý loại phòng (CRUD),Completed,High,AdminPortal.tsx
+Admin Portal,ADMIN-008,Rooms Management,Quản lý phòng (CRUD),Completed,High,AdminPortal.tsx
+Admin Portal,ADMIN-009,AI Input Parsing,Parse input tự nhiên bằng AI,Completed,Medium,AdminPortal.tsx
+Admin Portal,ADMIN-010,Batch Translation,Dịch hàng loạt bằng AI,Completed,Medium,AdminPortal.tsx
+Admin Portal,ADMIN-011,CSV Import,Import guests từ CSV,Completed,Medium,AdminPortal.tsx
+Admin Portal,ADMIN-012,CSV Export,Export guests ra CSV,Completed,Medium,AdminPortal.tsx
+Admin Portal,ADMIN-013,Rooms CSV Import,Import rooms từ CSV,Completed,Medium,AdminPortal.tsx
+Admin Portal,ADMIN-014,Unified History,Xem lịch sử thống nhất,Completed,Medium,AdminPortal.tsx
+Admin Portal,ADMIN-015,Password Reset,Reset password cho users,Completed,Medium,AdminPortal.tsx
+Admin Portal,ADMIN-016,Multi-language Content,Quản lý nội dung đa ngôn ngữ,Completed,High,AdminPortal.tsx
+Driver Portal,DRIVER-001,Driver Dashboard,Dashboard cho driver,Completed,High,DriverPortal.tsx
+Driver Portal,DRIVER-002,Ride Requests List,Danh sách yêu cầu chuyến đi,Completed,High,DriverPortal.tsx
+Driver Portal,DRIVER-003,Accept Ride,Chấp nhận chuyến đi,Completed,High,DriverPortal.tsx
+Driver Portal,DRIVER-004,Reject Ride,Từ chối chuyến đi,Completed,High,DriverPortal.tsx
+Driver Portal,DRIVER-005,Update Ride Status,Cập nhật trạng thái chuyến đi,Completed,High,DriverPortal.tsx
+Driver Portal,DRIVER-006,GPS Location Tracking,Theo dõi vị trí GPS,Completed,High,DriverPortal.tsx
+Driver Portal,DRIVER-007,Location Updates,Gửi cập nhật vị trí (30s),Completed,High,DriverPortal.tsx
+Driver Portal,DRIVER-008,Driver Heartbeat,Heartbeat để hiển thị online (30s),Completed,High,DriverPortal.tsx
+Driver Portal,DRIVER-009,Real-time Ride Updates,Cập nhật real-time (2s),Completed,High,DriverPortal.tsx
+Driver Portal,DRIVER-010,Driver Chat,Chat với guest,Completed,Medium,ServiceChat.tsx
+Driver Portal,DRIVER-011,Driver History,Lịch sử chuyến đi,Completed,Medium,DriverPortal.tsx
+Driver Portal,DRIVER-012,Map View,Hiển thị bản đồ với vị trí,Completed,Medium,DriverPortal.tsx
+Driver Portal,DRIVER-013,GPS Permission Handling,Xử lý quyền GPS,Completed,Medium,DriverPortal.tsx
+Staff Portal,STAFF-001,Staff Dashboard,Dashboard cho staff,Completed,High,StaffPortal.tsx
+Staff Portal,STAFF-002,Service Requests List,Danh sách yêu cầu dịch vụ,Completed,High,StaffPortal.tsx
+Staff Portal,STAFF-003,Confirm Order,Xác nhận đơn hàng,Completed,High,StaffPortal.tsx
+Staff Portal,STAFF-004,Complete Order,Hoàn thành đơn hàng,Completed,High,StaffPortal.tsx
+Staff Portal,STAFF-005,Order Details,Chi tiết đơn hàng với items,Completed,High,StaffPortal.tsx
+Staff Portal,STAFF-006,Staff Heartbeat,Heartbeat để hiển thị online (30s),Completed,High,StaffPortal.tsx
+Staff Portal,STAFF-007,Real-time Updates,Cập nhật real-time (2s),Completed,High,StaffPortal.tsx
+Staff Portal,STAFF-008,Service Chat,Chat với guest theo dịch vụ,Completed,High,ServiceChat.tsx
+Staff Portal,STAFF-009,Unread Messages,Hiển thị tin nhắn chưa đọc,Completed,Medium,StaffPortal.tsx
+Staff Portal,STAFF-010,Order History,Lịch sử đơn hàng,Completed,Medium,StaffPortal.tsx
+Staff Portal,STAFF-011,New Order Notification,Thông báo đơn hàng mới,Completed,Medium,StaffPortal.tsx
+Staff Portal,STAFF-012,Department Filtering,Lọc theo department,Completed,Medium,StaffPortal.tsx
+Reception Portal,RECEPT-001,Reception Dashboard,Dashboard cho reception,Completed,High,ReceptionPortal.tsx
+Reception Portal,RECEPT-002,Buggy Management,Quản lý buggy rides,Completed,High,ReceptionPortal.tsx
+Reception Portal,RECEPT-003,Service Management,Quản lý service requests,Completed,High,ReceptionPortal.tsx
+Reception Portal,RECEPT-004,Driver Management,Quản lý drivers,Completed,High,ReceptionPortal.tsx
+Reception Portal,RECEPT-005,Staff Management,Quản lý staff,Completed,High,ReceptionPortal.tsx
+Reception Portal,RECEPT-006,Manual Assignment,Gán thủ công rides/services,Completed,High,ReceptionPortal.tsx
+Reception Portal,RECEPT-007,AI Assignment,Gán tự động bằng AI,Completed,High,ReceptionPortal.tsx
+Reception Portal,RECEPT-008,Auto Assignment,Gán tự động theo config,Completed,Medium,ReceptionPortal.tsx
+Reception Portal,RECEPT-009,Fleet Configuration,Cấu hình fleet settings,Completed,Medium,ReceptionPortal.tsx
+Reception Portal,RECEPT-010,Driver Status Display,Hiển thị trạng thái driver (online/busy/offline),Completed,High,ReceptionPortal.tsx
+Reception Portal,RECEPT-011,Staff Status Display,Hiển thị trạng thái staff (online/busy/offline),Completed,High,ReceptionPortal.tsx
+Reception Portal,RECEPT-012,Map View,Hiển thị bản đồ với drivers,Completed,Medium,ReceptionPortal.tsx
+Reception Portal,RECEPT-013,List View,Hiển thị danh sách,Completed,Medium,ReceptionPortal.tsx
+Reception Portal,RECEPT-014,Real-time Updates,Cập nhật real-time (5s),Completed,High,ReceptionPortal.tsx
+Reception Portal,RECEPT-015,Ride Status Updates,Cập nhật trạng thái chuyến đi,Completed,High,ReceptionPortal.tsx
+Supervisor Portal,SUPER-001,Supervisor Dashboard,Dashboard cho supervisor,Completed,High,SupervisorDashboard.tsx
+Supervisor Portal,SUPER-002,All Departments View,Xem tất cả departments,Completed,High,SupervisorDashboard.tsx
+Supervisor Portal,SUPER-003,Service Requests Monitor,Giám sát service requests,Completed,High,SupervisorDashboard.tsx
+Supervisor Portal,SUPER-004,Cross-department Chat,Chat giữa các departments,Completed,Medium,SupervisorDashboard.tsx
+Service Chat,CHAT-SVC-001,Service Chat Widget,Chat widget cho từng dịch vụ,Completed,High,ServiceChat.tsx
+Service Chat,CHAT-SVC-002,Real-time Messaging,Nhắn tin real-time,Completed,High,ServiceChat.tsx
+Service Chat,CHAT-SVC-003,Message Persistence,Lưu tin nhắn vào database,Completed,High,ServiceChat.tsx
+Service Chat,CHAT-SVC-004,Unread Indicators,Hiển thị tin nhắn chưa đọc,Completed,Medium,ServiceChat.tsx
+Service Chat,CHAT-SVC-005,Auto-open Chat,Tự động mở chat khi có tin nhắn,Completed,Medium,ServiceChat.tsx
+Database,DB-001,PostgreSQL Integration,Tích hợp PostgreSQL,Completed,High,api/
+Database,DB-002,Users Table,Bảng users,Completed,High,api/_models/userModel.ts
+Database,DB-003,Rides Table,Bảng rides,Completed,High,api/_models/rideRequestModel.ts
+Database,DB-004,Service Requests Table,Bảng service_requests,Completed,High,api/_models/serviceRequestModel.ts
+Database,DB-005,Chat Messages Table,Bảng chat_messages,Completed,High,api/_models/chatMessageModel.ts
+Database,DB-006,Locations Table,Bảng locations,Completed,High,api/_models/locationModel.ts
+Database,DB-007,Menu Items Table,Bảng menu_items,Completed,High,api/_models/menuItemModel.ts
+Database,DB-008,Events Table,Bảng events,Completed,High,api/_models/eventModel.ts
+Database,DB-009,Promotions Table,Bảng promotions,Completed,High,api/_models/promotionModel.ts
+Database,DB-010,Knowledge Base Table,Bảng knowledge_base,Completed,High,api/_models/knowledgeBaseModel.ts
+Database,DB-011,Room Types Table,Bảng room_types,Completed,High,api/_models/roomTypeModel.ts
+Database,DB-012,Rooms Table,Bảng rooms,Completed,High,api/_models/roomModel.ts
+Database,DB-013,Driver Location Tracking,Theo dõi vị trí driver,Completed,Medium,migrations/
+API,API-001,REST API Server,API server với Express,Completed,High,api/
+API,API-002,Users Endpoints,Endpoints cho users,Completed,High,api/_controllers/userController.ts
+API,API-003,Rides Endpoints,Endpoints cho rides,Completed,High,api/_controllers/rideRequestController.ts
+API,API-004,Service Requests Endpoints,Endpoints cho service requests,Completed,High,api/_controllers/serviceRequestController.ts
+API,API-005,Chat Messages Endpoints,Endpoints cho chat messages,Completed,High,api/_controllers/chatMessageController.ts
+API,API-006,Locations Endpoints,Endpoints cho locations,Completed,High,api/_controllers/locationController.ts
+API,API-007,Menu Items Endpoints,Endpoints cho menu items,Completed,High,api/_controllers/menuItemController.ts
+API,API-008,Events Endpoints,Endpoints cho events,Completed,High,api/_controllers/eventController.ts
+API,API-009,Promotions Endpoints,Endpoints cho promotions,Completed,High,api/_controllers/promotionController.ts
+API,API-010,Knowledge Base Endpoints,Endpoints cho knowledge base,Completed,High,api/_controllers/knowledgeBaseController.ts
+API,API-011,Room Types Endpoints,Endpoints cho room types,Completed,High,api/_controllers/roomTypeController.ts
+API,API-012,Rooms Endpoints,Endpoints cho rooms,Completed,High,api/_controllers/roomController.ts
+API,API-013,Error Handling,Xử lý lỗi API,Completed,High,api/
+API,API-014,CORS Configuration,Cấu hình CORS,Completed,High,api/
+Mobile App,MOBILE-001,Capacitor Integration,Tích hợp Capacitor,Completed,High,capacitor.config.ts
+Mobile App,MOBILE-002,Android Build,Build APK Android,Completed,High,BUILD_APK_GUIDE.md
+Mobile App,MOBILE-003,GPS Permissions,Quyền GPS cho mobile,Completed,Medium,DriverPortal.tsx
+Mobile App,MOBILE-004,Audio Permissions,Quyền audio cho voice chat,Completed,Medium,ConciergeChat.tsx
+Mobile App,MOBILE-005,Safe Area Handling,Xử lý safe area cho mobile,Completed,Medium,Multiple components
+UI/UX,UI-001,Responsive Design,Thiết kế responsive,Completed,High,All components
+UI/UX,UI-002,Modern Glassmorphism,Glassmorphism design,Completed,Medium,Multiple components
+UI/UX,UI-003,Gradient Backgrounds,Nền gradient,Completed,Low,Multiple components
+UI/UX,UI-004,Animations,Animations và transitions,Completed,Medium,Multiple components
+UI/UX,UI-005,Loading States,Trạng thái loading,Completed,High,Loading.tsx
+UI/UX,UI-006,Error States,Trạng thái lỗi,Completed,High,Multiple components
+UI/UX,UI-007,Empty States,Trạng thái rỗng,Completed,Medium,Multiple components
+UI/UX,UI-008,Dark Mode Support,Hỗ trợ dark mode,Pending,Low,Not implemented
+UI/UX,UI-009,Accessibility,Accessibility features,Pending,Medium,Not implemented
+Localization,LOC-001,Multi-language Support,Hỗ trợ 7 ngôn ngữ,Completed,High,LanguageContext.tsx
+Localization,LOC-002,English Translation,Bản dịch tiếng Anh,Completed,High,LanguageContext.tsx
+Localization,LOC-003,Vietnamese Translation,Bản dịch tiếng Việt,Completed,High,LanguageContext.tsx
+Localization,LOC-004,Korean Translation,Bản dịch tiếng Hàn,Completed,High,LanguageContext.tsx
+Localization,LOC-005,Japanese Translation,Bản dịch tiếng Nhật,Completed,High,LanguageContext.tsx
+Localization,LOC-006,Chinese Translation,Bản dịch tiếng Trung,Completed,High,LanguageContext.tsx
+Localization,LOC-007,Russian Translation,Bản dịch tiếng Nga,Completed,High,LanguageContext.tsx
+Localization,LOC-008,French Translation,Bản dịch tiếng Pháp,Completed,High,LanguageContext.tsx
+Localization,LOC-009,Dynamic Content Translation,Dịch nội dung động bằng AI,Completed,Medium,geminiService.ts
+Performance,PERF-001,API Polling,Polling cho real-time updates,Completed,High,Multiple components
+Performance,PERF-002,Optimistic Updates,Cập nhật optimistic,Completed,Medium,Multiple components
+Performance,PERF-003,Error Retry Logic,Retry logic cho lỗi,Completed,Medium,ConciergeChat.tsx
+Performance,PERF-004,Session Caching,Cache session,Completed,Low,Multiple components
+Performance,PERF-005,Image Optimization,Tối ưu hình ảnh,Pending,Low,Not implemented
+Performance,PERF-006,Code Splitting,Code splitting,Pending,Medium,Not implemented
+Security,SEC-001,Password Hashing,Băm password,Completed,High,api/_models/userModel.ts
+Security,SEC-002,Role-based Access Control,Kiểm soát truy cập theo role,Completed,High,App.tsx
+Security,SEC-003,Input Validation,Validation input,Completed,High,api/
+Security,SEC-004,SQL Injection Prevention,Phòng chống SQL injection,Completed,High,api/
+Security,SEC-005,API Key Protection,Bảo vệ API keys,Completed,High,.env
+Security,SEC-006,HTTPS Support,Hỗ trợ HTTPS,Pending,Medium,Not implemented
+Testing,TEST-001,Unit Tests,Unit tests,Pending,High,Not implemented
+Testing,TEST-002,Integration Tests,Integration tests,Pending,High,Not implemented
+Testing,TEST-003,E2E Tests,E2E tests,Pending,Medium,Not implemented
+Testing,TEST-004,API Tests,API tests,Pending,High,Not implemented
+Documentation,DOC-001,README,README file,Completed,Medium,README.md
+Documentation,DOC-002,API Documentation,Tài liệu API,Pending,High,Not implemented
+Documentation,DOC-003,User Guide,Hướng dẫn người dùng,Pending,Medium,Not implemented
+Documentation,DOC-004,Developer Guide,Hướng dẫn developer,Pending,Medium,Not implemented
+Documentation,DOC-005,Build Guide,Hướng dẫn build APK,Completed,High,BUILD_APK_GUIDE.md
+Monitoring,MON-001,Console Logging,Logging vào console,Completed,High,All components
+Monitoring,MON-002,Error Logging,Logging lỗi,Completed,High,All components
+Monitoring,MON-003,Performance Monitoring,Giám sát hiệu suất,Pending,Medium,Not implemented
+Monitoring,MON-004,Analytics Integration,Tích hợp analytics,Pending,Low,Not implemented
+Deployment,DEPLOY-001,Environment Variables,Quản lý biến môi trường,Completed,High,.env
+Deployment,DEPLOY-002,Database Migrations,Migrations database,Completed,High,migrations/
+Deployment,DEPLOY-003,Production Build,Build production,Completed,High,package.json
+Deployment,DEPLOY-004,Deployment Guide,Hướng dẫn deploy,Pending,Medium,Not implemented
+Deployment,DEPLOY-005,CI/CD Pipeline,CI/CD pipeline,Pending,Low,Not implemented
+
