@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { getServiceRequests, updateServiceStatus, getLastMessage } from '../services/dataService';
+import { getServiceRequests, updateServiceStatus, getLastMessage, updateDriverHeartbeat, markDriverOffline } from '../services/dataService';
 import { ServiceRequest, User, UserRole } from '../types';
 import { UserCheck, ShieldCheck, MessageSquare, Eye, Bell, Clock, CheckCircle, List, History, Package } from 'lucide-react';
 import ServiceChat from './ServiceChat';
@@ -14,6 +14,25 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
     // New Order Notification State
     const [newOrderAlert, setNewOrderAlert] = useState(false);
     const prevRequestCount = useRef(0);
+
+    // Send initial heartbeat when staff portal opens
+    useEffect(() => {
+        if (user.id && user.role === UserRole.STAFF) {
+            updateDriverHeartbeat(user.id);
+        }
+    }, [user.id, user.role]);
+
+    // Heartbeat: Update staff online status every 30 seconds
+    useEffect(() => {
+        if (!user.id || user.role !== UserRole.STAFF) return;
+        
+        // Send heartbeat every 30 seconds to keep staff online
+        const heartbeatInterval = setInterval(() => {
+            updateDriverHeartbeat(user.id!);
+        }, 30000); // 30 seconds
+        
+        return () => clearInterval(heartbeatInterval);
+    }, [user.id, user.role]);
 
     useEffect(() => {
         // Initial fetch
@@ -184,7 +203,17 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                     )}
 
                     <button 
-                        onClick={onLogout} 
+                        onClick={async () => {
+                            // Mark staff as offline before logout
+                            if (user.id && (user.role === UserRole.STAFF || user.role === UserRole.SUPERVISOR)) {
+                                try {
+                                    await markDriverOffline(user.id);
+                                } catch (e) {
+                                    console.error('Failed to mark staff offline:', e);
+                                }
+                            }
+                            onLogout();
+                        }}
                         className="text-sm font-semibold text-white/90 hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-all border border-white/20"
                     >
                         Logout

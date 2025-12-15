@@ -129,7 +129,22 @@ const ActiveOrders: React.FC<ActiveOrdersProps> = ({ user, onBack }) => {
                                             {t(req.status)}
                                         </span>
                                     </div>
-                                    <p className="text-xs text-gray-600 mt-1.5 line-clamp-2 font-medium bg-gray-50 px-2 py-1 rounded border border-gray-200">{getTranslatedDetails(req)}</p>
+                                    {req.items && req.items.length > 0 ? (
+                                        <div className="text-xs text-gray-600 mt-1.5 font-medium bg-gray-50 px-2 py-1.5 rounded border border-gray-200">
+                                            <div className="font-semibold text-gray-700 mb-1">Items:</div>
+                                            <ul className="list-disc list-inside space-y-0.5">
+                                                {req.items.map((item, idx) => {
+                                                    const tr = item.translations?.[language];
+                                                    const itemName = tr?.name || item.name;
+                                                    return (
+                                                        <li key={idx} className="text-gray-600">{itemName}</li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        </div>
+                                    ) : req.details ? (
+                                        <p className="text-xs text-gray-600 mt-1.5 line-clamp-2 font-medium bg-gray-50 px-2 py-1 rounded border border-gray-200">{req.details}</p>
+                                    ) : null}
                                     <p className="text-[10px] text-gray-500 mt-2 flex items-center font-medium">
                                         <Clock size={11} className="mr-1 text-gray-400" />
                                         {new Date(req.timestamp).toLocaleString()}

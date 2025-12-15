@@ -42,3 +42,40 @@ You need to run both frontend and API in separate terminals:
 - Terminal 2: `npm run dev:api` (API on port 3000)
 
 The frontend is configured to proxy API requests from port 5173 to port 3000 automatically.
+
+## Build Android APK
+
+This app can be converted to an Android APK using Capacitor.
+
+### Quick Start
+
+1. Install dependencies (if not already done):
+   ```bash
+   npm install
+   ```
+
+2. Setup Android (automatic):
+   ```powershell
+   .\setup-android.ps1
+   ```
+
+3. Open Android Studio:
+   ```bash
+   npm run cap:open:android
+   ```
+
+4. Build APK in Android Studio:
+   - **Build** → **Build Bundle(s) / APK(s)** → **Build APK(s)**
+   - APK location: `android/app/build/outputs/apk/debug/app-debug.apk`
+
+### Documentation
+
+- 📖 **Quick Start Guide**: [BUILD_APK_QUICKSTART.md](./BUILD_APK_QUICKSTART.md)
+- 📚 **Detailed Guide**: [BUILD_APK_GUIDE.md](./BUILD_APK_GUIDE.md)
+
+### Requirements
+
+- Node.js (v18+)
+- Java JDK 17
+- Android Studio
+- Android SDK Platform 33+

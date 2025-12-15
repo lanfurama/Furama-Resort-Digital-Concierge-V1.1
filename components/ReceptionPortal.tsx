@@ -213,8 +213,32 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             return driverActiveRides[0].destination;
         }
         
-        // Driver is available - try to get their location from locations array
-        // This is a fallback - ideally driver location should be tracked separately
+        // Driver is available - check if we have GPS coordinates from database
+        if (driver.currentLat !== undefined && driver.currentLng !== undefined) {
+            // Find nearest location to driver's GPS coordinates
+            let nearestLocation = locations[0];
+            let minDistance = Infinity;
+            
+            locations.forEach(loc => {
+                const dist = Math.sqrt(
+                    Math.pow(driver.currentLat! - loc.lat, 2) + Math.pow(driver.currentLng! - loc.lng, 2)
+                );
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    nearestLocation = loc;
+                }
+            });
+            
+            // If within ~100 meters of a known location, show location name
+            if (minDistance < 0.001) {
+                return `Near ${nearestLocation.name}`;
+            } else {
+                // Show GPS coordinates if not near any known location
+                return `GPS: ${driver.currentLat.toFixed(6)}, ${driver.currentLng.toFixed(6)}`;
+            }
+        }
+        
+        // Fallback: try to get their location from locations array (old method)
         if (locations.length > 0) {
             const driverLocation = locations[parseInt(driver.id || '0') % locations.length];
             return driverLocation?.name || "Unknown Location";
@@ -363,19 +387,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     const calculateAssignmentCost = (driver: User, ride: RideRequest): number => {
         const driverIdStr = driver.id ? String(driver.id) : '';
         
-        // Get driver's current or expected location
-        const driverLocationName = getDriverLocation(driver);
-        const driverCoords = resolveLocationCoordinates(driverLocationName);
-        const pickupCoords = resolveLocationCoordinates(ride.pickup);
-        
-        // If we can't resolve coordinates, use a high default cost
-        if (!driverCoords || !pickupCoords) {
-            return 1000000; // Very high cost
-        }
-        
-        // Calculate distance from driver's current location to pickup point (in meters)
-        let distance = calculateDistance(driverCoords, pickupCoords);
-        
         // Check driver status
         const driverActiveRides = rides.filter(r => {
             const rideDriverId = r.driverId ? String(r.driverId) : '';
@@ -385,30 +396,102 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         const isAvailable = driverActiveRides.length === 0;
         const currentRide = driverActiveRides[0];
         
+        // Check if driver has GPS location
+        const hasGpsLocation = driver.currentLat !== undefined && driver.currentLng !== undefined;
+        
         // Calculate wait time in seconds (longer wait = higher priority = lower cost)
         const waitTimeSeconds = Math.floor((Date.now() - ride.timestamp) / 1000);
         const waitTimeBonus = waitTimeSeconds * 10; // Each second of wait reduces cost by 10 points
         
-        let cost = distance; // Start with distance as base cost
+        let cost = 0;
         
-        if (isAvailable) {
-            // Driver is AVAILABLE: Low cost (subtract a bonus)
-            cost -= 5000; // Available drivers get priority
-        } else if (currentRide) {
-            // Driver is BUSY: Check for Chain Trip opportunity
-            const dropoffCoords = resolveLocationCoordinates(currentRide.destination);
-            if (dropoffCoords) {
-                const chainDistance = calculateDistance(dropoffCoords, pickupCoords);
-                // If drop-off is very close to new pickup (Chain Trip), give very low cost
-                if (chainDistance < 200) { // Within 200 meters = Chain Trip
-                    cost = chainDistance - 10000; // Very low cost for chain trips
+        if (hasGpsLocation) {
+            // Driver has GPS location: Use distance-based calculation
+            const driverCoords = { lat: driver.currentLat!, lng: driver.currentLng! };
+            const pickupCoords = resolveLocationCoordinates(ride.pickup);
+            
+            if (!pickupCoords) {
+                return 1000000; // Very high cost if can't resolve pickup
+            }
+            
+            // Calculate distance from driver's current GPS location to pickup point (in meters)
+            let distance = calculateDistance(driverCoords, pickupCoords);
+            cost = distance; // Start with distance as base cost
+            
+            if (isAvailable) {
+                // Driver is AVAILABLE: Low cost (subtract a bonus)
+                cost -= 5000; // Available drivers get priority
+            } else if (currentRide) {
+                // Driver is BUSY: Check for Chain Trip opportunity
+                const dropoffCoords = resolveLocationCoordinates(currentRide.destination);
+                if (dropoffCoords) {
+                    const chainDistance = calculateDistance(dropoffCoords, pickupCoords);
+                    // If drop-off is very close to new pickup (Chain Trip), give very low cost
+                    if (chainDistance < 200) { // Within 200 meters = Chain Trip
+                        cost = chainDistance - 10000; // Very low cost for chain trips
+                    } else {
+                        // Busy driver but not a chain trip: higher cost
+                        cost += 10000; // Penalty for busy drivers
+                    }
                 } else {
-                    // Busy driver but not a chain trip: higher cost
+                    // Can't resolve drop-off location, use distance from current GPS location
                     cost += 10000; // Penalty for busy drivers
                 }
+            }
+        } else {
+            // Driver does NOT have GPS location: Use time-based priority
+            // Priority: Driver near completion of current ride > Available driver > Busy driver
+            
+            if (isAvailable) {
+                // Driver is AVAILABLE: Medium priority (not as good as near-completion)
+                cost = 5000; // Base cost for available drivers without GPS
+            } else if (currentRide) {
+                // Driver is BUSY: Calculate how close they are to completing current ride
+                const now = Date.now();
+                let rideDuration = 0;
+                
+                // Calculate ride duration based on status
+                if (currentRide.status === BuggyStatus.ON_TRIP && currentRide.pickedUpAt) {
+                    // Driver is on trip: time since pickup
+                    rideDuration = now - currentRide.pickedUpAt;
+                } else if (currentRide.status === BuggyStatus.ARRIVING && currentRide.confirmedAt) {
+                    // Driver is arriving: time since assignment
+                    rideDuration = now - currentRide.confirmedAt;
+                } else if (currentRide.status === BuggyStatus.ASSIGNED && currentRide.confirmedAt) {
+                    // Driver is assigned: time since assignment
+                    rideDuration = now - currentRide.confirmedAt;
+                }
+                
+                // Average ride duration is about 5-10 minutes (300000-600000 ms)
+                // Drivers who have been on trip for > 5 minutes are likely near completion
+                const rideDurationMinutes = rideDuration / (1000 * 60);
+                
+                if (rideDurationMinutes >= 5) {
+                    // Driver is likely near completion: HIGH PRIORITY (very low cost)
+                    // The longer the ride, the lower the cost (closer to completion)
+                    cost = 1000 - (rideDurationMinutes - 5) * 200; // Lower cost for longer rides
+                    cost = Math.max(0, cost); // Don't go negative
+                } else if (rideDurationMinutes >= 3) {
+                    // Driver is getting close: Medium-high priority
+                    cost = 2000;
+                } else {
+                    // Driver just started: Lower priority
+                    cost = 8000; // Higher cost for drivers who just started
+                }
+                
+                // Also check for chain trip opportunity (if we can resolve locations)
+                const dropoffCoords = resolveLocationCoordinates(currentRide.destination);
+                const pickupCoords = resolveLocationCoordinates(ride.pickup);
+                if (dropoffCoords && pickupCoords) {
+                    const chainDistance = calculateDistance(dropoffCoords, pickupCoords);
+                    if (chainDistance < 200) {
+                        // Chain trip: Very high priority
+                        cost = chainDistance - 10000; // Very low cost for chain trips
+                    }
+                }
             } else {
-                // Can't resolve drop-off location, use distance from current location
-                cost += 10000; // Penalty for busy drivers
+                // Driver is OFFLINE or unknown status: Very high cost
+                cost = 100000;
             }
         }
         

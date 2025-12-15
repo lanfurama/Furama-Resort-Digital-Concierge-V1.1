@@ -106,36 +106,53 @@ export const parseAdminInput = async (input: string, type: 'MENU_ITEM' | 'LOCATI
 
 // --- Text Chat (Gemini 2.5 Flash) ---
 export const createChatSession = async () => {
-  // Construct dynamic knowledge base
-  const knowledgeItems = await getKnowledgeBase();
-  const eventsList = await getEvents();
-  const promosList = await getPromotions();
-  
-  const knowledge = knowledgeItems.map(k => `Q: ${k.question} A: ${k.answer}`).join('\n');
-  const events = eventsList.map(e => `Event: ${e.title} at ${e.time} on ${e.date} (${e.location})`).join('\n');
-  const promos = promosList.map(p => `Promo: ${p.title} - ${p.description} (${p.discount})`).join('\n');
+  // Check API key
+  if (!apiKey) {
+    throw new Error('Gemini API key is not configured. Please set VITE_GEMINI_API_KEY in your environment variables.');
+  }
 
-  return ai.chats.create({
-    model: 'gemini-2.5-flash',
-    config: {
-      systemInstruction: `You are the virtual concierge for Furama Resort & Villas Da Nang. 
-      Your tone is polite, luxurious, and helpful. 
-      Assist guests with booking buggies, finding restaurants, and general information.
-      
-      Here is the current Resort Knowledge Base (Answer these exactly):
-      ${knowledge}
+  try {
+    // Construct dynamic knowledge base
+    const knowledgeItems = await getKnowledgeBase();
+    const eventsList = await getEvents();
+    const promosList = await getPromotions();
+    
+    const knowledge = knowledgeItems.map(k => `Q: ${k.question} A: ${k.answer}`).join('\n');
+    const events = eventsList.map(e => `Event: ${e.title} at ${e.time} on ${e.date} (${e.location})`).join('\n');
+    const promos = promosList.map(p => `Promo: ${p.title} - ${p.description} (${p.discount})`).join('\n');
 
-      Current Resort Events:
-      ${events}
+    return await ai.chats.create({
+      model: 'gemini-2.5-flash',
+      config: {
+        systemInstruction: `You are the virtual concierge for Furama Resort & Villas Da Nang. 
+        Your tone is polite, luxurious, and helpful. 
+        Assist guests with booking buggies, finding restaurants, and general information.
+        
+        Here is the current Resort Knowledge Base (Answer these exactly):
+        ${knowledge}
 
-      Active Promotions:
-      ${promos}
+        Current Resort Events:
+        ${events}
 
-      The resort is located in Da Nang, Vietnam.
-      Keep answers concise and suitable for a mobile screen.`,
-      tools: [{ googleMaps: {} }], // Enable Maps grounding
-    },
-  });
+        Active Promotions:
+        ${promos}
+
+        The resort is located in Da Nang, Vietnam.
+        Keep answers concise and suitable for a mobile screen.`,
+        tools: [{ googleMaps: {} }], // Enable Maps grounding
+      },
+    });
+  } catch (error: any) {
+    console.error('Error creating chat session:', error);
+    // Provide more helpful error messages
+    if (error?.message?.includes('API key') || error?.status === 401 || error?.status === 403) {
+      throw new Error('Invalid or missing Gemini API key. Please check your configuration.');
+    }
+    if (error?.message?.includes('quota') || error?.status === 429) {
+      throw new Error('API quota exceeded. Please try again later.');
+    }
+    throw error;
+  }
 };
 
 // --- Translation Service (Gemini 2.5 Flash) ---

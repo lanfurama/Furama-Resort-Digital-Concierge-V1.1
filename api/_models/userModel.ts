@@ -9,6 +9,9 @@ export interface User {
   password?: string;
   language?: string | null;
   notes?: string | null;
+  current_lat?: number | null;
+  current_lng?: number | null;
+  location_updated_at?: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -83,6 +86,18 @@ export const userModel = {
       console.log('Adding notes to update:', user.notes);
       fields.push(`notes = $${paramCount++}`);
       values.push(user.notes || null);
+    }
+    if (user.current_lat !== undefined) {
+      fields.push(`current_lat = $${paramCount++}`);
+      values.push(user.current_lat !== null ? user.current_lat : null);
+    }
+    if (user.current_lng !== undefined) {
+      fields.push(`current_lng = $${paramCount++}`);
+      values.push(user.current_lng !== null ? user.current_lng : null);
+    }
+    if (user.current_lat !== undefined || user.current_lng !== undefined) {
+      // Update location_updated_at when location is updated
+      fields.push(`location_updated_at = NOW()`);
     }
 
     // Always update updated_at timestamp, even if no other fields are being updated
@@ -183,6 +198,43 @@ export const userModel = {
       } catch (e) {
         console.error('[userModel.markOffline] Failed to re-enable trigger:', e);
       }
+      throw error;
+    }
+  },
+
+  // Update driver location (for DRIVER role only)
+  async updateLocation(id: number, lat: number, lng: number): Promise<User | null> {
+    try {
+      const result = await pool.query(
+        `UPDATE users 
+         SET current_lat = $1, current_lng = $2, location_updated_at = NOW(), updated_at = NOW() 
+         WHERE id = $3 AND role = 'DRIVER' 
+         RETURNING *`,
+        [lat, lng, id]
+      );
+      
+      if (result.rows.length === 0) {
+        console.warn(`[userModel.updateLocation] User ${id} not found or not a driver`);
+        return null;
+      }
+      
+      console.log(`[userModel.updateLocation] Updated location for driver ${id}:`, { lat, lng });
+      return result.rows[0];
+    } catch (error) {
+      console.error('[userModel.updateLocation] Error updating driver location:', error);
+      throw error;
+    }
+  },
+
+  // Get all drivers with their current locations
+  async getDriversWithLocations(): Promise<User[]> {
+    try {
+      const result = await pool.query(
+        `SELECT * FROM users WHERE role = 'DRIVER' ORDER BY last_name`
+      );
+      return result.rows;
+    } catch (error) {
+      console.error('[userModel.getDriversWithLocations] Error fetching drivers:', error);
       throw error;
     }
   },

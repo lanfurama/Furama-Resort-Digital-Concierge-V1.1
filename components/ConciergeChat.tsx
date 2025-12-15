@@ -139,12 +139,39 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
 
     loadMessages();
 
-    // Initialize text chat session
-    createChatSession().then(session => {
-      chatSessionRef.current = session;
-    }).catch(error => {
-      console.error('Failed to create chat session:', error);
-    });
+    // Initialize text chat session with retry
+    const initializeSession = async (retries = 3) => {
+      for (let i = 0; i < retries; i++) {
+        try {
+          const session = await createChatSession();
+          chatSessionRef.current = session;
+          console.log('Chat session initialized successfully');
+          return;
+        } catch (error) {
+          console.error(`Failed to create chat session (attempt ${i + 1}/${retries}):`, error);
+          if (i < retries - 1) {
+            // Wait before retry (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+          } else {
+            // Last attempt failed - show error message
+            const errorMsg: ChatMessage = {
+              id: 'init-error',
+              role: 'model',
+              text: t('connection_error')
+            };
+            setMessages(prev => {
+              // Only add error if not already present
+              if (!prev.find(m => m.id === 'init-error')) {
+                return [...prev, errorMsg];
+              }
+              return prev;
+            });
+          }
+        }
+      }
+    };
+    
+    initializeSession();
 
     return () => {
        // Cleanup Live API if active
@@ -164,12 +191,6 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
     
-    // Ensure chat session is initialized
-    if (!chatSessionRef.current) {
-      console.warn('Chat session not ready yet');
-      return;
-    }
-
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: input };
     setMessages(prev => [...prev, userMsg]);
     
@@ -178,6 +199,26 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
     
     setInput('');
     setIsLoading(true);
+
+    // Try to initialize session if not ready
+    if (!chatSessionRef.current) {
+      console.warn('Chat session not ready, attempting to initialize...');
+      try {
+        const session = await createChatSession();
+        chatSessionRef.current = session;
+      } catch (error) {
+        console.error('Failed to initialize chat session:', error);
+        const errorMsg: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'model',
+          text: t('connection_error')
+        };
+        setMessages(prev => [...prev, errorMsg]);
+        await saveMessageToDB('model', errorMsg.text);
+        setIsLoading(false);
+        return;
+      }
+    }
 
     try {
       const result: GenerateContentResponse = await chatSessionRef.current.sendMessage({ message: userMsg.text });
@@ -217,8 +258,34 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
       // Save model response to database
       await saveMessageToDB('model', modelMsg.text);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Chat Error", error);
+      
+      // Try to recreate session if it seems to be invalid
+      if (error?.message?.includes('session') || error?.code === 401 || error?.code === 403) {
+        console.log('Session appears invalid, attempting to recreate...');
+        try {
+          chatSessionRef.current = await createChatSession();
+          // Retry sending the message once
+          try {
+            const result: GenerateContentResponse = await chatSessionRef.current.sendMessage({ message: userMsg.text });
+            const modelMsg: ChatMessage = {
+              id: Date.now().toString(),
+              role: 'model',
+              text: result.text || t('sorry_couldnt_process')
+            };
+            setMessages(prev => [...prev, modelMsg]);
+            await saveMessageToDB('model', modelMsg.text);
+            setIsLoading(false);
+            return;
+          } catch (retryError) {
+            console.error('Retry also failed:', retryError);
+          }
+        } catch (recreateError) {
+          console.error('Failed to recreate session:', recreateError);
+        }
+      }
+      
       const errorMsg: ChatMessage = {
         id: Date.now().toString(),
         role: 'model',

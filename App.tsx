@@ -151,15 +151,19 @@ const AppContent: React.FC = () => {
   };
 
   const handleLogout = () => {
-      // Mark driver as offline before clearing user state
+      // Mark driver/staff as offline before clearing user state
       // Get user from localStorage in case state is already cleared
       const savedUser = localStorage.getItem('furama_user');
       if (savedUser) {
         try {
           const userData = JSON.parse(savedUser);
-          if (userData.role === UserRole.DRIVER && userData.id) {
+          if (userData.id && (
+            userData.role === UserRole.DRIVER || 
+            userData.role === UserRole.STAFF || 
+            userData.role === UserRole.SUPERVISOR
+          )) {
             markDriverOffline(String(userData.id)).catch(err => {
-              console.error('Failed to mark driver offline on logout:', err);
+              console.error('Failed to mark user offline on logout:', err);
             });
           }
         } catch (e) {

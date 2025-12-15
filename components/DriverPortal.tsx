@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { getRides, updateRideStatus, getLastMessage, createManualRide, getLocations, updateDriverHeartbeat, markDriverOffline } from '../services/dataService';
+import React, { useState, useEffect, useRef } from 'react';
+import { getRides, updateRideStatus, getLastMessage, createManualRide, getLocations, updateDriverHeartbeat, markDriverOffline, updateDriverLocation } from '../services/dataService';
 import { RideRequest, BuggyStatus } from '../types';
 import { Car, MapPin, Navigation, CheckCircle, Clock, MessageSquare, History, List, Plus, X, Loader2, User, Star, Volume2, VolumeX, Grid, LayoutGrid, Zap } from 'lucide-react';
 import NotificationBell from './NotificationBell';
@@ -47,11 +47,14 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             oscillator.frequency.value = 800; // Frequency in Hz
             oscillator.type = 'sine';
             
-            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            // Longer duration: 0.6 seconds with smoother fade
+            const duration = 0.6;
+            gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.3, audioContext.currentTime + 0.2); // Hold at 0.3 for 0.2s
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
             
             oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.3);
+            oscillator.stop(audioContext.currentTime + duration);
         } catch (error) {
             console.error('Failed to play notification sound:', error);
         }
@@ -65,6 +68,8 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         destination: ''
     });
     const [locations, setLocations] = useState<any[]>([]);
+    const [gpsPermissionStatus, setGpsPermissionStatus] = useState<'granted' | 'denied' | 'prompt' | 'checking'>('checking');
+    const [showGpsPermissionAlert, setShowGpsPermissionAlert] = useState(false);
 
     // Load driver info from localStorage and setup heartbeat
     useEffect(() => {
@@ -108,6 +113,149 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         }
     }, []);
 
+    // Check GPS Permission Status
+    useEffect(() => {
+        if (!navigator.geolocation) {
+            setGpsPermissionStatus('denied');
+            setShowGpsPermissionAlert(true);
+            return;
+        }
+
+        // Check permission status using Permissions API if available
+        if ('permissions' in navigator) {
+            navigator.permissions.query({ name: 'geolocation' as PermissionName }).then((result) => {
+                setGpsPermissionStatus(result.state as 'granted' | 'denied' | 'prompt');
+                if (result.state === 'denied') {
+                    setShowGpsPermissionAlert(true);
+                }
+                
+                // Listen for permission changes
+                result.onchange = () => {
+                    setGpsPermissionStatus(result.state as 'granted' | 'denied' | 'prompt');
+                    if (result.state === 'denied') {
+                        setShowGpsPermissionAlert(true);
+                    } else if (result.state === 'granted') {
+                        setShowGpsPermissionAlert(false);
+                    }
+                };
+            }).catch(() => {
+                // Permissions API not supported, will check on first geolocation call
+                setGpsPermissionStatus('prompt');
+            });
+        } else {
+            // Permissions API not available, will check on first geolocation call
+            setGpsPermissionStatus('prompt');
+        }
+    }, []);
+
+    // GPS Location Tracking: Update driver location every 15 seconds
+    useEffect(() => {
+        const savedUser = localStorage.getItem('furama_user');
+        if (!savedUser) return;
+        
+        try {
+            const user = JSON.parse(savedUser);
+            if (!user.id || user.role !== 'DRIVER') return;
+
+            // Check if geolocation is available
+            if (!navigator.geolocation) {
+                console.warn('[GPS] Geolocation is not supported by this browser');
+                setGpsPermissionStatus('denied');
+                setShowGpsPermissionAlert(true);
+                return;
+            }
+
+            let watchId: number | null = null;
+            let lastSentLat: number | null = null;
+            let lastSentLng: number | null = null;
+
+            // Function to update location
+            const updateLocation = (position: GeolocationPosition) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                
+                // Permission granted
+                setGpsPermissionStatus('granted');
+                setShowGpsPermissionAlert(false);
+                
+                // Only update if location changed significantly (more than 10 meters)
+                if (lastSentLat !== null && lastSentLng !== null) {
+                    const distance = Math.sqrt(
+                        Math.pow(lat - lastSentLat, 2) + Math.pow(lng - lastSentLng, 2)
+                    ) * 111000; // Convert to meters (rough approximation)
+                    
+                    if (distance < 10) {
+                        // Location hasn't changed significantly, skip update
+                        return;
+                    }
+                }
+
+                // Update location on server
+                updateDriverLocation(user.id, lat, lng);
+                lastSentLat = lat;
+                lastSentLng = lng;
+
+                // Update local driver info with location name if available
+                if (locations.length > 0) {
+                    // Find nearest location
+                    let nearestLocation = locations[0];
+                    let minDistance = Infinity;
+                    
+                    locations.forEach(loc => {
+                        const dist = Math.sqrt(
+                            Math.pow(lat - loc.lat, 2) + Math.pow(lng - loc.lng, 2)
+                        );
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            nearestLocation = loc;
+                        }
+                    });
+                    
+                    if (minDistance < 0.001) { // Within ~100 meters
+                        setDriverInfo(prev => ({
+                            ...prev,
+                            location: `Near ${nearestLocation.name}`
+                        }));
+                    }
+                }
+            };
+
+            const handleError = (error: GeolocationPositionError) => {
+                console.error('[GPS] Error getting location:', error);
+                
+                if (error.code === error.PERMISSION_DENIED) {
+                    setGpsPermissionStatus('denied');
+                    setShowGpsPermissionAlert(true);
+                } else if (error.code === error.POSITION_UNAVAILABLE) {
+                    console.warn('[GPS] Position unavailable');
+                } else if (error.code === error.TIMEOUT) {
+                    console.warn('[GPS] Request timeout');
+                }
+            };
+
+            // Request location updates every 15 seconds
+            const locationOptions: PositionOptions = {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 5000
+            };
+
+            // Get initial location
+            navigator.geolocation.getCurrentPosition(updateLocation, handleError, locationOptions);
+
+            // Watch position for continuous updates
+            watchId = navigator.geolocation.watchPosition(updateLocation, handleError, locationOptions);
+
+            return () => {
+                if (watchId !== null) {
+                    navigator.geolocation.clearWatch(watchId);
+                }
+            };
+        } catch (e) {
+            console.error('Failed to setup GPS tracking:', e);
+        }
+    }, [locations]);
+
     // Load locations on mount
     useEffect(() => {
         const loadLocations = async () => {
@@ -121,6 +269,9 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         };
         loadLocations();
     }, []);
+
+    // Track previous pending rides count to detect new requests
+    const previousPendingRidesRef = useRef<Set<string>>(new Set());
 
     // Polling for new rides and chat messages
     useEffect(() => {
@@ -141,6 +292,21 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                     }
                 }
                 
+                // Check for new pending requests (SEARCHING status)
+                const pendingRides = allRides.filter(r => r.status === BuggyStatus.SEARCHING);
+                const currentPendingIds = new Set(pendingRides.map(r => r.id));
+                
+                // Detect new requests (not in previous set)
+                const newRequests = pendingRides.filter(r => !previousPendingRidesRef.current.has(r.id));
+                if (newRequests.length > 0 && soundEnabled) {
+                    // New request(s) detected - play notification sound
+                    playNotificationSound();
+                    console.log(`[DriverPortal] New ride request(s) detected: ${newRequests.length}`);
+                }
+                
+                // Update previous pending rides set
+                previousPendingRidesRef.current = currentPendingIds;
+                
                 // Check if I have an active ride (match by driverId)
                 const active = allRides.find(r => {
                     if (r.status !== BuggyStatus.ASSIGNED && r.status !== BuggyStatus.ARRIVING && r.status !== BuggyStatus.ON_TRIP) {
@@ -157,7 +323,9 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                     // Check if this is a new ride assignment (different from previous)
                     if (previousRideId !== active.id && previousRideId !== null) {
                         // New ride assigned - play sound notification
-                        playNotificationSound();
+                        if (soundEnabled) {
+                            playNotificationSound();
+                        }
                     }
                     setPreviousRideId(active.id);
                     setMyRideId(active.id);
@@ -167,7 +335,9 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                     if (lastMsg && lastMsg.role === 'user') {
                         setHasUnreadChat(true);
                         // Play sound for new message
-                        playNotificationSound();
+                        if (soundEnabled) {
+                            playNotificationSound();
+                        }
                     }
                 } else {
                     setMyRideId(null);
@@ -185,7 +355,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
         const interval = setInterval(loadRides, 2000); // Poll every 2 seconds
         return () => clearInterval(interval);
-    }, []);
+    }, [soundEnabled]);
 
     const acceptRide = async (id: string) => {
         if (loadingAction) return; // Prevent double-click
@@ -494,6 +664,30 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
     return (
         <div className="min-h-screen bg-white text-gray-900 flex flex-col relative">
+            {/* GPS Permission Alert */}
+            {showGpsPermissionAlert && (
+                <div className="bg-yellow-500 text-white px-4 py-3 flex items-center justify-between z-50 border-b-2 border-yellow-600">
+                    <div className="flex items-center gap-3 flex-1">
+                        <MapPin size={20} className="flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                            <div className="font-bold text-sm mb-0.5">Location Permission Required</div>
+                            <div className="text-xs text-yellow-100">
+                                {gpsPermissionStatus === 'denied' 
+                                    ? 'Please enable location access in your browser settings to track your position.'
+                                    : 'Please allow location access to enable GPS tracking for better ride management.'}
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setShowGpsPermissionAlert(false)}
+                        className="ml-2 p-1 hover:bg-yellow-600 rounded transition-colors flex-shrink-0"
+                        title="Dismiss"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
+            )}
+
             {/* Header - Enhanced Design */}
             <header className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white shadow-lg p-4 flex items-center justify-between z-50">
                 <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -512,8 +706,21 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                             </div>
                         </div>
                         <div className="flex items-center gap-1.5">
-                            <MapPin size={13} className="text-white/80 flex-shrink-0" />
-                            <p className="text-sm text-white/90 truncate font-medium">{driverInfo.location}</p>
+                            <MapPin size={13} className={`flex-shrink-0 ${
+                                gpsPermissionStatus === 'granted' 
+                                    ? 'text-white/80' 
+                                    : 'text-yellow-300'
+                            }`} />
+                            <p className="text-sm text-white/90 truncate font-medium">
+                                {gpsPermissionStatus === 'granted' 
+                                    ? driverInfo.location 
+                                    : gpsPermissionStatus === 'denied'
+                                    ? 'Location access denied'
+                                    : 'Requesting location...'}
+                            </p>
+                            {gpsPermissionStatus === 'granted' && (
+                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse flex-shrink-0" title="GPS Active"></div>
+                            )}
                         </div>
                     </div>
                 </div>

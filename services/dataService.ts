@@ -213,7 +213,10 @@ export const getUsers = async (): Promise<User[]> => {
       checkOut: user.check_out || undefined,
       language: user.language || undefined,
       notes: user.notes || undefined,
-      updatedAt: user.updated_at ? new Date(user.updated_at).getTime() : undefined
+      updatedAt: user.updated_at ? new Date(user.updated_at).getTime() : undefined,
+      currentLat: user.current_lat ? parseFloat(user.current_lat) : undefined,
+      currentLng: user.current_lng ? parseFloat(user.current_lng) : undefined,
+      locationUpdatedAt: user.location_updated_at ? new Date(user.location_updated_at).getTime() : undefined
     }));
     
     console.log('Mapped users:', mapped);
@@ -403,6 +406,45 @@ export const markDriverOffline = async (userId: string): Promise<void> => {
   } catch (error) {
     console.error('[Logout] Failed to mark driver offline:', error);
     // Silently fail - logout should still proceed even if this fails
+  }
+};
+
+// Update driver location (GPS coordinates)
+export const updateDriverLocation = async (userId: string, lat: number, lng: number): Promise<void> => {
+  try {
+    console.log('[Location] Updating driver location:', userId, { lat, lng });
+    await apiClient.put(`/users/${userId}/location`, { lat, lng });
+    console.log('[Location] Driver location updated successfully');
+  } catch (error) {
+    console.error('[Location] Failed to update driver location:', error);
+    // Silently fail - location update is not critical for app functionality
+  }
+};
+
+// Get all drivers with their current locations
+export const getDriversWithLocations = async (): Promise<User[]> => {
+  try {
+    const dbDrivers = await apiClient.get<any[]>('/users/drivers/locations');
+    return dbDrivers.map(user => ({
+      id: user.id.toString(),
+      lastName: user.last_name,
+      roomNumber: user.room_number,
+      password: user.password || undefined,
+      villaType: user.villa_type || undefined,
+      role: user.role as UserRole,
+      department: 'All' as Department,
+      language: user.language || undefined,
+      notes: user.notes || undefined,
+      updatedAt: user.updated_at ? new Date(user.updated_at).getTime() : undefined,
+      currentLat: user.current_lat ? parseFloat(user.current_lat) : undefined,
+      currentLng: user.current_lng ? parseFloat(user.current_lng) : undefined,
+      locationUpdatedAt: user.location_updated_at ? new Date(user.location_updated_at).getTime() : undefined
+    }));
+  } catch (error) {
+    console.error('Failed to fetch drivers with locations:', error);
+    // Fallback to regular getUsers and filter
+    const allUsers = await getUsers();
+    return allUsers.filter(u => u.role === UserRole.DRIVER);
   }
 };
 

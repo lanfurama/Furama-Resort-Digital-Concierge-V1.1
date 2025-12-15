@@ -45,6 +45,10 @@ export interface User {
   language?: string; // Preferred Language
   notes?: string; // Guest personal notes/preferences
   updatedAt?: number; // Timestamp of last update (for driver online status)
+  // Driver Location Tracking
+  currentLat?: number; // Current latitude (for DRIVER role)
+  currentLng?: number; // Current longitude (for DRIVER role)
+  locationUpdatedAt?: number; // Timestamp when location was last updated
 }
 
 export interface RoomType {

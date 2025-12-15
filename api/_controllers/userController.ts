@@ -93,5 +93,39 @@ export const userController = {
       res.status(500).json({ error: error.message });
     }
   },
+
+  async updateLocation(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id);
+      const { lat, lng } = req.body;
+
+      if (typeof lat !== 'number' || typeof lng !== 'number') {
+        return res.status(400).json({ error: 'lat and lng must be numbers' });
+      }
+
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return res.status(400).json({ error: 'Invalid latitude or longitude values' });
+      }
+
+      const user = await userModel.updateLocation(id, lat, lng);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found or not a driver' });
+      }
+      res.json(user);
+    } catch (error: any) {
+      console.error('Error updating driver location:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  async getDriversWithLocations(req: Request, res: Response) {
+    try {
+      const drivers = await userModel.getDriversWithLocations();
+      res.json(drivers);
+    } catch (error: any) {
+      console.error('Error fetching drivers with locations:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
 };
 
