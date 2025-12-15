@@ -79,5 +79,19 @@ export const userController = {
       res.status(500).json({ error: error.message });
     }
   },
+
+  async markOffline(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id);
+      const user = await userModel.markOffline(id);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      res.json(user);
+    } catch (error: any) {
+      console.error('Error marking driver offline:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
 };
 

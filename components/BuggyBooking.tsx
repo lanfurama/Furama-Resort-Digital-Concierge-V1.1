@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Clock, Car, Navigation, Star, LocateFixed, XCircle, Search, Utensils, Coffee, Waves, Building2 } from 'lucide-react';
+import { MapPin, Clock, Car, Navigation, Star, LocateFixed, XCircle, Search, Utensils, Coffee, Waves, Building2, CheckCircle, Sparkles, Loader2 } from 'lucide-react';
 import { BuggyStatus, User, RideRequest, Location } from '../types';
-import { getLocations, requestRide, getActiveRideForUser, cancelRide } from '../services/dataService';
+import { getLocations, requestRide, getActiveRideForUser, cancelRide, rateServiceRequest, getRides } from '../services/dataService';
 import { THEME_COLORS, RESORT_CENTER } from '../constants';
 import ServiceChat from './ServiceChat';
 import { useTranslation } from '../contexts/LanguageContext';
@@ -23,6 +23,22 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [arrivingElapsedTime, setArrivingElapsedTime] = useState<number>(0); // Time elapsed since driver accepted (for ASSIGNED/ARRIVING)
   const [searchQuery, setSearchQuery] = useState<string>(''); // Search query for locations
   const [filterType, setFilterType] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('ALL'); // Filter by location type
+  const [isBooking, setIsBooking] = useState(false); // Prevent double-click/multiple submissions
+  
+  // Completion Modal & Rating State
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [completedRide, setCompletedRide] = useState<RideRequest | null>(null);
+  const [rating, setRating] = useState<number>(0);
+  const [hoveredRating, setHoveredRating] = useState<number>(0);
+  const [feedback, setFeedback] = useState<string>('');
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+  const [previousStatus, setPreviousStatus] = useState<BuggyStatus | null>(null);
+  
+  // Notification State
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'info' | 'warning'} | null>(null);
+  
+  // Track which ride ID we've already shown completion modal for
+  const completedRideIdRef = useRef<string | null>(null);
   
   const MAX_WAIT_TIME = 10 * 60; // 10 minutes in seconds (for SEARCHING status)
   const MAX_ARRIVING_WAIT_TIME = 15 * 60; // 15 minutes in seconds (for ASSIGNED/ARRIVING status - driver arriving too long)
@@ -37,8 +53,56 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   // Load active ride on mount and polling for ride updates
   useEffect(() => {
       const checkStatus = async () => {
+          // Don't check if modal is showing
+          if (showCompletionModal || completedRide) {
+              return;
+          }
+          
           try {
               const ride = await getActiveRideForUser(user.roomNumber);
+              
+              // Detect when ride was ON_TRIP but now is undefined (completed)
+              // getActiveRideForUser doesn't return completed rides, so if we had ON_TRIP and now it's undefined, it means completed
+              if (previousStatus === BuggyStatus.ON_TRIP && !ride && activeRide) {
+                  // Check if we've already shown modal for this ride (including if user skipped it)
+                  const rideId = activeRide.id;
+                  // IMPORTANT: Check if this ride ID was already handled (skipped or submitted)
+                  if (rideId && rideId !== completedRideIdRef.current) {
+                      // Ride was completed - show modal
+                      // Use the last known activeRide data to create completed ride object
+                      const completedRideData: RideRequest = {
+                          ...activeRide,
+                          status: BuggyStatus.COMPLETED,
+                          completedAt: Date.now()
+                      };
+                      // Set ref immediately to prevent duplicate modals
+                      completedRideIdRef.current = rideId;
+                      setCompletedRide(completedRideData);
+                      setShowCompletionModal(true);
+                      setNotification({ message: '🎊 Ride completed successfully!', type: 'success' });
+                      // Clear activeRide and previousStatus immediately to prevent re-triggering
+                      setActiveRide(undefined);
+                      setPreviousStatus(null);
+                      return; // Exit early to prevent further processing
+                  } else {
+                      // This ride was already handled (skipped or shown), clear activeRide
+                      // IMPORTANT: Clear these even if rideId matches completedRideIdRef to prevent re-triggering
+                      setActiveRide(undefined);
+                      setPreviousStatus(null);
+                      return; // Exit early to prevent any further processing
+                  }
+              }
+              
+              // Detect status changes for notifications
+              if (ride && previousStatus !== null && previousStatus !== ride.status) {
+                  if (previousStatus === BuggyStatus.SEARCHING && ride.status === BuggyStatus.ASSIGNED) {
+                      setNotification({ message: '🎉 Driver accepted your ride!', type: 'success' });
+                  } else if (previousStatus === BuggyStatus.ARRIVING && ride.status === BuggyStatus.ON_TRIP) {
+                      setNotification({ message: '✅ You\'ve been picked up!', type: 'success' });
+                  }
+              }
+              
+              setPreviousStatus(ride?.status || null);
               setActiveRide(ride);
               // Restore destination from active ride if exists
               if (ride && ride.destination) {
@@ -54,7 +118,51 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       checkStatus(); // Check immediately on mount
       const interval = setInterval(checkStatus, 3000); // Poll every 3 seconds
       return () => clearInterval(interval);
-  }, [user.roomNumber]);
+  }, [user.roomNumber, previousStatus, activeRide, showCompletionModal, completedRide]);
+  
+  // Auto-hide notification after 5 seconds
+  useEffect(() => {
+      if (notification) {
+          const timer = setTimeout(() => {
+              setNotification(null);
+          }, 5000);
+          return () => clearTimeout(timer);
+      }
+  }, [notification]);
+
+  // Check for recently completed ride on mount (in case user refreshes page after completion)
+  useEffect(() => {
+      const checkCompletedRide = async () => {
+          if (showCompletionModal || completedRide) return; // Already showing modal
+          
+          try {
+              const allRides = await getRides().catch(() => []);
+              // Find most recent completed ride for this user that hasn't been rated
+              const recentCompleted = allRides
+                  .filter(r => 
+                      r.roomNumber === user.roomNumber && 
+                      r.status === BuggyStatus.COMPLETED &&
+                      (!r.rating || r.rating === 0) &&
+                      r.completedAt &&
+                      (Date.now() - r.completedAt < 10 * 60 * 1000) // Within last 10 minutes
+                  )
+                  .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0))[0];
+              
+              if (recentCompleted && recentCompleted.id !== completedRideIdRef.current) {
+                  completedRideIdRef.current = recentCompleted.id;
+                  setCompletedRide(recentCompleted);
+                  setShowCompletionModal(true);
+                  setNotification({ message: '🎊 Ride completed successfully!', type: 'success' });
+              }
+          } catch (error) {
+              console.error('Failed to check completed ride:', error);
+          }
+      };
+      
+      // Only check once on mount, after a short delay to let active ride check complete
+      const timer = setTimeout(checkCompletedRide, 2000);
+      return () => clearTimeout(timer);
+  }, []); // Only run once on mount - don't re-check when modal closes
 
   // Countdown timer for ride waiting time
   // Track time differently based on ride status:
@@ -147,7 +255,9 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   };
 
   const handleBook = async () => {
-    if (!destination) return;
+    if (!destination || isBooking) return; // Prevent multiple submissions
+    
+    setIsBooking(true); // Set booking state immediately to prevent double-click
     try {
       const newRide = await requestRide(user.lastName, user.roomNumber, pickup, destination);
       setActiveRide(newRide);
@@ -155,6 +265,11 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     } catch (error) {
       console.error('Failed to request ride:', error);
       alert('Failed to request ride. Please try again.');
+    } finally {
+      // Reset booking state after a short delay to prevent rapid re-clicks
+      setTimeout(() => {
+        setIsBooking(false);
+      }, 1000);
     }
   };
 
@@ -219,6 +334,58 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       }
   };
 
+   // Handle rating submission
+   const handleSubmitRating = async () => {
+       if (!completedRide || rating === 0) {
+           alert('Please select a rating before submitting.');
+           return;
+       }
+       
+       setIsSubmittingRating(true);
+       try {
+           const rideId = completedRide.id;
+           // Mark as handled FIRST before any async operations to prevent race conditions
+           completedRideIdRef.current = rideId;
+           
+           await rateServiceRequest(rideId, rating, feedback, 'BUGGY');
+           
+           // Clear all state to prevent re-triggering
+           setActiveRide(undefined);
+           setPreviousStatus(null);
+           setShowCompletionModal(false);
+           setCompletedRide(null);
+           setRating(0);
+           setFeedback('');
+           setNotification({ message: '⭐ Thank you for your feedback!', type: 'success' });
+       } catch (error) {
+           console.error('Failed to submit rating:', error);
+           alert('Failed to submit rating. Please try again.');
+           // Even on error, mark as handled to prevent showing modal again
+           if (completedRide) {
+               completedRideIdRef.current = completedRide.id;
+           }
+       } finally {
+           setIsSubmittingRating(false);
+       }
+   };
+  
+   // Skip rating (close modal without rating)
+   const handleSkipRating = () => {
+       if (completedRide) {
+           // Mark this ride as "skipped" FIRST so we don't show modal again
+           const rideId = completedRide.id;
+           completedRideIdRef.current = rideId;
+           
+           // Clear all state to prevent re-triggering
+           setActiveRide(undefined);
+           setPreviousStatus(null);
+       }
+       setShowCompletionModal(false);
+       setCompletedRide(null);
+       setRating(0);
+       setFeedback('');
+   };
+
   // Use activeRide destination if available, otherwise use selected destination
   const destinationToShow = activeRide?.destination || destination;
 
@@ -269,7 +436,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative z-0">
+    <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative z-0 pb-24" style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}>
       
       {/* Header with gradient and glassmorphism */}
       <div className={`p-3 text-white shadow-lg backdrop-blur-md bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 flex items-center flex-shrink-0 relative z-10 border-b border-white/20`}>
@@ -291,7 +458,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       {/* Status card section - Always visible when there's an active ride */}
       {activeRide && (
         <div 
-          className={`mx-3 mt-3 rounded-2xl shadow-xl backdrop-blur-lg bg-white/90 border flex-shrink-0 p-4 overflow-hidden transition-all duration-500 ${
+          className={`mx-3 mt-3 mb-24 rounded-2xl shadow-xl backdrop-blur-lg bg-white/90 border flex-shrink-0 p-4 overflow-hidden transition-all duration-500 ${
             activeRide.status === BuggyStatus.SEARCHING && elapsedTime >= MAX_WAIT_TIME
               ? 'border-red-400 border-2 animate-pulse ring-4 ring-red-200'
               : 'border-white/60'
@@ -304,26 +471,52 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
           <div className="flex flex-col space-y-3">
               {/* Status & ETA - Simplified Header */}
               <div className="flex items-center justify-between gap-3">
-                {/* Status Badge */}
-                <div className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 ${
+                {/* Status Badge with Enhanced Animations */}
+                <div className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all duration-500 ${
                   activeRide.status === BuggyStatus.SEARCHING 
-                    ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                    ? 'bg-blue-100 text-blue-700 border border-blue-200 animate-pulse'
                     : activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING
-                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 animate-pulse'
                     : activeRide.status === BuggyStatus.ON_TRIP
                     ? 'bg-purple-100 text-purple-700 border border-purple-200'
                     : 'bg-green-100 text-green-700 border border-green-200'
                 }`}>
-                  <div className={`w-2 h-2 rounded-full ${
-                    activeRide.status === BuggyStatus.SEARCHING ? 'bg-blue-500' :
+                  <div className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                    activeRide.status === BuggyStatus.SEARCHING ? 'bg-blue-500 animate-ping' :
                     activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING ? 'bg-emerald-500 animate-pulse' :
-                    'bg-gray-400'
+                    activeRide.status === BuggyStatus.ON_TRIP ? 'bg-purple-500' :
+                    'bg-green-500'
                   }`}></div>
-                  {activeRide.status === BuggyStatus.SEARCHING && t('finding_driver')}
-                  {activeRide.status === BuggyStatus.ASSIGNED && t('driver_assigned')}
-                  {activeRide.status === BuggyStatus.ARRIVING && t('driver_arriving')}
-                  {activeRide.status === BuggyStatus.ON_TRIP && t('en_route')}
-                  {activeRide.status === BuggyStatus.COMPLETED && t('arrived')}
+                  {activeRide.status === BuggyStatus.SEARCHING && (
+                      <span className="flex items-center gap-1">
+                          <span>{t('finding_driver')}</span>
+                          <span className="animate-spin">⏳</span>
+                      </span>
+                  )}
+                  {activeRide.status === BuggyStatus.ASSIGNED && (
+                      <span className="flex items-center gap-1">
+                          <span>{t('driver_assigned')}</span>
+                          <span className="animate-bounce">🎉</span>
+                      </span>
+                  )}
+                  {activeRide.status === BuggyStatus.ARRIVING && (
+                      <span className="flex items-center gap-1">
+                          <span>{t('driver_arriving')}</span>
+                          <span className="animate-pulse">🚗</span>
+                      </span>
+                  )}
+                  {activeRide.status === BuggyStatus.ON_TRIP && (
+                      <span className="flex items-center gap-1">
+                          <span>{t('en_route')}</span>
+                          <span className="animate-pulse">✨</span>
+                      </span>
+                  )}
+                  {activeRide.status === BuggyStatus.COMPLETED && (
+                      <span className="flex items-center gap-1">
+                          <span>{t('arrived')}</span>
+                          <span>✅</span>
+                      </span>
+                  )}
                 </div>
                 
                 {/* ETA - Large & Clear */}
@@ -568,22 +761,37 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                   </div>
               )}
               
-              {/* Notification when picked up and on trip */}
+              {/* Enhanced Notification when picked up and on trip */}
               {activeRide && activeRide.status === BuggyStatus.ON_TRIP && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 rounded-lg border border-purple-200">
-                      <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></div>
-                      <p className="text-xs font-semibold text-purple-700">
-                          ✓ You're on the way to {activeRide.destination}
-                      </p>
+                  <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border-2 border-purple-300 shadow-md animate-in slide-in-from-bottom-2">
+                      <div className="w-3 h-3 rounded-full bg-purple-500 animate-pulse"></div>
+                      <div className="flex-1">
+                          <p className="text-sm font-bold text-purple-800">
+                              🎉 You're on the way!
+                          </p>
+                          <p className="text-xs text-purple-600 mt-0.5">
+                              Heading to {activeRide.destination}
+                          </p>
+                      </div>
+                      <Car className="w-5 h-5 text-purple-600 animate-bounce" />
                   </div>
               )}
               
-              {activeRide && activeRide.status === BuggyStatus.COMPLETED && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                      <p className="text-xs font-semibold text-green-700">
-                          ✓ Arrived at {activeRide.destination}
-                      </p>
+              {/* Enhanced notification when driver assigned */}
+              {activeRide && (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && (
+                  <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border-2 border-emerald-300 shadow-md animate-in slide-in-from-bottom-2">
+                      <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+                      <div className="flex-1">
+                          <p className="text-sm font-bold text-emerald-800">
+                              {activeRide.status === BuggyStatus.ASSIGNED ? '🚗 Driver is on the way!' : '📍 Driver is arriving!'}
+                          </p>
+                          {activeRide.eta && (
+                              <p className="text-xs text-emerald-600 mt-0.5">
+                                  Estimated arrival: {activeRide.eta} minutes
+                              </p>
+                          )}
+                      </div>
+                      <Navigation className="w-5 h-5 text-emerald-600 animate-pulse" />
                   </div>
               )}
             </div>
@@ -593,10 +801,11 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       {/* Booking Form - Modern glassmorphism design */}
       {!activeRide && !isLoadingRide && (
         <div 
-          className="mx-3 mt-3 mb-20 rounded-3xl shadow-2xl backdrop-blur-lg bg-white/95 border border-white/60 flex-shrink-0 flex flex-col overflow-hidden"
+          className="mx-3 mt-3 mb-24 rounded-3xl shadow-2xl backdrop-blur-lg bg-white/95 border border-white/60 flex-shrink-0 flex flex-col overflow-hidden"
           style={{
             boxShadow: '0 25px 70px -20px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.5)',
-            maxHeight: 'calc(100vh - 200px)'
+            maxHeight: 'calc(100vh - 200px)',
+            paddingBottom: 'max(1rem, calc(1rem + env(safe-area-inset-bottom)))'
           }}
         >
             {/* Fixed Header Section */}
@@ -773,14 +982,14 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                 {/* Book Button with modern gradient and hover effects */}
                 <button 
                     onClick={handleBook}
-                    disabled={!destination}
+                    disabled={!destination || isBooking}
                     className={`group relative w-full py-4 rounded-2xl font-bold text-base shadow-2xl transition-all duration-300 flex items-center justify-center gap-2.5 overflow-hidden ${
-                        destination 
+                        destination && !isBooking
                             ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white hover:shadow-emerald-400/50 cursor-pointer' 
                             : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     }`}
                 >
-                    {destination && (
+                    {destination && !isBooking && (
                         <>
                             {/* Animated gradient overlay */}
                             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
@@ -788,8 +997,17 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                             <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors duration-300"></div>
                         </>
                     )}
-                    <Car className="w-5 h-5 relative z-10" />
-                    <span className="relative z-10">{t('request_buggy')}</span>
+                    {isBooking ? (
+                        <>
+                            <Loader2 className="w-5 h-5 relative z-10 animate-spin" />
+                            <span className="relative z-10">Requesting...</span>
+                        </>
+                    ) : (
+                        <>
+                            <Car className="w-5 h-5 relative z-10" />
+                            <span className="relative z-10">{t('request_buggy')}</span>
+                        </>
+                    )}
                 </button>
             </div>
         </div>
@@ -801,6 +1019,117 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         roomNumber={user.roomNumber} 
         label={t('driver')}
       />
+
+      {/* Notification Toast */}
+      {notification && (
+          <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-5 ${
+              notification.type === 'success' ? 'bg-emerald-500' :
+              notification.type === 'info' ? 'bg-blue-500' :
+              'bg-amber-500'
+          } text-white px-6 py-3 rounded-lg shadow-2xl flex items-center gap-2 max-w-sm`}>
+              <CheckCircle size={20} />
+              <span className="font-semibold">{notification.message}</span>
+          </div>
+      )}
+
+      {/* Completion Success Modal with Rating Form */}
+      {showCompletionModal && completedRide && (
+          <div 
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in"
+              onClick={handleSkipRating}
+          >
+              <div 
+                  className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 animate-in slide-in-from-bottom-5 relative"
+                  onClick={(e) => e.stopPropagation()}
+              >
+                  {/* Success Animation Header */}
+                  <div className="text-center mb-6">
+                      <div className="relative inline-block mb-4">
+                          <div className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-full flex items-center justify-center mx-auto animate-bounce">
+                              <CheckCircle size={40} className="text-white" />
+                          </div>
+                          <Sparkles className="absolute -top-2 -right-2 text-yellow-400 animate-pulse" size={24} />
+                      </div>
+                      <h2 className="text-2xl font-bold text-gray-800 mb-2">Ride Completed!</h2>
+                      <p className="text-gray-600 text-sm">
+                          You've arrived at <span className="font-semibold text-emerald-600">{completedRide.destination}</span>
+                      </p>
+                  </div>
+
+                  {/* Rating Section */}
+                  <div className="mb-6">
+                      <label className="block text-sm font-semibold text-gray-700 mb-3 text-center">
+                          How was your ride experience?
+                      </label>
+                      <div className="flex justify-center gap-2 mb-4">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                              <button
+                                  key={star}
+                                  type="button"
+                                  onClick={() => setRating(star)}
+                                  onMouseEnter={() => setHoveredRating(star)}
+                                  onMouseLeave={() => setHoveredRating(0)}
+                                  className="transition-transform hover:scale-125 active:scale-95"
+                              >
+                                  <Star
+                                      size={40}
+                                      className={`${
+                                          star <= (hoveredRating || rating)
+                                              ? 'fill-yellow-400 text-yellow-400'
+                                              : 'text-gray-300'
+                                      } transition-all duration-200`}
+                                  />
+                              </button>
+                          ))}
+                      </div>
+                      {rating > 0 && (
+                          <p className="text-center text-sm text-gray-600">
+                              {rating === 1 && 'Poor'}
+                              {rating === 2 && 'Fair'}
+                              {rating === 3 && 'Good'}
+                              {rating === 4 && 'Very Good'}
+                              {rating === 5 && 'Excellent'}
+                          </p>
+                      )}
+                  </div>
+
+                  {/* Feedback Section */}
+                  <div className="mb-6">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Additional Feedback (Optional)
+                      </label>
+                      <textarea
+                          value={feedback}
+                          onChange={(e) => setFeedback(e.target.value)}
+                          placeholder="Tell us about your experience..."
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 resize-none"
+                          rows={3}
+                      />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3">
+                      <button
+                          onClick={handleSkipRating}
+                          className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+                      >
+                          Skip
+                      </button>
+                      <button
+                          onClick={handleSubmitRating}
+                          disabled={rating === 0 || isSubmittingRating}
+                          className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all ${
+                              rating === 0 || isSubmittingRating
+                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                  : 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:shadow-lg hover:scale-105 active:scale-95'
+                          }`}
+                      >
+                          {isSubmittingRating ? 'Submitting...' : 'Submit Rating'}
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

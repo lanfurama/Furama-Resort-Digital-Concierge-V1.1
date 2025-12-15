@@ -44,6 +44,7 @@ export interface User {
   checkOut?: string; // ISO Date String
   language?: string; // Preferred Language
   notes?: string; // Guest personal notes/preferences
+  updatedAt?: number; // Timestamp of last update (for driver online status)
 }
 
 export interface RoomType {

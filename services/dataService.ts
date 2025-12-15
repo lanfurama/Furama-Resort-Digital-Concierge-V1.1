@@ -212,7 +212,8 @@ export const getUsers = async (): Promise<User[]> => {
       checkIn: user.check_in || undefined,
       checkOut: user.check_out || undefined,
       language: user.language || undefined,
-      notes: user.notes || undefined
+      notes: user.notes || undefined,
+      updatedAt: user.updated_at ? new Date(user.updated_at).getTime() : undefined
     }));
     
     console.log('Mapped users:', mapped);
@@ -377,6 +378,31 @@ export const updateUserNotes = async (roomNumber: string, notes: string): Promis
     }
     
     throw error; // Re-throw để component có thể handle error
+  }
+};
+
+// Update driver heartbeat (last seen timestamp)
+export const updateDriverHeartbeat = async (userId: string): Promise<void> => {
+  try {
+    console.log('[Heartbeat] Sending heartbeat for driver:', userId);
+    const result = await apiClient.put(`/users/${userId}`, {});
+    console.log('[Heartbeat] Heartbeat successful, updated_at:', result.updated_at);
+    // Empty body will just update updated_at timestamp
+  } catch (error) {
+    console.error('[Heartbeat] Failed to update driver heartbeat:', error);
+    // Silently fail - heartbeat is not critical
+  }
+};
+
+// Mark driver as offline when they logout
+export const markDriverOffline = async (userId: string): Promise<void> => {
+  try {
+    console.log('[Logout] Marking driver offline:', userId);
+    await apiClient.post(`/users/${userId}/offline`, {});
+    console.log('[Logout] Driver marked offline successfully');
+  } catch (error) {
+    console.error('[Logout] Failed to mark driver offline:', error);
+    // Silently fail - logout should still proceed even if this fails
   }
 };
 
