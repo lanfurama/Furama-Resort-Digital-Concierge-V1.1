@@ -8,3 +8,5 @@ ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'RECEPTION';
 -- Verify the change
 SELECT unnest(enum_range(NULL::public.user_role)) AS role;
 
+
+
