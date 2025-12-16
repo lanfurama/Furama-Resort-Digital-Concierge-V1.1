@@ -38,9 +38,31 @@ async function apiRequest<T>(
     throw error;
   }
 
-  const data = await response.json();
-  console.log('API Response Data:', data);
-  return data;
+  // Handle empty response (common for DELETE requests with 204 No Content)
+  const contentType = response.headers.get('content-type');
+  const contentLength = response.headers.get('content-length');
+  
+  // If response is empty or no content-type, return null/undefined
+  if (response.status === 204 || contentLength === '0' || !contentType?.includes('application/json')) {
+    console.log('API Response: Empty body (204 No Content or no JSON)');
+    return null as T;
+  }
+
+  // Try to parse JSON, but handle empty body gracefully
+  const text = await response.text();
+  if (!text || text.trim() === '') {
+    console.log('API Response: Empty text body');
+    return null as T;
+  }
+
+  try {
+    const data = JSON.parse(text);
+    console.log('API Response Data:', data);
+    return data;
+  } catch (parseError) {
+    console.warn('API Response: Failed to parse JSON, returning null', parseError);
+    return null as T;
+  }
 }
 
 export const apiClient = {

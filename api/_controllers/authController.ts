@@ -38,6 +38,28 @@ export const authController = {
         });
       }
 
+      // Validate check-in/check-out dates if they exist
+      // If check_in/check_out are NULL, allow login (backward compatible)
+      if (user.check_in && user.check_out) {
+        const now = new Date();
+        const checkIn = new Date(user.check_in);
+        const checkOut = new Date(user.check_out);
+
+        if (now < checkIn) {
+          return res.status(403).json({ 
+            success: false,
+            message: `Check-in time starts at ${checkIn.toLocaleString()}.` 
+          });
+        }
+        
+        if (now > checkOut) {
+          return res.status(403).json({ 
+            success: false,
+            message: 'Your stay has expired. Please contact reception.' 
+          });
+        }
+      }
+
       // Map database user to frontend User format
       const frontendUser = {
         id: user.id.toString(),
@@ -46,6 +68,8 @@ export const authController = {
         villaType: user.villa_type,
         role: user.role as any,
         language: user.language || 'English', // Include language from database
+        checkIn: user.check_in ? new Date(user.check_in).toISOString() : undefined,
+        checkOut: user.check_out ? new Date(user.check_out).toISOString() : undefined,
       };
 
       res.json({ 

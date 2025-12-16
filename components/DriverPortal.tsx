@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getRides, updateRideStatus, getLastMessage, createManualRide, getLocations, updateDriverHeartbeat, markDriverOffline, updateDriverLocation } from '../services/dataService';
 import { RideRequest, BuggyStatus } from '../types';
-import { Car, MapPin, Navigation, CheckCircle, Clock, MessageSquare, History, List, Plus, X, Loader2, User, Star, Volume2, VolumeX, Grid, LayoutGrid, Zap } from 'lucide-react';
+import { Car, MapPin, Navigation, CheckCircle, Clock, MessageSquare, History, List, Plus, X, Loader2, User, Star, Volume2, VolumeX, Zap } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ServiceChat from './ServiceChat';
 
@@ -728,28 +728,6 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 {/* Right Icons - Enhanced */}
                 <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
                     <button 
-                        onClick={() => setDisplayMode('list')}
-                        className={`p-2 rounded-xl transition-all ${
-                            displayMode === 'list' 
-                                ? 'bg-white/20 backdrop-blur-sm text-white border border-white/30' 
-                                : 'hover:bg-white/10 text-white/80'
-                        }`}
-                        title="List View"
-                    >
-                        <List size={18} />
-                    </button>
-                    <button 
-                        onClick={() => setDisplayMode('grid')}
-                        className={`p-2 rounded-xl transition-all ${
-                            displayMode === 'grid' 
-                                ? 'bg-white/20 backdrop-blur-sm text-white border border-white/30' 
-                                : 'hover:bg-white/10 text-white/80'
-                        }`}
-                        title="Grid View"
-                    >
-                        <LayoutGrid size={18} />
-                    </button>
-                    <button 
                         onClick={() => {
                             const newState = !soundEnabled;
                             setSoundEnabled(newState);
@@ -895,10 +873,20 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                                                         setShowChat(true);
                                                         setHasUnreadChat(false);
                                                     }}
-                                                    className="p-1.5 rounded-lg bg-gray-100 hover:bg-emerald-100 text-emerald-600 transition-all"
+                                                    className={`relative flex items-center gap-2 px-3 py-2 rounded-lg transition-all ${
+                                                        hasUnreadChat 
+                                                            ? 'bg-red-50 hover:bg-red-100 text-red-700 border-2 border-red-300' 
+                                                            : 'bg-gray-100 hover:bg-emerald-100 text-emerald-600 border-2 border-transparent'
+                                                    }`}
                                                     title="Chat with guest"
                                                 >
-                                                    <MessageSquare size={16} />
+                                                    <MessageSquare size={18} strokeWidth={2.5} />
+                                                    <span className="text-sm font-semibold">
+                                                        {hasUnreadChat ? 'New Message' : 'Chat'}
+                                                    </span>
+                                                    {hasUnreadChat && (
+                                                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white shadow-md animate-pulse"></span>
+                                                    )}
                                                 </button>
                                             </div>
                                             
@@ -1250,7 +1238,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 <ServiceChat 
                     serviceType="BUGGY"
                     roomNumber={myCurrentRide.roomNumber}
-                    label={`Guest Room ${myCurrentRide.roomNumber}`}
+                    label={`${myCurrentRide.guestName} (Room ${myCurrentRide.roomNumber})`}
                     autoOpen={true}
                     userRole="staff"
                     onClose={() => setShowChat(false)}

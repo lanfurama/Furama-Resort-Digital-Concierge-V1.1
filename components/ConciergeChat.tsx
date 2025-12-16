@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Mic, MapPin, Volume2, X, Navigation, ExternalLink, MessageSquare } from 'lucide-react';
+import { Send, Mic, MapPin, Volume2, X, Navigation, ExternalLink, MessageSquare, Phone, Mail, MessageCircle } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { createChatSession, speakText, connectLiveSession, encode } from '../services/geminiService';
 import { GenerateContentResponse, LiveServerMessage } from '@google/genai';
@@ -118,61 +118,8 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
   const nextStartTimeRef = useRef<number>(0);
 
   useEffect(() => {
-    // Load messages from database
-    const loadMessages = async () => {
-      const dbMessages = await loadMessagesFromDB();
-      if (dbMessages.length > 0) {
-        // If we have saved messages, use them
-        setMessages(dbMessages);
-      } else {
-        // Otherwise, show welcome message
-        const welcomeMsg: ChatMessage = {
-          id: 'welcome',
-          role: 'model',
-          text: t('concierge_welcome')
-        };
-        setMessages([welcomeMsg]);
-        // Save welcome message to database
-        await saveMessageToDB('model', welcomeMsg.text);
-      }
-    };
-
-    loadMessages();
-
-    // Initialize text chat session with retry
-    const initializeSession = async (retries = 3) => {
-      for (let i = 0; i < retries; i++) {
-        try {
-          const session = await createChatSession();
-          chatSessionRef.current = session;
-          console.log('Chat session initialized successfully');
-          return;
-        } catch (error) {
-          console.error(`Failed to create chat session (attempt ${i + 1}/${retries}):`, error);
-          if (i < retries - 1) {
-            // Wait before retry (exponential backoff)
-            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-          } else {
-            // Last attempt failed - show error message
-            const errorMsg: ChatMessage = {
-              id: 'init-error',
-              role: 'model',
-              text: t('connection_error')
-            };
-            setMessages(prev => {
-              // Only add error if not already present
-              if (!prev.find(m => m.id === 'init-error')) {
-                return [...prev, errorMsg];
-              }
-              return prev;
-            });
-          }
-        }
-      }
-    };
-    
-    initializeSession();
-
+    // Beta feature - no need to load messages or initialize session
+    // All functionality is disabled and replaced with beta message
     return () => {
        // Cleanup Live API if active
        if (liveSessionPromise.current) {
@@ -189,6 +136,8 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
   }, [messages]);
 
   const handleSend = async () => {
+    // Beta feature - functionality disabled
+    return;
     if (!input.trim() || isLoading) return;
     
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: input };
@@ -363,13 +312,12 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
   };
 
   const toggleLiveMode = async () => {
-    if (mode === 'TEXT') {
-        setMode('VOICE');
-        startLiveSession();
-    } else {
+    // Beta feature - only allow switching back to TEXT mode
+    if (mode === 'VOICE') {
         setMode('TEXT');
         stopLiveSession();
     }
+    // Voice mode is disabled in beta
   };
 
   const startLiveSession = async () => {
@@ -465,105 +413,101 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative">
       {/* Header - Modern Design */}
-      <div className="p-3 text-white shadow-lg backdrop-blur-md bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 flex justify-between items-center z-10 border-b border-white/20"
+      <div className="px-3 py-2 text-white shadow-lg backdrop-blur-md bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 flex justify-between items-center z-10 border-b border-white/20"
         style={{
           boxShadow: '0 4px 20px -5px rgba(0,0,0,0.2)'
         }}
       >
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
-            <MessageSquare className="w-4 h-4" />
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+            <MessageSquare className="w-3.5 h-3.5" />
           </div>
           <div>
-            <h2 className="text-lg font-bold tracking-tight">{t('concierge_ai')}</h2>
-            <p className="text-[10px] text-white/80">AI Assistant</p>
+            <h2 className="text-base font-bold tracking-tight leading-tight">{t('concierge_ai')}</h2>
+            <p className="text-[9px] text-white/80 leading-tight">AI Assistant</p>
           </div>
         </div>
         <button 
           onClick={onClose}
-          className="p-1.5 rounded-lg text-white/90 hover:text-white hover:bg-white/10 transition-all"
+          className="p-1 rounded-lg text-white/90 hover:text-white hover:bg-white/10 transition-all"
         >
-          <X size={20} />
+          <X size={18} />
         </button>
       </div>
 
       {mode === 'TEXT' ? (
         <>
-           {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-transparent scrollbar-hide">
-            {messages.map((msg) => (
-              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-xl p-3 shadow-md backdrop-blur-sm ${
-                  msg.role === 'user' 
-                    ? 'bg-gradient-to-br from-emerald-600 to-teal-600 text-white' 
-                    : 'bg-white/95 text-gray-800 border border-gray-200/60'
-                }`}
-                style={{
-                  boxShadow: msg.role === 'user' 
-                    ? '0 4px 20px -5px rgba(16, 185, 129, 0.3)' 
-                    : '0 2px 10px -5px rgba(0,0,0,0.1)'
-                }}
-                >
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.text}</p>
-                  
-                  {/* Grounding Sources (Maps/Search) */}
-                  {msg.groundingUrls && (
-                      <div className="mt-3 pt-3 border-t border-gray-200/60">
-                          {msg.groundingUrls.some(u => u.type !== 'MAP') && (
-                              <div className="mb-3">
-                                  <p className="text-[10px] uppercase font-bold text-gray-500 mb-2 flex items-center gap-1.5">
-                                      <ExternalLink className="w-3 h-3"/> {t('sources')}
-                                  </p>
-                                  <ul className="space-y-1.5">
-                                      {msg.groundingUrls.filter(u => u.type !== 'MAP').map((url, i) => (
-                                          <li key={i}>
-                                              <a href={url.uri} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:text-blue-700 hover:underline flex items-start font-medium bg-blue-50 px-2 py-1.5 rounded border border-blue-100">
-                                                  <span className="truncate">{url.title}</span>
-                                              </a>
-                                          </li>
-                                      ))}
-                                  </ul>
-                              </div>
-                          )}
-                          
-                          {/* Map Cards */}
-                          <div className="space-y-2">
-                              {msg.groundingUrls.filter(u => u.type === 'MAP').map((url, i) => (
-                                  <MapCard key={i} url={url.uri} title={url.title} />
-                              ))}
-                          </div>
-                      </div>
-                  )}
+           {/* Beta Feature Message Area */}
+          <div className="flex-1 overflow-y-auto p-6 bg-transparent scrollbar-hide flex items-center justify-center">
+            <div className="w-full max-w-md">
+              {/* Beta Badge */}
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-100 to-orange-100 rounded-full border-2 border-amber-300 mb-4">
+                  <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">Beta</span>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-800 mb-3">{t('beta_feature_title')}</h3>
+                <p className="text-gray-600 text-sm leading-relaxed mb-6">{t('beta_feature_message')}</p>
+              </div>
 
-                  {/* TTS Button for Model */}
-                  {msg.role === 'model' && (
-                      <button 
-                        type="button"
-                        onClick={() => handleTTS(msg.text)} 
-                        className="mt-2 p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center border border-emerald-200"
-                        disabled={isPlayingAudio}
-                        title={t('play_audio') || 'Play audio'}
-                      >
-                         <Volume2 size={16} strokeWidth={2.5} />
-                      </button>
-                  )}
+              {/* Contact Information Cards */}
+              <div className="space-y-3">
+                <div className="bg-white/95 backdrop-blur-sm rounded-xl p-4 border-2 border-gray-200/60 shadow-md">
+                  <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-emerald-600" />
+                    {t('beta_contact_info')}
+                  </h4>
+                  <div className="space-y-2.5">
+                    {/* Phone */}
+                    <a 
+                      href="tel:+842363847333" 
+                      className="flex items-center gap-3 p-3 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg hover:from-emerald-100 hover:to-teal-100 transition-all border border-emerald-200/50 group"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-emerald-600 flex items-center justify-center group-hover:bg-emerald-700 transition-all">
+                        <Phone size={18} className="text-white" strokeWidth={2.5} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-gray-500 uppercase">{t('beta_contact_phone')}</p>
+                        <p className="text-sm font-bold text-gray-800">84-236-3847 333/888</p>
+                      </div>
+                    </a>
+
+                    {/* Email */}
+                    <a 
+                      href="mailto:reservation@furamavietnam.com" 
+                      className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg hover:from-blue-100 hover:to-cyan-100 transition-all border border-blue-200/50 group"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center group-hover:bg-blue-700 transition-all">
+                        <Mail size={18} className="text-white" strokeWidth={2.5} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-gray-500 uppercase">{t('beta_contact_email')}</p>
+                        <p className="text-sm font-bold text-gray-800">reservation@furamavietnam.com</p>
+                      </div>
+                    </a>
+
+                    {/* WhatsApp */}
+                    <a 
+                      href="https://api.whatsapp.com/message/IJNAGKZC35SXC1?autoload=1&app_absent=0" 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="flex items-center gap-3 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg hover:from-green-100 hover:to-emerald-100 transition-all border border-green-200/50 group"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-green-600 flex items-center justify-center group-hover:bg-green-700 transition-all">
+                        <MessageCircle size={18} className="text-white" strokeWidth={2.5} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-gray-500 uppercase">{t('beta_contact_whatsapp')}</p>
+                        <p className="text-sm font-bold text-gray-800">WhatsApp</p>
+                      </div>
+                    </a>
+                  </div>
                 </div>
               </div>
-            ))}
-            {isLoading && (
-               <div className="flex justify-start">
-                   <div className="bg-white/95 backdrop-blur-sm p-3 rounded-xl shadow-md border border-gray-200/60 flex space-x-1.5">
-                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
-                   </div>
-               </div>
-            )}
-            <div ref={messagesEndRef} />
+            </div>
           </div>
 
-          {/* Input Area - Modern Design */}
-          <div className="p-3 backdrop-blur-xl bg-white/95 border-t-2 border-gray-200/60 flex items-center space-x-2 safe-area-bottom"
+          {/* Disabled Input Area */}
+          <div className="p-3 backdrop-blur-xl bg-gray-100/80 border-t-2 border-gray-300/60 flex items-center space-x-2 safe-area-bottom opacity-60"
             style={{
               boxShadow: '0 -10px 40px -10px rgba(0,0,0,0.1)',
               paddingBottom: 'max(0.75rem, calc(0.75rem + env(safe-area-inset-bottom)))'
@@ -571,49 +515,47 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
           >
              <button 
                type="button"
-               onClick={toggleLiveMode}
-               className="p-2.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all cursor-pointer border border-emerald-200"
+               disabled
+               className="p-2.5 rounded-xl bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300"
              >
                 <Mic size={18} strokeWidth={2.5} />
              </button>
              <input 
                 type="text" 
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                value=""
+                disabled
                 placeholder={t('ask_placeholder')}
-                className="flex-1 bg-gray-50 rounded-xl px-4 py-2.5 text-gray-900 text-sm border-2 border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all placeholder:text-gray-400"
+                className="flex-1 bg-gray-200 rounded-xl px-4 py-2.5 text-gray-500 text-sm border-2 border-gray-300 cursor-not-allowed"
              />
              <button 
                 type="button"
-                onClick={handleSend}
-                disabled={!input.trim() || isLoading}
-                className="p-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer shadow-lg disabled:shadow-none"
+                disabled
+                className="p-2.5 rounded-xl bg-gray-300 text-gray-400 cursor-not-allowed"
              >
                 <Send size={18} strokeWidth={2.5} />
              </button>
           </div>
         </>
       ) : (
-        /* Voice Mode UI - Modern Design */
+        /* Voice Mode UI - Beta Message */
         <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-emerald-600 via-teal-600 to-emerald-700 text-white p-6 relative overflow-hidden">
             {/* Animated background pattern */}
             <div className="absolute inset-0 opacity-10">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1)_1px,transparent_1px)] [background-size:32px_32px]"></div>
             </div>
             
-            <div className="relative z-10 flex flex-col items-center">
-                <div className={`w-28 h-28 rounded-2xl flex items-center justify-center mb-6 transition-all duration-500 shadow-2xl ${
-                    isLiveConnected 
-                        ? 'bg-white text-emerald-600 shadow-emerald-300/50 animate-pulse' 
-                        : 'bg-white/20 backdrop-blur-sm border-2 border-white/30'
-                }`}>
-                    <Mic size={40} className={isLiveConnected ? 'text-emerald-600' : 'text-white'} strokeWidth={2.5} />
+            <div className="relative z-10 flex flex-col items-center max-w-md px-4">
+                <div className="w-28 h-28 rounded-2xl flex items-center justify-center mb-6 bg-white/20 backdrop-blur-sm border-2 border-white/30">
+                    <Mic size={40} className="text-white" strokeWidth={2.5} />
                 </div>
                 
-                <h3 className="text-2xl font-bold mb-2">{t('live_concierge')}</h3>
-                <p className="text-white/90 mb-8 text-center max-w-xs text-sm">
-                    {isLiveConnected ? t('listening') : t('connecting_voice')}
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full border-2 border-white/30 mb-4">
+                  <span className="text-xs font-bold text-white uppercase tracking-wide">Beta</span>
+                </div>
+                
+                <h3 className="text-2xl font-bold mb-2 text-center">{t('beta_feature_title')}</h3>
+                <p className="text-white/90 mb-8 text-center text-sm leading-relaxed">
+                    {t('beta_feature_message')}
                 </p>
 
                 <button 

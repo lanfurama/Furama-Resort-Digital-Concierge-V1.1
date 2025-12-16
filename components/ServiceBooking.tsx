@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getMenu, addServiceRequest } from '../services/dataService';
 import { User, MenuItem } from '../types';
-import { ArrowLeft, ShoppingBag, Plus, Sparkles, Utensils, Waves, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, Plus, Sparkles, Utensils, Waves, User as UserIcon, Search, ArrowUpDown, Filter } from 'lucide-react';
 import ServiceChat from './ServiceChat';
 import Loading from './Loading';
 import { useTranslation } from '../contexts/LanguageContext';
@@ -19,6 +19,50 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
     const [isOrderPlaced, setIsOrderPlaced] = useState(false);
     const [items, setItems] = useState<MenuItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState<string>('');
+    const [priceFilter, setPriceFilter] = useState<'ALL' | 'UNDER_100K' | '100K_300K' | '300K_500K' | 'OVER_500K'>('ALL');
+    const [dietaryFilter, setDietaryFilter] = useState<'ALL' | 'VEGETARIAN' | 'VEGAN'>('ALL');
+    const [sortBy, setSortBy] = useState<'NAME' | 'PRICE_LOW' | 'PRICE_HIGH'>('NAME');
+    
+    // Helper function to detect dietary restrictions from name/description
+    const isVegetarian = (item: MenuItem): boolean => {
+        const tr = item.translations?.[language];
+        const name = (tr?.name || item.name).toLowerCase();
+        const desc = (tr?.description || item.description || '').toLowerCase();
+        const text = `${name} ${desc}`;
+        
+        const vegetarianKeywords = ['vegetarian', 'chay', 'rau', 'vegetable', 'salad', 'fruit', 'tofu', 'đậu'];
+        const meatKeywords = ['beef', 'pork', 'chicken', 'meat', 'bò', 'heo', 'gà', 'thịt', 'burger', 'steak', 'fish', 'cá', 'seafood', 'hải sản'];
+        
+        // Check for meat keywords first
+        if (meatKeywords.some(keyword => text.includes(keyword))) {
+            return false;
+        }
+        
+        // Check for vegetarian keywords
+        return vegetarianKeywords.some(keyword => text.includes(keyword));
+    };
+    
+    const isVegan = (item: MenuItem): boolean => {
+        const tr = item.translations?.[language];
+        const name = (tr?.name || item.name).toLowerCase();
+        const desc = (tr?.description || item.description || '').toLowerCase();
+        const text = `${name} ${desc}`;
+        
+        const veganKeywords = ['vegan', 'thuần chay', 'plant-based', 'không sữa', 'no dairy', 'no egg', 'không trứng'];
+        const nonVeganKeywords = ['milk', 'cheese', 'butter', 'egg', 'sữa', 'phô mai', 'bơ', 'trứng', 'cream', 'kem'];
+        
+        // Must be vegetarian first
+        if (!isVegetarian(item)) return false;
+        
+        // Check for non-vegan keywords
+        if (nonVeganKeywords.some(keyword => text.includes(keyword))) {
+            return false;
+        }
+        
+        // Check for vegan keywords
+        return veganKeywords.some(keyword => text.includes(keyword));
+    };
     
     // Filter menu by type
     let categoryFilter: 'Dining' | 'Spa' | 'Pool' | 'Butler' = 'Dining';
@@ -68,6 +112,46 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
     };
 
     const totalPrice = cart.reduce((sum, item) => sum + item.price, 0);
+
+    // Filter and sort items
+    const filteredAndSortedItems = useMemo(() => {
+        let filtered = items.filter(item => {
+            const tr = item.translations?.[language];
+            const name = tr?.name || item.name;
+            const desc = tr?.description || item.description || '';
+            
+            // Search filter
+            const matchesSearch = !searchQuery || 
+                name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                desc.toLowerCase().includes(searchQuery.toLowerCase());
+            
+            // Price filter
+            const matchesPrice = priceFilter === 'ALL' ||
+                (priceFilter === 'UNDER_100K' && item.price < 100000) ||
+                (priceFilter === '100K_300K' && item.price >= 100000 && item.price < 300000) ||
+                (priceFilter === '300K_500K' && item.price >= 300000 && item.price < 500000) ||
+                (priceFilter === 'OVER_500K' && item.price >= 500000);
+            
+            // Dietary filter - Only apply for DINING
+            const matchesDietary = type !== 'DINING' || dietaryFilter === 'ALL' ||
+                (dietaryFilter === 'VEGETARIAN' && isVegetarian(item)) ||
+                (dietaryFilter === 'VEGAN' && isVegan(item));
+            
+            return matchesSearch && matchesPrice && matchesDietary;
+        });
+        
+        // Sort
+        filtered.sort((a, b) => {
+            if (sortBy === 'PRICE_LOW') return a.price - b.price;
+            if (sortBy === 'PRICE_HIGH') return b.price - a.price;
+            // NAME sort
+            const aName = a.translations?.[language]?.name || a.name;
+            const bName = b.translations?.[language]?.name || b.name;
+            return aName.localeCompare(bName);
+        });
+        
+        return filtered;
+    }, [items, searchQuery, priceFilter, dietaryFilter, sortBy, language, type]);
 
     // Configuration based on Type
     const getConfig = () => {
@@ -148,19 +232,19 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
     const chatLabel = type === 'DINING' ? t('kitchen') : t('staff');
 
     return (
-        <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative">
+        <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative overflow-x-hidden">
              {/* Header with gradient and glassmorphism */}
-            <div className={`p-4 text-white shadow-lg backdrop-blur-md bg-gradient-to-r ${config.gradient} flex items-center justify-between z-10 border-b border-white/20`}>
+            <div className={`p-2 text-white shadow-lg backdrop-blur-md bg-gradient-to-r ${config.gradient} flex items-center justify-between z-10 border-b border-white/20 overflow-x-hidden`}>
                 <div className="flex items-center flex-1 min-w-0">
                     <button 
                         onClick={onBack} 
-                        className="mr-3 text-white/90 hover:text-white hover:bg-white/10 rounded-full p-2 transition-all duration-300"
+                        className="mr-3 text-white/90 hover:text-white hover:bg-white/10 rounded-full p-2 transition-all duration-300 flex-shrink-0"
                     >
                         <ArrowLeft className="w-5 h-5" />
                     </button>
-                    <div className="flex-1 min-w-0">
-                        <h2 className="text-xl font-bold tracking-tight">{config.title}</h2>
-                        <p className="text-xs text-white/80 mt-0.5">{config.subtitle}</p>
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                        <h2 className="text-xl font-bold tracking-tight truncate">{config.title}</h2>
+                        <p className="text-xs text-white/80 mt-0.5 truncate">{config.subtitle}</p>
                     </div>
                 </div>
                 <div className="relative ml-3 flex-shrink-0">
@@ -176,12 +260,77 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto px-3 py-4 pb-32">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 pb-32">
                 {isLoading ? (
                     <Loading message={t('loading') || 'Loading menu...'} />
                 ) : (
-                    <div className="grid gap-3">
-                        {items.map(item => {
+                    <>
+                        {/* Filters Section */}
+                        <div className="mb-4 space-y-2.5">
+                            {/* Search Bar */}
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                <input
+                                    type="text"
+                                    placeholder={t('search_locations') || 'Search items...'}
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-10 pr-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                />
+                            </div>
+                            
+                            {/* Filter Dropdowns Row */}
+                            <div className="flex flex-wrap items-center gap-2 overflow-x-hidden">
+                                {/* Dietary Filter Dropdown - Only for DINING */}
+                                {type === 'DINING' && (
+                                    <div className="flex items-center gap-1.5 flex-1 min-w-0 basis-[calc(50%-4px)]">
+                                        <Filter className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                        <select
+                                            value={dietaryFilter}
+                                            onChange={(e) => setDietaryFilter(e.target.value as 'ALL' | 'VEGETARIAN' | 'VEGAN')}
+                                            className="flex-1 min-w-0 text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                        >
+                                            <option value="ALL">{t('filter_all_dietary')}</option>
+                                            <option value="VEGETARIAN">{t('filter_vegetarian')}</option>
+                                            <option value="VEGAN">{t('filter_vegan')}</option>
+                                        </select>
+                                    </div>
+                                )}
+                                
+                                {/* Price Filter Dropdown */}
+                                <div className={`flex items-center gap-1.5 flex-1 min-w-0 ${type === 'DINING' ? 'basis-[calc(50%-4px)]' : 'basis-[calc(50%-4px)]'}`}>
+                                    <Filter className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                    <select
+                                        value={priceFilter}
+                                        onChange={(e) => setPriceFilter(e.target.value as 'ALL' | 'UNDER_100K' | '100K_300K' | '300K_500K' | 'OVER_500K')}
+                                        className="flex-1 min-w-0 text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                    >
+                                        <option value="ALL">{t('filter_all_prices')}</option>
+                                        <option value="UNDER_100K">{t('filter_price_under_100k')}</option>
+                                        <option value="100K_300K">{t('filter_price_100k_300k')}</option>
+                                        <option value="300K_500K">{t('filter_price_300k_500k')}</option>
+                                        <option value="OVER_500K">{t('filter_price_over_500k')}</option>
+                                    </select>
+                                </div>
+                                
+                                {/* Sort Dropdown */}
+                                <div className={`flex items-center gap-1.5 flex-1 min-w-0 ${type === 'DINING' ? 'basis-full' : 'basis-[calc(50%-4px)]'}`}>
+                                    <ArrowUpDown className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                    <select
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value as 'NAME' | 'PRICE_LOW' | 'PRICE_HIGH')}
+                                        className="flex-1 min-w-0 text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                    >
+                                        <option value="NAME">{t('sort_name_az')}</option>
+                                        <option value="PRICE_LOW">{t('sort_price_low_high')}</option>
+                                        <option value="PRICE_HIGH">{t('sort_price_high_low')}</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="grid gap-3">
+                            {filteredAndSortedItems.map(item => {
                         const tr = item.translations?.[language];
                         const name = tr?.name || item.name;
                         const desc = tr?.description || item.description;
@@ -189,16 +338,16 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                         return (
                         <div 
                             key={item.id} 
-                            className="bg-white/95 backdrop-blur-sm p-4 rounded-2xl shadow-lg border-2 border-gray-100/60 flex justify-between items-start gap-3 transition-all hover:shadow-xl hover:border-gray-200"
+                            className="bg-white/95 backdrop-blur-sm p-4 rounded-2xl shadow-lg border-2 border-gray-100/60 flex justify-between items-start gap-3 transition-all hover:shadow-xl hover:border-gray-200 overflow-hidden"
                             style={{
                                 boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1)'
                             }}
                         >
                             <div className="flex-1 min-w-0">
-                                <h3 className="font-bold text-gray-800 text-base mb-1">{name}</h3>
+                                <h3 className="font-semibold text-gray-900 text-base mb-1.5 leading-snug" style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"' }}>{name}</h3>
                                 <p className="text-sm text-gray-500 line-clamp-2 mb-2 leading-relaxed">{desc}</p>
                                 <div className={`inline-flex items-center px-3 py-1 rounded-full font-bold text-sm ${config.lightBg} ${config.textColor} border ${config.borderColor}`}>
-                                    {item.price > 0 ? `$${item.price}` : 'Complimentary'}
+                                    {item.price > 0 ? `${item.price.toLocaleString('vi-VN')} VND` : 'Complimentary'}
                                 </div>
                             </div>
                             <button 
@@ -213,29 +362,39 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                         </div>
                         );
                         })}
-                        {items.length === 0 && (
-                            <div className="text-center py-16 px-4">
-                                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                    <ShoppingBag className="w-8 h-8 text-gray-400" />
+                            {filteredAndSortedItems.length === 0 && (
+                                <div className="text-center py-16 px-4">
+                                    <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                        <ShoppingBag className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <p className="text-gray-500 font-medium text-base">
+                                        {searchQuery || priceFilter !== 'ALL' 
+                                            ? 'No items found' 
+                                            : 'No items available'}
+                                    </p>
+                                    <p className="text-gray-400 text-sm mt-1">
+                                        {searchQuery || priceFilter !== 'ALL'
+                                            ? 'Try adjusting your filters'
+                                            : 'in this category yet'}
+                                    </p>
                                 </div>
-                                <p className="text-gray-500 font-medium text-base">No items available</p>
-                                <p className="text-gray-400 text-sm mt-1">in this category yet</p>
-                            </div>
-                        )}
-                    </div>
+                            )}
+                        </div>
+                    </>
                 )}
             </div>
 
             {/* Cart Summary - Modern fixed footer */}
             {cart.length > 0 && (
                 <div 
-                    className="fixed bottom-0 left-0 right-0 backdrop-blur-lg bg-white/95 border-t-2 border-gray-200/60 p-4 shadow-2xl z-20"
+                    className="fixed left-1/2 -translate-x-1/2 backdrop-blur-lg bg-white/95 border-t-2 border-gray-200/60 p-4 shadow-2xl z-30 max-w-md w-full"
                     style={{
+                        bottom: '5rem', // 80px for bottom nav (h-20)
                         boxShadow: '0 -10px 40px -10px rgba(0,0,0,0.2)',
                         paddingBottom: 'max(1rem, calc(1rem + env(safe-area-inset-bottom)))'
                     }}
                 >
-                    <div className="max-w-md mx-auto">
+                    <div className="w-full">
                         <div className="flex justify-between items-center mb-4 px-2">
                             <div className="flex items-center gap-2">
                                 <div className={`w-2 h-2 rounded-full ${config.textColor} animate-pulse`} style={{
@@ -249,8 +408,8 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                                 </span>
                             </div>
                             <div className="flex items-baseline gap-1">
-                                <span className="text-2xl font-black text-gray-800">${totalPrice}</span>
-                                <span className="text-xs text-gray-500">total</span>
+                                <span className="text-2xl font-black text-gray-800">{totalPrice.toLocaleString('vi-VN')}</span>
+                                <span className="text-xs text-gray-500">VND</span>
                             </div>
                         </div>
                         <button 

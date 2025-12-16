@@ -2,8 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, Send, X, User, Shield, Globe, Languages } from 'lucide-react';
 import { ChatMessage } from '../types';
-import { getServiceMessages, sendServiceMessage, markServiceMessagesAsRead, getServiceUnreadCount } from '../services/dataService';
+import { getServiceMessages, sendServiceMessage, markServiceMessagesAsRead, getServiceUnreadCount, getUsers } from '../services/dataService';
 import { translateText } from '../services/geminiService';
+import { useTranslation } from '../contexts/LanguageContext';
 
 interface ServiceChatProps {
     serviceType: string;
@@ -33,16 +34,65 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
     userRole = 'user',
     onClose
 }) => {
+    const { language } = useTranslation();
     const [isOpen, setIsOpen] = useState(autoOpen);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [unreadCount, setUnreadCount] = useState(0);
 
-    // Translation State
-    const [targetLang, setTargetLang] = useState('Original');
+    // Map app language to translation language
+    const mapAppLangToTranslateLang = (appLang: string): string => {
+        const langMap: Record<string, string> = {
+            'English': 'English',
+            'Vietnamese': 'Vietnamese',
+            'Korean': 'Korean',
+            'Japanese': 'Japanese',
+            'Chinese': 'Chinese',
+            'French': 'French',
+            'Russian': 'Russian'
+        };
+        return langMap[appLang] || 'Original';
+    };
+
+    // Translation State - Auto-set to app language
+    const [targetLang, setTargetLang] = useState(() => mapAppLangToTranslateLang(language));
     const [showLangSelector, setShowLangSelector] = useState(false);
     const [translatedCache, setTranslatedCache] = useState<Record<string, string>>({});
+    const [userManuallyChangedLang, setUserManuallyChangedLang] = useState(false);
+    
+    // Fetch guest language from database when userRole is 'user' (guest)
+    useEffect(() => {
+        const fetchGuestLanguage = async () => {
+            if (userRole === 'user' && roomNumber && !userManuallyChangedLang) {
+                try {
+                    const users = await getUsers();
+                    const guest = users.find(u => u.roomNumber === roomNumber && u.role === 'GUEST');
+                    if (guest && guest.language) {
+                        const guestLangMapped = mapAppLangToTranslateLang(guest.language);
+                        console.log(`[ServiceChat] Guest language from DB: ${guest.language} -> ${guestLangMapped}`);
+                        setTargetLang(guestLangMapped);
+                        // Clear cache when language changes
+                        setTranslatedCache({});
+                    }
+                } catch (error) {
+                    console.error('[ServiceChat] Failed to fetch guest language:', error);
+                }
+            }
+        };
+        
+        fetchGuestLanguage();
+    }, [userRole, roomNumber, userManuallyChangedLang]);
+    
+    // Auto-update targetLang when app language changes (unless user manually changed it)
+    useEffect(() => {
+        if (!userManuallyChangedLang) {
+            const appLangMapped = mapAppLangToTranslateLang(language);
+            setTargetLang(appLangMapped);
+            // Clear cache when language changes
+            setTranslatedCache({});
+        }
+    }, [language, userManuallyChangedLang]);
 
     // Poll for new messages (simulating real-time)
     useEffect(() => {
@@ -88,7 +138,11 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
     // Handle Auto-Translation when messages change or target language changes
     useEffect(() => {
         const translateIncoming = async () => {
-            if (targetLang === 'Original') return;
+            if (targetLang === 'Original') {
+                // Clear cache if switching to Original
+                setTranslatedCache({});
+                return;
+            }
 
             // Find messages that need translation (from the other person and not in cache)
             const msgsToTranslate = messages.filter(msg => 
@@ -98,20 +152,29 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
 
             if (msgsToTranslate.length === 0) return;
 
+            console.log(`[ServiceChat] Translating ${msgsToTranslate.length} messages to ${targetLang} for ${userRole === 'user' ? 'guest' : 'staff'}`);
+
             const newTranslations: Record<string, string> = {};
             
             await Promise.all(msgsToTranslate.map(async (msg) => {
-                const translated = await translateText(msg.text, targetLang);
-                if (translated) {
-                    newTranslations[msg.id] = translated;
+                try {
+                    const translated = await translateText(msg.text, targetLang);
+                    if (translated && translated !== msg.text) {
+                        newTranslations[msg.id] = translated;
+                        console.log(`[ServiceChat] Translated message ${msg.id}: "${msg.text.substring(0, 30)}..." -> "${translated.substring(0, 30)}..."`);
+                    }
+                } catch (error) {
+                    console.error(`[ServiceChat] Failed to translate message ${msg.id}:`, error);
                 }
             }));
 
-            setTranslatedCache(prev => ({ ...prev, ...newTranslations }));
+            if (Object.keys(newTranslations).length > 0) {
+                setTranslatedCache(prev => ({ ...prev, ...newTranslations }));
+            }
         };
 
         translateIncoming();
-    }, [messages, targetLang, userRole, translatedCache]);
+    }, [messages, targetLang, userRole]);
 
     // Auto-scroll and mark as read when new messages arrive
     useEffect(() => {
@@ -204,7 +267,11 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                                 {SUPPORTED_LANGUAGES.map(lang => (
                                     <button 
                                         key={lang}
-                                        onClick={() => { setTargetLang(lang); setShowLangSelector(false); }}
+                                        onClick={() => { 
+                                            setTargetLang(lang); 
+                                            setUserManuallyChangedLang(true);
+                                            setShowLangSelector(false); 
+                                        }}
                                         className={`w-full text-left px-3 py-1.5 text-xs hover:bg-emerald-50 ${targetLang === lang ? 'text-emerald-600 font-bold bg-emerald-50' : ''}`}
                                     >
                                         {lang}
@@ -246,7 +313,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                                         )}
 
                                         <p className={`text-[9px] mt-1 text-right ${isMe ? 'text-emerald-200' : 'text-gray-400'}`}>
-                                            {isMe ? 'You' : (userRole === 'user' ? label : 'Guest')}
+                                            {isMe ? 'You' : label}
                                         </p>
                                     </div>
                                 </div>

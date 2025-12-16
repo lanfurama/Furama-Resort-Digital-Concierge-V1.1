@@ -10,6 +10,7 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
     const [activeChatRequest, setActiveChatRequest] = useState<{roomNumber: string, type: string} | null>(null);
     const [unreadChats, setUnreadChats] = useState<Set<string>>(new Set());
     const [viewMode, setViewMode] = useState<'ACTIVE' | 'HISTORY'>('ACTIVE');
+    const [serviceTypeFilter, setServiceTypeFilter] = useState<'ALL' | 'DINING' | 'SPA' | 'POOL' | 'BUTLER' | 'HOUSEKEEPING'>('ALL');
     
     // New Order Notification State
     const [newOrderAlert, setNewOrderAlert] = useState(false);
@@ -137,8 +138,15 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
         return req.type === userDeptUpper;
     });
 
-    // Apply Tab Filtering (Active vs History)
+    // Apply Tab Filtering (Active vs History) and Service Type Filter
     const displayedRequests = filteredRequests.filter(req => {
+        // Exclude BUGGY requests
+        if (req.type === 'BUGGY') return false;
+        
+        // Apply service type filter
+        if (serviceTypeFilter !== 'ALL' && req.type !== serviceTypeFilter) return false;
+        
+        // Apply status filter based on view mode
         if (viewMode === 'ACTIVE') {
             return req.status === 'PENDING' || req.status === 'CONFIRMED';
         } else {
@@ -254,6 +262,36 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                 </div>
             </div>
 
+            {/* Service Type Filter */}
+            <div className="px-3 pb-3">
+                <div className="flex flex-wrap items-center gap-2 bg-white rounded-lg border border-gray-200 p-2">
+                    <span className="text-xs font-semibold text-gray-600 mr-1">Filter:</span>
+                    {(['ALL', 'DINING', 'SPA', 'POOL', 'BUTLER', 'HOUSEKEEPING'] as const).map(type => (
+                        <button
+                            key={type}
+                            onClick={() => setServiceTypeFilter(type)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                serviceTypeFilter === type
+                                    ? type === 'ALL'
+                                        ? 'bg-indigo-600 text-white shadow-md'
+                                        : type === 'DINING'
+                                        ? 'bg-purple-600 text-white shadow-md'
+                                        : type === 'SPA'
+                                        ? 'bg-pink-600 text-white shadow-md'
+                                        : type === 'POOL'
+                                        ? 'bg-cyan-600 text-white shadow-md'
+                                        : type === 'BUTLER'
+                                        ? 'bg-amber-600 text-white shadow-md'
+                                        : 'bg-indigo-600 text-white shadow-md'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                        >
+                            {type}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             <div className="p-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto">
                  {displayedRequests.length === 0 && (
                      <div className="col-span-full text-center py-12">
@@ -306,26 +344,129 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                          }
                      }
                      
+                     // Get service type specific styling
+                     const getServiceTypeStyle = (type: string, status: string) => {
+                         const baseStyle = 'bg-white p-4 rounded-xl shadow-md border-2 transition-all hover:shadow-lg';
+                         
+                         // Service type colors
+                         const typeColors: Record<string, {border: string, bg: string, badgePending: string, badgeConfirmed: string}> = {
+                             'DINING': { 
+                                 border: 'border-purple-300', 
+                                 bg: 'bg-purple-50/50',
+                                 badgePending: 'bg-purple-100 text-purple-700 border-purple-200',
+                                 badgeConfirmed: 'bg-purple-200 text-purple-800 border-purple-300'
+                             },
+                             'SPA': { 
+                                 border: 'border-pink-300', 
+                                 bg: 'bg-pink-50/50',
+                                 badgePending: 'bg-pink-100 text-pink-700 border-pink-200',
+                                 badgeConfirmed: 'bg-pink-200 text-pink-800 border-pink-300'
+                             },
+                             'POOL': { 
+                                 border: 'border-cyan-300', 
+                                 bg: 'bg-cyan-50/50',
+                                 badgePending: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+                                 badgeConfirmed: 'bg-cyan-200 text-cyan-800 border-cyan-300'
+                             },
+                             'BUTLER': { 
+                                 border: 'border-amber-300', 
+                                 bg: 'bg-amber-50/50',
+                                 badgePending: 'bg-amber-100 text-amber-700 border-amber-200',
+                                 badgeConfirmed: 'bg-amber-200 text-amber-800 border-amber-300'
+                             },
+                             'HOUSEKEEPING': { 
+                                 border: 'border-indigo-300', 
+                                 bg: 'bg-indigo-50/50',
+                                 badgePending: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+                                 badgeConfirmed: 'bg-indigo-200 text-indigo-800 border-indigo-300'
+                             }
+                         };
+                         
+                         const colors = typeColors[type] || { 
+                             border: 'border-gray-300', 
+                             bg: 'bg-gray-50/50',
+                             badgePending: 'bg-gray-100 text-gray-700 border-gray-200',
+                             badgeConfirmed: 'bg-gray-200 text-gray-800 border-gray-300'
+                         };
+                         
+                         // Adjust opacity/intensity based on status
+                         if (status === 'PENDING') {
+                             return `${baseStyle} ${colors.border} ${colors.bg}`;
+                         } else if (status === 'CONFIRMED') {
+                             // Slightly darker for confirmed
+                             return `${baseStyle} ${colors.border.replace('300', '400')} ${colors.bg.replace('50/50', '100/60')}`;
+                         } else {
+                             // Completed - green tint
+                             return `${baseStyle} border-green-300 bg-green-50/50`;
+                         }
+                     };
+
+                     // Get service type label style
+                     const getServiceTypeLabelStyle = (type: string) => {
+                         const typeLabelColors: Record<string, string> = {
+                             'DINING': 'bg-purple-100 text-purple-800 border-purple-300',
+                             'SPA': 'bg-pink-100 text-pink-800 border-pink-300',
+                             'POOL': 'bg-cyan-100 text-cyan-800 border-cyan-300',
+                             'BUTLER': 'bg-amber-100 text-amber-800 border-amber-300',
+                             'HOUSEKEEPING': 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                         };
+                         return typeLabelColors[type] || 'bg-gray-100 text-gray-800 border-gray-300';
+                     };
+
+                     // Get status badge style based on service type
+                     const getStatusBadgeStyle = (type: string, status: string) => {
+                         const typeColors: Record<string, {pending: string, confirmed: string}> = {
+                             'DINING': { 
+                                 pending: 'bg-purple-100 text-purple-700 border-purple-200',
+                                 confirmed: 'bg-purple-200 text-purple-800 border-purple-300'
+                             },
+                             'SPA': { 
+                                 pending: 'bg-pink-100 text-pink-700 border-pink-200',
+                                 confirmed: 'bg-pink-200 text-pink-800 border-pink-300'
+                             },
+                             'POOL': { 
+                                 pending: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+                                 confirmed: 'bg-cyan-200 text-cyan-800 border-cyan-300'
+                             },
+                             'BUTLER': { 
+                                 pending: 'bg-amber-100 text-amber-700 border-amber-200',
+                                 confirmed: 'bg-amber-200 text-amber-800 border-amber-300'
+                             },
+                             'HOUSEKEEPING': { 
+                                 pending: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+                                 confirmed: 'bg-indigo-200 text-indigo-800 border-indigo-300'
+                             }
+                         };
+                         
+                         const colors = typeColors[type] || { 
+                             pending: 'bg-gray-100 text-gray-700 border-gray-200',
+                             confirmed: 'bg-gray-200 text-gray-800 border-gray-300'
+                         };
+                         
+                         if (status === 'PENDING') {
+                             return colors.pending;
+                         } else if (status === 'CONFIRMED') {
+                             return colors.confirmed;
+                         } else {
+                             return 'bg-green-100 text-green-700 border-green-200';
+                         }
+                     };
+
                      return (
-                        <div key={req.id} className={`bg-white p-4 rounded-xl shadow-md border-2 transition-all hover:shadow-lg ${
-                            req.status === 'PENDING' ? 'border-orange-300 bg-orange-50/50' : 
-                            req.status === 'CONFIRMED' ? 'border-blue-300 bg-blue-50/50' : 
-                            'border-green-300 bg-green-50/50'
-                        }`}
-                        >
+                        <div key={req.id} className={getServiceTypeStyle(req.type, req.status)}>
                             <div className="flex justify-between items-start mb-3 pb-2.5 border-b border-gray-200">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-baseline gap-1.5 mb-1">
                                         <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Room</span>
                                         <span className="text-xl font-black text-gray-900">{req.roomNumber}</span>
                                     </div>
-                                    <span className="font-bold text-gray-500 text-[10px] tracking-wider uppercase">{req.type}</span>
+                                    <span className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold tracking-wider uppercase border ${getServiceTypeLabelStyle(req.type)}`}>
+                                        {req.type}
+                                    </span>
                                 </div>
-                                <span className={`px-2 py-1 rounded text-[10px] font-bold border flex-shrink-0 ml-2 ${
-                                    req.status === 'PENDING' ? 'bg-orange-100 text-orange-700 border-orange-200' :
-                                    req.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-700 border-blue-200' : 
-                                    'bg-green-100 text-green-700 border-green-200'
-                                }`}>{req.status}</span>
+                                <span className={`px-2 py-1 rounded text-[10px] font-bold border flex-shrink-0 ml-2 ${getStatusBadgeStyle(req.type, req.status)}`}>
+                                    {req.status}
+                                </span>
                             </div>
                             
                             {/* Order Details - Visual & Clear */}
@@ -423,7 +564,7 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                                 )}
                             </div>
 
-                            <div className="space-y-2">
+                            <div className="flex gap-2">
                                 {req.status === 'PENDING' && (
                                     <button 
                                        onClick={(e) => {
@@ -431,7 +572,7 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                                            e.stopPropagation();
                                            handleAction(req.id, 'CONFIRMED', e);
                                        }}
-                                       className="group relative w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-md transition-all duration-300 overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] hover:bg-indigo-700"
+                                       className="group relative flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-md transition-all duration-300 overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] hover:bg-indigo-700"
                                     >
                                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
                                         <span className="relative z-10">Confirm Order</span>
@@ -444,7 +585,7 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                                            e.stopPropagation();
                                            handleAction(req.id, 'COMPLETED', e);
                                        }}
-                                       className="group relative w-full bg-green-600 text-white py-3 rounded-lg font-bold shadow-md transition-all duration-300 overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] hover:bg-green-700"
+                                       className="group relative flex-1 bg-green-600 text-white py-3 rounded-lg font-bold shadow-md transition-all duration-300 overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] hover:bg-green-700"
                                     >
                                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
                                         <span className="relative z-10">Complete Order</span>
@@ -455,7 +596,7 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                                 {(req.status === 'PENDING' || req.status === 'CONFIRMED') && (
                                     <button
                                         onClick={() => setActiveChatRequest({ roomNumber: req.roomNumber, type: req.type })}
-                                        className={`w-full border-2 py-2.5 rounded-lg font-bold flex items-center justify-center relative transition-all min-h-[48px] ${
+                                        className={`flex-1 border-2 py-2.5 rounded-lg font-bold flex items-center justify-center relative transition-all min-h-[48px] ${
                                             isUnread 
                                                 ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100' 
                                                 : 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'

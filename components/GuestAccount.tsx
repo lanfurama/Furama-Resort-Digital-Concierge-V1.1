@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, ServiceRequest, HotelReview } from '../types';
 import { getCompletedGuestOrders, updateUserNotes, rateServiceRequest, submitHotelReview, getHotelReview, updateUserLanguage } from '../services/dataService';
-import { Clock, ShoppingBag, Car, Utensils, Sparkles, Waves, User as UserIcon, Save, Star, Hotel, ThumbsUp, Globe, ArrowLeft } from 'lucide-react';
+import { Clock, ShoppingBag, Car, Utensils, Sparkles, Waves, User as UserIcon, Save, Star, Hotel, ThumbsUp, Globe, ArrowLeft, Filter } from 'lucide-react';
 import Loading from './Loading';
 import { useTranslation } from '../contexts/LanguageContext';
 
@@ -40,6 +40,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
     const [isSaving, setIsSaving] = useState(false);
     const [isLoadingHistory, setIsLoadingHistory] = useState(true);
     const [isLoadingReview, setIsLoadingReview] = useState(true);
+    const [serviceFilter, setServiceFilter] = useState<'ALL' | 'DINING' | 'SPA' | 'POOL' | 'BUGGY' | 'BUTLER'>('ALL');
     
     // Load history and hotel review on mount
     useEffect(() => {
@@ -319,23 +320,9 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                 </button>
                 
                 <h2 className="text-lg font-bold text-center tracking-tight">{t('my_account')}</h2>
-                
-                <div className="mt-3 flex flex-col items-center">
-                    <div className="relative">
-                        <div className="w-14 h-14 bg-gradient-to-br from-white/20 to-white/10 rounded-2xl flex items-center justify-center border-2 border-white/30 shadow-xl backdrop-blur-sm">
-                            <span className="text-2xl font-bold text-white">{user.lastName.charAt(0)}</span>
-                        </div>
-                        {/* Active indicator */}
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-emerald-800 shadow-md"></div>
-                    </div>
-                    <h3 className="text-base font-bold mt-2 text-white">Mr/Ms {user.lastName}</h3>
-                    <div className="mt-1 px-2.5 py-0.5 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
-                        <p className="text-emerald-200 text-[10px] font-semibold">{t('room')} {user.roomNumber}</p>
-                    </div>
-                </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4 -mt-4 relative z-20 pb-24">
+            <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4 -mt-1 relative z-20 pb-24">
                 {(isLoadingHistory || isLoadingReview || isLoadingUserData) && (
                     <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
                         <Loading size="md" message={t('loading') || 'Loading account data...'} />
@@ -343,31 +330,44 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                 )}
                 
                 {/* Profile Card - Modern Design */}
-                <div className="backdrop-blur-lg bg-white/95 p-5 rounded-3xl shadow-xl border border-white/60"
+                <div className="backdrop-blur-lg bg-white/95 p-3 rounded-3xl shadow-xl border border-white/60"
                     style={{
                         boxShadow: '0 10px 40px -10px rgba(0,0,0,0.15)'
                     }}
                 >
-                    <div className="flex items-center gap-2 mb-4">
+                    <div className="flex items-center gap-2 mb-3">
                         <div className="w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-600 rounded-full"></div>
                         <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{t('reservation_details')}</h4>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-3 rounded-xl border border-blue-100">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-2.5 rounded-xl border border-blue-100">
                             <p className="text-xs text-gray-600 font-medium mb-1">{t('villa_type')}</p>
                             <p className="font-bold text-gray-800 text-sm">{user.villaType || 'Standard Room'}</p>
                         </div>
-                        <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-3 rounded-xl border border-purple-100">
+                        <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-2.5 rounded-xl border border-purple-100">
                             <p className="text-xs text-gray-600 font-medium mb-1">{t('stay_duration')}</p>
                             <p className="font-bold text-gray-800 text-sm">
-                                {user.checkIn ? new Date(user.checkIn).toLocaleDateString(undefined, {month:'short', day:'numeric'}) : 'N/A'} - 
-                                {user.checkOut ? new Date(user.checkOut).toLocaleDateString(undefined, {month:'short', day:'numeric'}) : 'N/A'}
+                                {user.checkIn && user.checkOut ? (
+                                    <>
+                                        {new Date(user.checkIn).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'})} - {new Date(user.checkOut).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'})}
+                                    </>
+                                ) : user.checkIn ? (
+                                    <>
+                                        {new Date(user.checkIn).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'})} - N/A
+                                    </>
+                                ) : user.checkOut ? (
+                                    <>
+                                        N/A - {new Date(user.checkOut).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'})}
+                                    </>
+                                ) : (
+                                    'N/A - N/A'
+                                )}
                             </p>
                         </div>
                         
                         {/* Language Selector */}
-                        <div className="col-span-2 mt-2 pt-4 border-t-2 border-gray-100">
+                        <div className="col-span-2 mt-2 pt-3 border-t-2 border-gray-100">
                             <div className="flex justify-between items-center mb-3">
                                 <p className="text-xs text-gray-600 font-semibold flex items-center gap-1.5">
                                     <Globe size={14} className="text-emerald-600"/> 
@@ -382,10 +382,23 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                             <select 
                                 value={selectedLang}
                                 onChange={(e) => handleLanguageChange(e.target.value)}
-                                className="w-full bg-gradient-to-r from-gray-50 to-blue-50 border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                className="w-full bg-white border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all appearance-none cursor-pointer"
+                                style={{
+                                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23374151' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                                    backgroundRepeat: 'no-repeat',
+                                    backgroundPosition: 'right 12px center',
+                                    paddingRight: '40px',
+                                    backgroundColor: '#ffffff'
+                                }}
                             >
                                 {SUPPORTED_LANGUAGES.map(lang => (
-                                    <option key={lang} value={lang}>{lang}</option>
+                                    <option 
+                                        key={lang} 
+                                        value={lang} 
+                                        style={{ backgroundColor: '#ffffff', color: '#111827' }}
+                                    >
+                                        {lang}
+                                    </option>
                                 ))}
                             </select>
                         </div>
@@ -566,9 +579,27 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
 
                 {/* Completed Order History */}
                 <div>
-                    <div className="flex items-center gap-2 mb-3 px-2">
-                        <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-cyan-600 rounded-full"></div>
-                        <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{t('completed_orders')}</h4>
+                    <div className="flex items-center justify-between mb-3 px-2">
+                        <div className="flex items-center gap-2">
+                            <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-cyan-600 rounded-full"></div>
+                            <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{t('completed_orders')}</h4>
+                        </div>
+                        {/* Service Filter Dropdown */}
+                        <div className="flex items-center gap-1.5">
+                            <Filter className="w-3.5 h-3.5 text-gray-500" />
+                            <select
+                                value={serviceFilter}
+                                onChange={(e) => setServiceFilter(e.target.value as 'ALL' | 'DINING' | 'SPA' | 'POOL' | 'BUGGY' | 'BUTLER')}
+                                className="text-[10px] font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                            >
+                                <option value="ALL">All</option>
+                                <option value="BUGGY">{t('buggy')}</option>
+                                <option value="DINING">{t('dining')}</option>
+                                <option value="SPA">{t('spa')}</option>
+                                <option value="POOL">{t('pool')}</option>
+                                <option value="BUTLER">{t('butler')}</option>
+                            </select>
+                        </div>
                     </div>
                     {isLoadingHistory ? (
                         <Loading size="sm" message={t('loading') || 'Loading history...'} />
@@ -579,9 +610,25 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                             </div>
                             <p className="text-gray-500 font-medium text-sm">No completed orders yet</p>
                         </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {history.map((req, i) => (
+                    ) : (() => {
+                        const filteredHistory = serviceFilter === 'ALL' 
+                            ? history 
+                            : history.filter(req => req.type === serviceFilter);
+                        
+                        return filteredHistory.length === 0 ? (
+                            <div className="text-center py-12 px-4">
+                                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                                    <ShoppingBag className="w-8 h-8 text-gray-400"/>
+                                </div>
+                                <p className="text-gray-500 font-medium text-sm">
+                                    {serviceFilter === 'ALL' 
+                                        ? 'No completed orders yet' 
+                                        : `No ${t(serviceFilter.toLowerCase())} orders yet`}
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {filteredHistory.map((req, i) => (
                                 <div key={i} className="backdrop-blur-sm bg-white/95 p-4 rounded-2xl shadow-lg border-2 border-gray-100/60 flex flex-col transition-all hover:shadow-xl"
                                     style={{
                                         boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1)'
@@ -683,9 +730,10 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                         </div>
                                     )}
                                 </div>
-                            ))}
-                        </div>
-                    )}
+                                ))}
+                            </div>
+                        );
+                    })()}
                 </div>
             </div>
         </div>

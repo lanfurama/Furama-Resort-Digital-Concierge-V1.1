@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key, Car, Settings, RefreshCw, Zap, Grid3x3, CheckCircle, Map, AlertCircle, Info, Brain, ArrowRight, Loader2 } from 'lucide-react';
-import { getLocations, getLocationsSync, addLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, updatePromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, getUsersSync, addUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory, getRides, getRidesSync, updateRideStatus } from '../services/dataService';
+import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key, Car, Settings, RefreshCw, Zap, Grid3x3, CheckCircle, Map, AlertCircle, Info, Brain, ArrowRight, Loader2, Pencil } from 'lucide-react';
+import { getLocations, getLocationsSync, addLocation, updateLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, updateMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, updatePromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, getUsersSync, addUser, updateUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory, getRides, getRidesSync, updateRideStatus } from '../services/dataService';
 import { parseAdminInput, generateTranslations } from '../services/geminiService';
 import { Location, MenuItem, ResortEvent, Promotion, KnowledgeItem, User, UserRole, Department, RoomType, Room, RideRequest, BuggyStatus } from '../types';
 import Loading from './Loading';
@@ -206,7 +206,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const [isParsing, setIsParsing] = useState(false);
     const [aiInput, setAiInput] = useState('');
     const [showAiInput, setShowAiInput] = useState(false);
-    const [menuFilter, setMenuFilter] = useState<'ALL' | 'Dining' | 'Spa'>('ALL');
+    const [menuFilter, setMenuFilter] = useState<'ALL' | 'Dining' | 'Spa' | 'Pool' | 'Butler'>('ALL');
+    const [locationFilter, setLocationFilter] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('ALL');
 
     // New User State (Staff)
     const [newUser, setNewUser] = useState<Partial<User>>({ role: UserRole.STAFF, department: 'Dining' });
@@ -233,6 +234,21 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
     const [showPromotionForm, setShowPromotionForm] = useState(false);
     const [newPromotion, setNewPromotion] = useState<Partial<Promotion>>({ title: '', description: '', discount: '', validUntil: '', imageColor: 'bg-emerald-500', imageUrl: '' });
+    
+    // Location Edit State
+    const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+    const [showLocationForm, setShowLocationForm] = useState(false);
+    const [newLocation, setNewLocation] = useState<Partial<Location>>({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
+    
+    // Menu Item Edit State
+    const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null);
+    const [showMenuItemForm, setShowMenuItemForm] = useState(false);
+    const [newMenuItem, setNewMenuItem] = useState<Partial<MenuItem>>({ name: '', price: 0, category: 'Dining', description: '' });
+    
+    // Guest Edit State
+    const [editingGuest, setEditingGuest] = useState<User | null>(null);
+    const [showGuestEditForm, setShowGuestEditForm] = useState(false);
+    const [editGuest, setEditGuest] = useState<Partial<User>>({ lastName: '', roomNumber: '', villaType: '', language: 'English', checkIn: '', checkOut: '' });
     
     const [showRoomForm, setShowRoomForm] = useState(false);
     const [newRoom, setNewRoom] = useState<{number: string, typeId: string}>({ number: '', typeId: '' });
@@ -1062,7 +1078,23 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             return;
         }
         try {
-            if (type === 'LOC') await deleteLocation(id);
+            if (type === 'LOC') {
+                console.log('Deleting location with id/name:', id);
+                await deleteLocation(id);
+                console.log('Location deleted successfully, refreshing...');
+                // Refresh locations specifically after deleting
+                try {
+                    const refreshedLocations = await getLocations();
+                    setLocations(refreshedLocations);
+                    console.log('Locations refreshed after delete:', refreshedLocations);
+                } catch (error) {
+                    console.error('Failed to refresh locations after delete:', error);
+                    // Fallback to sync version
+                    const fallbackLocations = getLocationsSync();
+                    setLocations(fallbackLocations);
+                    console.log('Using fallback locations:', fallbackLocations);
+                }
+            }
             else if (type === 'ITEM') await deleteMenuItem(id);
             else if (type === 'EVENT') {
                 await deleteEvent(id);
@@ -1115,8 +1147,10 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             }
             else if (type === 'ROOM') await deleteRoom(id);
             
-            // Refresh data after successful delete
-            await refreshData();
+            // Refresh data after successful delete (except for LOC which is already refreshed above)
+            if (type !== 'LOC') {
+                await refreshData();
+            }
             
             // Also refresh specific data if needed
             if (type === 'ROOM_TYPE') {
@@ -1175,6 +1209,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     };
 
     const filteredMenu = menuFilter === 'ALL' ? menu : menu.filter(m => m.category === menuFilter);
+    const filteredLocations = locationFilter === 'ALL' ? locations : locations.filter(l => l.type === locationFilter);
     const guestUsers = users.filter(u => u.role === UserRole.GUEST);
     const staffUsers = users.filter(u => u.role !== UserRole.GUEST);
     
@@ -1214,7 +1249,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     <Car size={18} /> <span className="text-xs md:text-sm">Fleet</span>
                 </button>
                 <button onClick={() => setTab('MENU')} className={`flex-1 min-w-[80px] py-4 font-semibold flex flex-col md:flex-row items-center justify-center md:space-x-2 border-b-2 ${tab === 'MENU' ? 'border-emerald-600 text-emerald-800' : 'border-transparent text-gray-500'}`}>
-                    <Utensils size={18} /> <span className="text-xs md:text-sm">Menu</span>
+                    <Utensils size={18} /> <span className="text-xs md:text-sm">Resort Services</span>
                 </button>
                 <button onClick={() => setTab('EVENTS')} className={`flex-1 min-w-[80px] py-4 font-semibold flex flex-col md:flex-row items-center justify-center md:space-x-2 border-b-2 ${tab === 'EVENTS' ? 'border-emerald-600 text-emerald-800' : 'border-transparent text-gray-500'}`}>
                     <Calendar size={18} /> <span className="text-xs md:text-sm">Events</span>
@@ -1293,11 +1328,51 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                         )}
 
                         {tab === 'MENU' && (
-                            <div className="flex bg-white rounded-lg border border-gray-200 p-1">
-                                <button onClick={() => setMenuFilter('ALL')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'ALL' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500'}`}>All</button>
-                                <button onClick={() => setMenuFilter('Dining')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Dining' ? 'bg-orange-100 text-orange-800 font-bold' : 'text-gray-500'}`}>Dining</button>
-                                <button onClick={() => setMenuFilter('Spa')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Spa' ? 'bg-purple-100 text-purple-800 font-bold' : 'text-gray-500'}`}>Spa</button>
-                            </div>
+                            <>
+                                <div className="flex bg-white rounded-lg border border-gray-200 p-1">
+                                    <button onClick={() => setMenuFilter('ALL')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'ALL' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500'}`}>All</button>
+                                    <button onClick={() => setMenuFilter('Dining')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Dining' ? 'bg-orange-100 text-orange-800 font-bold' : 'text-gray-500'}`}>Dining</button>
+                                    <button onClick={() => setMenuFilter('Spa')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Spa' ? 'bg-purple-100 text-purple-800 font-bold' : 'text-gray-500'}`}>Spa</button>
+                                    <button onClick={() => setMenuFilter('Pool')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Pool' ? 'bg-blue-100 text-blue-800 font-bold' : 'text-gray-500'}`}>Pool</button>
+                                    <button onClick={() => setMenuFilter('Butler')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Butler' ? 'bg-amber-100 text-amber-800 font-bold' : 'text-gray-500'}`}>Butler</button>
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        setShowMenuItemForm(!showMenuItemForm);
+                                        if (!showMenuItemForm) {
+                                            setEditingMenuItem(null);
+                                            setNewMenuItem({ name: '', price: 0, category: 'Dining', description: '' });
+                                        }
+                                    }}
+                                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition flex-1 md:flex-none"
+                                >
+                                    {showMenuItemForm && !editingMenuItem ? <X size={18}/> : <Plus size={18}/>}
+                                    <span>{showMenuItemForm && !editingMenuItem ? 'Cancel' : 'Add Item'}</span>
+                                </button>
+                            </>
+                        )}
+
+                        {tab === 'LOCATIONS' && (
+                            <>
+                                <div className="flex bg-white rounded-lg border border-gray-200 p-1">
+                                    <button onClick={() => setLocationFilter('ALL')} className={`px-3 py-1 text-xs rounded ${locationFilter === 'ALL' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500'}`}>All</button>
+                                    <button onClick={() => setLocationFilter('FACILITY')} className={`px-3 py-1 text-xs rounded ${locationFilter === 'FACILITY' ? 'bg-blue-100 text-blue-800 font-bold' : 'text-gray-500'}`}>Public Areas</button>
+                                    <button onClick={() => setLocationFilter('VILLA')} className={`px-3 py-1 text-xs rounded ${locationFilter === 'VILLA' ? 'bg-purple-100 text-purple-800 font-bold' : 'text-gray-500'}`}>Villa</button>
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        setShowLocationForm(!showLocationForm);
+                                        if (!showLocationForm) {
+                                            setEditingLocation(null);
+                                            setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
+                                        }
+                                    }}
+                                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition flex-1 md:flex-none"
+                                >
+                                    {showLocationForm && !editingLocation ? <X size={18}/> : <Plus size={18}/>}
+                                    <span>{showLocationForm && !editingLocation ? 'Cancel' : 'Add Location'}</span>
+                                </button>
+                            </>
                         )}
 
                         {tab === 'ROOMS' && (
@@ -1683,13 +1758,132 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 )}
 
                  {/* Tables Section */}
-                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
                     {isLoading ? (
                         <Loading message="Loading data..." />
                     ) : (
                         <>
                     {/* LOCATIONS TABLE */}
                     {tab === 'LOCATIONS' && (
+                        <>
+                            {/* Location Edit Modal */}
+                            {showLocationForm && (
+                                <div 
+                                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in"
+                                    onClick={() => {
+                                        setEditingLocation(null);
+                                        setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
+                                        setShowLocationForm(false);
+                                    }}
+                                >
+                                    <div 
+                                        className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[90vw] max-w-2xl p-6 animate-in slide-in-from-top-5 relative"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <button
+                                            onClick={() => {
+                                                setEditingLocation(null);
+                                                setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
+                                                setShowLocationForm(false);
+                                            }}
+                                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                                            aria-label="Close"
+                                        >
+                                            <X size={20} />
+                                        </button>
+                                        <h3 className="text-lg font-bold text-gray-800 mb-4 pr-8">{editingLocation ? 'Edit Location' : 'Create Location'}</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                            <div className="col-span-1 md:col-span-2">
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Name</label>
+                                                <input 
+                                                    type="text"
+                                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                    value={newLocation.name || ''}
+                                                    onChange={e => setNewLocation({...newLocation, name: e.target.value})}
+                                                    placeholder="e.g. Main Pool"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Latitude</label>
+                                                <input 
+                                                    type="number"
+                                                    step="any"
+                                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                    value={newLocation.lat || ''}
+                                                    onChange={e => setNewLocation({...newLocation, lat: parseFloat(e.target.value) || 0})}
+                                                    placeholder="e.g. 16.0471"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Longitude</label>
+                                                <input 
+                                                    type="number"
+                                                    step="any"
+                                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                    value={newLocation.lng || ''}
+                                                    onChange={e => setNewLocation({...newLocation, lng: parseFloat(e.target.value) || 0})}
+                                                    placeholder="e.g. 108.2068"
+                                                />
+                                            </div>
+                                            <div className="col-span-1 md:col-span-2">
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Type</label>
+                                                <select 
+                                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                    value={newLocation.type || 'FACILITY'}
+                                                    onChange={e => setNewLocation({...newLocation, type: e.target.value as 'VILLA' | 'FACILITY' | 'RESTAURANT'})}
+                                                >
+                                                    <option value="VILLA">Villa</option>
+                                                    <option value="FACILITY">Public Area</option>
+                                                    <option value="RESTAURANT">Restaurant</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-end gap-2">
+                                            <button 
+                                                onClick={() => {
+                                                    setEditingLocation(null);
+                                                    setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
+                                                    setShowLocationForm(false);
+                                                }}
+                                                className="bg-gray-500 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-gray-600"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button 
+                                                onClick={async () => {
+                                                    if (!newLocation.name) {
+                                                        alert('Please enter a name.');
+                                                        return;
+                                                    }
+                                                    if (!newLocation.lat || !newLocation.lng) {
+                                                        alert('Please enter valid coordinates.');
+                                                        return;
+                                                    }
+                                                    try {
+                                                        if (editingLocation && editingLocation.id) {
+                                                            await updateLocation(editingLocation.id, newLocation as Location);
+                                                            setEditingLocation(null);
+                                                            alert(`Location "${newLocation.name}" updated successfully!`);
+                                                        } else {
+                                                            await addLocation(newLocation as Location);
+                                                            alert(`Location "${newLocation.name}" added successfully!`);
+                                                        }
+                                                        setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
+                                                        setShowLocationForm(false);
+                                                        await refreshData();
+                                                    } catch (error) {
+                                                        console.error('Failed to save location:', error);
+                                                        alert('Failed to save location. Please try again.');
+                                                    }
+                                                }}
+                                                className="bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700"
+                                            >
+                                                {editingLocation ? 'Update Location' : 'Create Location'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         <table className="w-full text-left">
                             <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
@@ -1699,24 +1893,163 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {locations.map((loc, i) => (
-                                    <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                                {filteredLocations.map((loc) => (
+                                    <tr key={loc.id || loc.name} className="border-b border-gray-100 hover:bg-gray-50">
                                         <td className="p-4 font-medium text-gray-800">
                                             {loc.name}
                                             <div className="md:hidden text-xs text-gray-400 mt-1">{loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}</div>
                                         </td>
                                         <td className="p-4 text-sm font-mono text-gray-500 hidden md:table-cell">{loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}</td>
                                         <td className="p-4 text-right">
-                                            <button onClick={() => handleDelete(loc.id || loc.name, 'LOC')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
+                                            <div className="flex items-center justify-end gap-1 relative z-10">
+                                                <button 
+                                                    onClick={() => {
+                                                        setEditingLocation(loc);
+                                                        setNewLocation({
+                                                            name: loc.name,
+                                                            lat: loc.lat,
+                                                            lng: loc.lng,
+                                                            type: loc.type || 'FACILITY'
+                                                        });
+                                                        setShowLocationForm(true);
+                                                    }}
+                                                    className="text-emerald-600 hover:text-emerald-700 p-2 relative z-10 cursor-pointer" 
+                                                    title="Edit"
+                                                    type="button"
+                                                >
+                                                    <Pencil size={16}/>
+                                                </button>
+                                                <button onClick={() => handleDelete(loc.id || loc.name, 'LOC')} className="text-red-500 hover:text-red-700 p-2 relative z-10 cursor-pointer" type="button"><Trash2 size={16}/></button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                        </>
                     )}
                     
                     {/* MENU TABLE */}
                     {tab === 'MENU' && (
+                        <>
+                            {/* Menu Item Edit Modal */}
+                            {showMenuItemForm && (
+                                <div 
+                                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in"
+                                    onClick={() => {
+                                        setEditingMenuItem(null);
+                                        setNewMenuItem({ name: '', price: 0, category: 'Dining', description: '' });
+                                        setShowMenuItemForm(false);
+                                    }}
+                                >
+                                    <div 
+                                        className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[90vw] max-w-2xl p-6 animate-in slide-in-from-top-5 relative"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <button
+                                            onClick={() => {
+                                                setEditingMenuItem(null);
+                                                setNewMenuItem({ name: '', price: 0, category: 'Dining', description: '' });
+                                                setShowMenuItemForm(false);
+                                            }}
+                                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                                            aria-label="Close"
+                                        >
+                                            <X size={20} />
+                                        </button>
+                                        <h3 className="text-lg font-bold text-gray-800 mb-4 pr-8">{editingMenuItem ? 'Edit Menu Item' : 'Create Menu Item'}</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                            <div className="col-span-1 md:col-span-2">
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Name</label>
+                                                <input 
+                                                    type="text"
+                                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                    value={newMenuItem.name || ''}
+                                                    onChange={e => setNewMenuItem({...newMenuItem, name: e.target.value})}
+                                                    placeholder="e.g. Grilled Salmon"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Price ($)</label>
+                                                <input 
+                                                    type="number"
+                                                    step="0.01"
+                                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                    value={newMenuItem.price || ''}
+                                                    onChange={e => setNewMenuItem({...newMenuItem, price: parseFloat(e.target.value) || 0})}
+                                                    placeholder="e.g. 25.00"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Category</label>
+                                                <select 
+                                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                    value={newMenuItem.category || 'Dining'}
+                                                    onChange={e => setNewMenuItem({...newMenuItem, category: e.target.value as 'Dining' | 'Spa' | 'Pool' | 'Butler'})}
+                                                >
+                                                    <option value="Dining">Dining</option>
+                                                    <option value="Spa">Spa</option>
+                                                    <option value="Pool">Pool</option>
+                                                    <option value="Butler">Butler</option>
+                                                </select>
+                                            </div>
+                                            <div className="col-span-1 md:col-span-2">
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Description</label>
+                                                <textarea 
+                                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                    value={newMenuItem.description || ''}
+                                                    onChange={e => setNewMenuItem({...newMenuItem, description: e.target.value})}
+                                                    placeholder="e.g. Fresh Atlantic salmon with lemon butter sauce"
+                                                    rows={3}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-end gap-2">
+                                            <button 
+                                                onClick={() => {
+                                                    setEditingMenuItem(null);
+                                                    setNewMenuItem({ name: '', price: 0, category: 'Dining', description: '' });
+                                                    setShowMenuItemForm(false);
+                                                }}
+                                                className="bg-gray-500 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-gray-600"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button 
+                                                onClick={async () => {
+                                                    if (!newMenuItem.name) {
+                                                        alert('Please enter a name.');
+                                                        return;
+                                                    }
+                                                    if (!newMenuItem.price || newMenuItem.price <= 0) {
+                                                        alert('Please enter a valid price.');
+                                                        return;
+                                                    }
+                                                    try {
+                                                        if (editingMenuItem && editingMenuItem.id) {
+                                                            await updateMenuItem(editingMenuItem.id, newMenuItem as MenuItem);
+                                                            setEditingMenuItem(null);
+                                                            alert(`Menu item "${newMenuItem.name}" updated successfully!`);
+                                                        } else {
+                                                            await addMenuItem(newMenuItem as MenuItem);
+                                                            alert(`Menu item "${newMenuItem.name}" added successfully!`);
+                                                        }
+                                                        setNewMenuItem({ name: '', price: 0, category: 'Dining', description: '' });
+                                                        setShowMenuItemForm(false);
+                                                        await refreshData();
+                                                    } catch (error) {
+                                                        console.error('Failed to save menu item:', error);
+                                                        alert('Failed to save menu item. Please try again.');
+                                                    }
+                                                }}
+                                                className="bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700"
+                                            >
+                                                {editingMenuItem ? 'Update Item' : 'Create Item'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         <table className="w-full text-left">
                              <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
@@ -1735,18 +2068,44 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                             {item.translations && <div className="text-[10px] text-emerald-600 mt-0.5">Translated: {Object.keys(item.translations).length} languages</div>}
                                         </td>
                                         <td className="p-4 text-sm">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold ${item.category === 'Dining' ? 'bg-orange-100 text-orange-700' : 'bg-purple-100 text-purple-700'}`}>
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                                item.category === 'Dining' ? 'bg-orange-100 text-orange-700' : 
+                                                item.category === 'Spa' ? 'bg-purple-100 text-purple-700' :
+                                                item.category === 'Pool' ? 'bg-blue-100 text-blue-700' :
+                                                item.category === 'Butler' ? 'bg-amber-100 text-amber-700' :
+                                                'bg-gray-100 text-gray-700'
+                                            }`}>
                                                 {item.category}
                                             </span>
                                         </td>
                                         <td className="p-4 text-right text-sm font-bold text-emerald-600">${item.price}</td>
                                         <td className="p-4 text-right">
-                                            <button onClick={() => handleDelete(item.id, 'ITEM')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
+                                            <div className="flex items-center justify-end gap-1 relative z-10">
+                                                <button 
+                                                    onClick={() => {
+                                                        setEditingMenuItem(item);
+                                                        setNewMenuItem({
+                                                            name: item.name,
+                                                            price: item.price,
+                                                            category: item.category,
+                                                            description: item.description || ''
+                                                        });
+                                                        setShowMenuItemForm(true);
+                                                    }}
+                                                    className="text-emerald-600 hover:text-emerald-700 p-2 relative z-10 cursor-pointer" 
+                                                    title="Edit"
+                                                    type="button"
+                                                >
+                                                    <Pencil size={16}/>
+                                                </button>
+                                                <button onClick={() => handleDelete(item.id, 'ITEM')} className="text-red-500 hover:text-red-700 p-2 relative z-10 cursor-pointer" type="button"><Trash2 size={16}/></button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                        </>
                     )}
                     
                     {tab === 'EVENTS' && (
@@ -2067,6 +2426,217 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     )}
                     
                     {tab === 'GUESTS' && (
+                        <>
+                            {/* Guest Edit Modal */}
+                            {showGuestEditForm && (
+                                <div 
+                                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in"
+                                    onClick={() => {
+                                        setEditingGuest(null);
+                                        setEditGuest({ lastName: '', roomNumber: '', villaType: '', language: 'English', checkIn: '', checkOut: '' });
+                                        setShowGuestEditForm(false);
+                                    }}
+                                >
+                                    <div 
+                                        className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[90vw] max-w-2xl p-6 animate-in slide-in-from-top-5 relative max-h-[90vh] overflow-y-auto"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <button
+                                            onClick={() => {
+                                                setEditingGuest(null);
+                                                setEditGuest({ lastName: '', roomNumber: '', villaType: '', language: 'English', checkIn: '', checkOut: '' });
+                                                setShowGuestEditForm(false);
+                                            }}
+                                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                                            aria-label="Close"
+                                        >
+                                            <X size={20} />
+                                        </button>
+                                        <h3 className="text-lg font-bold text-gray-800 mb-4 pr-8">Edit Guest</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Last Name</label>
+                                                <input 
+                                                    type="text"
+                                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                    value={editGuest.lastName || ''}
+                                                    onChange={e => setEditGuest({...editGuest, lastName: e.target.value})}
+                                                    placeholder="e.g. Smith"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Room Number</label>
+                                                <input 
+                                                    type="text"
+                                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                    value={editGuest.roomNumber || ''}
+                                                    onChange={e => setEditGuest({...editGuest, roomNumber: e.target.value})}
+                                                    placeholder="e.g. 101"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Villa Type</label>
+                                                <select 
+                                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                    value={editGuest.villaType || ''}
+                                                    onChange={e => setEditGuest({...editGuest, villaType: e.target.value})}
+                                                >
+                                                    <option value="">Select Villa Type</option>
+                                                    {roomTypes.map(rt => (
+                                                        <option key={rt.id} value={rt.name}>{rt.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Language</label>
+                                                <select 
+                                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                                    value={editGuest.language || 'English'}
+                                                    onChange={e => setEditGuest({...editGuest, language: e.target.value})}
+                                                >
+                                                    <option value="English">English</option>
+                                                    <option value="Vietnamese">Vietnamese</option>
+                                                    <option value="Korean">Korean</option>
+                                                    <option value="Japanese">Japanese</option>
+                                                    <option value="Chinese">Chinese</option>
+                                                    <option value="French">French</option>
+                                                    <option value="Russian">Russian</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Check-In Date</label>
+                                                <input 
+                                                    type="datetime-local"
+                                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-white text-gray-900 cursor-pointer"
+                                                    value={(() => {
+                                                        if (!editGuest.checkIn || editGuest.checkIn === '') return '';
+                                                        const dateStr = editGuest.checkIn as string;
+                                                        // If already in datetime-local format (YYYY-MM-DDTHH:mm)
+                                                        if (dateStr.includes('T') && !dateStr.includes('Z') && dateStr.length >= 16) {
+                                                            return dateStr.slice(0, 16);
+                                                        }
+                                                        // Convert from ISO string to datetime-local format
+                                                        try {
+                                                            const date = new Date(dateStr);
+                                                            if (isNaN(date.getTime())) return '';
+                                                            const year = date.getFullYear();
+                                                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                                                            const day = String(date.getDate()).padStart(2, '0');
+                                                            const hours = String(date.getHours()).padStart(2, '0');
+                                                            const minutes = String(date.getMinutes()).padStart(2, '0');
+                                                            return `${year}-${month}-${day}T${hours}:${minutes}`;
+                                                        } catch (e) {
+                                                            return '';
+                                                        }
+                                                    })()}
+                                                    onChange={e => {
+                                                        const value = e.target.value;
+                                                        setEditGuest({
+                                                            ...editGuest, 
+                                                            checkIn: value || ''
+                                                        });
+                                                    }}
+                                                    onClick={(e) => {
+                                                        // Ensure input is focused and calendar opens
+                                                        e.currentTarget.focus();
+                                                        e.currentTarget.showPicker?.();
+                                                    }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Check-Out Date</label>
+                                                <input 
+                                                    type="datetime-local"
+                                                    className="w-full border border-gray-300 rounded p-2 text-sm bg-white text-gray-900 cursor-pointer"
+                                                    value={(() => {
+                                                        if (!editGuest.checkOut || editGuest.checkOut === '') return '';
+                                                        const dateStr = editGuest.checkOut as string;
+                                                        // If already in datetime-local format (YYYY-MM-DDTHH:mm)
+                                                        if (dateStr.includes('T') && !dateStr.includes('Z') && dateStr.length >= 16) {
+                                                            return dateStr.slice(0, 16);
+                                                        }
+                                                        // Convert from ISO string to datetime-local format
+                                                        try {
+                                                            const date = new Date(dateStr);
+                                                            if (isNaN(date.getTime())) return '';
+                                                            const year = date.getFullYear();
+                                                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                                                            const day = String(date.getDate()).padStart(2, '0');
+                                                            const hours = String(date.getHours()).padStart(2, '0');
+                                                            const minutes = String(date.getMinutes()).padStart(2, '0');
+                                                            return `${year}-${month}-${day}T${hours}:${minutes}`;
+                                                        } catch (e) {
+                                                            return '';
+                                                        }
+                                                    })()}
+                                                    onChange={e => {
+                                                        const value = e.target.value;
+                                                        setEditGuest({
+                                                            ...editGuest, 
+                                                            checkOut: value || ''
+                                                        });
+                                                    }}
+                                                    onClick={(e) => {
+                                                        // Ensure input is focused and calendar opens
+                                                        e.currentTarget.focus();
+                                                        e.currentTarget.showPicker?.();
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-end gap-2">
+                                            <button 
+                                                onClick={() => {
+                                                    setEditingGuest(null);
+                                                    setEditGuest({ lastName: '', roomNumber: '', villaType: '', language: 'English', checkIn: '', checkOut: '' });
+                                                    setShowGuestEditForm(false);
+                                                }}
+                                                className="bg-gray-500 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-gray-600"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button 
+                                                onClick={async () => {
+                                                    if (!editGuest.lastName || !editGuest.roomNumber) {
+                                                        alert('Please enter last name and room number.');
+                                                        return;
+                                                    }
+                                                    try {
+                                                        if (editingGuest && editingGuest.id) {
+                                                            // Convert datetime-local format to ISO string for database
+                                                            const userToUpdate: Partial<User> = {
+                                                                ...editGuest,
+                                                                checkIn: editGuest.checkIn && editGuest.checkIn.trim() !== '' 
+                                                                    ? (editGuest.checkIn.includes('T') && !editGuest.checkIn.includes('Z') 
+                                                                        ? new Date(editGuest.checkIn).toISOString() 
+                                                                        : editGuest.checkIn)
+                                                                    : undefined,
+                                                                checkOut: editGuest.checkOut && editGuest.checkOut.trim() !== '' 
+                                                                    ? (editGuest.checkOut.includes('T') && !editGuest.checkOut.includes('Z') 
+                                                                        ? new Date(editGuest.checkOut).toISOString() 
+                                                                        : editGuest.checkOut)
+                                                                    : undefined
+                                                            };
+                                                            await updateUser(editingGuest.id, userToUpdate as User);
+                                                            setEditingGuest(null);
+                                                            alert(`Guest "${editGuest.lastName}" updated successfully!`);
+                                                        }
+                                                        setEditGuest({ lastName: '', roomNumber: '', villaType: '', language: 'English', checkIn: '', checkOut: '' });
+                                                        setShowGuestEditForm(false);
+                                                        await refreshData();
+                                                    } catch (error) {
+                                                        console.error('Failed to save guest:', error);
+                                                        alert('Failed to save guest. Please try again.');
+                                                    }
+                                                }}
+                                                className="bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700"
+                                            >
+                                                Update Guest
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         <table className="w-full text-left">
                             <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
@@ -2108,13 +2678,51 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                                 </span>
                                             </td>
                                             <td className="p-4 text-right">
-                                                <button onClick={() => handleDelete(u.id || '', 'USER')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
+                                                <div className="flex items-center justify-end gap-1 relative z-10">
+                                                    <button 
+                                                        onClick={() => {
+                                                            setEditingGuest(u);
+                                                            // Convert checkIn/checkOut to local datetime format for input
+                                                            const formatForInput = (dateStr: string | undefined): string => {
+                                                                if (!dateStr) return '';
+                                                                try {
+                                                                    const date = new Date(dateStr);
+                                                                    if (isNaN(date.getTime())) return '';
+                                                                    const year = date.getFullYear();
+                                                                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                                                                    const day = String(date.getDate()).padStart(2, '0');
+                                                                    const hours = String(date.getHours()).padStart(2, '0');
+                                                                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                                                                    return `${year}-${month}-${day}T${hours}:${minutes}`;
+                                                                } catch (e) {
+                                                                    return '';
+                                                                }
+                                                            };
+                                                            setEditGuest({
+                                                                lastName: u.lastName,
+                                                                roomNumber: u.roomNumber,
+                                                                villaType: u.villaType || '',
+                                                                language: u.language || 'English',
+                                                                checkIn: formatForInput(u.checkIn),
+                                                                checkOut: formatForInput(u.checkOut)
+                                                            });
+                                                            setShowGuestEditForm(true);
+                                                        }}
+                                                        className="text-emerald-600 hover:text-emerald-700 p-2 relative z-10 cursor-pointer" 
+                                                        title="Edit"
+                                                        type="button"
+                                                    >
+                                                        <Pencil size={16}/>
+                                                    </button>
+                                                    <button onClick={() => handleDelete(u.id || '', 'USER')} className="text-red-500 hover:text-red-700 p-2 relative z-10 cursor-pointer" type="button"><Trash2 size={16}/></button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );
                                 })}
                             </tbody>
                         </table>
+                        </>
                     )}
                     
                     {tab === 'HISTORY' && (

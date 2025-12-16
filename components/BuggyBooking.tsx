@@ -2,10 +2,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapPin, Clock, Car, Navigation, LocateFixed, XCircle, Search, Utensils, Coffee, Waves, Building2, CheckCircle, Loader2 } from 'lucide-react';
 import { BuggyStatus, User, RideRequest, Location } from '../types';
-import { getLocations, requestRide, getActiveRideForUser, cancelRide } from '../services/dataService';
+import { getLocations, requestRide, getActiveRideForUser, cancelRide, getUsers } from '../services/dataService';
 import { THEME_COLORS, RESORT_CENTER } from '../constants';
 import ServiceChat from './ServiceChat';
 import { useTranslation } from '../contexts/LanguageContext';
+import Loading from './Loading';
 
 interface BuggyBookingProps {
   user: User;
@@ -19,10 +20,11 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [destination, setDestination] = useState<string>('');
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoadingRide, setIsLoadingRide] = useState(true);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(true);
   const [elapsedTime, setElapsedTime] = useState<number>(0); // Time elapsed in seconds (for SEARCHING)
   const [arrivingElapsedTime, setArrivingElapsedTime] = useState<number>(0); // Time elapsed since driver accepted (for ASSIGNED/ARRIVING)
   const [searchQuery, setSearchQuery] = useState<string>(''); // Search query for locations
-  const [filterType, setFilterType] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('ALL'); // Filter by location type
+  const [filterType, setFilterType] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('VILLA'); // Filter by location type - default to Villas
   const [isBooking, setIsBooking] = useState(false); // Prevent double-click/multiple submissions
   
   // Completion Modal & Rating State
@@ -36,6 +38,9 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   
   // Notification State
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'info' | 'warning'} | null>(null);
+  
+  // Driver name state for chat label
+  const [driverName, setDriverName] = useState<string>(t('driver'));
   
   // Sound notification state
   const [soundEnabled, setSoundEnabled] = useState(() => {
@@ -81,44 +86,60 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   
   // Load locations on mount
   useEffect(() => {
-    getLocations().then(setLocations).catch(console.error);
+    setIsLoadingLocations(true);
+    getLocations()
+      .then(setLocations)
+      .catch(console.error)
+      .finally(() => setIsLoadingLocations(false));
   }, []);
 
+
+  // Use refs to track previous values without causing re-renders
+  const previousStatusRef = useRef<BuggyStatus | null>(null);
+  const activeRideRef = useRef<RideRequest | undefined>(undefined);
 
   // Load active ride on mount and polling for ride updates
   useEffect(() => {
       const checkStatus = async () => {
           try {
               const ride = await getActiveRideForUser(user.roomNumber);
+              const currentPreviousStatus = previousStatusRef.current;
+              const currentActiveRide = activeRideRef.current;
               
               // Detect when ride was ON_TRIP but now is undefined (completed)
               // getActiveRideForUser doesn't return completed rides, so if we had ON_TRIP and now it's undefined, it means completed
-              if (previousStatus === BuggyStatus.ON_TRIP && !ride && activeRide) {
+              if (currentPreviousStatus === BuggyStatus.ON_TRIP && !ride && currentActiveRide) {
                   // Ride was completed - just clear the active ride
                   setActiveRide(undefined);
-                  setPreviousStatus(null);
+                  previousStatusRef.current = null;
+                  activeRideRef.current = undefined;
                   setNotification({ message: '🎊 Ride completed successfully!', type: 'success' });
                   playNotificationSound(); // Play sound when ride completed
                   return; // Exit early to prevent further processing
               }
               
               // Detect status changes for notifications
-              if (ride && previousStatus !== null && previousStatus !== ride.status) {
-                  if (previousStatus === BuggyStatus.SEARCHING && ride.status === BuggyStatus.ASSIGNED) {
+              if (ride && currentPreviousStatus !== null && currentPreviousStatus !== ride.status) {
+                  if (currentPreviousStatus === BuggyStatus.SEARCHING && ride.status === BuggyStatus.ASSIGNED) {
                       setNotification({ message: '🎉 Driver accepted your ride!', type: 'success' });
                       playNotificationSound(); // Play sound when driver accepts
-                  } else if (previousStatus === BuggyStatus.ASSIGNED && ride.status === BuggyStatus.ARRIVING) {
+                  } else if (currentPreviousStatus === BuggyStatus.ASSIGNED && ride.status === BuggyStatus.ARRIVING) {
                       setNotification({ message: '🚗 Driver is arriving!', type: 'info' });
                       playNotificationSound(); // Play sound when driver is arriving
-                  } else if (previousStatus === BuggyStatus.ARRIVING && ride.status === BuggyStatus.ON_TRIP) {
+                  } else if (currentPreviousStatus === BuggyStatus.ARRIVING && ride.status === BuggyStatus.ON_TRIP) {
                       setNotification({ message: '✅ You\'ve been picked up!', type: 'success' });
                       playNotificationSound(); // Play sound when picked up
-                  } else if (previousStatus === BuggyStatus.ON_TRIP && ride.status === BuggyStatus.COMPLETED) {
+                  } else if (currentPreviousStatus === BuggyStatus.ON_TRIP && ride.status === BuggyStatus.COMPLETED) {
                       setNotification({ message: '🎊 Ride completed successfully!', type: 'success' });
                       playNotificationSound(); // Play sound when ride completed
                   }
               }
               
+              // Update refs
+              previousStatusRef.current = ride?.status || null;
+              activeRideRef.current = ride;
+              
+              // Update state
               setPreviousStatus(ride?.status || null);
               setActiveRide(ride);
               // Restore destination from active ride if exists
@@ -133,9 +154,84 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       };
       
       checkStatus(); // Check immediately on mount
-      const interval = setInterval(checkStatus, 3000); // Poll every 3 seconds
-      return () => clearInterval(interval);
-  }, [user.roomNumber, previousStatus, activeRide]);
+      
+      // Adaptive polling: faster when there's an active ride (3s), slower when no ride (10s)
+      let interval: NodeJS.Timeout;
+      const scheduleNext = () => {
+          const pollingInterval = activeRideRef.current ? 3000 : 10000;
+          interval = setTimeout(() => {
+              checkStatus();
+              scheduleNext();
+          }, pollingInterval);
+      };
+      
+      scheduleNext();
+      
+      return () => {
+          if (interval) clearTimeout(interval);
+      };
+  }, [user.roomNumber]); // Only depend on roomNumber to avoid recreating interval
+
+  // Cache for driver names to avoid repeated API calls
+  const driverNameCacheRef = useRef<Record<string, string>>({});
+
+  // Fetch driver name when activeRide has driverId (only when driverId changes)
+  useEffect(() => {
+      const fetchDriverName = async () => {
+          if (!activeRide) {
+              setDriverName(t('driver'));
+              return;
+          }
+
+          // If ride is still searching, show searching status
+          if (activeRide.status === BuggyStatus.SEARCHING) {
+              setDriverName(`${t('driver')} (${t('finding_driver')})`);
+              return;
+          }
+
+          // If ride has driverId, fetch driver name (only if not cached)
+          if (activeRide.driverId) {
+              const driverIdStr = String(activeRide.driverId);
+              
+              // Check cache first
+              if (driverNameCacheRef.current[driverIdStr]) {
+                  setDriverName(driverNameCacheRef.current[driverIdStr]);
+                  return;
+              }
+
+              try {
+                  const users = await getUsers();
+                  const driver = users.find(u => {
+                      const userIdStr = String(u.id || '');
+                      return userIdStr === driverIdStr;
+                  });
+                  
+                  if (driver && driver.lastName) {
+                      // Cache the driver name
+                      driverNameCacheRef.current[driverIdStr] = driver.lastName;
+                      setDriverName(driver.lastName);
+                      console.log('[BuggyBooking] Driver name found:', driver.lastName, 'for driverId:', driverIdStr);
+                  } else {
+                      console.warn('[BuggyBooking] Driver not found for driverId:', driverIdStr);
+                      // Fallback: show driver with status
+                      const statusLabel = activeRide.status === BuggyStatus.ASSIGNED ? t('driver_assigned') :
+                                        activeRide.status === BuggyStatus.ARRIVING ? t('driver_arriving') :
+                                        activeRide.status === BuggyStatus.ON_TRIP ? t('en_route') :
+                                        t('driver');
+                      setDriverName(`${t('driver')} (${statusLabel})`);
+                  }
+              } catch (error) {
+                  console.error('[BuggyBooking] Failed to fetch driver name:', error);
+                  setDriverName(t('driver'));
+              }
+          } else {
+              // No driver assigned yet
+              setDriverName(`${t('driver')} (${t('finding_driver')})`);
+          }
+      };
+      
+      fetchDriverName();
+  }, [activeRide?.driverId, activeRide?.status, t]); // Removed activeRide and user.roomNumber from deps
   
   // Auto-hide notification after 5 seconds
   useEffect(() => {
@@ -372,7 +468,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative z-0 pb-40" style={{ paddingBottom: 'max(10rem, calc(10rem + env(safe-area-inset-bottom)))' }}>
       
       {/* Header with gradient and glassmorphism */}
-      <div className={`p-1 text-white shadow-lg backdrop-blur-md bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 flex items-center flex-shrink-0 relative z-10 border-b border-white/20`}>
+      <div className={`px-3 py-2 text-white shadow-lg backdrop-blur-md bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 flex items-center flex-shrink-0 relative z-10 border-b border-white/20`}>
         <button 
           onClick={onBack} 
           className="mr-2.5 text-white/90 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-all duration-300"
@@ -380,8 +476,8 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
           <Navigation className="w-4 h-4 rotate-180" />
         </button>
         <div className="flex-1">
-          <h2 className="text-lg font-bold tracking-tight">{t('buggy_service')}</h2>
-          <p className="text-[10px] text-white/80 mt-0.5">Fast & Convenient Transportation</p>
+          <h2 className="text-base font-bold tracking-tight leading-tight">{t('buggy_service')}</h2>
+          <p className="text-[10px] text-white/80 mt-0.5 leading-tight">Fast & Convenient Transportation</p>
         </div>
         <Car className="w-5 h-5 text-white/20" />
       </div>
@@ -637,8 +733,15 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         </div>
       )}
 
+      {/* Loading State */}
+      {(isLoadingRide || isLoadingLocations) && (
+        <div className="flex-1 flex items-center justify-center">
+          <Loading size="md" message={t('loading') || 'Loading...'} />
+        </div>
+      )}
+
       {/* Booking Form - Modern glassmorphism design */}
-      {!activeRide && !isLoadingRide && (
+      {!activeRide && !isLoadingRide && !isLoadingLocations && (
         <div 
           className="mx-3 mt-3 mb-40 rounded-3xl shadow-2xl backdrop-blur-lg bg-white/95 border border-white/60 flex-shrink-0 flex flex-col overflow-hidden"
           style={{
@@ -691,16 +794,6 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                     <label className="text-[10px] font-semibold text-gray-600 mb-1 block">Category</label>
                     <div className="flex flex-wrap gap-1.5">
                         <button
-                            onClick={() => setFilterType('ALL')}
-                            className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-all duration-300 ${
-                                filterType === 'ALL'
-                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-300/50'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                            All Locations
-                        </button>
-                        <button
                             onClick={() => setFilterType('VILLA')}
                             className={`px-3 py-1 text-[11px] font-bold rounded-full transition-all duration-300 flex items-center gap-1 ${
                                 filterType === 'VILLA'
@@ -720,7 +813,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                             }`}
                         >
                             <Waves className="w-3 h-3" />
-                            Facilities
+                            Public Areas
                         </button>
                         <button
                             onClick={() => setFilterType('RESTAURANT')}
@@ -732,6 +825,16 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                         >
                             <Utensils className="w-3 h-3" />
                             Restaurants
+                        </button>
+                        <button
+                            onClick={() => setFilterType('ALL')}
+                            className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-all duration-300 ${
+                                filterType === 'ALL'
+                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-300/50'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                        >
+                            All Locations
                         </button>
                     </div>
                 </div>
@@ -753,14 +856,15 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                                 <button
                                     key={loc.id || loc.name}
                                     onClick={() => handleSetDestination(loc.name)}
-                                    className={`group relative aspect-square p-2 rounded-xl border-2 transition-all duration-300 flex flex-col items-center justify-center ${
+                                    title={loc.name}
+                                    className={`group relative min-h-[80px] h-auto p-1.5 rounded-xl border-2 transition-all duration-300 flex flex-col items-center justify-center ${
                                         destinationToShow === loc.name
-                                            ? 'bg-gradient-to-br from-amber-400 to-orange-500 border-amber-500 shadow-lg shadow-amber-300/50 scale-105'
-                                            : 'bg-white border-gray-300 hover:border-emerald-400 hover:bg-gradient-to-br hover:from-emerald-50 hover:to-teal-50 hover:shadow-md hover:scale-102'
+                                            ? 'bg-gradient-to-br from-amber-400 to-orange-500 border-amber-500 shadow-lg shadow-amber-300/50'
+                                            : 'bg-white border-gray-300 hover:border-emerald-400 hover:bg-gradient-to-br hover:from-emerald-50 hover:to-teal-50 hover:shadow-md'
                                     }`}
                                 >
                                     {/* Icon */}
-                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center mb-1 transition-all ${
+                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center mb-1 flex-shrink-0 transition-all ${
                                         destinationToShow === loc.name 
                                             ? 'bg-white/30' 
                                             : 'bg-gradient-to-br from-emerald-100 to-teal-100 group-hover:from-emerald-200 group-hover:to-teal-200'
@@ -771,7 +875,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                                     </div>
                                     
                                     {/* Name */}
-                                    <div className={`text-[10px] font-bold text-center leading-tight px-0.5 ${
+                                    <div className={`text-[10px] font-bold text-center leading-tight px-0.5 break-words ${
                                         destinationToShow === loc.name ? 'text-white' : 'text-gray-800'
                                     }`}>
                                         {loc.name}
@@ -796,23 +900,8 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                 </div>
             </div>
 
-            {/* Fixed Footer Section - Selected Destination & Book Button */}
+            {/* Fixed Footer Section - Book Button */}
             <div className="p-4 pt-1.5 flex-shrink-0 space-y-1.5 border-t border-gray-100 bg-gradient-to-b from-white/50 to-white/95">
-                {/* Selected Destination Display */}
-                {destination && (
-                    <div className="relative group animate-in slide-in-from-bottom duration-300">
-                        <label className="text-[10px] font-semibold text-amber-600 mb-1 block">Selected Destination</label>
-                        <div className="relative overflow-hidden">
-                            <Navigation className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-600 w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
-                            <div className="w-full pl-9 pr-3 py-2.5 text-sm bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-2 border-amber-300 rounded-lg text-gray-800 font-bold shadow-sm">
-                                {destination}
-                            </div>
-                            {/* Animated shine effect */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-                        </div>
-                    </div>
-                )}
-
                 {/* Book Button with modern gradient and hover effects */}
                 <button 
                     onClick={handleBook}
@@ -847,12 +936,14 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         </div>
       )}
 
-      {/* Chat Widget: Connected to 'BUGGY' service */}
-      <ServiceChat 
-        serviceType="BUGGY" 
-        roomNumber={user.roomNumber} 
-        label={t('driver')}
-      />
+      {/* Chat Widget: Connected to 'BUGGY' service - Only show when driver has accepted */}
+      {activeRide && activeRide.status !== BuggyStatus.SEARCHING && (
+        <ServiceChat 
+          serviceType="BUGGY" 
+          roomNumber={user.roomNumber} 
+          label={driverName}
+        />
+      )}
 
       {/* Notification Toast */}
       {notification && (

@@ -209,8 +209,8 @@ export const getUsers = async (): Promise<User[]> => {
       villaType: user.villa_type || undefined,
       role: user.role as UserRole,
       department: 'All' as Department, // Default, database doesn't have department field
-      checkIn: user.check_in || undefined,
-      checkOut: user.check_out || undefined,
+      checkIn: user.check_in ? (typeof user.check_in === 'string' ? user.check_in : new Date(user.check_in).toISOString()) : undefined,
+      checkOut: user.check_out ? (typeof user.check_out === 'string' ? user.check_out : new Date(user.check_out).toISOString()) : undefined,
       language: user.language || undefined,
       notes: user.notes || undefined,
       updatedAt: user.updated_at ? new Date(user.updated_at).getTime() : undefined,
@@ -235,7 +235,7 @@ export const getUsersSync = () => users;
 
 export const addUser = async (user: User): Promise<void> => {
   try {
-    const requestBody = {
+    const requestBody: any = {
       last_name: user.lastName,
       room_number: user.roomNumber,
       villa_type: user.villaType || null,
@@ -243,6 +243,14 @@ export const addUser = async (user: User): Promise<void> => {
       password: user.password || '123', // Default password for new users
       language: user.language || 'English'
     };
+    
+    // Add check_in/check_out if provided
+    if (user.checkIn) {
+      requestBody.check_in = user.checkIn;
+    }
+    if (user.checkOut) {
+      requestBody.check_out = user.checkOut;
+    }
     
     console.log('Adding user via API - Input:', user);
     console.log('Adding user via API - Request Body:', requestBody);
@@ -260,8 +268,8 @@ export const addUser = async (user: User): Promise<void> => {
       villaType: dbUser.villa_type || undefined,
       role: dbUser.role as UserRole,
       department: 'All' as Department,
-      checkIn: dbUser.check_in || undefined,
-      checkOut: dbUser.check_out || undefined,
+      checkIn: dbUser.check_in ? (typeof dbUser.check_in === 'string' ? dbUser.check_in : new Date(dbUser.check_in).toISOString()) : undefined,
+      checkOut: dbUser.check_out ? (typeof dbUser.check_out === 'string' ? dbUser.check_out : new Date(dbUser.check_out).toISOString()) : undefined,
       language: dbUser.language || undefined
     };
     
@@ -278,6 +286,61 @@ export const addUser = async (user: User): Promise<void> => {
     console.warn('Falling back to local mock data. User will NOT be saved to database!');
     // Fallback to local state
     users = [...users, { ...user, id: Date.now().toString(), password: user.password || '123' }];
+    throw error;
+  }
+};
+
+export const updateUser = async (id: string, user: Partial<User>): Promise<User> => {
+  try {
+    const requestBody: any = {};
+    
+    if (user.lastName !== undefined) requestBody.last_name = user.lastName;
+    if (user.roomNumber !== undefined) requestBody.room_number = user.roomNumber;
+    if (user.villaType !== undefined) requestBody.villa_type = user.villaType || null;
+    if (user.language !== undefined) requestBody.language = user.language || 'English';
+    if (user.notes !== undefined) requestBody.notes = user.notes || null;
+    if (user.checkIn !== undefined) requestBody.check_in = user.checkIn || null;
+    if (user.checkOut !== undefined) requestBody.check_out = user.checkOut || null;
+    
+    console.log('Updating user via API - ID:', id);
+    console.log('Updating user via API - Request Body:', requestBody);
+    
+    const dbUser = await apiClient.put<any>(`/users/${id}`, requestBody);
+    
+    console.log('User updated successfully - API Response:', dbUser);
+    
+    // Update local cache
+    const updatedUser: User = {
+      id: dbUser.id.toString(),
+      lastName: dbUser.last_name,
+      roomNumber: dbUser.room_number,
+      password: dbUser.password || undefined,
+      villaType: dbUser.villa_type || undefined,
+      role: dbUser.role as UserRole,
+      department: 'All' as Department,
+      checkIn: dbUser.check_in ? (typeof dbUser.check_in === 'string' ? dbUser.check_in : new Date(dbUser.check_in).toISOString()) : undefined,
+      checkOut: dbUser.check_out ? (typeof dbUser.check_out === 'string' ? dbUser.check_out : new Date(dbUser.check_out).toISOString()) : undefined,
+      language: dbUser.language || undefined,
+      notes: dbUser.notes || undefined
+    };
+    
+    const existingIndex = users.findIndex(u => u.id === id);
+    if (existingIndex >= 0) {
+      users[existingIndex] = updatedUser;
+    } else {
+      users = [updatedUser, ...users];
+    }
+    
+    console.log('User updated in local cache:', updatedUser);
+    return updatedUser;
+  } catch (error: any) {
+    console.error('Failed to update user via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
     throw error;
   }
 };
@@ -682,24 +745,130 @@ export const addLocation = async (loc: Location): Promise<void> => {
   }
 };
 
+export const updateLocation = async (id: string, loc: Partial<Location>): Promise<Location> => {
+  try {
+    const requestBody: any = {};
+    if (loc.name !== undefined) requestBody.name = loc.name;
+    if (loc.lat !== undefined) requestBody.lat = loc.lat;
+    if (loc.lng !== undefined) requestBody.lng = loc.lng;
+    if (loc.type !== undefined) requestBody.type = loc.type || null;
+    
+    console.log('Updating location via API - ID:', id);
+    console.log('Updating location via API - Request Body:', requestBody);
+    
+    const dbLocation = await apiClient.put<any>(`/locations/${id}`, requestBody);
+    
+    console.log('Location updated successfully - API Response:', dbLocation);
+    
+    // Update local cache
+    const updatedLocation: Location = {
+      id: dbLocation.id.toString(),
+      lat: parseFloat(dbLocation.lat),
+      lng: parseFloat(dbLocation.lng),
+      name: dbLocation.name,
+      type: dbLocation.type as 'VILLA' | 'FACILITY' | 'RESTAURANT'
+    };
+    
+    const existingIndex = locations.findIndex(l => l.id === id);
+    if (existingIndex >= 0) {
+      locations[existingIndex] = updatedLocation;
+    } else {
+      locations = [updatedLocation, ...locations];
+    }
+    
+    console.log('Location updated in local cache:', updatedLocation);
+    return updatedLocation;
+  } catch (error) {
+    console.error('Failed to update location:', error);
+    throw error;
+  }
+};
+
 export const deleteLocation = async (idOrName: string): Promise<void> => {
   try {
-    // Try to find location by name first (for backward compatibility)
-    const location = locations.find(l => l.name === idOrName || l.id === idOrName);
+    console.log('[deleteLocation] Attempting to delete location with id/name:', idOrName);
+    console.log('[deleteLocation] Current locations cache:', locations.map(l => ({ id: l.id, name: l.name, idType: typeof l.id })));
+    
+    // Try to find location by ID or name (handle both string and number ID comparison)
+    const location = locations.find(l => {
+      // Compare by name
+      if (l.name === idOrName) return true;
+      // Compare by ID (handle both string and number)
+      if (l.id) {
+        const locationId = String(l.id);
+        const searchId = String(idOrName);
+        if (locationId === searchId) return true;
+      }
+      return false;
+    });
+    
+    console.log('[deleteLocation] Found location:', location);
     
     if (location && location.id) {
       // Try to delete by ID
-      await apiClient.delete(`/locations/${location.id}`);
-      // Update local cache
-      locations = locations.filter(l => l.id !== location.id);
+      const locationId = String(location.id);
+      console.log('[deleteLocation] Deleting via API with ID:', locationId);
+      const deleteResult = await apiClient.delete(`/locations/${locationId}`);
+      console.log('[deleteLocation] API delete successful, response:', deleteResult);
+      // Update local cache - compare IDs as strings to handle type mismatch
+      const beforeCount = locations.length;
+      locations = locations.filter(l => {
+        if (!l.id) return true;
+        return String(l.id) !== locationId;
+      });
+      const afterCount = locations.length;
+      console.log(`[deleteLocation] Local cache updated: ${beforeCount} -> ${afterCount} locations`);
     } else {
-      // Fallback: delete by name from local state
-      locations = locations.filter(l => l.name !== idOrName);
+      console.warn('[deleteLocation] Location not found in cache, trying to delete directly via API');
+      // Try to delete directly via API using idOrName (could be ID or name)
+      try {
+        const deleteResult = await apiClient.delete(`/locations/${idOrName}`);
+        console.log('[deleteLocation] API delete successful (direct delete), response:', deleteResult);
+        // Refresh locations from API to update cache
+        try {
+          const refreshedLocations = await apiClient.get<any[]>('/locations');
+          locations = refreshedLocations.map(loc => ({
+            id: loc.id.toString(),
+            lat: parseFloat(loc.lat),
+            lng: parseFloat(loc.lng),
+            name: loc.name,
+            type: loc.type as 'VILLA' | 'FACILITY' | 'RESTAURANT'
+          }));
+          console.log('[deleteLocation] Locations cache refreshed from API');
+        } catch (refreshError) {
+          console.error('[deleteLocation] Failed to refresh locations after delete:', refreshError);
+          // Fallback: try to remove from local cache by name
+          const beforeCount = locations.length;
+          locations = locations.filter(l => l.name !== idOrName);
+          const afterCount = locations.length;
+          console.log(`[deleteLocation] Fallback local delete: ${beforeCount} -> ${afterCount} locations`);
+        }
+      } catch (apiError) {
+        console.error('[deleteLocation] Direct API delete failed:', apiError);
+        // Final fallback: delete by name from local state
+        const beforeCount = locations.length;
+        locations = locations.filter(l => l.name !== idOrName);
+        const afterCount = locations.length;
+        console.log(`[deleteLocation] Final fallback local delete: ${beforeCount} -> ${afterCount} locations`);
+        if (beforeCount === afterCount) {
+          console.warn('[deleteLocation] No location was deleted! Location may not exist.');
+        }
+        throw apiError;
+      }
     }
-  } catch (error) {
-    console.error('Failed to delete location:', error);
+  } catch (error: any) {
+    console.error('[deleteLocation] Failed to delete location:', error);
+    console.error('[deleteLocation] Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      data: error?.response?.data
+    });
     // Fallback to local state
+    const beforeCount = locations.length;
     locations = locations.filter(l => l.name !== idOrName && l.id !== idOrName);
+    const afterCount = locations.length;
+    console.log(`[deleteLocation] Fallback local delete: ${beforeCount} -> ${afterCount} locations`);
     throw error;
   }
 };
@@ -1036,6 +1205,53 @@ export const addMenuItem = async (item: MenuItem): Promise<void> => {
     console.warn('Falling back to local mock data. Menu item will NOT be saved to database!');
     // Fallback to local state
     menuItems = [...menuItems, { ...item, id: Date.now().toString() }];
+    throw error;
+  }
+};
+
+export const updateMenuItem = async (id: string, item: Partial<MenuItem>): Promise<MenuItem> => {
+  try {
+    const language = getCurrentLanguage();
+    const requestBody: any = {};
+    if (item.name !== undefined) requestBody.name = item.name;
+    if (item.price !== undefined) requestBody.price = item.price;
+    if (item.category !== undefined) requestBody.category = item.category;
+    if (item.description !== undefined) requestBody.description = item.description || null;
+    requestBody.language = language;
+    
+    console.log('Updating menu item via API - ID:', id);
+    console.log('Updating menu item via API - Request Body:', requestBody);
+    
+    const dbMenuItem = await apiClient.put<any>(`/menu-items/${id}`, requestBody);
+    
+    console.log('Menu item updated successfully - API Response:', dbMenuItem);
+    
+    // Update local cache
+    const updatedItem: MenuItem = {
+      id: dbMenuItem.id.toString(),
+      name: dbMenuItem.name,
+      price: parseFloat(dbMenuItem.price),
+      category: dbMenuItem.category as 'Dining' | 'Spa' | 'Pool' | 'Butler',
+      description: dbMenuItem.description || undefined
+    };
+    
+    const existingIndex = menuItems.findIndex(m => m.id === id);
+    if (existingIndex >= 0) {
+      menuItems[existingIndex] = updatedItem;
+    } else {
+      menuItems = [updatedItem, ...menuItems];
+    }
+    
+    console.log('Menu item updated in local cache:', updatedItem);
+    return updatedItem;
+  } catch (error: any) {
+    console.error('Failed to update menu item via API:', error);
+    console.error('Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      body: error?.response?.body
+    });
     throw error;
   }
 };
@@ -1888,6 +2104,20 @@ export const addServiceRequest = async (req: ServiceRequest): Promise<ServiceReq
     });
     
     // Re-throw error so component can handle it
+    throw error;
+  }
+};
+
+export const cancelServiceRequest = async (id: string): Promise<void> => {
+  try {
+    await apiClient.delete(`/service-requests/${id}`);
+    
+    // Remove from local cache
+    serviceRequests = serviceRequests.filter(s => s.id !== id);
+    
+    console.log('Service request cancelled successfully:', id);
+  } catch (error) {
+    console.error('Failed to cancel service request:', error);
     throw error;
   }
 };
