@@ -197,9 +197,7 @@ const notifyStaffByDepartment = async (department: string, title: string, messag
 // --- USERS ---
 export const getUsers = async (): Promise<User[]> => {
   try {
-    console.log('Fetching users from API...');
     const dbUsers = await apiClient.get<any[]>('/users');
-    console.log('Users API response:', dbUsers);
     
     const mapped = dbUsers.map(user => ({
       id: user.id.toString(),
@@ -219,7 +217,6 @@ export const getUsers = async (): Promise<User[]> => {
       locationUpdatedAt: user.location_updated_at ? new Date(user.location_updated_at).getTime() : undefined
     }));
     
-    console.log('Mapped users:', mapped);
     // Update local cache
     users = mapped;
     return mapped;
@@ -257,7 +254,6 @@ export const addUser = async (user: User): Promise<void> => {
     
     const dbUser = await apiClient.post<any>('/users', requestBody);
     
-    console.log('User added successfully - API Response:', dbUser);
     
     // Update local cache
     const mappedUser: User = {
@@ -274,7 +270,6 @@ export const addUser = async (user: User): Promise<void> => {
     };
     
     users = [...users, mappedUser];
-    console.log('User added to local cache:', mappedUser);
   } catch (error: any) {
     console.error('Failed to add user via API:', error);
     console.error('Error details:', {
@@ -302,26 +297,52 @@ export const updateUser = async (id: string, user: Partial<User>): Promise<User>
     if (user.checkIn !== undefined) requestBody.check_in = user.checkIn || null;
     if (user.checkOut !== undefined) requestBody.check_out = user.checkOut || null;
     
-    console.log('Updating user via API - ID:', id);
-    console.log('Updating user via API - Request Body:', requestBody);
     
     const dbUser = await apiClient.put<any>(`/users/${id}`, requestBody);
     
-    console.log('User updated successfully - API Response:', dbUser);
+    
+    // If response is null but request was successful, use request body to construct user
+    if (!dbUser) {
+      console.warn('API returned null response, constructing user from request body and existing data');
+      const existingUser = users.find(u => u.id === id);
+      const updatedUser: User = {
+        id: id,
+        lastName: user.lastName !== undefined ? user.lastName : (existingUser?.lastName || ''),
+        roomNumber: user.roomNumber !== undefined ? user.roomNumber : (existingUser?.roomNumber || ''),
+        password: existingUser?.password || undefined,
+        villaType: user.villaType !== undefined ? user.villaType : existingUser?.villaType,
+        role: existingUser?.role || 'GUEST' as UserRole,
+        department: 'All' as Department,
+        checkIn: user.checkIn !== undefined ? user.checkIn : existingUser?.checkIn,
+        checkOut: user.checkOut !== undefined ? user.checkOut : existingUser?.checkOut,
+        language: user.language !== undefined ? user.language : existingUser?.language,
+        notes: user.notes !== undefined ? user.notes : existingUser?.notes
+      };
+      
+      const existingIndex = users.findIndex(u => u.id === id);
+      if (existingIndex >= 0) {
+        users[existingIndex] = updatedUser;
+      } else {
+        users = [updatedUser, ...users];
+      }
+      
+      console.log('User updated in local cache (from request body):', updatedUser);
+      return updatedUser;
+    }
     
     // Update local cache
     const updatedUser: User = {
-      id: dbUser.id.toString(),
-      lastName: dbUser.last_name,
-      roomNumber: dbUser.room_number,
+      id: dbUser.id ? dbUser.id.toString() : id,
+      lastName: dbUser.last_name !== undefined ? dbUser.last_name : (user.lastName !== undefined ? user.lastName : ''),
+      roomNumber: dbUser.room_number !== undefined ? dbUser.room_number : (user.roomNumber !== undefined ? user.roomNumber : ''),
       password: dbUser.password || undefined,
-      villaType: dbUser.villa_type || undefined,
-      role: dbUser.role as UserRole,
+      villaType: dbUser.villa_type !== undefined ? dbUser.villa_type : (user.villaType !== undefined ? user.villaType : undefined),
+      role: dbUser.role ? (dbUser.role as UserRole) : (users.find(u => u.id === id)?.role || 'GUEST' as UserRole),
       department: 'All' as Department,
-      checkIn: dbUser.check_in ? (typeof dbUser.check_in === 'string' ? dbUser.check_in : new Date(dbUser.check_in).toISOString()) : undefined,
-      checkOut: dbUser.check_out ? (typeof dbUser.check_out === 'string' ? dbUser.check_out : new Date(dbUser.check_out).toISOString()) : undefined,
-      language: dbUser.language || undefined,
-      notes: dbUser.notes || undefined
+      checkIn: dbUser.check_in ? (typeof dbUser.check_in === 'string' ? dbUser.check_in : new Date(dbUser.check_in).toISOString()) : (user.checkIn !== undefined ? user.checkIn : undefined),
+      checkOut: dbUser.check_out ? (typeof dbUser.check_out === 'string' ? dbUser.check_out : new Date(dbUser.check_out).toISOString()) : (user.checkOut !== undefined ? user.checkOut : undefined),
+      language: dbUser.language !== undefined ? dbUser.language : (user.language !== undefined ? user.language : undefined),
+      notes: dbUser.notes !== undefined ? dbUser.notes : (user.notes !== undefined ? user.notes : undefined)
     };
     
     const existingIndex = users.findIndex(u => u.id === id);
@@ -331,7 +352,6 @@ export const updateUser = async (id: string, user: Partial<User>): Promise<User>
       users = [updatedUser, ...users];
     }
     
-    console.log('User updated in local cache:', updatedUser);
     return updatedUser;
   } catch (error: any) {
     console.error('Failed to update user via API:', error);
@@ -347,7 +367,6 @@ export const updateUser = async (id: string, user: Partial<User>): Promise<User>
 
 export const deleteUser = async (id: string): Promise<void> => {
   try {
-    console.log('Deleting user via API:', id);
     await apiClient.delete(`/users/${id}`);
     console.log('User deleted successfully from database');
     // Update local cache
@@ -393,40 +412,25 @@ export const resetUserPassword = async (userId: string, newPass: string): Promis
 
 export const updateUserNotes = async (roomNumber: string, notes: string): Promise<void> => {
   try {
-    console.log('=== updateUserNotes START ===');
-    console.log('Parameters:', { roomNumber, notes });
-    
     // Get user by room number first
-    console.log('Step 1: Fetching user by room number...');
     const user = await apiClient.get<any>(`/users/room/${roomNumber}`);
-    console.log('Step 1: User found:', user);
     
     if (!user || !user.id) {
       const error = new Error('User not found or missing ID');
-      console.error('Step 1: FAILED -', error.message, user);
+      console.error('Failed to update user notes - User not found:', roomNumber);
       throw error;
     }
     
-    console.log('Step 2: Updating user notes via API...');
-    console.log('Step 2: Request URL:', `/users/${user.id}`);
-    console.log('Step 2: Request body:', { notes });
-    
     // Update user notes in database
     const updatedUser = await apiClient.put(`/users/${user.id}`, { notes });
-    console.log('Step 2: SUCCESS - User updated:', updatedUser);
-    console.log('Step 2: Updated notes value:', updatedUser.notes);
     
     // Update localStorage
-    console.log('Step 3: Updating localStorage...');
     const savedUser = localStorage.getItem('furama_user');
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
       parsedUser.notes = notes;
       localStorage.setItem('furama_user', JSON.stringify(parsedUser));
-      console.log('Step 3: localStorage updated');
     }
-    
-    console.log('=== updateUserNotes SUCCESS ===');
   } catch (error: any) {
     console.error('=== updateUserNotes ERROR ===');
     console.error('Error:', error);

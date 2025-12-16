@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, ServiceRequest, HotelReview } from '../types';
-import { getCompletedGuestOrders, updateUserNotes, rateServiceRequest, submitHotelReview, getHotelReview, updateUserLanguage } from '../services/dataService';
-import { Clock, ShoppingBag, Car, Utensils, Sparkles, Waves, User as UserIcon, Save, Star, Hotel, ThumbsUp, Globe, ArrowLeft, Filter } from 'lucide-react';
+import { getCompletedGuestOrders, updateUserNotes, rateServiceRequest, submitHotelReview, getHotelReview, updateUserLanguage, updateUser } from '../services/dataService';
+import { Clock, ShoppingBag, Car, Utensils, Sparkles, Waves, User as UserIcon, Save, Star, Hotel, ThumbsUp, Globe, ArrowLeft, Filter, Edit2, Lock, Eye, EyeOff } from 'lucide-react';
 import Loading from './Loading';
 import { useTranslation } from '../contexts/LanguageContext';
 
@@ -41,6 +41,17 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
     const [isLoadingHistory, setIsLoadingHistory] = useState(true);
     const [isLoadingReview, setIsLoadingReview] = useState(true);
     const [serviceFilter, setServiceFilter] = useState<'ALL' | 'DINING' | 'SPA' | 'POOL' | 'BUGGY' | 'BUTLER'>('ALL');
+    
+    // Profile Edit State
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
+    const [profileName, setProfileName] = useState(user.lastName || '');
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
     
     // Load history and hotel review on mount
     useEffect(() => {
@@ -105,7 +116,6 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                     
                     // Update notes if exists in database
                     if (dbUser.notes !== undefined && dbUser.notes !== null) {
-                        console.log('Loaded notes from database:', dbUser.notes);
                         setNotes(dbUser.notes);
                         // Update localStorage
                         const savedUser = localStorage.getItem('furama_user');
@@ -164,19 +174,73 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
         }
     };
 
+    const handleSaveProfile = async () => {
+        if (!user.id) {
+            alert('User ID not found');
+            return;
+        }
+
+        // Validate password if changing
+        if (newPassword || confirmPassword) {
+            if (!currentPassword) {
+                alert('Please enter your current password to change password');
+                return;
+            }
+            if (newPassword.length < 4) {
+                alert('New password must be at least 4 characters');
+                return;
+            }
+            if (newPassword !== confirmPassword) {
+                alert('New passwords do not match');
+                return;
+            }
+        }
+
+        setIsSavingProfile(true);
+        try {
+            const updateData: Partial<User> = {};
+            
+            // Update name if changed
+            if (profileName !== user.lastName) {
+                updateData.lastName = profileName;
+            }
+            
+            // Update password if provided
+            if (newPassword) {
+                updateData.password = newPassword;
+            }
+
+            await updateUser(user.id, updateData);
+            
+            // Update user in localStorage
+            const savedUser = localStorage.getItem('furama_user');
+            if (savedUser) {
+                const parsedUser = JSON.parse(savedUser);
+                if (updateData.lastName) parsedUser.lastName = profileName;
+                if (updateData.password) parsedUser.password = newPassword;
+                localStorage.setItem('furama_user', JSON.stringify(parsedUser));
+            }
+
+            // Reset form
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+            setIsEditingProfile(false);
+            alert('Profile updated successfully!');
+        } catch (error: any) {
+            console.error('Failed to save profile:', error);
+            alert(`Failed to update profile: ${error.message || 'Please try again'}`);
+        } finally {
+            setIsSavingProfile(false);
+        }
+    };
+
     const handleLanguageChange = async (newLang: string) => {
-        console.log('=== handleLanguageChange START ===');
-        console.log('New language:', newLang);
-        console.log('Current language:', selectedLang);
-        console.log('User room number:', user.roomNumber);
-        
         setSelectedLang(newLang);
         setIsLangSaving(true);
         
         try {
-            console.log('Calling updateUserLanguage...');
             await updateUserLanguage(user.roomNumber, newLang);
-            console.log('updateUserLanguage completed successfully');
             
             // Update user in localStorage
             const savedUser = localStorage.getItem('furama_user');
@@ -184,18 +248,12 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                 const parsedUser = JSON.parse(savedUser);
                 parsedUser.language = newLang;
                 localStorage.setItem('furama_user', JSON.stringify(parsedUser));
-                console.log('localStorage updated');
             }
             
             // Update Context Immediately
-            console.log('Updating language context...');
             setContextLanguage(newLang as any);
-            console.log('Language context updated');
-            
-            console.log('=== handleLanguageChange SUCCESS ===');
         } catch (error: any) {
-            console.error('=== handleLanguageChange ERROR ===');
-            console.error('Error:', error);
+            console.error('Failed to update language:', error);
             console.error('Error message:', error.message);
             console.error('Error stack:', error.stack);
             
@@ -329,7 +387,160 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                     </div>
                 )}
                 
-                {/* Profile Card - Modern Design */}
+                {/* Profile Edit Card - Modern Design */}
+                <div className="backdrop-blur-lg bg-white/95 p-3 rounded-3xl shadow-xl border border-white/60"
+                    style={{
+                        boxShadow: '0 10px 40px -10px rgba(0,0,0,0.15)'
+                    }}
+                >
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <div className="w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-600 rounded-full"></div>
+                            <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Profile Settings</h4>
+                        </div>
+                        {!isEditingProfile && (
+                            <button
+                                onClick={() => setIsEditingProfile(true)}
+                                className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all"
+                            >
+                                <Edit2 size={16} strokeWidth={2.5} />
+                            </button>
+                        )}
+                    </div>
+                    
+                    {isEditingProfile ? (
+                        <div className="space-y-3">
+                            {/* Name Field */}
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Name</label>
+                                <input
+                                    type="text"
+                                    value={profileName}
+                                    onChange={(e) => setProfileName(e.target.value)}
+                                    placeholder="Enter your name"
+                                    className="w-full px-3 py-2 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                    style={{ color: '#111827' }}
+                                />
+                            </div>
+                            
+                            {/* Current Password Field */}
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Current Password</label>
+                                <div className="relative">
+                                    <input
+                                        type={showCurrentPassword ? "text" : "password"}
+                                        value={currentPassword}
+                                        onChange={(e) => setCurrentPassword(e.target.value)}
+                                        placeholder="Enter current password"
+                                        className="w-full px-3 py-2 pr-10 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                        style={{ color: '#111827' }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
+                                        {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* New Password Field */}
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1.5">New Password</label>
+                                <div className="relative">
+                                    <input
+                                        type={showNewPassword ? "text" : "password"}
+                                        value={newPassword}
+                                        onChange={(e) => setNewPassword(e.target.value)}
+                                        placeholder="Enter new password (min 4 chars)"
+                                        className="w-full px-3 py-2 pr-10 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                        style={{ color: '#111827' }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowNewPassword(!showNewPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
+                                        {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* Confirm Password Field */}
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Confirm New Password</label>
+                                <div className="relative">
+                                    <input
+                                        type={showConfirmPassword ? "text" : "password"}
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        placeholder="Confirm new password"
+                                        className="w-full px-3 py-2 pr-10 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                        style={{ color: '#111827' }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
+                                        {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* Action Buttons */}
+                            <div className="flex gap-2 pt-2">
+                                <button
+                                    onClick={() => {
+                                        setIsEditingProfile(false);
+                                        setProfileName(user.lastName || '');
+                                        setCurrentPassword('');
+                                        setNewPassword('');
+                                        setConfirmPassword('');
+                                    }}
+                                    disabled={isSavingProfile}
+                                    className="flex-1 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl border-2 border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                >
+                                    {t('cancel')}
+                                </button>
+                                <button
+                                    onClick={handleSaveProfile}
+                                    disabled={isSavingProfile}
+                                    className="flex-1 py-2 text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5 shadow-lg"
+                                >
+                                    {isSavingProfile ? (
+                                        <>
+                                            <span className="animate-spin">⏳</span>
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save size={14} />
+                                            {t('save')}
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between py-2">
+                                <span className="text-xs font-semibold text-gray-600">Name</span>
+                                <span className="text-sm font-bold text-gray-800">{user.lastName || 'Not set'}</span>
+                            </div>
+                            <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                                <span className="text-xs font-semibold text-gray-600 flex items-center gap-1">
+                                    <Lock size={12} />
+                                    Password
+                                </span>
+                                <span className="text-sm font-bold text-gray-800">••••••</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Reservation Details Card - Modern Design */}
                 <div className="backdrop-blur-lg bg-white/95 p-3 rounded-3xl shadow-xl border border-white/60"
                     style={{
                         boxShadow: '0 10px 40px -10px rgba(0,0,0,0.15)'

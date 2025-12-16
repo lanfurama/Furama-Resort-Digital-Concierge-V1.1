@@ -125,7 +125,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             });
 
             if (ridesToAutoAssign.length > 0) {
-                console.log(`[Auto-Assign] Found ${ridesToAutoAssign.length} ride(s) waiting over ${fleetConfig.maxWaitTimeBeforeAutoAssign}s, triggering auto-assign...`);
                 lastAutoAssignRef.current = now;
                 // Trigger auto-assign for these rides (silently, without showing modal)
                 await handleAutoAssign(true); // Pass true to indicate auto-triggered
@@ -824,7 +823,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             setAIAssignmentData(prev => prev ? { ...prev, status: 'completed' } : null);
         } else {
             // For auto-triggered assignments, just log success
-            console.log(`[Auto-Assign] Successfully assigned ${assignmentCount} ride(s) automatically`);
         }
 
         // Refresh data after assignments

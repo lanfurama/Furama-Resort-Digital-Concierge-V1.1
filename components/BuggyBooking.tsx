@@ -210,7 +210,6 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                       // Cache the driver name
                       driverNameCacheRef.current[driverIdStr] = driver.lastName;
                       setDriverName(driver.lastName);
-                      console.log('[BuggyBooking] Driver name found:', driver.lastName, 'for driverId:', driverIdStr);
                   } else {
                       console.warn('[BuggyBooking] Driver not found for driverId:', driverIdStr);
                       // Fallback: show driver with status

@@ -1,10 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { getRides, updateRideStatus, getLastMessage, createManualRide, getLocations, updateDriverHeartbeat, markDriverOffline, updateDriverLocation } from '../services/dataService';
-import { RideRequest, BuggyStatus } from '../types';
-import { Car, MapPin, Navigation, CheckCircle, Clock, MessageSquare, History, List, Plus, X, Loader2, User, Star, Volume2, VolumeX, Zap } from 'lucide-react';
+import { getRides, updateRideStatus, getLastMessage, createManualRide, getLocations, updateDriverHeartbeat, markDriverOffline, updateDriverLocation, updateUser, getUsers } from '../services/dataService';
+import { RideRequest, BuggyStatus, User } from '../types';
+import { Car, MapPin, Navigation, CheckCircle, Clock, MessageSquare, History, List, Plus, X, Loader2, User as UserIcon, Star, Volume2, VolumeX, Zap, Settings, Save } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ServiceChat from './ServiceChat';
+import { useTranslation } from '../contexts/LanguageContext';
+
+type Language = 'English' | 'Vietnamese' | 'Korean' | 'Japanese' | 'Chinese' | 'French' | 'Russian';
 
 const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     const [rides, setRides] = useState<RideRequest[]>([]);
@@ -16,6 +19,11 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         rating: 5,
         location: "Near Don Cipriani's Italian Restaurant"
     });
+    const [currentDriver, setCurrentDriver] = useState<User | null>(null);
+    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [profileName, setProfileName] = useState('');
+    const [profileLanguage, setProfileLanguage] = useState<Language>('English');
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
     
     // Loading states for better UX
     const [loadingAction, setLoadingAction] = useState<string | null>(null);
@@ -73,25 +81,149 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
     // Load driver info from localStorage and setup heartbeat
     useEffect(() => {
-        const savedUser = localStorage.getItem('furama_user');
-        if (savedUser) {
-            try {
-                const user = JSON.parse(savedUser);
-                setDriverInfo({
-                    name: user.lastName ? `Mr. ${user.lastName}` : 'Driver',
-                    rating: 5, // Default rating, can be fetched from API if available
-                    location: "Near Don Cipriani's Italian Restaurant" // Default location, can be updated
-                });
-                
-                // Send initial heartbeat when driver portal opens
-                if (user.id && user.role === 'DRIVER') {
-                    updateDriverHeartbeat(user.id);
+        const loadDriverInfo = async () => {
+            const savedUser = localStorage.getItem('furama_user');
+            if (savedUser) {
+                try {
+                    const user = JSON.parse(savedUser);
+                    setCurrentDriver(user);
+                    setDriverInfo({
+                        name: user.lastName ? `Mr. ${user.lastName}` : 'Driver',
+                        rating: 5, // Default rating, can be fetched from API if available
+                        location: "Near Don Cipriani's Italian Restaurant" // Default location, can be updated
+                    });
+                    
+                    // Load from database if available
+                    if (user.id) {
+                        try {
+                            const users = await getUsers();
+                            const dbDriver = users.find(u => u.id === user.id);
+                            if (dbDriver) {
+                                setCurrentDriver(dbDriver);
+                                setDriverInfo({
+                                    name: dbDriver.lastName ? `Mr. ${dbDriver.lastName}` : 'Driver',
+                                    rating: 5,
+                                    location: driverInfo.location
+                                });
+                                // Set language from database
+                                if (dbDriver.language) {
+                                    setProfileLanguage(dbDriver.language as Language);
+                                    setContextLanguage(dbDriver.language as Language);
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Failed to load driver from database:', error);
+                        }
+                    }
+                    
+                    // Send initial heartbeat when driver portal opens
+                    if (user.id && user.role === 'DRIVER') {
+                        updateDriverHeartbeat(user.id);
+                    }
+                } catch (e) {
+                    console.error('Failed to parse user from localStorage:', e);
                 }
-            } catch (e) {
-                console.error('Failed to parse user from localStorage:', e);
             }
-        }
+        };
+        
+        loadDriverInfo();
     }, []);
+    
+    // Initialize profile form when modal opens
+    useEffect(() => {
+        if (showProfileModal && currentDriver) {
+            setProfileName(currentDriver.lastName || '');
+            setProfileLanguage((currentDriver.language as Language) || 'English');
+        }
+    }, [showProfileModal, currentDriver]);
+    
+    // Handle save profile
+    const handleSaveProfile = async () => {
+        if (!currentDriver || !currentDriver.id) {
+            alert('Driver information not found');
+            return;
+        }
+        
+        setIsSavingProfile(true);
+        try {
+            // Update driver name and language
+            const updatedUser = await updateUser(currentDriver.id, {
+                lastName: profileName,
+                language: profileLanguage
+            });
+            
+            console.log('Profile updated successfully:', updatedUser);
+            
+            // Update local state with the values we sent (in case API response is incomplete)
+            const finalLastName = updatedUser?.lastName || profileName;
+            const finalLanguage = (updatedUser?.language as Language) || profileLanguage;
+            
+            setCurrentDriver({
+                ...currentDriver,
+                lastName: finalLastName,
+                language: finalLanguage
+            });
+            
+            setDriverInfo({
+                ...driverInfo,
+                name: finalLastName ? `Mr. ${finalLastName}` : 'Driver'
+            });
+            
+            // Update localStorage
+            const savedUser = localStorage.getItem('furama_user');
+            if (savedUser) {
+                const parsedUser = JSON.parse(savedUser);
+                parsedUser.lastName = finalLastName;
+                parsedUser.language = finalLanguage;
+                localStorage.setItem('furama_user', JSON.stringify(parsedUser));
+            }
+            
+            // Update language context
+            setContextLanguage(finalLanguage);
+            
+            setShowProfileModal(false);
+            
+            // Show success message
+            alert('Profile updated successfully!');
+        } catch (error: any) {
+            console.error('Failed to save profile:', error);
+            console.error('Error details:', {
+                message: error?.message,
+                response: error?.response,
+                status: error?.response?.status
+            });
+            
+            // Check if it's actually a success (status 200-299) but caught as error
+            const status = error?.response?.status;
+            if (status && status >= 200 && status < 300) {
+                // Success response but caught as error - update anyway
+                setCurrentDriver({
+                    ...currentDriver,
+                    lastName: profileName,
+                    language: profileLanguage
+                });
+                setDriverInfo({
+                    ...driverInfo,
+                    name: profileName ? `Mr. ${profileName}` : 'Driver'
+                });
+                const savedUser = localStorage.getItem('furama_user');
+                if (savedUser) {
+                    const parsedUser = JSON.parse(savedUser);
+                    parsedUser.lastName = profileName;
+                    parsedUser.language = profileLanguage;
+                    localStorage.setItem('furama_user', JSON.stringify(parsedUser));
+                }
+                setContextLanguage(profileLanguage);
+                setShowProfileModal(false);
+                alert('Profile updated successfully!');
+            } else {
+                // Real error - show error message
+                alert(`Failed to save profile: ${error?.message || 'Unknown error'}. Please try again.`);
+            }
+        } finally {
+            setIsSavingProfile(false);
+        }
+    };
     
     // Heartbeat: Update driver online status every 30 seconds
     useEffect(() => {
@@ -301,7 +433,6 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 if (newRequests.length > 0 && soundEnabled) {
                     // New request(s) detected - play notification sound
                     playNotificationSound();
-                    console.log(`[DriverPortal] New ride request(s) detected: ${newRequests.length}`);
                 }
                 
                 // Update previous pending rides set
@@ -384,7 +515,6 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             
             console.log('Accepting ride:', id, 'with driverId:', driverId);
             await updateRideStatus(id, BuggyStatus.ARRIVING, driverId, 5); // 5 min ETA mock
-            console.log('Ride accepted successfully');
             
             // Refresh rides after update to ensure consistency
             const allRides = await getRides();
@@ -413,9 +543,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                     : ride
             ));
             
-            console.log('Picking up guest for ride:', id);
             await updateRideStatus(id, BuggyStatus.ON_TRIP);
-            console.log('Guest picked up successfully');
             
             // Refresh rides after update
             const allRides = await getRides();
@@ -436,9 +564,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         
         setLoadingAction(`complete-${id}`);
         try {
-            console.log('Completing ride:', id);
             await updateRideStatus(id, BuggyStatus.COMPLETED);
-            console.log('Ride completed successfully');
             
             setShowChat(false);
             setMyRideId(null);
@@ -473,7 +599,6 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 }
             }
             
-            console.log('Creating manual ride:', manualRideData, 'with driverId:', driverId);
             const newRide = await createManualRide(
                 driverId, 
                 manualRideData.roomNumber, 
@@ -481,7 +606,6 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 manualRideData.destination
             );
             
-            console.log('Manual ride created successfully:', newRide);
             
             // Immediately set this as my active ride and switch view
             setMyRideId(newRide.id);
@@ -727,6 +851,13 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 
                 {/* Right Icons - Enhanced */}
                 <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                    <button 
+                        onClick={() => setShowProfileModal(true)}
+                        className="p-2 rounded-xl hover:bg-white/10 transition-all text-white/80"
+                        title="Edit Profile"
+                    >
+                        <Settings size={18} />
+                    </button>
                     <button 
                         onClick={() => {
                             const newState = !soundEnabled;
@@ -1243,6 +1374,85 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                     userRole="staff"
                     onClose={() => setShowChat(false)}
                 />
+            )}
+
+            {/* Profile Edit Modal */}
+            {showProfileModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in" onClick={() => setShowProfileModal(false)}>
+                    <div className="backdrop-blur-xl bg-white/95 rounded-3xl shadow-2xl w-full max-w-md border-2 border-gray-200/60 max-h-[90vh] overflow-y-auto"
+                        style={{
+                            boxShadow: '0 25px 70px -20px rgba(0,0,0,0.3)'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex justify-between items-center p-5 border-b-2 border-gray-200/60 sticky top-0 bg-white/95 backdrop-blur-sm z-10">
+                            <h3 className="font-bold text-lg text-gray-900">Edit Profile</h3>
+                            <button 
+                                onClick={() => setShowProfileModal(false)} 
+                                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <X size={20} className="text-gray-500" />
+                            </button>
+                        </div>
+                        
+                        <div className="p-5 space-y-4">
+                            {/* Name Field */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={profileName}
+                                    onChange={(e) => setProfileName(e.target.value)}
+                                    placeholder="Enter your name"
+                                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all bg-white"
+                                    style={{ color: '#111827' }}
+                                />
+                            </div>
+                            
+                            {/* Language Field */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Language
+                                </label>
+                                <select
+                                    value={profileLanguage}
+                                    onChange={(e) => setProfileLanguage(e.target.value as Language)}
+                                    className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all bg-white"
+                                    style={{ color: '#111827' }}
+                                >
+                                    <option value="English">English</option>
+                                    <option value="Vietnamese">Vietnamese</option>
+                                    <option value="Korean">Korean</option>
+                                    <option value="Japanese">Japanese</option>
+                                    <option value="Chinese">Chinese</option>
+                                    <option value="French">French</option>
+                                    <option value="Russian">Russian</option>
+                                </select>
+                            </div>
+                            
+                            {/* Save Button */}
+                            <button
+                                onClick={handleSaveProfile}
+                                disabled={isSavingProfile}
+                                className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-3 rounded-xl font-bold shadow-lg transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-emerald-500/50"
+                            >
+                                {isSavingProfile ? (
+                                    <>
+                                        <Loader2 size={18} className="animate-spin" />
+                                        <span>Saving...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save size={18} />
+                                        <span>Save Profile</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

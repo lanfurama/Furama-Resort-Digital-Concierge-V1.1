@@ -70,7 +70,6 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                     const guest = users.find(u => u.roomNumber === roomNumber && u.role === 'GUEST');
                     if (guest && guest.language) {
                         const guestLangMapped = mapAppLangToTranslateLang(guest.language);
-                        console.log(`[ServiceChat] Guest language from DB: ${guest.language} -> ${guestLangMapped}`);
                         setTargetLang(guestLangMapped);
                         // Clear cache when language changes
                         setTranslatedCache({});
@@ -161,7 +160,6 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                     const translated = await translateText(msg.text, targetLang);
                     if (translated && translated !== msg.text) {
                         newTranslations[msg.id] = translated;
-                        console.log(`[ServiceChat] Translated message ${msg.id}: "${msg.text.substring(0, 30)}..." -> "${translated.substring(0, 30)}..."`);
                     }
                 } catch (error) {
                     console.error(`[ServiceChat] Failed to translate message ${msg.id}:`, error);

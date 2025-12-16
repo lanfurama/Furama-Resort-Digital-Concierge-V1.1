@@ -53,7 +53,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 let locationsData: Location[];
                 try {
                     locationsData = await getLocations();
-                    console.log('Locations loaded from database:', locationsData);
                 } catch (error) {
                     console.error('Failed to load locations from database, using sync:', error);
                     locationsData = getLocationsSync();
@@ -70,7 +69,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 let knowledgeData: KnowledgeItem[];
                 try {
                     knowledgeData = await getKnowledgeBase();
-                    console.log('Knowledge items loaded from database:', knowledgeData);
                 } catch (error) {
                     console.error('Failed to load knowledge items from database:', error);
                     knowledgeData = getKnowledgeBaseSync();
@@ -86,7 +84,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const usersData = await getUsers();
                     setUsers(usersData);
-                    console.log('Users loaded from database:', usersData);
                 } catch (error) {
                     console.error('Failed to load users from database:', error);
                     setUsers(getUsersSync());
@@ -95,7 +92,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const historyData = await getUnifiedHistory();
                     setServiceHistory(historyData);
-                    console.log('Service history loaded from database:', historyData);
                 } catch (error) {
                     console.error('Failed to load service history from database:', error);
                     setServiceHistory([]);
@@ -104,7 +100,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const ridesData = await getRides();
                     setRides(ridesData);
-                    console.log('Rides loaded from database:', ridesData);
                 } catch (error) {
                     console.error('Failed to load rides from database:', error);
                     setRides(getRidesSync());
@@ -289,7 +284,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         try {
             const historyData = await getUnifiedHistory();
             setServiceHistory(historyData);
-            console.log('Service history refreshed:', historyData);
         } catch (error) {
             console.error('Failed to refresh service history:', error);
             setServiceHistory([]);
@@ -699,7 +693,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         if (!isAutoTriggered) {
             setAIAssignmentData(prev => prev ? { ...prev, status: 'completed' } : null);
         } else {
-            console.log(`[Auto-Assign] Successfully assigned ${assignmentCount} ride(s) automatically`);
         }
 
         // Refresh data after assignments
@@ -764,7 +757,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     try {
                         const refreshedEvents = await getEvents();
                         setEvents(refreshedEvents);
-                        console.log('Events refreshed after add:', refreshedEvents);
                     } catch (error) {
                         console.error('Failed to refresh events after add:', error);
                     }
@@ -781,7 +773,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     try {
                         const refreshedPromotions = await getPromotions();
                         setPromotions(refreshedPromotions);
-                        console.log('Promotions refreshed after add/update:', refreshedPromotions);
                     } catch (error) {
                         console.error('Failed to refresh promotions after add/update:', error);
                     }
@@ -792,7 +783,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     try {
                         const refreshedKnowledge = await getKnowledgeBase();
                         setKnowledge(refreshedKnowledge);
-                        console.log('Knowledge refreshed after add:', refreshedKnowledge);
                     } catch (error) {
                         console.error('Failed to refresh knowledge after add:', error);
                     }
@@ -825,7 +815,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             return;
         }
         try {
-            console.log('Adding user - Input:', newUser);
             await addUser({
                 lastName: newUser.lastName,
                 roomNumber: newUser.roomNumber,
@@ -860,7 +849,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             return;
         }
         try {
-            console.log('Adding guest - Input:', newGuest);
             await addUser({
                 lastName: newGuest.lastName,
                 roomNumber: newGuest.room,
@@ -899,8 +887,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         try {
             if (editingRoomType) {
                 // Update existing room type
-                console.log('Updating room type - Editing:', editingRoomType);
-                console.log('Updating room type - New Data:', newRoomType);
                 const updated = await updateRoomType(editingRoomType.id, {
                     name: newRoomType.name,
                     description: newRoomType.description || '',
@@ -927,7 +913,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             let refreshedLocations: Location[];
             try {
                 refreshedLocations = await getLocations();
-                console.log('Locations refreshed from database:', refreshedLocations);
             } catch (error) {
                 console.error('Failed to refresh locations from database:', error);
                 refreshedLocations = getLocationsSync();
@@ -936,25 +921,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             const refreshedRoomTypes = await getRoomTypes();
             setRoomTypes(refreshedRoomTypes);
             setLocations(refreshedLocations);
-            
-            console.log('Room types refreshed:', refreshedRoomTypes);
-            console.log('Locations refreshed:', refreshedLocations);
-            console.log('Checking location matches:', refreshedRoomTypes.map(rt => ({
-                name: rt.name,
-                locationId: rt.locationId,
-                locationIdType: typeof rt.locationId,
-                matchedLocation: rt.locationId ? refreshedLocations.find(l => {
-                    const match = String(l.id) === String(rt.locationId);
-                    if (!match && rt.locationId) {
-                        console.log('Location ID mismatch:', {
-                            roomTypeLocationId: rt.locationId,
-                            locationIdType: typeof rt.locationId,
-                            availableLocationIds: refreshedLocations.map(l => ({ id: l.id, idType: typeof l.id, name: l.name }))
-                        });
-                    }
-                    return match;
-                })?.name || 'NOT FOUND' : 'NONE'
-            })));
         } catch (error: any) {
             console.error('Failed to save room type:', error);
             const errorMessage = error?.message || error?.toString() || 'Unknown error';
@@ -1023,7 +989,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     try {
                         const refreshedUsers = await getUsers();
                         setUsers(refreshedUsers);
-                        console.log('Users refreshed after CSV import:', refreshedUsers);
                     } catch (error) {
                         console.error('Failed to refresh users after CSV import:', error);
                     }
@@ -1079,14 +1044,12 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         }
         try {
             if (type === 'LOC') {
-                console.log('Deleting location with id/name:', id);
                 await deleteLocation(id);
                 console.log('Location deleted successfully, refreshing...');
                 // Refresh locations specifically after deleting
                 try {
                     const refreshedLocations = await getLocations();
                     setLocations(refreshedLocations);
-                    console.log('Locations refreshed after delete:', refreshedLocations);
                 } catch (error) {
                     console.error('Failed to refresh locations after delete:', error);
                     // Fallback to sync version
@@ -1102,7 +1065,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const refreshedEvents = await getEvents();
                     setEvents(refreshedEvents);
-                    console.log('Events refreshed after delete:', refreshedEvents);
                 } catch (error) {
                     console.error('Failed to refresh events after delete:', error);
                 }
@@ -1113,7 +1075,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const refreshedPromotions = await getPromotions();
                     setPromotions(refreshedPromotions);
-                    console.log('Promotions refreshed after delete:', refreshedPromotions);
                 } catch (error) {
                     console.error('Failed to refresh promotions after delete:', error);
                 }
@@ -1124,7 +1085,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const refreshedKnowledge = await getKnowledgeBase();
                     setKnowledge(refreshedKnowledge);
-                    console.log('Knowledge refreshed after delete:', refreshedKnowledge);
                 } catch (error) {
                     console.error('Failed to refresh knowledge after delete:', error);
                 }
@@ -1135,13 +1095,11 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const refreshedUsers = await getUsers();
                     setUsers(refreshedUsers);
-                    console.log('Users refreshed after delete:', refreshedUsers);
                 } catch (error) {
                     console.error('Failed to refresh users after delete:', error);
                 }
             }
             else if (type === 'ROOM_TYPE') {
-                console.log('Deleting room type:', id);
                 await deleteRoomType(id);
                 console.log('Room type deleted successfully');
             }
@@ -1161,7 +1119,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const refreshedMenu = await getMenu();
                     setMenu(refreshedMenu);
-                    console.log('Menu refreshed after delete:', refreshedMenu);
                 } catch (error) {
                     console.error('Failed to refresh menu after delete:', error);
                 }
@@ -3492,7 +3449,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                             try {
                                                 const refreshedUsers = await getUsers();
                                                 setUsers(refreshedUsers);
-                                                console.log('Users refreshed after password reset:', refreshedUsers);
                                             } catch (error) {
                                                 console.error('Failed to refresh users after password reset:', error);
                                             }

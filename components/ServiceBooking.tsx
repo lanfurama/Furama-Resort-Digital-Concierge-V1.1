@@ -88,7 +88,6 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
         
         const details = cart.map(i => i.name).join(', ');
         try {
-            console.log('Placing order - Type:', type, 'Cart:', cart, 'User:', user);
             const result = await addServiceRequest({
                 id: Date.now().toString(),
                 type: type,
@@ -99,7 +98,6 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                 timestamp: Date.now()
             });
             
-            console.log('Order placed successfully:', result);
             setIsOrderPlaced(true);
             setTimeout(() => {
                 onBack();

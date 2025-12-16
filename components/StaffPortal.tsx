@@ -87,7 +87,6 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
 
     const handleAction = async (id: string, newStatus: 'CONFIRMED' | 'COMPLETED', event?: React.MouseEvent<HTMLButtonElement>) => {
         try {
-            console.log(`Updating service request ${id} to ${newStatus}`);
             
             // Show loading state
             if (event?.currentTarget) {
@@ -104,7 +103,6 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
             }
             
             await updateServiceStatus(id, newStatus);
-            console.log('Service status updated successfully');
             
             // Show success message
             alert(`Order ${newStatus.toLowerCase()} successfully!`);

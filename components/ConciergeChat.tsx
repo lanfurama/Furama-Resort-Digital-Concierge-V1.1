@@ -212,7 +212,6 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
       
       // Try to recreate session if it seems to be invalid
       if (error?.message?.includes('session') || error?.code === 401 || error?.code === 403) {
-        console.log('Session appears invalid, attempting to recreate...');
         try {
           chatSessionRef.current = await createChatSession();
           // Retry sending the message once
@@ -251,7 +250,6 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
 
   const handleTTS = async (text: string) => {
       if (isPlayingAudio) {
-        console.log('TTS: Already playing audio');
         return;
       }
       if (!text || text.trim().length === 0) {
@@ -261,7 +259,6 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
       
       setIsPlayingAudio(true);
       try {
-        console.log('TTS: Requesting audio for text:', text.substring(0, 50) + '...');
         const audioBuffer = await speakText(text);
         
         if (!audioBuffer) {
@@ -270,16 +267,13 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
           return;
         }
         
-        console.log('TTS: Audio buffer received, duration:', audioBuffer.duration, 'sampleRate:', audioBuffer.sampleRate);
         
         // Create AudioContext for playback
         const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
         
         // Resume context if suspended (required for autoplay policies in browsers)
         if (ctx.state === 'suspended') {
-          console.log('TTS: Resuming suspended playback AudioContext');
           await ctx.resume();
-          console.log('TTS: AudioContext state after resume:', ctx.state);
         }
         
         const source = ctx.createBufferSource();
@@ -287,7 +281,6 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
         source.connect(ctx.destination);
         
         source.onended = () => {
-          console.log('TTS: Audio playback ended');
           setIsPlayingAudio(false);
           // Close context after a short delay to ensure cleanup
           setTimeout(() => {
@@ -303,7 +296,6 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
           ctx.close().catch(err => console.warn('TTS: Error closing AudioContext on error', err));
         };
         
-        console.log('TTS: Starting audio playback, AudioContext state:', ctx.state);
         source.start(0);
       } catch (error) {
         console.error('TTS: Error in handleTTS', error);
