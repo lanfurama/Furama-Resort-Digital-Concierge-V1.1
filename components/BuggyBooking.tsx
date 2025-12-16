@@ -22,7 +22,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [elapsedTime, setElapsedTime] = useState<number>(0); // Time elapsed in seconds (for SEARCHING)
   const [arrivingElapsedTime, setArrivingElapsedTime] = useState<number>(0); // Time elapsed since driver accepted (for ASSIGNED/ARRIVING)
   const [searchQuery, setSearchQuery] = useState<string>(''); // Search query for locations
-  const [filterType, setFilterType] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('VILLA'); // Filter by location type
+  const [filterType, setFilterType] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('ALL'); // Filter by location type
   const [isBooking, setIsBooking] = useState(false); // Prevent double-click/multiple submissions
   
   // Completion Modal & Rating State
@@ -691,6 +691,16 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                     <label className="text-[10px] font-semibold text-gray-600 mb-1.5 block">Category</label>
                     <div className="flex flex-wrap gap-1.5">
                         <button
+                            onClick={() => setFilterType('ALL')}
+                            className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-all duration-300 ${
+                                filterType === 'ALL'
+                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-300/50'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                        >
+                            All Locations
+                        </button>
+                        <button
                             onClick={() => setFilterType('VILLA')}
                             className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-all duration-300 flex items-center gap-1 ${
                                 filterType === 'VILLA'
@@ -722,16 +732,6 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                         >
                             <Utensils className="w-3 h-3" />
                             Restaurants
-                        </button>
-                        <button
-                            onClick={() => setFilterType('ALL')}
-                            className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-all duration-300 ${
-                                filterType === 'ALL'
-                                    ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-300/50'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                            All Locations
                         </button>
                     </div>
                 </div>
