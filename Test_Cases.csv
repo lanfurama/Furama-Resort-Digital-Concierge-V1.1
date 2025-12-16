@@ -1,0 +1,571 @@
+Test Case ID,Module,Feature ID,Feature Name,Test Scenario,Các Bước Test (Step by Step),Kết Quả Mong Đợi,Độ Ưu Tiên,Loại Test,Ghi Chú
+TC-001,Authentication,AUTH-001,Guest Login,Kiểm tra đăng nhập Guest với Room Number và Last Name,"1. Mở ứng dụng
+2. Chọn ""Guest Login""
+3. Nhập Room Number hợp lệ (VD: 101)
+4. Nhập Last Name hợp lệ (VD: Nguyen)
+5. Nhấn nút ""Login""","- Đăng nhập thành công
+- Chuyển đến màn hình Home của Guest
+- Hiển thị menu các dịch vụ",High,Functional,"Test với Room Number và Last Name có trong database"
+TC-002,Authentication,AUTH-001,Guest Login,Kiểm tra đăng nhập Guest với thông tin sai,"1. Mở ứng dụng
+2. Chọn ""Guest Login""
+3. Nhập Room Number không tồn tại (VD: 999)
+4. Nhập Last Name bất kỳ
+5. Nhấn nút ""Login""","- Hiển thị thông báo lỗi
+- Không đăng nhập được
+- Vẫn ở màn hình Login",High,Functional,Test negative case
+TC-003,Authentication,AUTH-002,Staff Login,Kiểm tra đăng nhập Staff với Username và Password,"1. Mở ứng dụng
+2. Chọn ""Staff Login""
+3. Nhập Username hợp lệ (VD: staff01)
+4. Nhập Password hợp lệ
+5. Nhấn nút ""Login""","- Đăng nhập thành công
+- Chuyển đến Staff Dashboard
+- Hiển thị danh sách service requests",High,Functional,"Test với tài khoản Staff có trong hệ thống"
+TC-004,Authentication,AUTH-003,Admin Login,Kiểm tra đăng nhập Admin,"1. Mở ứng dụng
+2. Chọn ""Admin Login""
+3. Nhập Admin username
+4. Nhập Admin password
+5. Nhấn nút ""Login""","- Đăng nhập thành công
+- Chuyển đến Admin Portal
+- Hiển thị các chức năng quản lý",High,Functional,"Test với tài khoản Admin"
+TC-005,Authentication,AUTH-007,Logout Functionality,Kiểm tra chức năng Logout,"1. Đăng nhập với bất kỳ role nào (Guest/Staff/Admin)
+2. Nhấn nút ""Logout"" hoặc icon Logout
+3. Xác nhận logout nếu có popup","- Đăng xuất thành công
+- Quay về màn hình Login
+- Session được xóa
+- Không thể quay lại trang trước bằng nút Back",High,Functional,Test với tất cả các role
+TC-006,Guest Portal,GUEST-001,Home Screen,Kiểm tra màn hình Home của Guest,"1. Đăng nhập với tài khoản Guest
+2. Quan sát màn hình Home","- Hiển thị menu chính với các dịch vụ
+- Có các nút: Buggy Service, Dining, Spa, Pool, Butler, Concierge Chat, Events
+- Giao diện đẹp, dễ nhìn",High,UI/Functional,"Kiểm tra UI và navigation"
+TC-007,Guest Portal,GUEST-003,Language Selection,Kiểm tra chọn ngôn ngữ,"1. Đăng nhập với tài khoản Guest
+2. Tìm và nhấn vào icon/chọn ngôn ngữ
+3. Chọn một ngôn ngữ khác (VD: English, Korean, Japanese)
+4. Quan sát giao diện","- Ngôn ngữ thay đổi ngay lập tức
+- Tất cả text trên màn hình được dịch sang ngôn ngữ đã chọn
+- Có 7 ngôn ngữ để chọn: Việt, Anh, Hàn, Nhật, Trung, Nga, Pháp",High,Functional,"Test với tất cả 7 ngôn ngữ"
+TC-008,Buggy Service,BUGGY-001,Buggy Booking,Kiểm tra đặt xe buggy,"1. Đăng nhập Guest
+2. Chọn ""Buggy Service""
+3. Chọn điểm đón (Pickup Location)
+4. Chọn điểm đến (Destination)
+5. Nhấn nút ""Book Buggy"" hoặc ""Request Ride""","- Tạo yêu cầu thành công
+- Hiển thị thông báo xác nhận
+- Hiển thị trạng thái chuyến đi (Pending/Waiting)
+- Có thể xem chi tiết chuyến đi",High,Functional,"Test với các điểm đón và điểm đến hợp lệ"
+TC-009,Buggy Service,BUGGY-002,Location Search,Kiểm tra tìm kiếm địa điểm,"1. Đăng nhập Guest
+2. Vào màn hình Buggy Booking
+3. Nhập từ khóa tìm kiếm vào ô search (VD: ""Beach"", ""Restaurant"", ""Villa 101"")
+4. Quan sát kết quả","- Hiển thị danh sách địa điểm khớp với từ khóa
+- Kết quả được highlight hoặc hiển thị rõ ràng
+- Có thể chọn địa điểm từ kết quả tìm kiếm",High,Functional,"Test với các từ khóa khác nhau"
+TC-010,Buggy Service,BUGGY-003,Location Filter,Kiểm tra lọc địa điểm theo loại,"1. Đăng nhập Guest
+2. Vào màn hình Buggy Booking
+3. Nhấn vào filter (Villa/Facility/Restaurant)
+4. Chọn một loại (VD: ""Villa"")
+5. Quan sát danh sách","- Chỉ hiển thị địa điểm thuộc loại đã chọn
+- Có thể chọn nhiều filter cùng lúc
+- Có nút ""Clear Filter"" để xóa filter",High,Functional,"Test với từng loại filter"
+TC-011,Buggy Service,BUGGY-004,Ride Status Tracking,Kiểm tra theo dõi trạng thái chuyến đi,"1. Đăng nhập Guest
+2. Đặt một chuyến buggy
+3. Quan sát trạng thái chuyến đi
+4. Đợi driver chấp nhận
+5. Quan sát sự thay đổi trạng thái","- Hiển thị các trạng thái: Pending, Accepted, Driver Assigned, On the way, Arrived, Completed
+- Trạng thái cập nhật theo thời gian thực
+- Có thể xem chi tiết từng trạng thái",High,Functional,"Cần có driver để test đầy đủ"
+TC-012,Buggy Service,BUGGY-005,Real-time Updates,Kiểm tra cập nhật real-time,"1. Đăng nhập Guest
+2. Đặt một chuyến buggy
+3. Đợi và quan sát màn hình trong 10 giây
+4. Yêu cầu driver cập nhật trạng thái
+5. Quan sát màn hình Guest","- Trạng thái tự động cập nhật sau mỗi 3 giây
+- Không cần refresh trang
+- Thông tin mới nhất luôn được hiển thị",High,Functional,"Kiểm tra polling interval 3 giây"
+TC-013,Buggy Service,BUGGY-006,Ride Cancellation,Kiểm tra hủy chuyến đi,"1. Đăng nhập Guest
+2. Đặt một chuyến buggy
+3. Nhấn nút ""Cancel Ride""
+4. Xác nhận hủy nếu có popup","- Hủy thành công
+- Chuyến đi biến mất khỏi danh sách active
+- Hiển thị thông báo hủy thành công
+- Chỉ có thể hủy khi ở trạng thái Pending hoặc Accepted (theo business rules)",High,Functional,"Kiểm tra business rules về hủy chuyến"
+TC-014,Service Booking,SVC-001,Dining Order,Kiểm tra đặt món ăn trong phòng,"1. Đăng nhập Guest
+2. Chọn ""Dining"" hoặc ""Room Service""
+3. Xem menu món ăn
+4. Chọn món muốn đặt
+5. Thêm vào giỏ hàng
+6. Nhấn ""Submit Order""","- Hiển thị menu với giá và mô tả
+- Có thể thêm nhiều món vào giỏ hàng
+- Hiển thị tổng tiền
+- Đặt hàng thành công và hiển thị thông báo",High,Functional,"Test với nhiều món khác nhau"
+TC-015,Service Booking,SVC-002,Spa Booking,Kiểm tra đặt dịch vụ spa,"1. Đăng nhập Guest
+2. Chọn ""Spa Service""
+3. Xem danh sách dịch vụ spa
+4. Chọn dịch vụ muốn đặt
+5. Chọn thời gian (nếu có)
+6. Nhấn ""Book Spa""","- Hiển thị danh sách dịch vụ spa
+- Có thể chọn dịch vụ và thời gian
+- Đặt thành công và hiển thị thông báo xác nhận",High,Functional,"Kiểm tra booking flow"
+TC-016,Service Booking,SVC-005,Menu Display,Kiểm tra hiển thị menu,"1. Đăng nhập Guest
+2. Vào màn hình Service Booking (Dining/Spa/Pool)
+3. Quan sát menu","- Hiển thị tên món/dịch vụ
+- Hiển thị giá tiền rõ ràng
+- Có mô tả chi tiết
+- Hình ảnh (nếu có)
+- Menu dễ đọc, bố cục đẹp",High,UI/Functional,"Kiểm tra UI của menu"
+TC-017,Service Booking,SVC-006,Add to Cart,Kiểm tra thêm món vào giỏ hàng,"1. Đăng nhập Guest
+2. Vào màn hình Dining
+3. Chọn một món
+4. Nhấn ""Add to Cart"" hoặc nút +
+5. Kiểm tra giỏ hàng","- Món được thêm vào giỏ hàng
+- Số lượng tăng lên
+- Tổng tiền được cập nhật
+- Có thể xem giỏ hàng và chỉnh sửa",High,Functional,"Test với nhiều món"
+TC-018,Active Orders,ORDER-001,Active Orders List,Kiểm tra danh sách đơn hàng đang hoạt động,"1. Đăng nhập Guest
+2. Đặt một vài đơn hàng (Dining/Spa/Pool)
+3. Vào màn hình ""Active Orders"" hoặc ""My Orders""
+4. Quan sát danh sách","- Hiển thị tất cả đơn hàng đang active
+- Mỗi đơn hàng hiển thị: Loại dịch vụ, Trạng thái, Thời gian đặt
+- Có thể click vào để xem chi tiết
+- Danh sách được sắp xếp theo thời gian",High,Functional,"Cần có đơn hàng để test"
+TC-019,Active Orders,ORDER-002,Order Status Display,Kiểm tra hiển thị trạng thái đơn hàng,"1. Đăng nhập Guest
+2. Vào Active Orders
+3. Quan sát trạng thái của từng đơn hàng","- Hiển thị trạng thái rõ ràng: Pending, Confirmed, Preparing, On the way, Completed
+- Màu sắc phân biệt trạng thái (VD: vàng=Pending, xanh=Completed)
+- Có icon hoặc badge hiển thị trạng thái",High,UI/Functional,"Kiểm tra UI của status display"
+TC-020,Active Orders,ORDER-003,Order Details,Kiểm tra chi tiết đơn hàng,"1. Đăng nhập Guest
+2. Vào Active Orders
+3. Click vào một đơn hàng
+4. Quan sát chi tiết","- Hiển thị đầy đủ thông tin: Danh sách items, Số lượng, Giá từng món, Tổng tiền, Trạng thái, Thời gian đặt
+- Có thể xem lại đơn hàng đã hoàn thành
+- Layout dễ đọc",High,Functional,"Kiểm tra thông tin chi tiết"
+TC-021,Active Orders,ORDER-004,Service Chat,Kiểm tra chat với staff theo dịch vụ,"1. Đăng nhập Guest
+2. Vào Active Orders
+3. Chọn một đơn hàng
+4. Nhấn nút ""Chat"" hoặc icon chat
+5. Gửi tin nhắn
+6. Đợi staff phản hồi","- Mở cửa sổ chat
+- Có thể gửi tin nhắn
+- Tin nhắn được gửi đến đúng staff phụ trách dịch vụ đó
+- Nhận được phản hồi từ staff
+- Chat real-time",High,Functional,"Cần có staff online để test"
+TC-022,Concierge Chat,CHAT-002,Text Chat Mode,Kiểm tra chat bằng text với AI Concierge,"1. Đăng nhập Guest
+2. Chọn ""Concierge Chat""
+3. Nhập câu hỏi bằng text (VD: ""What time does the pool close?"")
+4. Nhấn Send
+5. Đợi phản hồi","- AI trả lời câu hỏi
+- Câu trả lời liên quan đến resort
+- Có thể hỏi nhiều câu hỏi liên tiếp
+- Lịch sử chat được lưu",High,Functional,"Test với nhiều câu hỏi khác nhau"
+TC-023,Concierge Chat,CHAT-003,Voice Chat Mode,Kiểm tra chat bằng giọng nói,"1. Đăng nhập Guest
+2. Vào Concierge Chat
+3. Nhấn nút microphone hoặc ""Voice Chat""
+4. Nói câu hỏi (VD: ""Where is the spa?"")
+5. Đợi AI trả lời","- Ghi âm giọng nói thành công
+- Chuyển đổi giọng nói thành text
+- AI trả lời bằng text hoặc giọng nói
+- Có thể nghe câu trả lời",High,Functional,"Cần có microphone và quyền audio"
+TC-024,Concierge Chat,CHAT-004,Knowledge Base Integration,Kiểm tra tích hợp knowledge base,"1. Đăng nhập Guest
+2. Vào Concierge Chat
+3. Hỏi về thông tin resort (VD: ""What facilities are available?"", ""What are the restaurant hours?"")
+4. Quan sát câu trả lời","- AI trả lời dựa trên knowledge base của resort
+- Thông tin chính xác về facilities, services, hours
+- Có thể hỏi về events, promotions",High,Functional,"Kiểm tra độ chính xác thông tin"
+TC-025,Concierge Chat,CHAT-005,Events Integration,Kiểm tra tích hợp thông tin events,"1. Đăng nhập Guest
+2. Vào Concierge Chat
+3. Hỏi về events (VD: ""What events are happening today?"", ""Tell me about the beach party"")
+4. Quan sát câu trả lời","- AI trả lời về events có trong hệ thống
+- Hiển thị thông tin chi tiết: Tên event, Thời gian, Địa điểm, Mô tả
+- Có thể hỏi về events trong tương lai",High,Functional,"Cần có events trong hệ thống"
+TC-026,Concierge Chat,CHAT-006,Promotions Integration,Kiểm tra tích hợp promotions,"1. Đăng nhập Guest
+2. Vào Concierge Chat
+3. Hỏi về promotions (VD: ""Are there any promotions?"", ""What discounts are available?"")
+4. Quan sát câu trả lời","- AI trả lời về promotions hiện tại
+- Hiển thị thông tin: Tên promotion, Mô tả, Giá trị giảm giá, Thời gian áp dụng
+- Có thể hỏi về promotions cụ thể",High,Functional,"Cần có promotions trong hệ thống"
+TC-027,Events & Promotions,EVENT-001,Events List,Kiểm tra danh sách sự kiện,"1. Đăng nhập Guest
+2. Chọn ""Events"" hoặc ""Resort Events""
+3. Quan sát danh sách events","- Hiển thị danh sách tất cả events
+- Mỗi event có: Tên, Hình ảnh, Thời gian, Địa điểm
+- Có thể click để xem chi tiết
+- Danh sách được sắp xếp theo thời gian",High,UI/Functional,"Kiểm tra UI và thông tin"
+TC-028,Events & Promotions,EVENT-002,Event Details,Kiểm tra chi tiết sự kiện,"1. Đăng nhập Guest
+2. Vào Events List
+3. Click vào một event
+4. Quan sát chi tiết","- Hiển thị đầy đủ thông tin: Tên, Mô tả chi tiết, Thời gian bắt đầu/kết thúc, Địa điểm, Hình ảnh
+- Có thể đăng ký tham gia (nếu có)
+- Layout đẹp, dễ đọc",High,Functional,"Kiểm tra thông tin chi tiết"
+TC-029,Events & Promotions,EVENT-003,Promotions Display,Kiểm tra hiển thị promotions,"1. Đăng nhập Guest
+2. Vào màn hình Home
+3. Quan sát phần Promotions","- Hiển thị promotions trên màn hình Home
+- Mỗi promotion có: Tên, Mô tả, Giá trị giảm giá, Hình ảnh
+- Có thể click để xem chi tiết
+- Promotions nổi bật, thu hút",High,UI/Functional,"Kiểm tra UI và visibility"
+TC-030,Driver Portal,DRIVER-001,Driver Dashboard,Kiểm tra Dashboard của Driver,"1. Đăng nhập với tài khoản Driver
+2. Quan sát màn hình Dashboard","- Hiển thị Dashboard với các thông tin: Số chuyến đang chờ, Chuyến đang thực hiện, Lịch sử
+- Có nút ""Accept Ride"", ""View Requests""
+- Hiển thị trạng thái online/offline
+- Giao diện dễ sử dụng",High,UI/Functional,"Kiểm tra UI và chức năng"
+TC-031,Driver Portal,DRIVER-002,Ride Requests List,Kiểm tra danh sách yêu cầu chuyến đi,"1. Đăng nhập Driver
+2. Vào ""Ride Requests"" hoặc xem danh sách trên Dashboard
+3. Quan sát danh sách","- Hiển thị tất cả yêu cầu chuyến đi đang chờ
+- Mỗi request có: Điểm đón, Điểm đến, Thời gian yêu cầu, Trạng thái
+- Có thể Accept hoặc Reject
+- Danh sách cập nhật real-time",High,Functional,"Cần có ride requests để test"
+TC-032,Driver Portal,DRIVER-003,Accept Ride,Kiểm tra chấp nhận chuyến đi,"1. Đăng nhập Driver
+2. Xem danh sách Ride Requests
+3. Chọn một request
+4. Nhấn ""Accept Ride""
+5. Quan sát thay đổi","- Chấp nhận thành công
+- Request chuyển sang trạng thái ""Accepted""
+- Driver được gán cho chuyến đi đó
+- Guest nhận được thông báo
+- Request biến mất khỏi danh sách chờ của drivers khác",High,Functional,"Cần có ride request để test"
+TC-033,Driver Portal,DRIVER-004,Reject Ride,Kiểm tra từ chối chuyến đi,"1. Đăng nhập Driver
+2. Xem danh sách Ride Requests
+3. Chọn một request
+4. Nhấn ""Reject Ride""
+5. Xác nhận nếu có popup","- Từ chối thành công
+- Request vẫn còn trong danh sách cho drivers khác
+- Driver không thấy request đó nữa
+- Có thể reject với lý do (nếu có)",High,Functional,"Test negative case"
+TC-034,Driver Portal,DRIVER-005,Update Ride Status,Kiểm tra cập nhật trạng thái chuyến đi,"1. Đăng nhập Driver
+2. Accept một ride
+3. Nhấn ""Update Status""
+4. Chọn trạng thái mới (VD: ""On the way"", ""Arrived"", ""Completed"")
+5. Quan sát","- Cập nhật trạng thái thành công
+- Trạng thái mới được hiển thị
+- Guest nhận được thông báo cập nhật
+- Có thể cập nhật nhiều lần",High,Functional,"Test với các trạng thái khác nhau"
+TC-035,Driver Portal,DRIVER-006,GPS Location Tracking,Kiểm tra theo dõi vị trí GPS,"1. Đăng nhập Driver trên mobile
+2. Bật GPS
+3. Chấp nhận một ride
+4. Di chuyển
+5. Quan sát vị trí trên app","- Vị trí GPS được cập nhật
+- Hiển thị vị trí hiện tại trên bản đồ
+- Guest có thể xem vị trí driver real-time
+- Vị trí được cập nhật định kỳ",High,Functional,"Cần test trên mobile với GPS"
+TC-036,Staff Portal,STAFF-001,Staff Dashboard,Kiểm tra Dashboard của Staff,"1. Đăng nhập với tài khoản Staff
+2. Quan sát màn hình Dashboard","- Hiển thị Dashboard với: Số đơn hàng đang chờ, Đơn hàng đang xử lý, Tin nhắn chưa đọc
+- Có nút ""View Orders"", ""Service Requests""
+- Hiển thị trạng thái online/offline
+- Giao diện dễ sử dụng",High,UI/Functional,"Kiểm tra UI và chức năng"
+TC-037,Staff Portal,STAFF-002,Service Requests List,Kiểm tra danh sách yêu cầu dịch vụ,"1. Đăng nhập Staff
+2. Vào ""Service Requests"" hoặc xem trên Dashboard
+3. Quan sát danh sách","- Hiển thị tất cả service requests đang chờ
+- Mỗi request có: Loại dịch vụ, Phòng, Thời gian, Trạng thái
+- Có thể Confirm hoặc xem chi tiết
+- Danh sách được lọc theo department của staff",High,Functional,"Cần có service requests để test"
+TC-038,Staff Portal,STAFF-003,Confirm Order,Kiểm tra xác nhận đơn hàng,"1. Đăng nhập Staff
+2. Xem Service Requests
+3. Chọn một đơn hàng (Dining/Spa/Pool)
+4. Nhấn ""Confirm Order""
+5. Quan sát","- Xác nhận thành công
+- Trạng thái đơn hàng chuyển sang ""Confirmed""
+- Guest nhận được thông báo
+- Staff có thể bắt đầu xử lý đơn hàng",High,Functional,"Cần có order để test"
+TC-039,Staff Portal,STAFF-004,Complete Order,Kiểm tra hoàn thành đơn hàng,"1. Đăng nhập Staff
+2. Xem Service Requests
+3. Chọn một đơn hàng đã Confirm
+4. Nhấn ""Complete Order""
+5. Xác nhận hoàn thành","- Hoàn thành thành công
+- Trạng thái chuyển sang ""Completed""
+- Guest nhận được thông báo
+- Đơn hàng chuyển sang lịch sử
+- Có thể đánh giá (nếu có)",High,Functional,"Cần có order đã confirm"
+TC-040,Staff Portal,STAFF-008,Service Chat,Kiểm tra chat với guest,"1. Đăng nhập Staff
+2. Vào một service request
+3. Nhấn ""Chat"" hoặc icon chat
+4. Gửi tin nhắn cho guest
+5. Đợi guest phản hồi","- Mở cửa sổ chat
+- Có thể gửi và nhận tin nhắn
+- Chat real-time với guest
+- Tin nhắn được lưu vào database
+- Có thể xem lịch sử chat",High,Functional,"Cần có guest để test chat"
+TC-041,Reception Portal,RECEPT-001,Reception Dashboard,Kiểm tra Dashboard của Reception,"1. Đăng nhập với tài khoản Reception
+2. Quan sát màn hình Dashboard","- Hiển thị tổng quan: Số rides đang chờ, Service requests, Drivers online, Staff online
+- Có các tab: Buggy Management, Service Management, Driver Management, Staff Management
+- Có thể gán rides/services thủ công hoặc tự động
+- Giao diện dễ sử dụng",High,UI/Functional,"Kiểm tra UI và chức năng"
+TC-042,Reception Portal,RECEPT-002,Buggy Management,Kiểm tra quản lý buggy rides,"1. Đăng nhập Reception
+2. Vào ""Buggy Management""
+3. Quan sát danh sách rides
+4. Thử gán driver cho một ride","- Hiển thị tất cả buggy rides
+- Mỗi ride có: Guest info, Pickup/Destination, Trạng thái, Driver assigned
+- Có thể gán driver thủ công
+- Có thể xem chi tiết và cập nhật trạng thái",High,Functional,"Kiểm tra quản lý rides"
+TC-043,Reception Portal,RECEPT-003,Service Management,Kiểm tra quản lý service requests,"1. Đăng nhập Reception
+2. Vào ""Service Management""
+3. Quan sát danh sách service requests
+4. Thử gán staff cho một request","- Hiển thị tất cả service requests
+- Mỗi request có: Guest info, Loại dịch vụ, Trạng thái, Staff assigned
+- Có thể gán staff thủ công
+- Có thể xem chi tiết và cập nhật trạng thái",High,Functional,"Kiểm tra quản lý services"
+TC-044,Reception Portal,RECEPT-004,Driver Management,Kiểm tra quản lý drivers,"1. Đăng nhập Reception
+2. Vào ""Driver Management""
+3. Quan sát danh sách drivers","- Hiển thị danh sách tất cả drivers
+- Mỗi driver có: Tên, Trạng thái (online/busy/offline), Số rides đang xử lý, Vị trí
+- Có thể xem chi tiết driver
+- Có thể gán ride cho driver cụ thể",High,Functional,"Kiểm tra quản lý drivers"
+TC-045,Reception Portal,RECEPT-005,Staff Management,Kiểm tra quản lý staff,"1. Đăng nhập Reception
+2. Vào ""Staff Management""
+3. Quan sát danh sách staff","- Hiển thị danh sách tất cả staff
+- Mỗi staff có: Tên, Department, Trạng thái (online/busy/offline), Số orders đang xử lý
+- Có thể xem chi tiết staff
+- Có thể gán service request cho staff cụ thể",High,Functional,"Kiểm tra quản lý staff"
+TC-046,Reception Portal,RECEPT-006,Manual Assignment,Kiểm tra gán thủ công,"1. Đăng nhập Reception
+2. Vào Buggy Management hoặc Service Management
+3. Chọn một ride/service request chưa được gán
+4. Nhấn ""Assign""
+5. Chọn driver/staff từ danh sách
+6. Xác nhận","- Gán thành công
+- Driver/Staff nhận được thông báo
+- Ride/Request được cập nhật với driver/staff đã gán
+- Có thể thay đổi assignment nếu cần",High,Functional,"Kiểm tra manual assignment"
+TC-047,Reception Portal,RECEPT-007,AI Assignment,Kiểm tra gán tự động bằng AI,"1. Đăng nhập Reception
+2. Vào Buggy Management hoặc Service Management
+3. Chọn một ride/service request chưa được gán
+4. Nhấn ""AI Assign"" hoặc ""Auto Assign""
+5. Quan sát kết quả","- AI tự động gán driver/staff phù hợp
+- Dựa trên: Vị trí, Tải công việc hiện tại, Trạng thái online
+- Gán thành công và hiển thị lý do gán
+- Có thể chấp nhận hoặc từ chối assignment",High,Functional,"Kiểm tra AI logic"
+TC-048,Reception Portal,RECEPT-010,Driver Status Display,Kiểm tra hiển thị trạng thái driver,"1. Đăng nhập Reception
+2. Vào Driver Management
+3. Quan sát trạng thái của các drivers","- Hiển thị trạng thái rõ ràng: Online (xanh), Busy (vàng), Offline (xám)
+- Trạng thái cập nhật real-time
+- Có thể xem thời gian online/offline
+- Có icon hoặc badge phân biệt trạng thái",High,UI/Functional,"Kiểm tra UI và real-time update"
+TC-049,Reception Portal,RECEPT-011,Staff Status Display,Kiểm tra hiển thị trạng thái staff,"1. Đăng nhập Reception
+2. Vào Staff Management
+3. Quan sát trạng thái của các staff","- Hiển thị trạng thái rõ ràng: Online (xanh), Busy (vàng), Offline (xám)
+- Trạng thái cập nhật real-time
+- Có thể xem thời gian online/offline
+- Có icon hoặc badge phân biệt trạng thái",High,UI/Functional,"Kiểm tra UI và real-time update"
+TC-050,Admin Portal,ADMIN-001,Locations Management,Kiểm tra quản lý địa điểm,"1. Đăng nhập Admin
+2. Vào ""Locations Management""
+3. Thử thêm một địa điểm mới
+4. Thử sửa một địa điểm
+5. Thử xóa một địa điểm","- Hiển thị danh sách tất cả locations
+- Có thể thêm mới: Tên, Loại (Villa/Facility/Restaurant), Tọa độ, Mô tả
+- Có thể sửa thông tin
+- Có thể xóa (có xác nhận)
+- Thay đổi được lưu vào database",High,Functional,"Kiểm tra CRUD operations"
+TC-051,Admin Portal,ADMIN-002,Menu Management,Kiểm tra quản lý menu,"1. Đăng nhập Admin
+2. Vào ""Menu Management""
+3. Thử thêm một món mới
+4. Thử sửa giá/mô tả
+5. Thử xóa một món","- Hiển thị danh sách menu items
+- Có thể thêm mới: Tên, Giá, Mô tả, Hình ảnh, Loại (Dining/Spa/Pool)
+- Có thể sửa thông tin
+- Có thể xóa (có xác nhận)
+- Hỗ trợ đa ngôn ngữ",High,Functional,"Kiểm tra CRUD operations"
+TC-052,Admin Portal,ADMIN-003,Events Management,Kiểm tra quản lý events,"1. Đăng nhập Admin
+2. Vào ""Events Management""
+3. Thử thêm một event mới
+4. Thử sửa event
+5. Thử xóa event","- Hiển thị danh sách events
+- Có thể thêm mới: Tên, Mô tả, Thời gian, Địa điểm, Hình ảnh
+- Có thể sửa thông tin
+- Có thể xóa (có xác nhận)
+- Hỗ trợ đa ngôn ngữ",High,Functional,"Kiểm tra CRUD operations"
+TC-053,Admin Portal,ADMIN-004,Promotions Management,Kiểm tra quản lý promotions,"1. Đăng nhập Admin
+2. Vào ""Promotions Management""
+3. Thử thêm một promotion mới
+4. Thử sửa promotion
+5. Thử xóa promotion","- Hiển thị danh sách promotions
+- Có thể thêm mới: Tên, Mô tả, Giá trị giảm giá, Thời gian áp dụng, Hình ảnh
+- Có thể sửa thông tin
+- Có thể xóa (có xác nhận)
+- Hỗ trợ đa ngôn ngữ",High,Functional,"Kiểm tra CRUD operations"
+TC-054,Admin Portal,ADMIN-005,Knowledge Base Management,Kiểm tra quản lý knowledge base,"1. Đăng nhập Admin
+2. Vào ""Knowledge Base Management""
+3. Thử thêm một mục mới
+4. Thử sửa mục
+5. Thử xóa mục","- Hiển thị danh sách knowledge items
+- Có thể thêm mới: Câu hỏi, Câu trả lời, Tags, Loại
+- Có thể sửa thông tin
+- Có thể xóa (có xác nhận)
+- Knowledge base được sử dụng bởi AI Concierge",High,Functional,"Kiểm tra CRUD operations"
+TC-055,Admin Portal,ADMIN-006,Users Management,Kiểm tra quản lý users,"1. Đăng nhập Admin
+2. Vào ""Users Management""
+3. Quan sát danh sách users
+4. Thử thêm user mới
+5. Thử sửa thông tin user
+6. Thử reset password","- Hiển thị danh sách users: Guest, Staff, Driver, Admin
+- Có thể thêm user mới với role cụ thể
+- Có thể sửa thông tin: Tên, Email, Role
+- Có thể reset password
+- Có thể xóa user (có xác nhận)",High,Functional,"Kiểm tra quản lý users"
+TC-056,Admin Portal,ADMIN-007,Room Types Management,Kiểm tra quản lý loại phòng,"1. Đăng nhập Admin
+2. Vào ""Room Types Management""
+3. Thử thêm loại phòng mới
+4. Thử sửa loại phòng
+5. Thử xóa loại phòng","- Hiển thị danh sách room types
+- Có thể thêm mới: Tên loại, Mô tả, Giá, Sức chứa
+- Có thể sửa thông tin
+- Có thể xóa (có xác nhận)
+- Hỗ trợ đa ngôn ngữ",High,Functional,"Kiểm tra CRUD operations"
+TC-057,Admin Portal,ADMIN-008,Rooms Management,Kiểm tra quản lý phòng,"1. Đăng nhập Admin
+2. Vào ""Rooms Management""
+3. Thử thêm phòng mới
+4. Thử sửa thông tin phòng
+5. Thử xóa phòng","- Hiển thị danh sách rooms
+- Có thể thêm mới: Số phòng, Loại phòng, Tình trạng, Tọa độ
+- Có thể sửa thông tin
+- Có thể xóa (có xác nhận)
+- Có thể import từ CSV",High,Functional,"Kiểm tra CRUD operations"
+TC-058,Admin Portal,ADMIN-016,Multi-language Content,Kiểm tra quản lý nội dung đa ngôn ngữ,"1. Đăng nhập Admin
+2. Vào bất kỳ màn hình quản lý nào (Menu/Events/Promotions)
+3. Thử thêm nội dung bằng nhiều ngôn ngữ
+4. Kiểm tra hiển thị trên Guest app","- Có thể nhập nội dung cho từng ngôn ngữ
+- Có thể dịch tự động bằng AI (nếu có)
+- Nội dung được lưu đúng ngôn ngữ
+- Guest app hiển thị đúng ngôn ngữ đã chọn",High,Functional,"Kiểm tra đa ngôn ngữ"
+TC-059,Supervisor Portal,SUPER-001,Supervisor Dashboard,Kiểm tra Dashboard của Supervisor,"1. Đăng nhập với tài khoản Supervisor
+2. Quan sát màn hình Dashboard","- Hiển thị tổng quan tất cả departments
+- Có thể xem: Buggy Service, Dining, Spa, Pool, Butler
+- Hiển thị số liệu: Tổng requests, Đang xử lý, Hoàn thành
+- Có thể xem chi tiết từng department",High,UI/Functional,"Kiểm tra UI và chức năng"
+TC-060,Supervisor Portal,SUPER-002,All Departments View,Kiểm tra xem tất cả departments,"1. Đăng nhập Supervisor
+2. Vào ""All Departments"" hoặc xem trên Dashboard
+3. Quan sát","- Hiển thị tất cả departments cùng lúc
+- Mỗi department có: Tên, Số requests, Trạng thái hoạt động
+- Có thể click vào để xem chi tiết
+- Có thể filter theo department",High,Functional,"Kiểm tra overview"
+TC-061,Supervisor Portal,SUPER-003,Service Requests Monitor,Kiểm tra giám sát service requests,"1. Đăng nhập Supervisor
+2. Vào ""Service Requests Monitor""
+3. Quan sát danh sách requests
+4. Thử filter theo department","- Hiển thị tất cả service requests từ tất cả departments
+- Có thể filter theo: Department, Trạng thái, Thời gian
+- Có thể xem chi tiết từng request
+- Có thể can thiệp nếu cần (nếu có quyền)",High,Functional,"Kiểm tra monitoring"
+TC-062,Service Chat,CHAT-SVC-001,Service Chat Widget,Kiểm tra chat widget cho từng dịch vụ,"1. Đăng nhập Guest
+2. Vào Active Orders
+3. Chọn một đơn hàng
+4. Mở chat widget
+5. Quan sát giao diện","- Chat widget hiển thị đẹp
+- Có thể gửi và nhận tin nhắn
+- Hiển thị tên staff đang chat
+- Có thể đóng/mở widget dễ dàng
+- Widget không che khuất nội dung chính",High,UI/Functional,"Kiểm tra UI của widget"
+TC-063,Service Chat,CHAT-SVC-002,Real-time Messaging,Kiểm tra nhắn tin real-time,"1. Đăng nhập Guest
+2. Mở chat với staff
+3. Gửi tin nhắn
+4. Yêu cầu staff phản hồi
+5. Quan sát","- Tin nhắn được gửi ngay lập tức
+- Nhận tin nhắn từ staff ngay khi họ gửi
+- Không cần refresh trang
+- Có indicator ""Đang gõ..."" (nếu có)",High,Functional,"Cần có staff để test"
+TC-064,Service Chat,CHAT-SVC-003,Message Persistence,Kiểm tra lưu tin nhắn vào database,"1. Đăng nhập Guest
+2. Mở chat với staff
+3. Gửi vài tin nhắn
+4. Đóng chat và đăng xuất
+5. Đăng nhập lại và mở chat","- Tin nhắn được lưu vào database
+- Có thể xem lại lịch sử chat khi mở lại
+- Tin nhắn được sắp xếp theo thời gian
+- Không mất tin nhắn khi refresh trang",High,Functional,"Kiểm tra persistence"
+TC-065,Guest Portal,GUEST-004,Notification Bell,Kiểm tra thông báo đơn hàng,"1. Đăng nhập Guest
+2. Quan sát icon notification bell trên màn hình
+3. Đặt một đơn hàng
+4. Đợi staff confirm
+5. Kiểm tra notification bell","- Icon notification bell hiển thị số lượng thông báo chưa đọc
+- Khi có thông báo mới, số tăng lên
+- Click vào bell để xem danh sách thông báo
+- Thông báo hiển thị: Loại, Nội dung, Thời gian
+- Có thể đánh dấu đã đọc",Medium,UI/Functional,"Kiểm tra notification system"
+TC-066,Buggy Service,BUGGY-007,Waiting Time Display,Kiểm tra hiển thị thời gian chờ,"1. Đăng nhập Guest
+2. Đặt một chuyến buggy
+3. Quan sát màn hình chờ
+4. Đợi driver chấp nhận
+5. Quan sát thời gian chờ","- Hiển thị thời gian đã chờ (VD: ""Đã chờ 2 phút"")
+- Thời gian được cập nhật mỗi giây
+- Hiển thị rõ ràng, dễ nhìn
+- Có thể ước tính thời gian đến",Medium,UI/Functional,"Kiểm tra UI và tính toán thời gian"
+TC-067,Buggy Service,BUGGY-008,ETA Display,Kiểm tra hiển thị thời gian đến dự kiến,"1. Đăng nhập Guest
+2. Đặt một chuyến buggy
+3. Đợi driver chấp nhận và bắt đầu di chuyển
+4. Quan sát ETA","- Hiển thị ETA (Estimated Time of Arrival) - VD: ""Đến trong 5 phút""
+- ETA được tính dựa trên vị trí driver và điểm đến
+- ETA được cập nhật khi driver di chuyển
+- Hiển thị rõ ràng trên màn hình",Medium,UI/Functional,"Kiểm tra tính toán ETA"
+TC-068,Buggy Service,BUGGY-011,Sound Notifications,Kiểm tra âm thanh thông báo trạng thái,"1. Đăng nhập Guest
+2. Đặt một chuyến buggy
+3. Đợi driver chấp nhận
+4. Quan sát âm thanh","- Có âm thanh khi trạng thái thay đổi (VD: Driver accepted, Driver arrived)
+- Âm thanh rõ ràng, không quá to
+- Có thể tắt/bật âm thanh trong settings (nếu có)
+- Âm thanh phù hợp với từng loại thông báo",Low,Functional,"Kiểm tra sound notifications"
+TC-069,UI/UX,UI-001,Responsive Design,Kiểm tra thiết kế responsive,"1. Mở ứng dụng trên desktop
+2. Thu nhỏ cửa sổ trình duyệt
+3. Mở trên tablet
+4. Mở trên mobile
+5. Quan sát giao diện","- Giao diện tự động điều chỉnh theo kích thước màn hình
+- Không bị vỡ layout
+- Text và button có kích thước phù hợp
+- Menu và navigation hoạt động tốt trên mọi thiết bị
+- Có thể sử dụng dễ dàng trên mobile",High,UI,"Kiểm tra trên nhiều kích thước màn hình"
+TC-070,UI/UX,UI-005,Loading States,Kiểm tra trạng thái loading,"1. Thực hiện bất kỳ action nào (Login, Đặt hàng, Load data)
+2. Quan sát màn hình loading","- Hiển thị loading indicator khi đang xử lý
+- Loading không quá lâu (dưới 3 giây cho action thông thường)
+- Có thể hiển thị progress bar hoặc spinner
+- Không bị đơ màn hình
+- User biết hệ thống đang xử lý",High,UI/Functional,"Kiểm tra UX của loading"
+TC-071,UI/UX,UI-006,Error States,Kiểm tra trạng thái lỗi,"1. Thử các action có thể gây lỗi: Login sai, Mất kết nối, Server error
+2. Quan sát thông báo lỗi","- Hiển thị thông báo lỗi rõ ràng, dễ hiểu
+- Thông báo bằng tiếng Việt (hoặc ngôn ngữ đã chọn)
+- Có thể retry nếu lỗi do mạng
+- Không hiển thị lỗi kỹ thuật khó hiểu
+- Có hướng dẫn xử lý",High,UI/Functional,"Kiểm tra error handling"
+TC-072,Localization,LOC-002 to LOC-008,All Language Translations,Kiểm tra bản dịch tất cả ngôn ngữ,"1. Đăng nhập Guest
+2. Lần lượt chọn từng ngôn ngữ: English, Vietnamese, Korean, Japanese, Chinese, Russian, French
+3. Kiểm tra từng màn hình","- Tất cả text được dịch đúng ngôn ngữ
+- Không có text nào bị thiếu hoặc hiển thị mã lỗi
+- Bố cục không bị vỡ với ngôn ngữ dài
+- Ngày giờ được format theo locale
+- Số tiền được format đúng",High,Functional,"Kiểm tra từng ngôn ngữ"
+TC-073,Mobile App,MOBILE-001,Capacitor Integration,Kiểm tra tích hợp Capacitor,"1. Build app thành APK
+2. Cài đặt trên Android device
+3. Mở app và test các chức năng cơ bản","- App chạy được trên Android
+- Các chức năng hoạt động như trên web
+- Có thể truy cập native features (GPS, Camera, Microphone)
+- Performance tốt trên mobile",High,Functional,"Cần build APK để test"
+TC-074,Mobile App,MOBILE-003,GPS Permissions,Kiểm tra quyền GPS trên mobile,"1. Cài đặt app trên mobile
+2. Đăng nhập Driver
+3. App yêu cầu quyền GPS
+4. Cho phép quyền GPS
+5. Kiểm tra tracking","- App yêu cầu quyền GPS khi cần
+- Có thể cho phép hoặc từ chối
+- Nếu từ chối, có thông báo giải thích
+- GPS hoạt động sau khi được cho phép
+- Có thể thay đổi quyền trong Settings",Medium,Functional,"Test trên mobile device"
+TC-075,Mobile App,MOBILE-004,Audio Permissions,Kiểm tra quyền audio cho voice chat,"1. Cài đặt app trên mobile
+2. Đăng nhập Guest
+3. Vào Concierge Chat
+4. Chọn Voice Chat
+5. App yêu cầu quyền microphone","- App yêu cầu quyền microphone khi dùng voice chat
+- Có thể cho phép hoặc từ chối
+- Voice chat hoạt động sau khi được cho phép
+- Có thể thay đổi quyền trong Settings",Medium,Functional,"Test trên mobile device"
+TC-076,Performance,PERF-001,API Polling,Kiểm tra polling cho real-time updates,"1. Đăng nhập Guest
+2. Đặt một chuyến buggy
+3. Mở Developer Tools (F12)
+4. Vào tab Network
+5. Quan sát các request API","- API được gọi định kỳ để cập nhật (VD: mỗi 3 giây cho buggy, 2 giây cho orders)
+- Không có quá nhiều request không cần thiết
+- Request được tối ưu (không gửi quá nhiều data)
+- Performance tốt, không lag",High,Performance,"Cần kiến thức kỹ thuật để test"
+TC-077,Security,SEC-002,Role-based Access Control,Kiểm tra kiểm soát truy cập theo role,"1. Đăng nhập Guest
+2. Thử truy cập Admin Portal (bằng cách thay đổi URL hoặc tìm đường dẫn)
+3. Đăng nhập Staff
+4. Thử truy cập Admin Portal
+5. Đăng nhập Admin
+6. Kiểm tra truy cập Admin Portal","- Guest không thể truy cập Admin/Staff/Driver portals
+- Staff chỉ có thể truy cập Staff Portal
+- Admin có thể truy cập tất cả
+- Có redirect về Login nếu không có quyền
+- Không hiển thị menu/button không có quyền",High,Security,"Kiểm tra security"
+TC-078,Security,SEC-003,Input Validation,Kiểm tra validation input,"1. Thử nhập các giá trị không hợp lệ: Trống, Ký tự đặc biệt, SQL injection, XSS
+2. Quan sát hệ thống xử lý","- Hệ thống từ chối input không hợp lệ
+- Hiển thị thông báo lỗi rõ ràng
+- Không bị SQL injection
+- Không bị XSS attack
+- Input được sanitize trước khi lưu",High,Security,"Kiểm tra security"
+
+
