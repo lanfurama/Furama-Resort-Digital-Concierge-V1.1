@@ -465,7 +465,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative z-0 pb-40" style={{ paddingBottom: 'max(10rem, calc(10rem + env(safe-area-inset-bottom)))' }}>
+    <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative z-0" style={{ paddingBottom: 'max(5rem, calc(5rem + env(safe-area-inset-bottom)))' }}>
       
       {/* Header with gradient and glassmorphism */}
       <div className={`px-3 py-2 text-white shadow-lg backdrop-blur-md bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 flex items-center flex-shrink-0 relative z-10 border-b border-white/20`}>
@@ -743,10 +743,10 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       {/* Booking Form - Modern glassmorphism design */}
       {!activeRide && !isLoadingRide && !isLoadingLocations && (
         <div 
-          className="mx-3 mt-3 mb-40 rounded-3xl shadow-2xl backdrop-blur-lg bg-white/95 border border-white/60 flex-shrink-0 flex flex-col overflow-hidden"
+          className="mx-3 mt-3 mb-24 rounded-3xl shadow-2xl backdrop-blur-lg bg-white/95 border border-white/60 flex-shrink-0 flex flex-col overflow-hidden"
           style={{
             boxShadow: '0 25px 70px -20px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.5)',
-            maxHeight: 'calc(100vh - 200px)',
+            maxHeight: 'calc(100vh - 180px)',
             paddingBottom: 'max(1rem, calc(1rem + env(safe-area-inset-bottom)))'
           }}
         >
@@ -841,15 +841,15 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
             </div>
 
             {/* Scrollable Locations Grid - Cinema Seat Style */}
-            <div className="flex-1 min-h-0 flex flex-col px-4 pb-3">
-                <div className="flex items-center gap-2 mb-2">
+            <div className="flex-1 min-h-0 flex flex-col px-4 pb-3" style={{ maxHeight: 'calc(100vh - 380px)' }}>
+                <div className="flex items-center gap-2 mb-2 flex-shrink-0">
                     <div className="text-[10px] font-bold text-gray-700 uppercase tracking-wide">
                         {filteredLocations.length} {filterType === 'ALL' ? 'Locations' : filterType.toLowerCase()}
                     </div>
                     <div className="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent"></div>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-emerald-300 scrollbar-track-gray-100">
+                <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-emerald-300 scrollbar-track-gray-100 min-h-0">
                     {filteredLocations.length > 0 ? (
                         <div className="grid grid-cols-5 gap-2">
                             {filteredLocations.map((loc) => (
@@ -901,7 +901,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
             </div>
 
             {/* Fixed Footer Section - Book Button */}
-            <div className="p-4 pt-1.5 flex-shrink-0 space-y-1.5 border-t border-gray-100 bg-gradient-to-b from-white/50 to-white/95">
+            <div className="p-4 pt-1.5 flex-shrink-0 space-y-1.5 border-t border-gray-100 bg-gradient-to-b from-white/50 to-white/95 sticky bottom-0 z-20">
                 {/* Book Button with modern gradient and hover effects */}
                 <button 
                     onClick={handleBook}
