@@ -15,7 +15,7 @@ import GuestAccount from './components/GuestAccount';
 import ActiveOrders from './components/ActiveOrders';
 import NotificationBell from './components/NotificationBell';
 import SupervisorDashboard from './components/SupervisorDashboard';
-import { findUserByCredentials, loginStaff, loginGuest, getPromotions, getActiveGuestOrders, getActiveRideForUser, markDriverOffline } from './services/dataService';
+import { findUserByCredentials, loginStaff, loginGuest, getPromotions, getActiveGuestOrders, getActiveRideForUser } from './services/dataService';
 import { BuggyStatus } from './types';
 import { User as UserIcon, LogOut, MessageSquare, Car, Percent, Lock, Eye, EyeOff, ShoppingCart, Home } from 'lucide-react';
 import { LanguageProvider, useTranslation } from './contexts/LanguageContext';
@@ -151,26 +151,6 @@ const AppContent: React.FC = () => {
   };
 
   const handleLogout = () => {
-      // Mark driver/staff as offline before clearing user state
-      // Get user from localStorage in case state is already cleared
-      const savedUser = localStorage.getItem('furama_user');
-      if (savedUser) {
-        try {
-          const userData = JSON.parse(savedUser);
-          if (userData.id && (
-            userData.role === UserRole.DRIVER || 
-            userData.role === UserRole.STAFF || 
-            userData.role === UserRole.SUPERVISOR
-          )) {
-            markDriverOffline(String(userData.id)).catch(err => {
-              console.error('Failed to mark user offline on logout:', err);
-            });
-          }
-        } catch (e) {
-          console.error('Failed to parse user from localStorage:', e);
-        }
-      }
-      
       setUser(null);
       setView(AppView.LOGIN);
       setUsernameInput('');
@@ -263,30 +243,7 @@ const AppContent: React.FC = () => {
 
             <form onSubmit={handleLogin} className="space-y-4">
                 {/* Role Switcher (For Demo) */}
-                <div 
-                    className="flex bg-gray-100 p-1 rounded-lg mb-6 overflow-x-auto" 
-                    style={{ 
-                        WebkitOverflowScrolling: 'touch',
-                        scrollbarWidth: 'thin',
-                        scrollbarColor: '#10b981 #e5e7eb'
-                    }}
-                >
-                    <style>{`
-                        div::-webkit-scrollbar {
-                            height: 3px;
-                        }
-                        div::-webkit-scrollbar-track {
-                            background: #e5e7eb;
-                            border-radius: 10px;
-                        }
-                        div::-webkit-scrollbar-thumb {
-                            background: #10b981;
-                            border-radius: 10px;
-                        }
-                        div::-webkit-scrollbar-thumb:hover {
-                            background: #059669;
-                        }
-                    `}</style>
+                <div className="flex bg-gray-100 p-1 rounded-lg mb-6 overflow-x-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
                     <div className="flex gap-1 min-w-max">
                         {Object.values(UserRole).map((role) => (
                             <button
@@ -445,7 +402,7 @@ const AppContent: React.FC = () => {
       
       {/* 1. Modern Header with Gradient & Glassmorphism */}
       <div 
-        className="backdrop-blur-md bg-gradient-to-r from-emerald-700 via-emerald-800 to-teal-800 text-white pt-2 pb-2 px-3 flex justify-between items-center shadow-xl z-30 shrink-0 border-b border-white/10"
+        className="backdrop-blur-md bg-gradient-to-r from-emerald-700 via-emerald-800 to-teal-800 text-white pt-3 pb-3 px-4 flex justify-between items-center shadow-xl z-30 shrink-0 border-b border-white/10"
         style={{
           boxShadow: '0 4px 20px -5px rgba(0,0,0,0.3)'
         }}
@@ -475,10 +432,10 @@ const AppContent: React.FC = () => {
                <NotificationBell userId={user.roomNumber} />
                <button 
                    onClick={handleLogout} 
-                   className="p-2.5 rounded-xl hover:bg-white/10 text-white/90 hover:text-white transition-all duration-300 border border-white/10 hover:border-white/20 backdrop-blur-sm" 
+                   className="p-2 rounded-xl hover:bg-white/10 text-white/90 hover:text-white transition-all duration-300 border border-white/10 hover:border-white/20 backdrop-blur-sm" 
                    title="Logout"
                >
-                  <LogOut className="w-5 h-5" strokeWidth={2.5} />
+                  <LogOut size={17} strokeWidth={2.5} />
                </button>
           </div>
       </div>
@@ -488,13 +445,8 @@ const AppContent: React.FC = () => {
         {/* Render View Content */}
         {view === AppView.HOME && (
              <div className="flex flex-col min-h-full">
-                {/* Hero Banner - Modern & Creative Design */}
-                <div className="mx-4 mt-4 h-44 rounded-3xl overflow-hidden relative shadow-2xl mb-6"
-                    style={{
-                        boxShadow: '0 20px 60px -15px rgba(0,0,0,0.3)'
-                    }}
-                >
-                    {/* Background Image */}
+                {/* Hero Banner (Smaller) */}
+                <div className="mx-4 mt-4 h-40 rounded-2xl overflow-hidden relative shadow-lg mb-6">
                     <img 
                         src="https://furamavietnam.com/wp-content/uploads/2025/10/furama-resort-danang.jpg" 
                         className="absolute inset-0 w-full h-full object-cover" 
@@ -509,46 +461,12 @@ const AppContent: React.FC = () => {
                             }
                         }}
                     />
-                    
-                    {/* Animated Gradient Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/90 via-teal-800/75 to-transparent"></div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
-                    
-                    {/* Decorative Pattern */}
-                    <div className="absolute inset-0 opacity-10">
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.1)_1px,transparent_1px)] [background-size:24px_24px]"></div>
-                    </div>
-                    
-                    {/* Content */}
-                    <div className="absolute inset-0 flex items-center p-6 z-10">
-                        <div className="relative">
-                            {/* Badge */}
-                            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 backdrop-blur-md rounded-full border border-white/30 mb-3">
-                                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                                <span className="text-white text-[10px] font-bold uppercase tracking-wider">Premium Resort</span>
-                            </div>
-                            
-                            {/* Title */}
-                            <h2 className="text-white font-serif text-3xl font-bold mb-2 drop-shadow-2xl leading-tight">
-                                Furama
-                                <span className="block text-emerald-300 text-2xl mt-0.5">Danang</span>
-                            </h2>
-                            
-                            {/* Subtitle */}
-                            <div className="flex items-center gap-2 mt-2">
-                                <div className="h-px w-8 bg-gradient-to-r from-emerald-400 to-transparent"></div>
-                                <p className="text-emerald-100 text-xs font-medium drop-shadow-lg tracking-wide">A Culinary Beach Resort</p>
-                            </div>
-                        </div>
-                        
-                        {/* Decorative Element - Right Side */}
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-20">
-                            <div className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-sm border-2 border-white/20 flex items-center justify-center">
-                                <div className="w-16 h-16 rounded-full bg-white/10 border border-white/20"></div>
-                            </div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/85 via-emerald-900/70 to-transparent flex items-center p-6">
+                        <div>
+                             <h2 className="text-white font-serif text-2xl font-bold mb-1 drop-shadow-lg">Furama Danang</h2>
+                             <p className="text-emerald-100 text-xs drop-shadow-md">A Culinary Beach Resort</p>
                         </div>
                     </div>
-                    
                 </div>
 
                 {/* Services Grid */}
@@ -575,61 +493,29 @@ const AppContent: React.FC = () => {
                             return (
                                 <div 
                                     key={promo.id} 
-                                    className={`min-w-[280px] p-6 rounded-3xl text-white shadow-2xl snap-center relative overflow-hidden shrink-0 ${
-                                        promo.imageUrl ? '' : (promo.imageColor || 'bg-gradient-to-br from-emerald-500 to-teal-600')
+                                    className={`min-w-[260px] p-5 rounded-2xl text-white shadow-lg snap-center relative overflow-hidden shrink-0 ${
+                                        promo.imageUrl ? '' : (promo.imageColor || 'bg-emerald-500')
                                     }`}
                                     style={promo.imageUrl ? {
                                         backgroundImage: `url(${promo.imageUrl})`,
                                         backgroundSize: 'cover',
                                         backgroundPosition: 'center',
-                                        backgroundRepeat: 'no-repeat',
-                                        boxShadow: '0 10px 40px -10px rgba(0,0,0,0.3)'
-                                    } : {
-                                        boxShadow: '0 10px 40px -10px rgba(0,0,0,0.3)'
-                                    }}
+                                        backgroundRepeat: 'no-repeat'
+                                    } : {}}
                                 >
-                                    {/* Enhanced Gradient Overlay for better text readability */}
+                                    {/* Overlay for better text readability when using image */}
                                     {promo.imageUrl && (
-                                        <>
-                                            <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/40 to-black/50 rounded-3xl"></div>
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent rounded-3xl"></div>
-                                        </>
+                                        <div className="absolute inset-0 bg-black/40 rounded-2xl shadow-lg"></div>
                                     )}
-                                    
-                                    {/* Decorative Pattern */}
-                                    <div className="absolute inset-0 opacity-10">
-                                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1)_1px,transparent_1px)] [background-size:20px_20px]"></div>
-                                    </div>
-                                    
-                                    <div className="relative z-10 h-full flex flex-col">
-                                        {/* Discount Badge - Enhanced */}
-                                        <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-emerald-400/90 to-teal-400/90 backdrop-blur-md w-fit px-3 py-1.5 rounded-full text-[11px] font-black mb-3 border border-white/30 shadow-lg">
-                                            <Percent size={12} strokeWidth={3} />
-                                            <span>{discount}</span>
-                                        </div>
-                                        
-                                        {/* Title */}
-                                        <h4 className="font-bold text-xl mb-2 leading-tight drop-shadow-lg">{title}</h4>
-                                        
-                                        {/* Description */}
-                                        <p className="text-sm opacity-95 line-clamp-2 mb-auto leading-relaxed">{desc}</p>
-                                        
-                                        {/* Valid Until */}
-                                        <div className="mt-4 pt-3 border-t border-white/20">
-                                            <p className="text-[10px] opacity-80 font-medium flex items-center gap-1">
-                                                <span>Valid until</span>
-                                                <span className="font-bold">{promo.validUntil}</span>
-                                            </p>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Decorative Icon - Enhanced */}
-                                    <div className="absolute -bottom-6 -right-6 text-white/5">
-                                        <Percent size={120} strokeWidth={1} />
-                                    </div>
-                                    
-                                    {/* Corner Accent */}
-                                    <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-white/10 to-transparent rounded-bl-full"></div>
+                                    <div className="relative z-10">
+                                        <div className="bg-white/20 w-fit px-2 py-1 rounded text-[10px] font-bold mb-2 backdrop-blur-sm">{discount}</div>
+                                        <h4 className="font-bold text-lg mb-1">{title}</h4>
+                                        <p className="text-xs opacity-90 line-clamp-2">{desc}</p>
+                                        <p className="text-[10px] mt-3 opacity-75">{promo.validUntil}</p>
+                    </div>
+                                    <div className="absolute -bottom-4 -right-4 text-white/10">
+                                        <Percent size={100} />
+                                </div>
                                 </div>
                             );
                         })}
@@ -654,9 +540,8 @@ const AppContent: React.FC = () => {
 
       {/* 3. Fixed Bottom Navigation Bar - Modern glassmorphism design */}
       <div 
-        className="backdrop-blur-xl bg-white/95 border-t-2 border-gray-200/60 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-50 flex justify-around items-center px-1.5 safe-area-bottom" 
+        className="backdrop-blur-xl bg-white/95 border-t-2 border-gray-200/60 h-20 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-50 flex justify-around items-center px-2 safe-area-bottom" 
         style={{ 
-          height: '73px',
           paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
           position: 'fixed',
           willChange: 'transform',
