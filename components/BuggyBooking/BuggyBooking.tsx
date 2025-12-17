@@ -1,23 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Car, Navigation, Loader2 } from 'lucide-react';
-import { BuggyStatus, User, Location } from '../types';
-import { getLocations, requestRide, cancelRide } from '../services/dataService';
-import ServiceChat from './ServiceChat';
-import { useTranslation } from '../contexts/LanguageContext';
-import Loading from './Loading';
+import { BuggyStatus, User, Location } from '../../types';
+import { getLocations, requestRide, cancelRide } from '../../services/dataService';
+import ServiceChat from '../ServiceChat';
+import { useTranslation } from '../../contexts/LanguageContext';
+import Loading from '../Loading';
 
 // Hooks
-import { useGeolocation } from './BuggyBooking/hooks/useGeolocation';
-import { useRideStatus } from './BuggyBooking/hooks/useRideStatus';
-import { useDriverName } from './BuggyBooking/hooks/useDriverName';
-import { useNotificationSound } from './BuggyBooking/hooks/useNotificationSound';
+import { useGeolocation } from './hooks/useGeolocation';
+import { useRideStatus } from './hooks/useRideStatus';
+import { useDriverName } from './hooks/useDriverName';
+import { useNotificationSound } from './hooks/useNotificationSound';
 
 // Components
-import { StatusCard } from './BuggyBooking/components/StatusCard';
-import { NotificationToast } from './BuggyBooking/components/NotificationToast';
+import { StatusCard } from './components/StatusCard';
+import { NotificationToast } from './components/NotificationToast';
 
 // Utils
-import { MAX_WAIT_TIME, MAX_ARRIVING_WAIT_TIME } from './BuggyBooking/utils/constants';
+import { MAX_WAIT_TIME, MAX_ARRIVING_WAIT_TIME } from './utils/constants';
 
 interface BuggyBookingProps {
   user: User;

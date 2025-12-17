@@ -10,6 +10,7 @@ import { useTranslation } from '../contexts/LanguageContext';
 type Language = 'English' | 'Vietnamese' | 'Korean' | 'Japanese' | 'Chinese' | 'French' | 'Russian';
 
 const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
+    const { setLanguage } = useTranslation();
     const [rides, setRides] = useState<RideRequest[]>([]);
     const [myRideId, setMyRideId] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'REQUESTS' | 'HISTORY'>('REQUESTS');
@@ -78,9 +79,6 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     const [locations, setLocations] = useState<any[]>([]);
     const [gpsPermissionStatus, setGpsPermissionStatus] = useState<'granted' | 'denied' | 'prompt' | 'checking'>('checking');
     const [showGpsPermissionAlert, setShowGpsPermissionAlert] = useState(false);
-    
-    // Real-time clock for updating waiting times
-    const [currentTime, setCurrentTime] = useState(Date.now());
 
     // Load driver info from localStorage and setup heartbeat
     useEffect(() => {
@@ -111,7 +109,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                                 // Set language from database
                                 if (dbDriver.language) {
                                     setProfileLanguage(dbDriver.language as Language);
-                                    setContextLanguage(dbDriver.language as Language);
+                                    setLanguage(dbDriver.language as Language);
                                 }
                             }
                         } catch (error) {
@@ -182,7 +180,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             }
             
             // Update language context
-            setContextLanguage(finalLanguage);
+            setLanguage(finalLanguage);
             
             setShowProfileModal(false);
             
@@ -216,7 +214,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                     parsedUser.language = profileLanguage;
                     localStorage.setItem('furama_user', JSON.stringify(parsedUser));
                 }
-                setContextLanguage(profileLanguage);
+                setLanguage(profileLanguage);
                 setShowProfileModal(false);
                 alert('Profile updated successfully!');
             } else {
@@ -715,17 +713,9 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     const formatTime = (ts?: number) => ts ? new Date(ts).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-';
     
     // Calculate waiting time in minutes
-    // Real-time clock for updating waiting times
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setCurrentTime(Date.now());
-        }, 1000); // Update every second
-        
-        return () => clearInterval(interval);
-    }, []);
-    
     const getWaitingTime = (timestamp: number): number => {
-        const waitingMs = currentTime - timestamp;
+        const now = Date.now();
+        const waitingMs = now - timestamp;
         return Math.floor(waitingMs / (1000 * 60)); // minutes
     };
     
@@ -1146,22 +1136,8 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div className="flex flex-col items-end">
-                                                        <div className={`text-xl font-black leading-none transition-all duration-300 ${
-                                                            waitingMinutes >= 10 ? 'text-red-500 animate-pulse' :
-                                                            waitingMinutes >= 5 ? 'text-yellow-300 drop-shadow-lg' :
-                                                            'text-white'
-                                                        }`}>
-                                                            {(() => {
-                                                                const waitingSeconds = Math.floor((currentTime - ride.timestamp) / 1000);
-                                                                if (waitingSeconds < 60) {
-                                                                    return `${waitingSeconds}s`;
-                                                                } else {
-                                                                    return `${waitingMinutes}m`;
-                                                                }
-                                                            })()}
-                                                        </div>
-                                                        <div className="text-[9px] font-bold mt-0.5 opacity-90 uppercase tracking-wider text-white/90">Wait</div>
+                                                    <div className="text-xs font-semibold opacity-90">
+                                                        {waitingMinutes > 0 ? `${waitingMinutes}m` : 'Now'}
                                                     </div>
                                                 </div>
                                                 

@@ -445,7 +445,7 @@ const AppContent: React.FC = () => {
       
       {/* 1. Modern Header with Gradient & Glassmorphism */}
       <div 
-        className="backdrop-blur-md bg-gradient-to-r from-emerald-700 via-emerald-800 to-teal-800 text-white pt-3 pb-3 px-4 flex justify-between items-center shadow-xl z-30 shrink-0 border-b border-white/10"
+        className="backdrop-blur-md bg-gradient-to-r from-emerald-700 via-emerald-800 to-teal-800 text-white pt-2 pb-2 px-3 flex justify-between items-center shadow-xl z-30 shrink-0 border-b border-white/10"
         style={{
           boxShadow: '0 4px 20px -5px rgba(0,0,0,0.3)'
         }}
@@ -654,8 +654,9 @@ const AppContent: React.FC = () => {
 
       {/* 3. Fixed Bottom Navigation Bar - Modern glassmorphism design */}
       <div 
-        className="backdrop-blur-xl bg-white/95 border-t-2 border-gray-200/60 h-20 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-50 flex justify-around items-center px-2 safe-area-bottom" 
+        className="backdrop-blur-xl bg-white/95 border-t-2 border-gray-200/60 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-50 flex justify-around items-center px-1.5 safe-area-bottom" 
         style={{ 
+          height: '73px',
           paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
           position: 'fixed',
           willChange: 'transform',

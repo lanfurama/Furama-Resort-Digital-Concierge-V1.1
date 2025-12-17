@@ -1315,6 +1315,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                     <button onClick={() => setLocationFilter('ALL')} className={`px-3 py-1 text-xs rounded ${locationFilter === 'ALL' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500'}`}>All</button>
                                     <button onClick={() => setLocationFilter('FACILITY')} className={`px-3 py-1 text-xs rounded ${locationFilter === 'FACILITY' ? 'bg-blue-100 text-blue-800 font-bold' : 'text-gray-500'}`}>Public Areas</button>
                                     <button onClick={() => setLocationFilter('VILLA')} className={`px-3 py-1 text-xs rounded ${locationFilter === 'VILLA' ? 'bg-purple-100 text-purple-800 font-bold' : 'text-gray-500'}`}>Villa</button>
+                                    <button onClick={() => setLocationFilter('RESTAURANT')} className={`px-3 py-1 text-xs rounded ${locationFilter === 'RESTAURANT' ? 'bg-orange-100 text-orange-800 font-bold' : 'text-gray-500'}`}>Restaurant</button>
                                 </div>
                                 <button 
                                     onClick={() => {
