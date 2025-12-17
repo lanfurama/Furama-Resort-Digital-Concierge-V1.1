@@ -258,15 +258,15 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             });
             if (hasActiveRide) return true; // Busy drivers are considered online
             
-            // Check if driver has recent heartbeat (updated_at within last 2 minutes)
+            // Check if driver has recent heartbeat (updated_at within last 30 seconds)
             // This is the PRIMARY way to determine if driver is online
             // When driver logs out, updatedAt is set to 3 minutes ago, so they will be offline
             if (driver.updatedAt) {
                 const timeSinceUpdate = Date.now() - driver.updatedAt;
-                if (timeSinceUpdate < 120000) { // 2 minutes
+                if (timeSinceUpdate < 30000) { // 30 seconds
                     return true; // Driver is online (heartbeat active)
                 }
-                // If updatedAt is more than 2 minutes ago, driver is offline
+                // If updatedAt is more than 30 seconds ago, driver is offline
                 return false;
             }
             
@@ -360,7 +360,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             // Check if staff has recent heartbeat
             if (staff.updatedAt) {
                 const timeSinceUpdate = Date.now() - staff.updatedAt;
-                return timeSinceUpdate < 120000; // 2 minutes
+                return timeSinceUpdate < 30000; // 30 seconds
             }
             return false;
         }).length;
@@ -537,7 +537,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         const onlineStaff = staffUsers.filter(staff => {
             if (staff.updatedAt) {
                 const timeSinceUpdate = Date.now() - staff.updatedAt;
-                return timeSinceUpdate < 120000; // 2 minutes
+                return timeSinceUpdate < 30000; // 30 seconds
             }
             return false;
         });
@@ -694,11 +694,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             });
             if (hasActiveRide) return true; // Busy drivers are considered online
             
-            // Check if driver has recent heartbeat (updated_at within last 2 minutes)
+            // Check if driver has recent heartbeat (updated_at within last 30 seconds)
             // This indicates driver portal is open and active
             if (driver.updatedAt) {
                 const timeSinceUpdate = Date.now() - driver.updatedAt;
-                if (timeSinceUpdate < 120000) { // 2 minutes
+                if (timeSinceUpdate < 30000) { // 30 seconds
                     return true; // Driver is online (heartbeat active)
                 }
             }
@@ -1562,14 +1562,14 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                     driverStatus = 'BUSY';
                                                 }
                                             } else {
-                                                // Check if driver has recent heartbeat (updated_at within last 2 minutes)
+                                                // Check if driver has recent heartbeat (updated_at within last 30 seconds)
                                                 // This is the PRIMARY way to determine if driver is online
                                                 if (driver.updatedAt) {
                                                     const timeSinceUpdate = Date.now() - driver.updatedAt;
-                                                    if (timeSinceUpdate < 120000) { // 2 minutes
+                                                    if (timeSinceUpdate < 30000) { // 30 seconds
                                                         driverStatus = 'AVAILABLE';
                                                     } else {
-                                                        // Driver has been offline for more than 2 minutes
+                                                        // Driver has been offline for more than 30 seconds
                                                         driverStatus = 'OFFLINE';
                                                     }
                                                 } else {
@@ -1851,7 +1851,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                             } else {
                                                 if (driver.updatedAt) {
                                                     const timeSinceUpdate = Date.now() - driver.updatedAt;
-                                                    if (timeSinceUpdate < 120000) {
+                                                    if (timeSinceUpdate < 30000) {
                                                         driverStatus = 'AVAILABLE';
                                                     }
                                                 }
@@ -1886,7 +1886,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                      dRides[0].status === BuggyStatus.ON_TRIP);
                                                 
                                                 if (hasActive) return true;
-                                                if (d.updatedAt && (Date.now() - d.updatedAt < 120000)) return true;
+                                                if (d.updatedAt && (Date.now() - d.updatedAt < 30000)) return true;
                                                 const recent = rides.filter(r => {
                                                     const rideDriverId = r.driverId ? String(r.driverId) : '';
                                                     return rideDriverId === dIdStr && 
@@ -1910,7 +1910,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                      dRides[0].status === BuggyStatus.ON_TRIP);
                                                 
                                                 if (hasActive) return true;
-                                                if (d.updatedAt && (Date.now() - d.updatedAt < 120000)) return true;
+                                                if (d.updatedAt && (Date.now() - d.updatedAt < 30000)) return true;
                                                 const recent = rides.filter(r => {
                                                     const rideDriverId = r.driverId ? String(r.driverId) : '';
                                                     return rideDriverId === dIdStr && 
@@ -2506,7 +2506,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                 return sr.status === 'CONFIRMED' && (srDepartment === department || department === 'All');
                                             });
                                             
-                                            const isOnline = staff.updatedAt && (Date.now() - staff.updatedAt < 120000);
+                                            const isOnline = staff.updatedAt && (Date.now() - staff.updatedAt < 30000);
                                             
                                             let bgColor = 'bg-white';
                                             let borderColor = 'border-gray-200';

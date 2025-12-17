@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { getRides, updateRideStatus, getLastMessage, createManualRide, getLocations } from '../services/dataService';
+import { getRides, updateRideStatus, getLastMessage, createManualRide, getLocations, updateDriverHeartbeat } from '../services/dataService';
 import { RideRequest, BuggyStatus } from '../types';
 import { Car, MapPin, Navigation, CheckCircle, Clock, MessageSquare, History, List, Plus, X, Loader2, User, Star, Volume2, Grid, LayoutGrid, Zap } from 'lucide-react';
 import NotificationBell from './NotificationBell';
@@ -65,6 +65,29 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             }
         };
         loadLocations();
+    }, []);
+
+    // Heartbeat: Update driver online status every 30 seconds
+    useEffect(() => {
+        const savedUser = localStorage.getItem('furama_user');
+        if (!savedUser) return;
+        
+        try {
+            const user = JSON.parse(savedUser);
+            if (!user.id) return;
+            
+            // Send initial heartbeat immediately
+            updateDriverHeartbeat(user.id);
+            
+            // Send heartbeat every 30 seconds to keep driver online
+            const heartbeatInterval = setInterval(() => {
+                updateDriverHeartbeat(user.id);
+            }, 30000); // 30 seconds
+            
+            return () => clearInterval(heartbeatInterval);
+        } catch (e) {
+            console.error('Failed to setup heartbeat:', e);
+        }
     }, []);
 
     // Polling for new rides and chat messages

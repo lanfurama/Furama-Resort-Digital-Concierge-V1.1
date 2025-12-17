@@ -398,7 +398,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             
             if (driver.updatedAt) {
                 const timeSinceUpdate = Date.now() - driver.updatedAt;
-                if (timeSinceUpdate < 120000) { // 2 minutes
+                if (timeSinceUpdate < 30000) { // 30 seconds
                     return true;
                 }
                 return false;
@@ -581,7 +581,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             
             if (driver.updatedAt) {
                 const timeSinceUpdate = Date.now() - driver.updatedAt;
-                if (timeSinceUpdate < 120000) {
+                if (timeSinceUpdate < 30000) {
                     return true;
                 }
             }
