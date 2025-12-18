@@ -4,18 +4,20 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+
     return {
-      // When using middleware mode in server.js, Vite config is still needed
-      // but server settings are handled by Express
-      // This config is used when Vite is created in middleware mode
-      base: './', // Important for Capacitor mobile app
-      plugins: [react()],
-      // Vite automatically exposes VITE_* env vars via import.meta.env
-      // No need to manually define them here
-      resolve: {
-        alias: {
-          '@': path.resolve(__dirname, '.'),
-        }
-      }
+        plugins: [react()],
+        resolve: {
+            alias: {
+                '@': path.resolve(__dirname, '.'),
+            }
+        },
+        server: {
+            allowedHosts: [
+                'data.horecfex.com', // Thêm domain của bạn vào đây
+                'localhost',          // Nếu bạn muốn chấp nhận localhost
+                '0.0.0.0',            // Để chấp nhận tất cả các địa chỉ IP
+            ],
+        },
     };
 });
