@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Car, Settings, RefreshCw, Zap, Users, List, Grid3x3, CheckCircle, MapPin, AlertCircle, Info, X, Map, Star, Loader2, Brain, ArrowRight, Clock, UtensilsCrossed } from 'lucide-react';
 import { getRides, getRidesSync, getUsers, getUsersSync, updateRideStatus, getLocations, getServiceRequests, updateServiceStatus } from '../services/dataService';
 import { User, UserRole, RideRequest, BuggyStatus, Location, ServiceRequest } from '../types';
+import { apiClient } from '../services/apiClient';
 
 interface ReceptionPortalProps {
     onLogout: () => void;
@@ -50,6 +51,9 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     
     // Track last auto-assign time to prevent too frequent calls
     const lastAutoAssignRef = useRef<number>(0);
+    
+    // Cache for guest information by room number
+    const [guestInfoCache, setGuestInfoCache] = useState<Record<string, { last_name: string; villa_type?: string | null }>>({});
 
     // Load data on mount
     useEffect(() => {
@@ -102,6 +106,54 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         
         return () => clearInterval(refreshInterval);
     }, []);
+
+    // Load guest information for active rides
+    useEffect(() => {
+        const loadGuestInfo = async () => {
+            // Get unique room numbers from active rides (ASSIGNED, ARRIVING, ON_TRIP)
+            const activeRides = rides.filter(r => 
+                r.status === BuggyStatus.ASSIGNED || 
+                r.status === BuggyStatus.ARRIVING || 
+                r.status === BuggyStatus.ON_TRIP
+            );
+            
+            const roomNumbers = [...new Set(activeRides.map(r => r.roomNumber))];
+            
+            // Load guest info for rooms that we don't have in cache
+            const roomsToLoad = roomNumbers.filter(roomNum => !guestInfoCache[roomNum]);
+            
+            if (roomsToLoad.length === 0) return;
+            
+            // Load guest info for each room
+            const loadPromises = roomsToLoad.map(async (roomNumber) => {
+                try {
+                    const guestData = await apiClient.get<any>(`/users/room/${roomNumber}`);
+                    if (guestData && guestData.role === 'GUEST') {
+                        return { roomNumber, guestInfo: { last_name: guestData.last_name, villa_type: guestData.villa_type } };
+                    }
+                } catch (error) {
+                    console.error(`Failed to load guest info for room ${roomNumber}:`, error);
+                }
+                return null;
+            });
+            
+            const results = await Promise.all(loadPromises);
+            const newGuestInfo: Record<string, { last_name: string; villa_type?: string | null }> = {};
+            
+            results.forEach(result => {
+                if (result) {
+                    newGuestInfo[result.roomNumber] = result.guestInfo;
+                }
+            });
+            
+            if (Object.keys(newGuestInfo).length > 0) {
+                setGuestInfoCache(prev => ({ ...prev, ...newGuestInfo }));
+            }
+        };
+        
+        loadGuestInfo();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rides]);
 
     // Auto-assign logic: Automatically assign rides that have been waiting too long
     useEffect(() => {
@@ -258,15 +310,15 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             });
             if (hasActiveRide) return true; // Busy drivers are considered online
             
-            // Check if driver has recent heartbeat (updated_at within last 2 minutes)
+            // Check if driver has recent heartbeat (updated_at within last 30 seconds)
             // This is the PRIMARY way to determine if driver is online
             // When driver logs out, updatedAt is set to 3 minutes ago, so they will be offline
             if (driver.updatedAt) {
                 const timeSinceUpdate = Date.now() - driver.updatedAt;
-                if (timeSinceUpdate < 120000) { // 2 minutes
+                if (timeSinceUpdate < 30000) { // 30 seconds
                     return true; // Driver is online (heartbeat active)
                 }
-                // If updatedAt is more than 2 minutes ago, driver is offline
+                // If updatedAt is more than 30 seconds ago, driver is offline
                 return false;
             }
             
@@ -360,7 +412,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             // Check if staff has recent heartbeat
             if (staff.updatedAt) {
                 const timeSinceUpdate = Date.now() - staff.updatedAt;
-                return timeSinceUpdate < 120000; // 2 minutes
+                return timeSinceUpdate < 30000; // 30 seconds
             }
             return false;
         }).length;
@@ -537,7 +589,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         const onlineStaff = staffUsers.filter(staff => {
             if (staff.updatedAt) {
                 const timeSinceUpdate = Date.now() - staff.updatedAt;
-                return timeSinceUpdate < 120000; // 2 minutes
+                return timeSinceUpdate < 30000; // 30 seconds
             }
             return false;
         });
@@ -694,11 +746,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             });
             if (hasActiveRide) return true; // Busy drivers are considered online
             
-            // Check if driver has recent heartbeat (updated_at within last 2 minutes)
+            // Check if driver has recent heartbeat (updated_at within last 30 seconds)
             // This indicates driver portal is open and active
             if (driver.updatedAt) {
                 const timeSinceUpdate = Date.now() - driver.updatedAt;
-                if (timeSinceUpdate < 120000) { // 2 minutes
+                if (timeSinceUpdate < 30000) { // 30 seconds
                     return true; // Driver is online (heartbeat active)
                 }
             }
@@ -1562,14 +1614,14 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                     driverStatus = 'BUSY';
                                                 }
                                             } else {
-                                                // Check if driver has recent heartbeat (updated_at within last 2 minutes)
+                                                // Check if driver has recent heartbeat (updated_at within last 30 seconds)
                                                 // This is the PRIMARY way to determine if driver is online
                                                 if (driver.updatedAt) {
                                                     const timeSinceUpdate = Date.now() - driver.updatedAt;
-                                                    if (timeSinceUpdate < 120000) { // 2 minutes
+                                                    if (timeSinceUpdate < 30000) { // 30 seconds
                                                         driverStatus = 'AVAILABLE';
                                                     } else {
-                                                        // Driver has been offline for more than 2 minutes
+                                                        // Driver has been offline for more than 30 seconds
                                                         driverStatus = 'OFFLINE';
                                                     }
                                                 } else {
@@ -1726,6 +1778,18 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                              currentRide.status === BuggyStatus.ARRIVING ? 'ARRIVING' : 'ASSIGNED'}
                                                                         </span>
                                                                     </div>
+                                                                    {guestInfoCache[currentRide.roomNumber] && (
+                                                                        <div className={`text-xs mb-1 ${
+                                                                            isNearCompletion ? 'text-blue-600' : 'text-orange-600'
+                                                                        }`}>
+                                                                            <span className="font-semibold">Khách:</span> {guestInfoCache[currentRide.roomNumber].last_name}
+                                                                            {guestInfoCache[currentRide.roomNumber].villa_type && (
+                                                                                <span className="ml-2 text-[10px] opacity-75">
+                                                                                    ({guestInfoCache[currentRide.roomNumber].villa_type})
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
                                                                     <div className={`text-xs flex items-center gap-2 ${
                                                                         isNearCompletion ? 'text-blue-700' : 'text-orange-700'
                                                                     }`}>
@@ -1851,7 +1915,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                             } else {
                                                 if (driver.updatedAt) {
                                                     const timeSinceUpdate = Date.now() - driver.updatedAt;
-                                                    if (timeSinceUpdate < 120000) {
+                                                    if (timeSinceUpdate < 30000) {
                                                         driverStatus = 'AVAILABLE';
                                                     }
                                                 }
@@ -1886,7 +1950,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                      dRides[0].status === BuggyStatus.ON_TRIP);
                                                 
                                                 if (hasActive) return true;
-                                                if (d.updatedAt && (Date.now() - d.updatedAt < 120000)) return true;
+                                                if (d.updatedAt && (Date.now() - d.updatedAt < 30000)) return true;
                                                 const recent = rides.filter(r => {
                                                     const rideDriverId = r.driverId ? String(r.driverId) : '';
                                                     return rideDriverId === dIdStr && 
@@ -1910,7 +1974,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                      dRides[0].status === BuggyStatus.ON_TRIP);
                                                 
                                                 if (hasActive) return true;
-                                                if (d.updatedAt && (Date.now() - d.updatedAt < 120000)) return true;
+                                                if (d.updatedAt && (Date.now() - d.updatedAt < 30000)) return true;
                                                 const recent = rides.filter(r => {
                                                     const rideDriverId = r.driverId ? String(r.driverId) : '';
                                                     return rideDriverId === dIdStr && 
@@ -2506,7 +2570,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                 return sr.status === 'CONFIRMED' && (srDepartment === department || department === 'All');
                                             });
                                             
-                                            const isOnline = staff.updatedAt && (Date.now() - staff.updatedAt < 120000);
+                                            const isOnline = staff.updatedAt && (Date.now() - staff.updatedAt < 30000);
                                             
                                             let bgColor = 'bg-white';
                                             let borderColor = 'border-gray-200';

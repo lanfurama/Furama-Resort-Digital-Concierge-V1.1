@@ -1,16 +1,13 @@
 {
-  "name": "furama-resort-digital-concierge-v1.1",
+  "name": "furama-driver-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development tsx server.js",
-    "dev:win": "set NODE_ENV=development && tsx server.js",
+    "dev": "cross-env NODE_ENV=development vite",
+    "dev:win": "set NODE_ENV=development && vite",
     "build": "cross-env NODE_ENV=production vite build",
-    "build:win": "set NODE_ENV=production && vite build",
     "preview": "vite preview",
-    "update-locations": "node run_sql_updates.js",
-    "generate-locations": "node generate_grid_locations.js",
     "cap:init": "cap init",
     "cap:add:android": "cap add android",
     "cap:sync": "cap sync",
@@ -28,19 +25,12 @@
     "@capacitor/keyboard": "^6.0.2",
     "@capacitor/status-bar": "^6.0.2",
     "@google/genai": "^1.30.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
     "lucide-react": "^0.555.0",
-    "pg": "^8.11.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
-    "@types/pg": "^8.10.9",
     "@vitejs/plugin-react": "^5.0.0",
     "cross-env": "^10.1.0",
     "tsx": "^4.7.0",
@@ -48,3 +38,4 @@
     "vite": "^6.2.0"
   }
 }
+
