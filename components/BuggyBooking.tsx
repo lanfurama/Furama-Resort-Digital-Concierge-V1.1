@@ -229,12 +229,23 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   // Use refs to track previous values without causing re-renders
   const previousStatusRef = useRef<BuggyStatus | null>(null);
   const activeRideRef = useRef<RideRequest | undefined>(undefined);
+  const isMountedRef = useRef<boolean>(true);
+  const intervalsRef = useRef<Set<NodeJS.Timeout>>(new Set());
 
   // Load active ride on mount and polling for ride updates
   useEffect(() => {
+      isMountedRef.current = true;
+      
       const checkStatus = async () => {
+          // Prevent state updates if component is unmounted
+          if (!isMountedRef.current) return;
+          
           try {
               const ride = await getActiveRideForUser(user.roomNumber);
+              
+              // Check again after async operation
+              if (!isMountedRef.current) return;
+              
               const currentPreviousStatus = previousStatusRef.current;
               const currentActiveRide = activeRideRef.current;
               
@@ -280,6 +291,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
               }
               setIsLoadingRide(false);
           } catch (error) {
+              if (!isMountedRef.current) return;
               console.error('Failed to check ride status:', error);
               setIsLoadingRide(false);
           }
@@ -288,21 +300,30 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       checkStatus(); // Check immediately on mount
       
       // Adaptive polling: faster when there's an active ride (3s), slower when no ride (10s)
-      let interval: NodeJS.Timeout;
       const scheduleNext = () => {
+          if (!isMountedRef.current) return;
+          
           const pollingInterval = activeRideRef.current ? 3000 : 10000;
-          interval = setTimeout(() => {
-              checkStatus();
-              scheduleNext();
+          const interval = setTimeout(() => {
+              intervalsRef.current.delete(interval);
+              if (isMountedRef.current) {
+                  checkStatus();
+                  scheduleNext();
+              }
           }, pollingInterval);
+          
+          intervalsRef.current.add(interval);
       };
       
       scheduleNext();
       
       return () => {
-          if (interval) clearTimeout(interval);
+          isMountedRef.current = false;
+          // Clear all intervals
+          intervalsRef.current.forEach(interval => clearTimeout(interval));
+          intervalsRef.current.clear();
       };
-  }, [user.roomNumber]); // Only depend on roomNumber to avoid recreating interval
+  }, [user.roomNumber, playNotificationSound]); // Include playNotificationSound in dependencies
 
   // Cache for driver names to avoid repeated API calls
   const driverNameCacheRef = useRef<Record<string, string>>({});
@@ -488,7 +509,12 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     setIsBooking(true); // Set booking state immediately to prevent double-click
     try {
       const newRide = await requestRide(user.lastName, user.roomNumber, pickup, destination);
-      setActiveRide(newRide);
+      // Re-check status from server to ensure UI is in sync
+      const updatedRide = await getActiveRideForUser(user.roomNumber);
+      setActiveRide(updatedRide || newRide);
+      previousStatusRef.current = (updatedRide || newRide)?.status || null;
+      activeRideRef.current = updatedRide || newRide;
+      setPreviousStatus((updatedRide || newRide)?.status || null);
       setDestination(''); // Clear destination after booking
     } catch (error) {
       console.error('Failed to request ride:', error);
@@ -503,6 +529,9 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
   const handleCancel = async () => {
       if (!activeRide) return;
+      
+      // Prevent state updates if component is unmounted
+      if (!isMountedRef.current) return;
 
       // Business Logic for Resort Buggy Service:
       // 1. SEARCHING: Can cancel anytime (if waiting > 10 min, show warning)
@@ -524,11 +553,28 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
               if (window.confirm(confirmMessage)) {
                   try {
                       await cancelRide(activeRide.id);
-                      setActiveRide(undefined);
+                      
+                      // Check if component is still mounted before updating state
+                      if (!isMountedRef.current) return;
+                      
+                      // Re-check status from server to ensure UI is in sync
+                      const updatedRide = await getActiveRideForUser(user.roomNumber);
+                      
+                      // Check again after async operation
+                      if (!isMountedRef.current) return;
+                      
+                      setActiveRide(updatedRide);
+                      previousStatusRef.current = updatedRide?.status || null;
+                      activeRideRef.current = updatedRide;
+                      setPreviousStatus(updatedRide?.status || null);
                       setElapsedTime(0);
                       setArrivingElapsedTime(0);
                       setDestination(''); // Clear destination
+                      if (!updatedRide) {
+                          setNotification({ message: '✅ Ride cancelled successfully!', type: 'success' });
+                      }
                   } catch (error) {
+                      if (!isMountedRef.current) return;
                       console.error('Failed to cancel ride:', error);
                       alert('Failed to cancel ride. Please try again.');
                   }
@@ -550,11 +596,28 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
           if (window.confirm(confirmMessage)) {
             try {
               await cancelRide(activeRide.id);
-              setActiveRide(undefined);
+              
+              // Check if component is still mounted before updating state
+              if (!isMountedRef.current) return;
+              
+              // Re-check status from server to ensure UI is in sync
+              const updatedRide = await getActiveRideForUser(user.roomNumber);
+              
+              // Check again after async operation
+              if (!isMountedRef.current) return;
+              
+              setActiveRide(updatedRide);
+              previousStatusRef.current = updatedRide?.status || null;
+              activeRideRef.current = updatedRide;
+              setPreviousStatus(updatedRide?.status || null);
               setElapsedTime(0);
               setArrivingElapsedTime(0);
               setDestination(''); // Clear destination
+              if (!updatedRide) {
+                  setNotification({ message: '✅ Ride cancelled successfully!', type: 'success' });
+              }
             } catch (error) {
+              if (!isMountedRef.current) return;
               console.error('Failed to cancel ride:', error);
               alert('Failed to cancel ride. Please try again.');
             }

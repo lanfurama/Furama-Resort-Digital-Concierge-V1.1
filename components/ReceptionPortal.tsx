@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Car, Settings, RefreshCw, Zap, Users, List, Grid3x3, CheckCircle, MapPin, AlertCircle, Info, X, Map, Star, Loader2, Brain, ArrowRight, Clock, UtensilsCrossed } from 'lucide-react';
 import { getRides, getRidesSync, getUsers, getUsersSync, updateRideStatus, getLocations, getServiceRequests, updateServiceStatus } from '../services/dataService';
 import { User, UserRole, RideRequest, BuggyStatus, Location, ServiceRequest } from '../types';
+import { apiClient } from '../services/apiClient';
 
 interface ReceptionPortalProps {
     onLogout: () => void;
@@ -50,6 +51,9 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     
     // Track last auto-assign time to prevent too frequent calls
     const lastAutoAssignRef = useRef<number>(0);
+    
+    // Cache for guest information by room number
+    const [guestInfoCache, setGuestInfoCache] = useState<Record<string, { last_name: string; villa_type?: string | null }>>({});
 
     // Load data on mount
     useEffect(() => {
@@ -102,6 +106,54 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         
         return () => clearInterval(refreshInterval);
     }, []);
+
+    // Load guest information for active rides
+    useEffect(() => {
+        const loadGuestInfo = async () => {
+            // Get unique room numbers from active rides (ASSIGNED, ARRIVING, ON_TRIP)
+            const activeRides = rides.filter(r => 
+                r.status === BuggyStatus.ASSIGNED || 
+                r.status === BuggyStatus.ARRIVING || 
+                r.status === BuggyStatus.ON_TRIP
+            );
+            
+            const roomNumbers = [...new Set(activeRides.map(r => r.roomNumber))];
+            
+            // Load guest info for rooms that we don't have in cache
+            const roomsToLoad = roomNumbers.filter(roomNum => !guestInfoCache[roomNum]);
+            
+            if (roomsToLoad.length === 0) return;
+            
+            // Load guest info for each room
+            const loadPromises = roomsToLoad.map(async (roomNumber) => {
+                try {
+                    const guestData = await apiClient.get<any>(`/users/room/${roomNumber}`);
+                    if (guestData && guestData.role === 'GUEST') {
+                        return { roomNumber, guestInfo: { last_name: guestData.last_name, villa_type: guestData.villa_type } };
+                    }
+                } catch (error) {
+                    console.error(`Failed to load guest info for room ${roomNumber}:`, error);
+                }
+                return null;
+            });
+            
+            const results = await Promise.all(loadPromises);
+            const newGuestInfo: Record<string, { last_name: string; villa_type?: string | null }> = {};
+            
+            results.forEach(result => {
+                if (result) {
+                    newGuestInfo[result.roomNumber] = result.guestInfo;
+                }
+            });
+            
+            if (Object.keys(newGuestInfo).length > 0) {
+                setGuestInfoCache(prev => ({ ...prev, ...newGuestInfo }));
+            }
+        };
+        
+        loadGuestInfo();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rides]);
 
     // Auto-assign logic: Automatically assign rides that have been waiting too long
     useEffect(() => {
@@ -1726,6 +1778,18 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                              currentRide.status === BuggyStatus.ARRIVING ? 'ARRIVING' : 'ASSIGNED'}
                                                                         </span>
                                                                     </div>
+                                                                    {guestInfoCache[currentRide.roomNumber] && (
+                                                                        <div className={`text-xs mb-1 ${
+                                                                            isNearCompletion ? 'text-blue-600' : 'text-orange-600'
+                                                                        }`}>
+                                                                            <span className="font-semibold">Khách:</span> {guestInfoCache[currentRide.roomNumber].last_name}
+                                                                            {guestInfoCache[currentRide.roomNumber].villa_type && (
+                                                                                <span className="ml-2 text-[10px] opacity-75">
+                                                                                    ({guestInfoCache[currentRide.roomNumber].villa_type})
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
                                                                     <div className={`text-xs flex items-center gap-2 ${
                                                                         isNearCompletion ? 'text-blue-700' : 'text-orange-700'
                                                                     }`}>
