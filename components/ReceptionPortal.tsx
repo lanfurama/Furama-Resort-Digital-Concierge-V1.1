@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Car, Settings, RefreshCw, Zap, Users, List, Grid3x3, CheckCircle, MapPin, AlertCircle, Info, X, Map, Star, Loader2, Brain, ArrowRight, Clock, UtensilsCrossed } from 'lucide-react';
-import { getRides, getRidesSync, getUsers, getUsersSync, updateRideStatus, getLocations, getServiceRequests, updateServiceStatus } from '../services/dataService';
+import { Car, Settings, RefreshCw, Zap, Users, List, Grid3x3, CheckCircle, MapPin, AlertCircle, Info, X, Map, Star, Loader2, Brain, ArrowRight, Clock, UtensilsCrossed, Building2, Utensils, Waves, Search } from 'lucide-react';
+import { getRides, getRidesSync, getUsers, getUsersSync, updateRideStatus, getLocations, getServiceRequests, updateServiceStatus, requestRide } from '../services/dataService';
 import { User, UserRole, RideRequest, BuggyStatus, Location, ServiceRequest } from '../types';
 import { apiClient } from '../services/apiClient';
 
@@ -54,6 +54,24 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     
     // Cache for guest information by room number
     const [guestInfoCache, setGuestInfoCache] = useState<Record<string, { last_name: string; villa_type?: string | null }>>({});
+    
+    // Create New Ride Modal State
+    const [showCreateRideModal, setShowCreateRideModal] = useState(false);
+    const [newRideData, setNewRideData] = useState({
+        roomNumber: '',
+        pickup: '',
+        destination: '',
+        guestName: ''
+    });
+    const [pickupSearchQuery, setPickupSearchQuery] = useState('');
+    const [destinationSearchQuery, setDestinationSearchQuery] = useState('');
+    const [pickupFilterType, setPickupFilterType] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('ALL');
+    const [destinationFilterType, setDestinationFilterType] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('ALL');
+    const [showPickupDropdown, setShowPickupDropdown] = useState(false);
+    const [showDestinationDropdown, setShowDestinationDropdown] = useState(false);
+    const [isCreatingRide, setIsCreatingRide] = useState(false);
+    const pickupDropdownRef = useRef<HTMLDivElement>(null);
+    const destinationDropdownRef = useRef<HTMLDivElement>(null);
 
     // Load data on mount
     useEffect(() => {
@@ -735,8 +753,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             return;
         }
         
-        // Check if there are any online drivers (not just offline)
-        // Use the same logic as getOnlineDriversCount to ensure consistency
+        // Check if there are any online drivers
+        // Only consider drivers as online if they have:
+        // 1. Active ride (busy), OR
+        // 2. Recent heartbeat (updatedAt within last 30 seconds)
+        // Do NOT use completed rides as indicator of online status
         const onlineDrivers = allDrivers.filter(driver => {
             const driverIdStr = driver.id ? String(driver.id) : '';
             const hasActiveRide = rides.some(r => {
@@ -747,7 +768,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             if (hasActiveRide) return true; // Busy drivers are considered online
             
             // Check if driver has recent heartbeat (updated_at within last 30 seconds)
-            // This indicates driver portal is open and active
+            // This is the PRIMARY indicator that driver portal is open and active
             if (driver.updatedAt) {
                 const timeSinceUpdate = Date.now() - driver.updatedAt;
                 if (timeSinceUpdate < 30000) { // 30 seconds
@@ -755,15 +776,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                 }
             }
             
-            // Check if driver has recent activity (completed ride in last hour)
-            const recentCompleted = rides.filter(r => {
-                const rideDriverId = r.driverId ? String(r.driverId) : '';
-                return rideDriverId === driverIdStr && 
-                    r.status === BuggyStatus.COMPLETED && 
-                    r.completedAt && 
-                    (Date.now() - r.completedAt < 3600000);
-            });
-            return recentCompleted.length > 0;
+            // Driver is offline if no active ride and no recent heartbeat
+            return false;
         });
         
         const offlineDrivers = totalDrivers - onlineDrivers.length;
@@ -798,11 +812,20 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             await new Promise(resolve => setTimeout(resolve, 800));
         }
 
-        // Calculate cost for all (driver, ride) pairs
+        // Calculate cost for all (driver, ride) pairs - ONLY for online drivers
         const assignments: Array<{ driver: User; ride: RideRequest; cost: number }> = [];
         
+        // Create a Set of online driver IDs for quick lookup
+        const onlineDriverIds = new Set(onlineDrivers.map(d => d.id ? String(d.id) : ''));
+        
         for (const ride of pendingRidesList) {
+            // Only calculate cost for online drivers
             for (const driver of allDrivers) {
+                const driverIdStr = driver.id ? String(driver.id) : '';
+                // Skip offline drivers
+                if (!onlineDriverIds.has(driverIdStr)) {
+                    continue;
+                }
                 const cost = calculateAssignmentCost(driver, ride);
                 assignments.push({ driver, ride, cost });
             }
@@ -887,6 +910,130 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         }
     };
 
+    // Handle ending a buggy ride
+    const handleEndRide = async (rideId: string) => {
+        try {
+            await updateRideStatus(rideId, BuggyStatus.COMPLETED);
+            // Refresh data after ending ride
+            const refreshedRides = await getRides();
+            setRides(refreshedRides);
+        } catch (error) {
+            console.error('Failed to end ride:', error);
+            // Refresh anyway to sync state
+            setRides(getRidesSync());
+        }
+    };
+
+    // Handle pickup guest (mark ride as ON_TRIP)
+    const handlePickupGuest = async (rideId: string) => {
+        try {
+            await updateRideStatus(rideId, BuggyStatus.ON_TRIP);
+            // Refresh data after pickup
+            const refreshedRides = await getRides();
+            setRides(refreshedRides);
+        } catch (error) {
+            console.error('Failed to pickup guest:', error);
+            // Refresh anyway to sync state
+            setRides(getRidesSync());
+        }
+    };
+
+    // Handle creating new ride
+    const handleCreateRide = async () => {
+        if (!newRideData.roomNumber || !newRideData.pickup || !newRideData.destination) {
+            alert('Please fill in all required fields (Room Number, Pickup, Destination)');
+            return;
+        }
+
+        if (newRideData.pickup === newRideData.destination) {
+            alert('Pickup and destination cannot be the same');
+            return;
+        }
+
+        // Check for duplicate pending ride (any status except COMPLETED)
+        // Only allow creating new ride when the previous one with same info is COMPLETED
+        const duplicateRide = rides.find(r => 
+            r.roomNumber === newRideData.roomNumber &&
+            r.pickup === newRideData.pickup &&
+            r.destination === newRideData.destination &&
+            r.status !== BuggyStatus.COMPLETED // Block if there's any non-completed ride
+        );
+
+        if (duplicateRide) {
+            alert(`A pending ride already exists for Room ${newRideData.roomNumber} from ${newRideData.pickup} to ${newRideData.destination} (Status: ${duplicateRide.status}). Please wait for it to complete or cancel it first.`);
+            return;
+        }
+
+        setIsCreatingRide(true);
+        try {
+            // Get guest name from room number if available
+            let guestName = newRideData.guestName;
+            if (!guestName && newRideData.roomNumber) {
+                const guest = users.find(u => u.roomNumber === newRideData.roomNumber && u.role === UserRole.GUEST);
+                guestName = guest ? guest.lastName : `Guest ${newRideData.roomNumber}`;
+            }
+
+            await requestRide(guestName || `Guest ${newRideData.roomNumber}`, newRideData.roomNumber, newRideData.pickup, newRideData.destination);
+            
+            // Refresh rides list
+            const refreshedRides = await getRides();
+            setRides(refreshedRides);
+
+            // Close modal and reset form
+            setShowCreateRideModal(false);
+            setNewRideData({ roomNumber: '', pickup: '', destination: '', guestName: '' });
+            setPickupSearchQuery('');
+            setDestinationSearchQuery('');
+        } catch (error: any) {
+            console.error('Failed to create ride:', error);
+            // Check if error is about duplicate
+            if (error?.response?.data?.error?.includes('duplicate') || error?.message?.includes('duplicate')) {
+                alert(`A pending ride already exists for Room ${newRideData.roomNumber} from ${newRideData.pickup} to ${newRideData.destination}. Please wait for it to complete or cancel it first.`);
+            } else {
+                alert('Failed to create ride. Please try again.');
+            }
+        } finally {
+            setIsCreatingRide(false);
+        }
+    };
+
+    // Filter locations based on search query and filter type
+    const getFilteredLocations = (query: string, filterType: 'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT' = 'ALL') => {
+        let filtered = locations;
+        
+        // Filter by type
+        if (filterType !== 'ALL') {
+            filtered = filtered.filter(loc => loc.type === filterType);
+        }
+        
+        // Filter by search query
+        if (query) {
+            const lowerQuery = query.toLowerCase();
+            filtered = filtered.filter(loc => 
+                loc.name.toLowerCase().includes(lowerQuery) ||
+                loc.type.toLowerCase().includes(lowerQuery)
+            );
+        }
+        
+        // Sort alphabetically
+        return filtered.sort((a, b) => a.name.localeCompare(b.name));
+    };
+
+    // Handle click outside dropdowns
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (pickupDropdownRef.current && !pickupDropdownRef.current.contains(event.target as Node)) {
+                setShowPickupDropdown(false);
+            }
+            if (destinationDropdownRef.current && !destinationDropdownRef.current.contains(event.target as Node)) {
+                setShowDestinationDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     return (
         <div className={`${embedded ? '' : 'min-h-screen'} bg-gray-100 flex flex-col font-sans`}>
             {/* Header */}
@@ -941,12 +1088,14 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                             <span>Buggy Fleet</span>
                         </button>
                         <button
-                            onClick={() => setViewMode('SERVICE')}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                            onClick={() => {/* Disabled temporarily */}}
+                            disabled
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm transition-all opacity-50 cursor-not-allowed ${
                                 viewMode === 'SERVICE'
                                     ? 'bg-blue-600 text-white shadow-md'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    : 'bg-gray-100 text-gray-600'
                             }`}
+                            title="Service Requests feature is temporarily disabled"
                         >
                             <UtensilsCrossed size={18} />
                             <span>Service Requests</span>
@@ -1381,14 +1530,24 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                 <h3 className="font-bold text-sm text-gray-800">
                                     Pending Requests ({rides.filter(r => r.status === BuggyStatus.SEARCHING).length})
                                 </h3>
-                                {fleetConfig.autoAssignEnabled && (
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-semibold">
-                                            Auto: {fleetConfig.maxWaitTimeBeforeAutoAssign}s
-                                        </span>
-                                        <span className="text-[9px] text-gray-500">(Active)</span>
-                                    </div>
-                                )}
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setShowCreateRideModal(true)}
+                                        className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded transition-colors"
+                                        title="Create New Ride"
+                                    >
+                                        <Car size={14} />
+                                        New Ride
+                                    </button>
+                                    {fleetConfig.autoAssignEnabled && (
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-semibold">
+                                                Auto: {fleetConfig.maxWaitTimeBeforeAutoAssign}s
+                                            </span>
+                                            <span className="text-[9px] text-gray-500">(Active)</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <div className="space-y-2 max-h-[600px] overflow-y-auto">
                                 {rides.filter(r => r.status === BuggyStatus.SEARCHING).length === 0 ? (
@@ -1804,13 +1963,34 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                         </span>
                                                                     </div>
                                                                 </div>
-                                                                {tripProgress !== null && (
-                                                                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded whitespace-nowrap ${
-                                                                        isNearCompletion ? 'bg-blue-200 text-blue-900' : 'bg-orange-200 text-orange-900'
-                                                                    }`}>
-                                                                        {tripProgress}m
-                                                                    </span>
-                                                                )}
+                                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                                    {tripProgress !== null && (
+                                                                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded whitespace-nowrap ${
+                                                                            isNearCompletion ? 'bg-blue-200 text-blue-900' : 'bg-orange-200 text-orange-900'
+                                                                        }`}>
+                                                                            {tripProgress}m
+                                                                        </span>
+                                                                    )}
+                                                                    {(currentRide.status === BuggyStatus.ARRIVING || currentRide.status === BuggyStatus.ASSIGNED) ? (
+                                                                        <button
+                                                                            onClick={() => handlePickupGuest(currentRide.id)}
+                                                                            className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded transition-colors whitespace-nowrap"
+                                                                            title="Pickup Guest"
+                                                                        >
+                                                                            <Users size={12} />
+                                                                            Pickup Guest
+                                                                        </button>
+                                                                    ) : (
+                                                                        <button
+                                                                            onClick={() => handleEndRide(currentRide.id)}
+                                                                            className="flex items-center gap-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded transition-colors whitespace-nowrap"
+                                                                            title="End Ride"
+                                                                        >
+                                                                            <CheckCircle size={12} />
+                                                                            End
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     )}
@@ -2110,20 +2290,51 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                             return userIdStr === rideDriverId;
                                         });
                                         const driverName = driver ? driver.lastName || 'Unknown' : 'Unknown';
+                                        
+                                        // Determine status display
+                                        let statusText = 'ASSIGNED';
+                                        let statusClass = 'bg-blue-100 text-blue-700';
+                                        if (ride.status === BuggyStatus.ON_TRIP) {
+                                            statusText = 'ON TRIP';
+                                            statusClass = 'bg-purple-100 text-purple-700';
+                                        } else if (ride.status === BuggyStatus.ARRIVING) {
+                                            statusText = 'ARRIVING';
+                                            statusClass = 'bg-orange-100 text-orange-700';
+                                        }
+                                        
                                         return (
                                             <div key={ride.id} className="bg-gray-50 p-2.5 rounded-md border border-gray-200">
-                                                <div className="font-bold text-sm text-gray-900 mb-0.5">Room {ride.roomNumber}</div>
-                                                <div className="text-xs text-gray-600 mb-0.5">Driver: {driverName}</div>
-                                                <div className="text-[11px] text-gray-500 mb-1.5">
-                                                    {ride.pickup} → {ride.destination}
+                                                <div className="flex items-start justify-between gap-2 mb-1.5">
+                                                    <div className="flex-1">
+                                                        <div className="font-bold text-sm text-gray-900 mb-0.5">Room {ride.roomNumber}</div>
+                                                        <div className="text-xs text-gray-600 mb-0.5">Driver: {driverName}</div>
+                                                        <div className="text-[11px] text-gray-500 mb-1.5">
+                                                            {ride.pickup} → {ride.destination}
+                                                        </div>
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${statusClass}`}>
+                                                            {statusText}
+                                                        </span>
+                                                    </div>
+                                                    {(ride.status === BuggyStatus.ARRIVING || ride.status === BuggyStatus.ASSIGNED) ? (
+                                                        <button
+                                                            onClick={() => handlePickupGuest(ride.id)}
+                                                            className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded transition-colors whitespace-nowrap"
+                                                            title="Pickup Guest"
+                                                        >
+                                                            <Users size={12} />
+                                                            Pickup Guest
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleEndRide(ride.id)}
+                                                            className="flex items-center gap-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded transition-colors whitespace-nowrap"
+                                                            title="End Ride"
+                                                        >
+                                                            <CheckCircle size={12} />
+                                                            End
+                                                        </button>
+                                                    )}
                                                 </div>
-                                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                                                    ride.status === BuggyStatus.ARRIVING 
-                                                        ? 'bg-blue-100 text-blue-700' 
-                                                        : 'bg-blue-100 text-blue-700'
-                                                }`}>
-                                                    {ride.status === BuggyStatus.ARRIVING ? 'ARRIVING' : 'ASSIGNED'}
-                                                </span>
                                             </div>
                                         );
                                     })
@@ -2227,6 +2438,259 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                         </div>
                     </div>
                         </>
+                    )}
+
+                    {/* Create New Ride Modal */}
+                    {showCreateRideModal && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-visible relative">
+                                {/* Header */}
+                                <div className="bg-emerald-600 text-white p-4 flex justify-between items-center rounded-t-xl">
+                                    <h3 className="text-lg font-bold">Create New Ride</h3>
+                                    <button
+                                        onClick={() => {
+                                            setShowCreateRideModal(false);
+                                            setNewRideData({ roomNumber: '', pickup: '', destination: '', guestName: '' });
+                                            setPickupSearchQuery('');
+                                            setDestinationSearchQuery('');
+                                        }}
+                                        className="hover:bg-emerald-700 rounded-full p-1 transition"
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                </div>
+
+                                {/* Form */}
+                                <div className="p-6 space-y-4">
+                                    {/* Room Number */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                            Room Number <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={newRideData.roomNumber}
+                                            onChange={(e) => {
+                                                const roomNum = e.target.value;
+                                                setNewRideData(prev => ({ ...prev, roomNumber: roomNum }));
+                                                // Auto-fill guest name if available
+                                                const guest = users.find(u => u.roomNumber === roomNum && u.role === UserRole.GUEST);
+                                                if (guest) {
+                                                    setNewRideData(prev => ({ ...prev, guestName: guest.lastName }));
+                                                }
+                                            }}
+                                            placeholder="e.g. 101, 205"
+                                            className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                    </div>
+
+                                    {/* Guest Name (Optional) */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                            Guest Name (Optional)
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={newRideData.guestName}
+                                            onChange={(e) => setNewRideData(prev => ({ ...prev, guestName: e.target.value }))}
+                                            placeholder="Auto-filled from room number"
+                                            className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                    </div>
+
+                                    {/* Pickup Location */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                            Pickup Location <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="relative" ref={pickupDropdownRef}>
+                                            <input
+                                                type="text"
+                                                value={newRideData.pickup || pickupSearchQuery}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+                                                    setPickupSearchQuery(value);
+                                                    setNewRideData(prev => ({ ...prev, pickup: '' }));
+                                                    setShowPickupDropdown(true);
+                                                }}
+                                                onFocus={(e) => {
+                                                    if (newRideData.pickup) {
+                                                        setPickupSearchQuery(newRideData.pickup);
+                                                        setNewRideData(prev => ({ ...prev, pickup: '' }));
+                                                        e.target.select();
+                                                    }
+                                                    setShowPickupDropdown(true);
+                                                }}
+                                                placeholder="Search or select pickup location"
+                                                className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                            />
+                                            {showPickupDropdown && (
+                                                <div className="absolute z-[60] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-hidden flex flex-col">
+                                                    {/* Filter Buttons */}
+                                                    <div className="p-2 border-b border-gray-200 flex gap-1 flex-wrap">
+                                                        {(['ALL', 'VILLA', 'FACILITY', 'RESTAURANT'] as const).map((type) => (
+                                                            <button
+                                                                key={type}
+                                                                onClick={() => setPickupFilterType(type)}
+                                                                className={`px-2 py-1 text-xs font-semibold rounded transition ${
+                                                                    pickupFilterType === type
+                                                                        ? 'bg-emerald-600 text-white'
+                                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                                }`}
+                                                            >
+                                                                {type === 'ALL' ? 'All' : type}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    {/* Locations Grid - 5 columns */}
+                                                    <div className="overflow-y-auto max-h-64 p-2">
+                                                        {getFilteredLocations(pickupSearchQuery, pickupFilterType).length > 0 ? (
+                                                            <div className="grid grid-cols-5 gap-2">
+                                                                {getFilteredLocations(pickupSearchQuery, pickupFilterType).map((loc) => (
+                                                                    <button
+                                                                        key={loc.id}
+                                                                        onClick={() => {
+                                                                            setNewRideData(prev => ({ ...prev, pickup: loc.name }));
+                                                                            setPickupSearchQuery('');
+                                                                            setShowPickupDropdown(false);
+                                                                        }}
+                                                                        className="flex flex-col items-center justify-center p-2 border border-gray-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition text-center min-h-[60px]"
+                                                                        title={loc.name}
+                                                                    >
+                                                                        <div className="text-xs font-medium text-gray-900 break-words w-full leading-tight">
+                                                                            {loc.name}
+                                                                        </div>
+                                                                        <div className="text-[10px] text-gray-500 mt-0.5">
+                                                                            {loc.type}
+                                                                        </div>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-center py-4 text-gray-500 text-sm">
+                                                                No locations found
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Destination */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                            Destination <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="relative" ref={destinationDropdownRef}>
+                                            <input
+                                                type="text"
+                                                value={newRideData.destination || destinationSearchQuery}
+                                                onChange={(e) => {
+                                                    const value = e.target.value;
+                                                    setDestinationSearchQuery(value);
+                                                    setNewRideData(prev => ({ ...prev, destination: '' }));
+                                                    setShowDestinationDropdown(true);
+                                                }}
+                                                onFocus={(e) => {
+                                                    if (newRideData.destination) {
+                                                        setDestinationSearchQuery(newRideData.destination);
+                                                        setNewRideData(prev => ({ ...prev, destination: '' }));
+                                                        e.target.select();
+                                                    }
+                                                    setShowDestinationDropdown(true);
+                                                }}
+                                                placeholder="Search or select destination"
+                                                className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                            />
+                                            {showDestinationDropdown && (
+                                                <div className="absolute z-[60] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-hidden flex flex-col">
+                                                    {/* Filter Buttons */}
+                                                    <div className="p-2 border-b border-gray-200 flex gap-1 flex-wrap">
+                                                        {(['ALL', 'VILLA', 'FACILITY', 'RESTAURANT'] as const).map((type) => (
+                                                            <button
+                                                                key={type}
+                                                                onClick={() => setDestinationFilterType(type)}
+                                                                className={`px-2 py-1 text-xs font-semibold rounded transition ${
+                                                                    destinationFilterType === type
+                                                                        ? 'bg-emerald-600 text-white'
+                                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                                }`}
+                                                            >
+                                                                {type === 'ALL' ? 'All' : type}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    {/* Locations Grid - 5 columns */}
+                                                    <div className="overflow-y-auto max-h-64 p-2">
+                                                        {getFilteredLocations(destinationSearchQuery, destinationFilterType).length > 0 ? (
+                                                            <div className="grid grid-cols-5 gap-2">
+                                                                {getFilteredLocations(destinationSearchQuery, destinationFilterType).map((loc) => (
+                                                                    <button
+                                                                        key={loc.id}
+                                                                        onClick={() => {
+                                                                            setNewRideData(prev => ({ ...prev, destination: loc.name }));
+                                                                            setDestinationSearchQuery('');
+                                                                            setShowDestinationDropdown(false);
+                                                                        }}
+                                                                        className="flex flex-col items-center justify-center p-2 border border-gray-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition text-center min-h-[60px]"
+                                                                        title={loc.name}
+                                                                    >
+                                                                        <div className="text-xs font-medium text-gray-900 break-words w-full leading-tight">
+                                                                            {loc.name}
+                                                                        </div>
+                                                                        <div className="text-[10px] text-gray-500 mt-0.5">
+                                                                            {loc.type}
+                                                                        </div>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-center py-4 text-gray-500 text-sm">
+                                                                No locations found
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Footer */}
+                                <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-end gap-3 rounded-b-xl">
+                                    <button
+                                        onClick={() => {
+                                            setShowCreateRideModal(false);
+                                            setNewRideData({ roomNumber: '', pickup: '', destination: '', guestName: '' });
+                                            setPickupSearchQuery('');
+                                            setDestinationSearchQuery('');
+                                        }}
+                                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition font-medium text-gray-700"
+                                        disabled={isCreatingRide}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleCreateRide}
+                                        disabled={isCreatingRide || !newRideData.roomNumber || !newRideData.pickup || !newRideData.destination}
+                                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    >
+                                        {isCreatingRide ? (
+                                            <>
+                                                <Loader2 size={16} className="animate-spin" />
+                                                Creating...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Car size={16} />
+                                                Create Ride
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     )}
 
                     {/* Service Request Management */}

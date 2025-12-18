@@ -22,6 +22,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [priceFilter, setPriceFilter] = useState<'ALL' | 'UNDER_100K' | '100K_300K' | '300K_500K' | 'OVER_500K'>('ALL');
     const [dietaryFilter, setDietaryFilter] = useState<'ALL' | 'VEGETARIAN' | 'VEGAN'>('ALL');
+    const [durationFilter, setDurationFilter] = useState<'ALL' | '15_MIN' | '30_MIN' | '1_HOUR' | '2_HOURS' | '4_HOURS'>('ALL');
     const [sortBy, setSortBy] = useState<'NAME' | 'PRICE_LOW' | 'PRICE_HIGH'>('NAME');
     
     // Helper function to detect dietary restrictions from name/description
@@ -62,6 +63,46 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
         
         // Check for vegan keywords
         return veganKeywords.some(keyword => text.includes(keyword));
+    };
+    
+    // Helper function to detect duration from name/description
+    const getDuration = (item: MenuItem): '15_MIN' | '30_MIN' | '1_HOUR' | '2_HOURS' | '4_HOURS' | null => {
+        const tr = item.translations?.[language];
+        const name = (tr?.name || item.name).toLowerCase();
+        const desc = (tr?.description || item.description || '').toLowerCase();
+        const text = `${name} ${desc}`;
+        
+        // Check for 15 minutes / 15 phút
+        if (text.includes('15 phút') || text.includes('15 minutes') || text.includes('15분') || text.includes('15分') || text.includes('15分钟')) {
+            return '15_MIN';
+        }
+        
+        // Check for 30 minutes / 30 phút / 1/2 hour / nửa giờ
+        if (text.includes('30 phút') || text.includes('30 minutes') || text.includes('30분') || text.includes('30分') || 
+            text.includes('30分钟') || text.includes('1/2 hour') || text.includes('nửa giờ') || text.includes('half hour') ||
+            text.includes('半時間') || text.includes('半小时')) {
+            return '30_MIN';
+        }
+        
+        // Check for 1 hour / 1 giờ
+        if (text.includes('1 giờ') || text.includes('1 hour') || text.includes('1시간') || text.includes('1時間') || 
+            text.includes('1小时') || text.includes('une heure') || text.includes('1 час')) {
+            return '1_HOUR';
+        }
+        
+        // Check for 2 hours / 2 giờ
+        if (text.includes('2 giờ') || text.includes('2 hours') || text.includes('2시간') || text.includes('2時間') || 
+            text.includes('2小时') || text.includes('2 heures') || text.includes('2 часа')) {
+            return '2_HOURS';
+        }
+        
+        // Check for 4 hours / 4 giờ
+        if (text.includes('4 giờ') || text.includes('4 hours') || text.includes('4시간') || text.includes('4時間') || 
+            text.includes('4小时') || text.includes('4 heures') || text.includes('4 часа')) {
+            return '4_HOURS';
+        }
+        
+        return null;
     };
     
     // Filter menu by type
@@ -135,7 +176,11 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                 (dietaryFilter === 'VEGETARIAN' && isVegetarian(item)) ||
                 (dietaryFilter === 'VEGAN' && isVegan(item));
             
-            return matchesSearch && matchesPrice && matchesDietary;
+            // Duration filter - Only apply for POOL
+            const matchesDuration = type !== 'POOL' || durationFilter === 'ALL' || 
+                (durationFilter !== 'ALL' && getDuration(item) === durationFilter);
+            
+            return matchesSearch && matchesPrice && matchesDietary && matchesDuration;
         });
         
         // Sort
@@ -149,7 +194,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
         });
         
         return filtered;
-    }, [items, searchQuery, priceFilter, dietaryFilter, sortBy, language, type]);
+    }, [items, searchQuery, priceFilter, dietaryFilter, durationFilter, sortBy, language, type]);
 
     // Configuration based on Type
     const getConfig = () => {
@@ -295,8 +340,27 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                                     </div>
                                 )}
                                 
+                                {/* Duration Filter Dropdown - Only for POOL */}
+                                {type === 'POOL' && (
+                                    <div className="flex items-center gap-1.5 flex-1 min-w-0 basis-[calc(50%-4px)]">
+                                        <Filter className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                        <select
+                                            value={durationFilter}
+                                            onChange={(e) => setDurationFilter(e.target.value as 'ALL' | '15_MIN' | '30_MIN' | '1_HOUR' | '2_HOURS' | '4_HOURS')}
+                                            className="flex-1 min-w-0 text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                        >
+                                            <option value="ALL">{t('filter_all_duration')}</option>
+                                            <option value="15_MIN">{t('filter_duration_15min')}</option>
+                                            <option value="30_MIN">{t('filter_duration_30min')}</option>
+                                            <option value="1_HOUR">{t('filter_duration_1hour')}</option>
+                                            <option value="2_HOURS">{t('filter_duration_2hours')}</option>
+                                            <option value="4_HOURS">{t('filter_duration_4hours')}</option>
+                                        </select>
+                                    </div>
+                                )}
+                                
                                 {/* Price Filter Dropdown */}
-                                <div className={`flex items-center gap-1.5 flex-1 min-w-0 ${type === 'DINING' ? 'basis-[calc(50%-4px)]' : 'basis-[calc(50%-4px)]'}`}>
+                                <div className={`flex items-center gap-1.5 flex-1 min-w-0 ${type === 'DINING' || type === 'POOL' ? 'basis-[calc(50%-4px)]' : 'basis-[calc(50%-4px)]'}`}>
                                     <Filter className="w-4 h-4 text-gray-500 flex-shrink-0" />
                                     <select
                                         value={priceFilter}
@@ -312,7 +376,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                                 </div>
                                 
                                 {/* Sort Dropdown */}
-                                <div className={`flex items-center gap-1.5 flex-1 min-w-0 ${type === 'DINING' ? 'basis-full' : 'basis-[calc(50%-4px)]'}`}>
+                                <div className={`flex items-center gap-1.5 flex-1 min-w-0 ${type === 'DINING' || type === 'POOL' ? 'basis-full' : 'basis-[calc(50%-4px)]'}`}>
                                     <ArrowUpDown className="w-4 h-4 text-gray-500 flex-shrink-0" />
                                     <select
                                         value={sortBy}
@@ -366,12 +430,12 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
                                         <ShoppingBag className="w-8 h-8 text-gray-400" />
                                     </div>
                                     <p className="text-gray-500 font-medium text-base">
-                                        {searchQuery || priceFilter !== 'ALL' 
+                                        {searchQuery || priceFilter !== 'ALL' || durationFilter !== 'ALL' || dietaryFilter !== 'ALL'
                                             ? 'No items found' 
                                             : 'No items available'}
                                     </p>
                                     <p className="text-gray-400 text-sm mt-1">
-                                        {searchQuery || priceFilter !== 'ALL'
+                                        {searchQuery || priceFilter !== 'ALL' || durationFilter !== 'ALL' || dietaryFilter !== 'ALL'
                                             ? 'Try adjusting your filters'
                                             : 'in this category yet'}
                                     </p>

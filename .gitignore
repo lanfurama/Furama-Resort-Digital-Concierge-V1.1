@@ -36,3 +36,9 @@ ios/
 .capacitor/
 *.jks
 *.keystore
+
+# SSL Certificates (development only - never commit real certificates)
+certs/*.key
+certs/*.crt
+certs/*.pem
+!certs/.gitkeep

@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server.js",
     "dev:win": "set NODE_ENV=development && tsx server.js",
+    "dev:https": "cross-env NODE_ENV=development ENABLE_HTTPS=true tsx server.js",
+    "dev:https:win": "set NODE_ENV=development && set ENABLE_HTTPS=true && tsx server.js",
+    "generate-ssl": "node scripts/generate-ssl-certs.js",
     "build": "cross-env NODE_ENV=production vite build",
     "build:win": "set NODE_ENV=production && vite build",
     "preview": "vite preview",
@@ -43,6 +46,7 @@
     "@types/pg": "^8.10.9",
     "@vitejs/plugin-react": "^5.0.0",
     "cross-env": "^10.1.0",
+    "selfsigned": "^5.2.0",
     "tsx": "^4.7.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"

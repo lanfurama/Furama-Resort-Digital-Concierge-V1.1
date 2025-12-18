@@ -55,6 +55,25 @@ export const rideRequestModel = {
   },
 
   async create(rideRequest: Omit<RideRequest, 'id' | 'created_at' | 'updated_at'>): Promise<RideRequest> {
+    // Check for duplicate pending ride (same room, pickup, destination, and status is not COMPLETED)
+    const duplicateCheck = await pool.query(
+      `SELECT * FROM ride_requests 
+       WHERE room_number = $1 
+       AND pickup = $2 
+       AND destination = $3 
+       AND status != 'COMPLETED'
+       ORDER BY timestamp DESC 
+       LIMIT 1`,
+      [rideRequest.room_number, rideRequest.pickup, rideRequest.destination]
+    );
+
+    if (duplicateCheck.rows.length > 0) {
+      const duplicate = duplicateCheck.rows[0];
+      throw new Error(
+        `Duplicate ride request: A pending ride already exists for Room ${rideRequest.room_number} from ${rideRequest.pickup} to ${rideRequest.destination} (Status: ${duplicate.status}). Please wait for it to complete or cancel it first.`
+      );
+    }
+
     const result = await pool.query(
       'INSERT INTO ride_requests (guest_name, room_number, pickup, destination, status, timestamp, driver_id, eta) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
       [

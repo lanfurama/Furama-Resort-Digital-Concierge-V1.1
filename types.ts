@@ -1,5 +1,6 @@
 
 export enum AppView {
+  ROLE_SELECTION = 'ROLE_SELECTION', // New: Role selection page
   LOGIN = 'LOGIN',
   HOME = 'HOME',
   BUGGY = 'BUGGY',

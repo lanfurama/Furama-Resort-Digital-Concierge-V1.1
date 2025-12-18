@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { getDashboardStats } from '../services/dataService';
-import { Users, AlertCircle, Car, DollarSign, Clock, Activity, Utensils, Sparkles, Waves, User as UserIcon } from 'lucide-react';
+import { getDashboardStats, getDriverPerformanceStats } from '../services/dataService';
+import { Users, AlertCircle, Car, DollarSign, Clock, Activity, Utensils, Sparkles, Waves, User as UserIcon, TrendingUp, Award } from 'lucide-react';
 
 const SupervisorDashboard: React.FC = () => {
     // Initialize with default values to prevent null errors
@@ -21,6 +21,8 @@ const SupervisorDashboard: React.FC = () => {
     });
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isLoading, setIsLoading] = useState(true);
+    const [driverPerformancePeriod, setDriverPerformancePeriod] = useState<'day' | 'week' | 'month'>('day');
+    const [driverStats, setDriverStats] = useState<any[]>([]);
 
     useEffect(() => {
         // Load initial stats
@@ -40,11 +42,24 @@ const SupervisorDashboard: React.FC = () => {
         // Real-time clock
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         
+        // Load driver performance stats
+        const loadDriverStats = async () => {
+            try {
+                const driverData = await getDriverPerformanceStats(driverPerformancePeriod);
+                setDriverStats(driverData);
+            } catch (error) {
+                console.error('Failed to load driver performance stats:', error);
+            }
+        };
+        loadDriverStats();
+
         // Poll stats
         const dataPoller = setInterval(async () => {
             try {
                 const newStats = await getDashboardStats();
                 setStats(newStats);
+                const driverData = await getDriverPerformanceStats(driverPerformancePeriod);
+                setDriverStats(driverData);
             } catch (error) {
                 console.error('Failed to update dashboard stats:', error);
             }
@@ -54,7 +69,7 @@ const SupervisorDashboard: React.FC = () => {
             clearInterval(timer);
             clearInterval(dataPoller);
         };
-    }, []);
+    }, [driverPerformancePeriod]);
 
     // Department Health Indicators
     const getHealthStatus = (pendingCount: number) => {
@@ -119,49 +134,50 @@ const SupervisorDashboard: React.FC = () => {
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-emerald-500 flex justify-between items-center">
-                    <div>
-                        <p className="text-xs text-gray-500 uppercase font-bold">Total Guests</p>
-                        <h3 className="text-3xl font-bold text-gray-800">{activeGuests}</h3>
+                {/* Total Guests Card */}
+                <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-emerald-500 flex justify-between items-center">
+                    <div className="flex-1">
+                        <p className="text-[10px] text-gray-500 uppercase font-semibold tracking-wide mb-1">Total Guests</p>
+                        <h3 className="text-2xl font-bold text-gray-800 leading-tight">{activeGuests}</h3>
                     </div>
-                    <div className="p-3 bg-emerald-50 rounded-full text-emerald-600">
-                        <Users size={24} />
+                    <div className="p-2.5 bg-emerald-50 rounded-full text-emerald-600 ml-3 flex-shrink-0">
+                        <Users size={20} />
                     </div>
                 </div>
 
-                <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-500">
-                    <div className="flex justify-between items-start mb-3">
-                    <div>
-                            <p className="text-xs text-gray-500 uppercase font-bold">Buggy Status</p>
-                    </div>
+                {/* Buggy Status Card */}
+                <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-amber-500">
+                    <div className="flex justify-between items-center mb-2.5">
+                        <p className="text-[10px] text-gray-500 uppercase font-semibold tracking-wide">Buggy Status</p>
                         <div className="p-2 bg-amber-50 rounded-full text-amber-600">
-                            <Car size={20} />
-                    </div>
-                </div>
-                    <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                            <span className="text-[11px] text-gray-600">Waiting</span>
-                            <span className="text-lg font-bold text-amber-600">{searchingBuggies}</span>
+                            <Car size={18} />
                         </div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-[11px] text-gray-600">On Trip</span>
-                            <span className="text-lg font-bold text-blue-600">{onTripBuggies}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-[11px] text-gray-600">Completed</span>
-                            <span className="text-lg font-bold text-green-600">{completedBuggies}</span>
                     </div>
+                    <div className="grid grid-cols-3 gap-2">
+                        <div className="text-center">
+                            <p className="text-[9px] text-gray-500 mb-0.5">Waiting</p>
+                            <p className="text-base font-bold text-amber-600 leading-tight">{searchingBuggies}</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-[9px] text-gray-500 mb-0.5">On Trip</p>
+                            <p className="text-base font-bold text-blue-600 leading-tight">{onTripBuggies}</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-[9px] text-gray-500 mb-0.5">Completed</p>
+                            <p className="text-base font-bold text-green-600 leading-tight">{completedBuggies}</p>
+                        </div>
                     </div>
                 </div>
 
-                <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-purple-500 flex justify-between items-center">
-                    <div>
-                        <p className="text-xs text-gray-500 uppercase font-bold">Est. Daily Rev</p>
-                        <h3 className="text-3xl font-bold text-gray-800">${totalRevenue}</h3>
-                        <p className="text-[10px] text-purple-600">{todayCompletedCount} completed orders</p>
+                {/* Estimated Daily Revenue Card */}
+                <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-purple-500 flex justify-between items-center">
+                    <div className="flex-1">
+                        <p className="text-[10px] text-gray-500 uppercase font-semibold tracking-wide mb-1">Est. Daily Rev</p>
+                        <h3 className="text-2xl font-bold text-gray-800 leading-tight">${totalRevenue}</h3>
+                        <p className="text-[9px] text-purple-600 mt-0.5">{todayCompletedCount} completed orders</p>
                     </div>
-                    <div className="p-3 bg-purple-50 rounded-full text-purple-600">
-                        <DollarSign size={24} />
+                    <div className="p-2.5 bg-purple-50 rounded-full text-purple-600 ml-3 flex-shrink-0">
+                        <DollarSign size={20} />
                     </div>
                 </div>
             </div>
@@ -222,6 +238,91 @@ const SupervisorDashboard: React.FC = () => {
                                 </div>
                             ))}
                          </div>
+                    </div>
+
+                    {/* Driver Performance Chart */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <div className="flex items-center gap-2">
+                                <TrendingUp className="w-5 h-5 text-emerald-600" />
+                                <h3 className="font-bold text-gray-700">Driver Performance</h3>
+                            </div>
+                            <div className="flex gap-2">
+                                {(['day', 'week', 'month'] as const).map((period) => (
+                                    <button
+                                        key={period}
+                                        onClick={() => setDriverPerformancePeriod(period)}
+                                        className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                                            driverPerformancePeriod === period
+                                                ? 'bg-emerald-600 text-white shadow-sm'
+                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        {period.charAt(0).toUpperCase() + period.slice(1)}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        {driverStats.length === 0 ? (
+                            <div className="text-center py-12 text-gray-400 text-sm">
+                                No driver performance data available for this period.
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {driverStats.slice(0, 5).map((driver, index) => {
+                                    const maxScore = driverStats[0]?.performanceScore || 100;
+                                    const percentage = maxScore > 0 ? (driver.performanceScore / maxScore) * 100 : 0;
+                                    const isTopDriver = index === 0;
+                                    
+                                    return (
+                                        <div key={driver.driverId} className="relative">
+                                            <div className="flex items-center gap-3 mb-1">
+                                                <div className="flex items-center gap-2 min-w-[120px]">
+                                                    {isTopDriver && <Award className="w-4 h-4 text-yellow-500" />}
+                                                    <span className="text-sm font-semibold text-gray-800 truncate">
+                                                        {driver.driverName}
+                                                    </span>
+                                                </div>
+                                                <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden relative">
+                                                    <div 
+                                                        className={`h-full rounded-full transition-all duration-1000 ${
+                                                            isTopDriver ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' :
+                                                            index === 1 ? 'bg-gradient-to-r from-gray-300 to-gray-400' :
+                                                            index === 2 ? 'bg-gradient-to-r from-orange-300 to-orange-400' :
+                                                            'bg-gradient-to-r from-emerald-400 to-emerald-500'
+                                                        }`}
+                                                        style={{ width: `${percentage}%` }}
+                                                    />
+                                                    <div className="absolute inset-0 flex items-center justify-end pr-2">
+                                                        <span className="text-[10px] font-bold text-gray-700">
+                                                            {driver.performanceScore.toFixed(1)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-[10px] text-gray-500 ml-[140px]">
+                                                <span className="flex items-center gap-1">
+                                                    <Car className="w-3 h-3" />
+                                                    {driver.totalRides} rides
+                                                </span>
+                                                {driver.avgRating > 0 && (
+                                                    <span className="flex items-center gap-1">
+                                                        <span className="text-yellow-500">★</span>
+                                                        {driver.avgRating.toFixed(1)} rating
+                                                    </span>
+                                                )}
+                                                {driver.avgResponseTime > 0 && (
+                                                    <span className="flex items-center gap-1">
+                                                        <Clock className="w-3 h-3" />
+                                                        {Math.round(driver.avgResponseTime / 1000 / 60)}m response
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 </div>
 

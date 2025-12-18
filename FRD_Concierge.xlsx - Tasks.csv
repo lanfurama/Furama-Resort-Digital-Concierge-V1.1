@@ -193,13 +193,13 @@ Security,SEC-004,SQL Injection Prevention,Phòng chống SQL injection,Pending,L
 Testing,TEST-001,Unit Tests,Unit tests,Pending,Medium,Not implemented,10/12/2025 0:00:00
 Import data thực vào,,,,Pending,High,,16/12/2025 0:00:00
 Supervisor Portal,SUPER-004,Cross-department Chat,Chat giữa các departments,Pending,Low,SupervisorDashboard.tsx,16/12/2025 0:00:00
-Service Chat,CHAT-SVC-005,Auto-open Chat,Tự động mở chat khi có tin nhắn,Pending,Low,ServiceChat.tsx,17/12/2025 0:00:00
+Service Chat,CHAT-SVC-005,Auto-open Chat,Tự động mở chat khi có tin nhắn,Completed,Low,ServiceChat.tsx,17/12/2025 0:00:00
 UI/UX,UI-008,Dark Mode Support,Hỗ trợ dark mode,Pending,Low,Not implemented,17/12/2025 0:00:00
 Documentation,DOC-002,API Documentation,Tài liệu API,Pending,Low,Not implemented,20/12/2025 0:00:00
 Documentation,DOC-003,User Guide,Hướng dẫn người dùng,Pending,Low,Not implemented,20/12/2025 0:00:00
 Monitoring,MON-004,Analytics Integration,Tích hợp analytics,Pending,Low,Not implemented,17/12/2025 0:00:00
 Deployment,DEPLOY-005,CI/CD Pipeline,CI/CD pipeline,Pending,Low,Not implemented,25/12/2025 0:00:00
-Security,SEC-006,HTTPS Support,Hỗ trợ HTTPS,Pending,Medium,Not implemented,18/12/2025 0:00:00
+Security,SEC-006,HTTPS Support,Hỗ trợ HTTPS,Completed,Medium,server.js + scripts/generate-ssl-certs.js,18/12/2025 0:00:00
 Concierge Chat,CHAT-001,AI Concierge Chat,Chat với AI concierge (Gemini),Pending,Medium,ConciergeChat.tsx,20/12/2025 0:00:00
 Guest Portal,GUEST-005,Guest Account,Quản lý thông tin tài khoản,Pending,Medium,GuestAccount.tsx,16/12/2025 0:00:00
 Monitoring,MON-003,Performance Monitoring,Giám sát hiệu suất,Pending,Medium,Not implemented,18/12/2025 0:00:00

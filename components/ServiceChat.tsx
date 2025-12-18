@@ -40,6 +40,8 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
     const [input, setInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [unreadCount, setUnreadCount] = useState(0);
+    const prevUnreadCountRef = useRef(0);
+    const isFirstFetchRef = useRef(true);
 
     // Map app language to translation language
     const mapAppLangToTranslateLang = (appLang: string): string => {
@@ -120,7 +122,18 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
             const fetchUnread = async () => {
                 try {
                     const count = await getServiceUnreadCount(roomNumber, serviceType, userRole);
+                    const prevCount = prevUnreadCountRef.current;
+                    
+                    // Skip auto-open on first fetch (component mount) to avoid opening for old messages
+                    // Only auto-open when unread count increases from a known value (indicating new message)
+                    if (!isFirstFetchRef.current && prevCount >= 0 && count > prevCount) {
+                        console.log(`[ServiceChat] New message detected, auto-opening chat for ${serviceType} in room ${roomNumber}`);
+                        setIsOpen(true);
+                    }
+                    
                     setUnreadCount(count);
+                    prevUnreadCountRef.current = count;
+                    isFirstFetchRef.current = false; // Mark first fetch as complete
                 } catch (error) {
                     console.error('Failed to fetch unread count:', error);
                 }
@@ -131,6 +144,8 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
             return () => clearInterval(interval);
         } else {
             setUnreadCount(0); // Reset when chat is open
+            prevUnreadCountRef.current = 0; // Reset previous count when chat is open
+            isFirstFetchRef.current = true; // Reset first fetch flag when chat opens
         }
     }, [roomNumber, serviceType, userRole, isOpen]);
 

@@ -2747,3 +2747,145 @@ export const getDashboardStats = async () => {
         todayCompletedCount: todayCompleted.length
     };
 };
+
+// --- DRIVER PERFORMANCE ANALYTICS ---
+export const getDriverPerformanceStats = async (period: 'day' | 'week' | 'month' = 'day') => {
+    try {
+        const allRides = await getRides().catch(() => getRidesSync());
+        const allUsers = await getUsers().catch(() => getUsersSync());
+        const drivers = allUsers.filter(u => u.role === UserRole.DRIVER);
+
+        // Calculate time range based on period
+        const now = new Date();
+        let startTime: number;
+        
+        if (period === 'day') {
+            const todayStart = new Date(now);
+            todayStart.setHours(0, 0, 0, 0);
+            startTime = todayStart.getTime();
+        } else if (period === 'week') {
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() - 7);
+            startTime = weekStart.getTime();
+        } else { // month
+            const monthStart = new Date(now);
+            monthStart.setDate(1);
+            monthStart.setHours(0, 0, 0, 0);
+            startTime = monthStart.getTime();
+        }
+
+        // Filter completed rides within period
+        const periodRides = allRides.filter(r => 
+            r.status === BuggyStatus.COMPLETED &&
+            r.completedAt &&
+            r.completedAt >= startTime &&
+            r.driverId
+        );
+
+        // Calculate stats per driver
+        const driverStatsMap = new Map<string, {
+            driverId: string;
+            driverName: string;
+            totalRides: number;
+            totalRating: number;
+            ratingCount: number;
+            avgRating: number;
+            avgResponseTime: number; // Time from SEARCHING to ASSIGNED (ms)
+            avgTripTime: number; // Time from ON_TRIP to COMPLETED (ms)
+            totalResponseTime: number;
+            responseTimeCount: number;
+            totalTripTime: number;
+            tripTimeCount: number;
+            performanceScore: number; // Combined score for ranking
+        }>();
+
+        // Initialize all drivers
+        drivers.forEach(driver => {
+            driverStatsMap.set(driver.id || '', {
+                driverId: driver.id || '',
+                driverName: driver.lastName || `Driver ${driver.id}`,
+                totalRides: 0,
+                totalRating: 0,
+                ratingCount: 0,
+                avgRating: 0,
+                avgResponseTime: 0,
+                avgTripTime: 0,
+                totalResponseTime: 0,
+                responseTimeCount: 0,
+                totalTripTime: 0,
+                tripTimeCount: 0,
+                performanceScore: 0
+            });
+        });
+
+        // Process rides
+        periodRides.forEach(ride => {
+            const driverId = ride.driverId || '';
+            const stats = driverStatsMap.get(driverId);
+            
+            if (!stats) return;
+
+            stats.totalRides++;
+
+            // Rating
+            if (ride.rating) {
+                stats.totalRating += ride.rating;
+                stats.ratingCount++;
+            }
+
+            // Response time (SEARCHING to ASSIGNED)
+            if (ride.confirmedAt && ride.timestamp) {
+                const responseTime = ride.confirmedAt - ride.timestamp;
+                if (responseTime > 0) {
+                    stats.totalResponseTime += responseTime;
+                    stats.responseTimeCount++;
+                }
+            }
+
+            // Trip time (ON_TRIP to COMPLETED)
+            if (ride.completedAt && ride.pickedUpAt) {
+                const tripTime = ride.completedAt - ride.pickedUpAt;
+                if (tripTime > 0) {
+                    stats.totalTripTime += tripTime;
+                    stats.tripTimeCount++;
+                }
+            }
+        });
+
+        // Calculate averages and performance scores
+        const driverStatsArray = Array.from(driverStatsMap.values()).map(stats => {
+            // Calculate averages
+            stats.avgRating = stats.ratingCount > 0 ? stats.totalRating / stats.ratingCount : 0;
+            stats.avgResponseTime = stats.responseTimeCount > 0 ? stats.totalResponseTime / stats.responseTimeCount : 0;
+            stats.avgTripTime = stats.tripTimeCount > 0 ? stats.totalTripTime / stats.tripTimeCount : 0;
+
+            // Calculate performance score (higher is better)
+            // Formula: (rides * 0.4) + (rating * 20 * 0.3) + (response speed * 0.2) + (trip efficiency * 0.1)
+            // Normalize values: rides (0-50), rating (0-100), response (0-100), trip (0-100)
+            const normalizedRides = Math.min(stats.totalRides / 50, 1) * 100;
+            const normalizedRating = stats.avgRating * 20; // 0-5 rating -> 0-100
+            const normalizedResponse = stats.avgResponseTime > 0 
+                ? Math.max(0, 100 - (stats.avgResponseTime / 60000) * 10) // Faster = better, max 10 min
+                : 50; // Default if no data
+            const normalizedTrip = stats.avgTripTime > 0
+                ? Math.max(0, 100 - (stats.avgTripTime / 600000) * 5) // Faster = better, max 10 min
+                : 50; // Default if no data
+
+            stats.performanceScore = 
+                normalizedRides * 0.4 +
+                normalizedRating * 0.3 +
+                normalizedResponse * 0.2 +
+                normalizedTrip * 0.1;
+
+            return stats;
+        });
+
+        // Sort by performance score (descending)
+        driverStatsArray.sort((a, b) => b.performanceScore - a.performanceScore);
+
+        return driverStatsArray;
+    } catch (error) {
+        console.error('Failed to get driver performance stats:', error);
+        return [];
+    }
+};

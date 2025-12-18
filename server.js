@@ -1,6 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import https from 'https';
+import http from 'http';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
 import { createServer as createViteServer } from 'vite';
 import routes from './api/_routes/index.ts';
 
@@ -8,7 +12,36 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+// Nếu HTTPS_PORT không được set, sử dụng PORT (3000) cho HTTPS
+const HTTPS_PORT = process.env.HTTPS_PORT || PORT;
 const isDev = process.env.NODE_ENV !== 'production';
+
+// HTTPS Configuration
+const ENABLE_HTTPS = process.env.ENABLE_HTTPS === 'true';
+const SSL_KEY_PATH = process.env.SSL_KEY_PATH || join(process.cwd(), 'certs', 'server.key');
+const SSL_CERT_PATH = process.env.SSL_CERT_PATH || join(process.cwd(), 'certs', 'server.crt');
+
+let httpsOptions = null;
+if (ENABLE_HTTPS) {
+  try {
+    if (existsSync(SSL_KEY_PATH) && existsSync(SSL_CERT_PATH)) {
+      httpsOptions = {
+        key: readFileSync(SSL_KEY_PATH),
+        cert: readFileSync(SSL_CERT_PATH),
+      };
+      console.log('🔐 HTTPS enabled - SSL certificates loaded');
+    } else {
+      console.warn('⚠️  HTTPS enabled but certificates not found!');
+      console.warn(`   Key: ${SSL_KEY_PATH}`);
+      console.warn(`   Cert: ${SSL_CERT_PATH}`);
+      console.warn('   Run "npm run generate-ssl" to generate certificates');
+      console.warn('   Falling back to HTTP mode');
+    }
+  } catch (error) {
+    console.error('❌ Error loading SSL certificates:', error.message);
+    console.error('   Falling back to HTTP mode');
+  }
+}
 
 // Log environment info
 console.log(`🔍 Environment: ${isDev ? 'DEVELOPMENT' : 'PRODUCTION'}`);
@@ -103,15 +136,50 @@ export default app;
 if (process.env.VERCEL !== '1') {
   setupVite()
     .then(() => {
-      app.listen(PORT, () => {
-        console.log(`🚀 Server is running on http://localhost:${PORT}`);
-        console.log(`📡 API endpoints available at http://localhost:${PORT}/api/v1`);
-        console.log(`💚 Health check: http://localhost:${PORT}/health`);
-        if (isDev) {
-          console.log(`⚡ Vite dev server integrated`);
-          console.log(`🌐 Frontend available at http://localhost:${PORT}`);
+      if (ENABLE_HTTPS && httpsOptions) {
+        // Create HTTPS server
+        const httpsServer = https.createServer(httpsOptions, app);
+        
+        // Optional: Create HTTP server to redirect to HTTPS
+        if (process.env.HTTPS_REDIRECT === 'true') {
+          const httpServer = http.createServer((req, res) => {
+            const httpsUrl = `https://${req.headers.host?.replace(`:${PORT}`, `:${HTTPS_PORT}`)}${req.url}`;
+            res.writeHead(301, { Location: httpsUrl });
+            res.end();
+          });
+          
+          httpServer.listen(PORT, () => {
+            console.log(`🔄 HTTP redirect server running on http://localhost:${PORT}`);
+            console.log(`   Redirecting to https://localhost:${HTTPS_PORT}`);
+          });
         }
-      });
+        
+        httpsServer.listen(HTTPS_PORT, () => {
+          console.log(`🔐 HTTPS Server is running on https://localhost:${HTTPS_PORT}`);
+          console.log(`📡 API endpoints available at https://localhost:${HTTPS_PORT}/api/v1`);
+          console.log(`💚 Health check: https://localhost:${HTTPS_PORT}/health`);
+          if (isDev) {
+            console.log(`⚡ Vite dev server integrated`);
+            console.log(`🌐 Frontend available at https://localhost:${HTTPS_PORT}`);
+          }
+          console.log(`\n⚠️  Using self-signed certificate - browser will show security warning`);
+          console.log(`   Click "Advanced" → "Proceed to localhost" to continue\n`);
+        });
+      } else {
+        // Create HTTP server (default)
+        app.listen(PORT, () => {
+          console.log(`🚀 Server is running on http://localhost:${PORT}`);
+          console.log(`📡 API endpoints available at http://localhost:${PORT}/api/v1`);
+          console.log(`💚 Health check: http://localhost:${PORT}/health`);
+          if (isDev) {
+            console.log(`⚡ Vite dev server integrated`);
+            console.log(`🌐 Frontend available at http://localhost:${PORT}`);
+          }
+          if (!ENABLE_HTTPS) {
+            console.log(`\n💡 To enable HTTPS, set ENABLE_HTTPS=true in .env and run "npm run generate-ssl"\n`);
+          }
+        });
+      }
     })
     .catch((err) => {
       console.error('❌ Failed to start server:', err);
