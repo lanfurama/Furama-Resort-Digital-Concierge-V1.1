@@ -38,3 +38,11 @@ HTTPS_REDIRECT=false
 # Use 'production' for production, 'development' for development
 NODE_ENV=production
 
+# Email Configuration (for notifications)
+# Gmail SMTP settings
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=your_email@gmail.com
+EMAIL_HOST_PASSWORD=your_app_password
+DEFAULT_FROM_EMAIL=your_email@gmail.com
+

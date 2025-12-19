@@ -1,6 +1,7 @@
 
 export enum AppView {
-  ROLE_SELECTION = 'ROLE_SELECTION', // New: Role selection page
+  LOGIN_TYPE_SELECTION = 'LOGIN_TYPE_SELECTION', // Choose between Guest or Staff/Admin
+  ROLE_SELECTION = 'ROLE_SELECTION', // Staff role selection page
   LOGIN = 'LOGIN',
   HOME = 'HOME',
   BUGGY = 'BUGGY',
@@ -37,6 +38,7 @@ export interface User {
   lastName: string;
   roomNumber: string; // Acts as Username/ID for staff
   password?: string; // New field for staff auth
+  email?: string; // Email for notifications (Admin, Driver, Reception, Supervisor)
   villaType?: string; // Name of the Room Type
   role: UserRole;
   department?: Department; // Permission group
@@ -138,7 +140,7 @@ export interface RideRequest {
 
 export interface ServiceRequest {
   id: string;
-  type: 'DINING' | 'SPA' | 'POOL' | 'BUTLER' | 'HOUSEKEEPING' | 'BUGGY';
+  type: 'DINING' | 'SPA' | 'POOL' | 'BUTLER' | 'HOUSEKEEPING' | 'BUGGY' | 'EXTEND_STAY';
   status: string;
   details: string;
   items?: MenuItem[]; // Stored items to support dynamic translation display
@@ -151,6 +153,7 @@ export interface ServiceRequest {
   completedAt?: number; // Timestamp when service completed
   rating?: number;   // 1-5 Stars
   feedback?: string; // User comment
+  newCheckOutDate?: string; // For EXTEND_STAY type: requested new check-out date
 }
 
 export interface HotelReview {

@@ -1,10 +1,37 @@
 import { User } from '../types';
 import { apiClient } from './apiClient';
 
-// Guest Login - Calls API
+// Guest Login by Check-in Code - Calls API (new secure method)
+export const authenticateUserByCode = async (checkInCode: string): Promise<User | null> => {
+  try {
+    const response = await apiClient.post<{ success: boolean; user?: User; message?: string }>('/auth/guest/code', {
+      checkInCode
+    });
+    
+    if (response.success && response.user) {
+      return response.user;
+    }
+    
+    // If not successful, throw error with message from backend
+    if (response.message) {
+      throw new Error(response.message);
+    }
+    
+    return null;
+  } catch (error: any) {
+    console.error('Guest authentication by code failed:', error);
+    // Re-throw error so frontend can display the message
+    if (error.message) {
+      throw error;
+    }
+    throw new Error('Login failed. Please try again.');
+  }
+};
+
+// Guest Login - Calls API (legacy method, kept for backward compatibility)
 export const authenticateUser = async (lastName: string, roomNumber: string): Promise<User | null> => {
   try {
-    const response = await apiClient.post<{ success: boolean; user: User }>('/auth/guest', {
+    const response = await apiClient.post<{ success: boolean; user?: User; message?: string }>('/auth/guest', {
       lastName,
       roomNumber
     });
@@ -12,10 +39,20 @@ export const authenticateUser = async (lastName: string, roomNumber: string): Pr
     if (response.success && response.user) {
       return response.user;
     }
+    
+    // If not successful, throw error with message from backend
+    if (response.message) {
+      throw new Error(response.message);
+    }
+    
     return null;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Guest authentication failed:', error);
-    return null;
+    // Re-throw error so frontend can display the message
+    if (error.message) {
+      throw error;
+    }
+    throw new Error('Login failed. Please try again.');
   }
 };
 

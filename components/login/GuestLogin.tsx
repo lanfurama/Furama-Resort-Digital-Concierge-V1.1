@@ -1,17 +1,15 @@
 import React, { useState } from 'react';
 import { UserRole } from '../../types';
-import { authenticateUser } from '../../services/authService';
+import { authenticateUserByCode } from '../../services/authService';
 import { useTranslation } from '../../contexts/LanguageContext';
 
 interface GuestLoginProps {
   onLoginSuccess: (user: any) => void;
-  onBack: () => void;
   setLanguage: (lang: string) => void;
 }
 
-export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, onBack, setLanguage }) => {
-  const [roomNumber, setRoomNumber] = useState('');
-  const [lastName, setLastName] = useState('');
+export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLanguage }) => {
+  const [checkInCode, setCheckInCode] = useState('');
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const { t } = useTranslation();
@@ -22,10 +20,10 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, onBack, 
     setAuthError('');
 
     try {
-      const foundUser = await authenticateUser(lastName, roomNumber);
+      const foundUser = await authenticateUserByCode(checkInCode.trim().toUpperCase());
 
       if (!foundUser) {
-        setAuthError('Invalid guest credentials. Please check Room # and Last Name.');
+        setAuthError('Invalid check-in code. Please check your code and try again.');
         setIsAuthLoading(false);
         return;
       }
@@ -59,26 +57,20 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, onBack, 
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Room Number</label>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Check-in Code</label>
             <input 
               type="text" 
-              value={roomNumber}
-              onChange={(e) => setRoomNumber(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-black"
-              placeholder="e.g. 101"
+              value={checkInCode}
+              onChange={(e) => setCheckInCode(e.target.value.toUpperCase())}
+              className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-black text-center text-2xl font-bold tracking-widest"
+              placeholder="Enter your check-in code"
+              maxLength={8}
               required
+              autoFocus
             />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Guest Last Name</label>
-            <input 
-              type="text" 
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-black"
-              placeholder="e.g. Smith"
-              required
-            />
+            <p className="text-xs text-gray-400 mt-2 text-center">
+              Enter the 8-character code provided at check-in
+            </p>
           </div>
 
           {authError && (
@@ -98,14 +90,6 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, onBack, 
             ) : (
               <span>Login</span>
             )}
-          </button>
-
-          <button 
-            type="button"
-            onClick={onBack}
-            className="w-full text-emerald-800 font-semibold py-2 text-sm hover:text-emerald-900 transition"
-          >
-            ← Back to Role Selection
           </button>
         </form>
         

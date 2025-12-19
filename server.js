@@ -107,7 +107,12 @@ async function setupVite() {
     
     if (existsSync(distPath)) {
       app.use(express.static(distPath));
+      // SPA fallback: serve index.html for all non-API routes
       app.get('*', (req, res, next) => {
+        // Skip API routes
+        if (req.path.startsWith('/api')) {
+          return next();
+        }
         // Only serve static files in production mode
         if (!isDev) {
           res.sendFile('index.html', { root: distPath });

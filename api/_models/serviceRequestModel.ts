@@ -2,7 +2,7 @@ import pool from '../_config/database.js';
 
 export interface ServiceRequest {
   id: number;
-  type: 'DINING' | 'SPA' | 'HOUSEKEEPING' | 'POOL' | 'BUTLER';
+  type: 'DINING' | 'SPA' | 'HOUSEKEEPING' | 'POOL' | 'BUTLER' | 'EXTEND_STAY';
   status: 'PENDING' | 'CONFIRMED' | 'COMPLETED';
   details: string;
   room_number: string;

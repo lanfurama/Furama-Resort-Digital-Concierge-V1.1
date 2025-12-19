@@ -374,6 +374,39 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         return rides.filter(r => r.status === BuggyStatus.SEARCHING).length;
     };
 
+    // Helper: Get offline drivers count
+    const getOfflineDriversCount = (): number => {
+        const totalDrivers = users.filter(u => u.role === UserRole.DRIVER).length;
+        return totalDrivers - getOnlineDriversCount();
+    };
+
+    // Helper: Get active rides count (ASSIGNED, ARRIVING, ON_TRIP)
+    const getActiveRidesCount = (): number => {
+        return rides.filter(r => 
+            r.status === BuggyStatus.ASSIGNED || 
+            r.status === BuggyStatus.ARRIVING || 
+            r.status === BuggyStatus.ON_TRIP
+        ).length;
+    };
+
+    // Helper: Get completed rides count today
+    const getCompletedRidesTodayCount = (): number => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return rides.filter(r => {
+            if (r.status !== BuggyStatus.COMPLETED) return false;
+            if (!r.completedAt) return false;
+            const completedDate = new Date(r.completedAt);
+            completedDate.setHours(0, 0, 0, 0);
+            return completedDate.getTime() === today.getTime();
+        }).length;
+    };
+
+    // Helper: Get total drivers count
+    const getTotalDriversCount = (): number => {
+        return users.filter(u => u.role === UserRole.DRIVER).length;
+    };
+
     // Service Request Helpers
     const getPendingServiceRequestsCount = (): number => {
         return serviceRequests.filter(sr => sr.status === 'PENDING' && sr.type !== 'BUGGY').length;
@@ -1105,6 +1138,90 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                     {/* Buggy Fleet Dispatch */}
                     {viewMode === 'BUGGY' && (
                         <>
+                    {/* Dashboard Stats */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+                        <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                            <Grid3x3 size={16} className="text-emerald-600" />
+                            Dashboard Điều Phối / Dispatch Dashboard
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                            {/* Tài Xế Online */}
+                            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg px-2 py-1.5 border border-green-200">
+                                <div className="flex items-center justify-between mb-0">
+                                    <span className="text-xs font-semibold text-green-700 uppercase leading-tight">Tài Xế Online</span>
+                                    <Users size={12} className="text-green-600 flex-shrink-0" />
+                                </div>
+                                <div className="text-2xl font-bold text-green-700 leading-none mt-0.5">{getOnlineDriversCount()}</div>
+                                <div className="text-[10px] text-green-600 mt-0 leading-tight">of {getTotalDriversCount()} total</div>
+                            </div>
+
+                            {/* Tài Xế Offline */}
+                            <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-lg px-2 py-1.5 border border-gray-200">
+                                <div className="flex items-center justify-between mb-0">
+                                    <span className="text-xs font-semibold text-gray-700 uppercase leading-tight">Tài Xế Offline</span>
+                                    <Users size={12} className="text-gray-500 flex-shrink-0" />
+                                </div>
+                                <div className="text-2xl font-bold text-gray-700 leading-none mt-0.5">{getOfflineDriversCount()}</div>
+                                <div className="text-[10px] text-gray-500 mt-0 leading-tight">offline drivers</div>
+                            </div>
+
+                            {/* Cuốc Đang Chạy */}
+                            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg px-2 py-1.5 border border-blue-200">
+                                <div className="flex items-center justify-between mb-0">
+                                    <span className="text-xs font-semibold text-blue-700 uppercase leading-tight">Cuốc Đang Chạy</span>
+                                    <Car size={12} className="text-blue-600 flex-shrink-0" />
+                                </div>
+                                <div className="text-2xl font-bold text-blue-700 leading-none mt-0.5">{getActiveRidesCount()}</div>
+                                <div className="text-[10px] text-blue-600 mt-0 leading-tight">active rides</div>
+                            </div>
+
+                            {/* Cuốc Đang Chờ */}
+                            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg px-2 py-1.5 border border-orange-200">
+                                <div className="flex items-center justify-between mb-0">
+                                    <span className="text-xs font-semibold text-orange-700 uppercase leading-tight">Cuốc Đang Chờ</span>
+                                    <Clock size={12} className="text-orange-600 flex-shrink-0" />
+                                </div>
+                                <div className="text-2xl font-bold text-orange-700 leading-none mt-0.5">{getPendingRequestsCount()}</div>
+                                <div className="text-[10px] text-orange-600 mt-0 leading-tight">pending requests</div>
+                            </div>
+                        </div>
+                        
+                        {/* Additional Stats Row */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 pt-3 border-t border-gray-200">
+                            {/* Tổng Tài Xế */}
+                            <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+                                <div className="text-[10px] text-gray-600 uppercase mb-0.5">Tổng Tài Xế</div>
+                                <div className="text-lg font-bold text-gray-800">{getTotalDriversCount()}</div>
+                            </div>
+
+                            {/* Hoàn Thành Hôm Nay */}
+                            <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-200">
+                                <div className="text-[10px] text-emerald-700 uppercase mb-0.5">Hoàn Thành Hôm Nay</div>
+                                <div className="text-lg font-bold text-emerald-700">{getCompletedRidesTodayCount()}</div>
+                            </div>
+
+                            {/* Tỷ Lệ Online */}
+                            <div className="bg-blue-50 rounded-lg p-2 border border-blue-200">
+                                <div className="text-[10px] text-blue-700 uppercase mb-0.5">Tỷ Lệ Online</div>
+                                <div className="text-lg font-bold text-blue-700">
+                                    {getTotalDriversCount() > 0 
+                                        ? Math.round((getOnlineDriversCount() / getTotalDriversCount()) * 100) 
+                                        : 0}%
+                                </div>
+                            </div>
+
+                            {/* Tỷ Lệ Bận */}
+                            <div className="bg-purple-50 rounded-lg p-2 border border-purple-200">
+                                <div className="text-[10px] text-purple-700 uppercase mb-0.5">Tỷ Lệ Bận</div>
+                                <div className="text-lg font-bold text-purple-700">
+                                    {getOnlineDriversCount() > 0 
+                                        ? Math.round((getActiveRidesCount() / getOnlineDriversCount()) * 100) 
+                                        : 0}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Fleet Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4 px-4 py-3">
                         <div className="flex items-center gap-2.5">

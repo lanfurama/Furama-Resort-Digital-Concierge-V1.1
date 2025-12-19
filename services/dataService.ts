@@ -410,6 +410,30 @@ export const resetUserPassword = async (userId: string, newPass: string): Promis
   }
 };
 
+export const generateCheckInCode = async (userId: string): Promise<{ checkInCode: string; user: User }> => {
+  try {
+    const response = await apiClient.post<{ success: boolean; checkInCode: string; user: any }>(`/users/${userId}/generate-check-in-code`, {});
+    if (response.success && response.checkInCode) {
+      // Map database user to frontend User format
+      const frontendUser: User = {
+        id: response.user.id.toString(),
+        lastName: response.user.last_name,
+        roomNumber: response.user.room_number,
+        villaType: response.user.villa_type,
+        role: response.user.role as UserRole,
+        language: response.user.language || 'English',
+        checkIn: response.user.check_in ? new Date(response.user.check_in).toISOString() : undefined,
+        checkOut: response.user.check_out ? new Date(response.user.check_out).toISOString() : undefined,
+      };
+      return { checkInCode: response.checkInCode, user: frontendUser };
+    }
+    throw new Error('Failed to generate check-in code');
+  } catch (error: any) {
+    console.error('Failed to generate check-in code:', error);
+    throw error;
+  }
+};
+
 export const updateUserNotes = async (roomNumber: string, notes: string): Promise<void> => {
   try {
     // Get user by room number first

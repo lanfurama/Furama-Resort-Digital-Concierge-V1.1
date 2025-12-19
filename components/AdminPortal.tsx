@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key, Car, Settings, RefreshCw, Zap, Grid3x3, CheckCircle, Map, AlertCircle, Info, Brain, ArrowRight, Loader2, Pencil } from 'lucide-react';
-import { getLocations, getLocationsSync, addLocation, updateLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, updateMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, updatePromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, getUsersSync, addUser, updateUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory, getRides, getRidesSync, updateRideStatus } from '../services/dataService';
+import { getLocations, getLocationsSync, addLocation, updateLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, updateMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, updatePromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, getUsersSync, addUser, updateUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory, getRides, getRidesSync, updateRideStatus, generateCheckInCode } from '../services/dataService';
 import { parseAdminInput, generateTranslations } from '../services/geminiService';
 import { Location, MenuItem, ResortEvent, Promotion, KnowledgeItem, User, UserRole, Department, RoomType, Room, RideRequest, BuggyStatus } from '../types';
 import Loading from './Loading';
@@ -244,6 +244,10 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const [editingGuest, setEditingGuest] = useState<User | null>(null);
     const [showGuestEditForm, setShowGuestEditForm] = useState(false);
     const [editGuest, setEditGuest] = useState<Partial<User>>({ lastName: '', roomNumber: '', villaType: '', language: 'English', checkIn: '', checkOut: '' });
+    
+    // Check-in Code State
+    const [generatedCode, setGeneratedCode] = useState<{ code: string; guestName: string; roomNumber: string } | null>(null);
+    const [isGeneratingCode, setIsGeneratingCode] = useState(false);
     
     const [showRoomForm, setShowRoomForm] = useState(false);
     const [newRoom, setNewRoom] = useState<{number: string, typeId: string}>({ number: '', typeId: '' });
@@ -2638,6 +2642,32 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                             <td className="p-4 text-right">
                                                 <div className="flex items-center justify-end gap-1 relative z-10">
                                                     <button 
+                                                        onClick={async () => {
+                                                            if (!u.id) return;
+                                                            setIsGeneratingCode(true);
+                                                            try {
+                                                                const result = await generateCheckInCode(u.id);
+                                                                setGeneratedCode({
+                                                                    code: result.checkInCode,
+                                                                    guestName: u.lastName,
+                                                                    roomNumber: u.roomNumber
+                                                                });
+                                                                // Update the user in the list
+                                                                await refreshData();
+                                                            } catch (error: any) {
+                                                                alert(`Failed to generate check-in code: ${error.message || 'Unknown error'}`);
+                                                            } finally {
+                                                                setIsGeneratingCode(false);
+                                                            }
+                                                        }}
+                                                        className="text-blue-600 hover:text-blue-700 p-2 relative z-10 cursor-pointer" 
+                                                        title="Generate Check-in Code"
+                                                        type="button"
+                                                        disabled={isGeneratingCode}
+                                                    >
+                                                        {isGeneratingCode ? <Loader2 size={16} className="animate-spin"/> : <Key size={16}/>}
+                                                    </button>
+                                                    <button 
                                                         onClick={() => {
                                                             setEditingGuest(u);
                                                             // Convert checkIn/checkOut to local datetime format for input
@@ -2680,6 +2710,50 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 })}
                             </tbody>
                         </table>
+                        
+                        {/* Check-in Code Modal */}
+                        {generatedCode && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setGeneratedCode(null)}>
+                                <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                                    <div className="text-center">
+                                        <div className="mb-4">
+                                            <Key size={48} className="mx-auto text-emerald-600 mb-2"/>
+                                            <h3 className="text-xl font-bold text-gray-800 mb-2">Check-in Code Generated</h3>
+                                            <p className="text-sm text-gray-600">
+                                                Guest: <span className="font-semibold">{generatedCode.guestName}</span><br/>
+                                                Room: <span className="font-semibold">{generatedCode.roomNumber}</span>
+                                            </p>
+                                        </div>
+                                        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-6 mb-4">
+                                            <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Check-in Code</p>
+                                            <p className="text-4xl font-bold text-emerald-800 tracking-widest font-mono">
+                                                {generatedCode.code}
+                                            </p>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mb-4">
+                                            Share this code with the guest. They can use it to log in to the app.
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(generatedCode.code);
+                                                    alert('Code copied to clipboard!');
+                                                }}
+                                                className="flex-1 bg-emerald-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-emerald-700 transition"
+                                            >
+                                                Copy Code
+                                            </button>
+                                            <button
+                                                onClick={() => setGeneratedCode(null)}
+                                                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300 transition"
+                                            >
+                                                Close
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         </>
                     )}
                     

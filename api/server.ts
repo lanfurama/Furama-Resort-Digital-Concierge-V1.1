@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import routes from './_routes/index.js';
+import { checkAndSendCheckoutReminders } from './_services/checkoutReminderService.js';
 
 dotenv.config();
 
@@ -38,5 +39,13 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
   console.log(`📡 API endpoints available at http://localhost:${PORT}/api/v1`);
+  
+  // Start checkout reminder service (check every 5 minutes)
+  console.log('⏰ Starting checkout reminder service...');
+  checkAndSendCheckoutReminders(); // Run immediately on startup
+  setInterval(() => {
+    checkAndSendCheckoutReminders();
+  }, 5 * 60 * 1000); // Check every 5 minutes
+  console.log('✅ Checkout reminder service started (checks every 5 minutes)');
 });
 
