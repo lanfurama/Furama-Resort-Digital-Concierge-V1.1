@@ -12,12 +12,73 @@ dist
 dist-ssr
 *.local
 
-# Environment variables
+# Environment variables - QUAN TRỌNG: Không commit file .env
 .env
 .env.local
 .env.*.local
 .env.production
 .env.development
+.env.test
+.env.*.backup
+
+# Backup files - Không commit file backup
+*.backup
+*.bak
+*.old
+*.orig
+*.tmp
+*~
+
+# SSL Certificates & Keys - QUAN TRỌNG: Không commit chứng chỉ thực
+certs/*.key
+certs/*.crt
+certs/*.pem
+certs/*.p12
+certs/*.pfx
+*.key
+*.crt
+*.pem
+*.p12
+*.pfx
+!certs/.gitkeep
+
+# Database dumps & SQL files with sensitive data
+*.sql.dump
+*.sql.backup
+*.dump
+database_backup/
+db_backup/
+
+# API Keys & Secrets - File có thể chứa thông tin nhạy cảm
+*secret*
+*password*
+*credential*
+*api-key*
+*apikey*
+config.local.*
+secrets.json
+credentials.json
+
+# Build artifacts & cache
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.vite/
+.turbo/
+build/
+out/
+*.tsbuildinfo
+
+# Capacitor / Android / iOS - QUAN TRỌNG: Không commit keystore
+android/
+ios/
+.capacitor/
+*.jks
+*.keystore
+*.mobileprovision
+*.p12
+*.cer
 
 # Editor directories and files
 .vscode/*
@@ -29,16 +90,26 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+Thumbs.db
 
-# Capacitor / Android
-android/
-ios/
-.capacitor/
-*.jks
-*.keystore
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
 
-# SSL Certificates (development only - never commit real certificates)
-certs/*.key
-certs/*.crt
-certs/*.pem
-!certs/.gitkeep
+# Test coverage & reports
+coverage/
+*.lcov
+.nyc_output/
+test-results/
+playwright-report/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
