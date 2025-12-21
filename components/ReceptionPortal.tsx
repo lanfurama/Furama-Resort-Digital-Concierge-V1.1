@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Car, Settings, RefreshCw, Zap, Users, List, Grid3x3, CheckCircle, MapPin, AlertCircle, Info, X, Map, Star, Loader2, Brain, ArrowRight, Clock, UtensilsCrossed, Building2, Utensils, Waves, Search } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Car, Settings, RefreshCw, Zap, Users, List, Grid3x3, CheckCircle, MapPin, AlertCircle, Info, X, Map, Star, Loader2, Brain, ArrowRight, Clock, UtensilsCrossed, Building2, Utensils, Waves, Search, Bell } from 'lucide-react';
 import { getRides, getRidesSync, getUsers, getUsersSync, updateRideStatus, getLocations, getServiceRequests, updateServiceStatus, requestRide } from '../services/dataService';
 import { User, UserRole, RideRequest, BuggyStatus, Location, ServiceRequest } from '../types';
 import { apiClient } from '../services/apiClient';
+import BuggyNotificationBell from './BuggyNotificationBell';
 
 interface ReceptionPortalProps {
     onLogout: () => void;
@@ -72,6 +73,12 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     const [isCreatingRide, setIsCreatingRide] = useState(false);
     const pickupDropdownRef = useRef<HTMLDivElement>(null);
     const destinationDropdownRef = useRef<HTMLDivElement>(null);
+    
+    // Sound notification state
+    const [soundEnabled, setSoundEnabled] = useState(() => {
+        const saved = localStorage.getItem('reception_sound_enabled');
+        return saved !== null ? saved === 'true' : true; // Default to enabled
+    });
 
     // Load data on mount
     useEffect(() => {
@@ -114,6 +121,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                     getUsers().catch(() => getUsersSync()),
                     getServiceRequests().catch(() => [])
                 ]);
+                
                 setRides(refreshedRides);
                 setUsers(refreshedUsers);
                 setServiceRequests(refreshedServices);
@@ -159,8 +167,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             const newGuestInfo: Record<string, { last_name: string; villa_type?: string | null }> = {};
             
             results.forEach(result => {
-                if (result) {
-                    newGuestInfo[result.roomNumber] = result.guestInfo;
+                if (result && result.roomNumber) {
+                    newGuestInfo[String(result.roomNumber)] = result.guestInfo;
                 }
             });
             
@@ -1066,6 +1074,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+    
+    // Save sound preference to localStorage
+    useEffect(() => {
+        localStorage.setItem('reception_sound_enabled', String(soundEnabled));
+    }, [soundEnabled]);
 
     return (
         <div className={`${embedded ? '' : 'min-h-screen'} bg-gray-100 flex flex-col font-sans`}>
@@ -1090,6 +1103,23 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Notification Bell - Only show when BUGGY view mode */}
+                        {viewMode === 'BUGGY' && (
+                            <BuggyNotificationBell
+                                rides={rides}
+                                users={users}
+                                onNavigate={() => setViewMode('BUGGY')}
+                                soundEnabled={soundEnabled}
+                                onSoundToggle={(enabled) => {
+                                    setSoundEnabled(enabled);
+                                    localStorage.setItem('reception_sound_enabled', String(enabled));
+                                }}
+                                localStorageKey="reception_sound_enabled"
+                                showCompleted={false}
+                                showAssigned={false}
+                                showActive={false}
+                            />
+                        )}
                         <div className="text-right">
                             <div className="text-sm font-semibold">{user.lastName || 'Reception'}</div>
                             <div className="text-xs text-emerald-200">ID: {user.id || 'N/A'}</div>
@@ -1139,85 +1169,58 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                     {viewMode === 'BUGGY' && (
                         <>
                     {/* Dashboard Stats */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
-                        <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-                            <Grid3x3 size={16} className="text-emerald-600" />
-                            Dashboard Điều Phối / Dispatch Dashboard
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-                            {/* Tài Xế Online */}
-                            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg px-2 py-1.5 border border-green-200">
-                                <div className="flex items-center justify-between mb-0">
-                                    <span className="text-xs font-semibold text-green-700 uppercase leading-tight">Tài Xế Online</span>
-                                    <Users size={12} className="text-green-600 flex-shrink-0" />
-                                </div>
-                                <div className="text-2xl font-bold text-green-700 leading-none mt-0.5">{getOnlineDriversCount()}</div>
-                                <div className="text-[10px] text-green-600 mt-0 leading-tight">of {getTotalDriversCount()} total</div>
-                            </div>
-
-                            {/* Tài Xế Offline */}
-                            <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-lg px-2 py-1.5 border border-gray-200">
-                                <div className="flex items-center justify-between mb-0">
-                                    <span className="text-xs font-semibold text-gray-700 uppercase leading-tight">Tài Xế Offline</span>
-                                    <Users size={12} className="text-gray-500 flex-shrink-0" />
-                                </div>
-                                <div className="text-2xl font-bold text-gray-700 leading-none mt-0.5">{getOfflineDriversCount()}</div>
-                                <div className="text-[10px] text-gray-500 mt-0 leading-tight">offline drivers</div>
-                            </div>
-
-                            {/* Cuốc Đang Chạy */}
-                            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg px-2 py-1.5 border border-blue-200">
-                                <div className="flex items-center justify-between mb-0">
-                                    <span className="text-xs font-semibold text-blue-700 uppercase leading-tight">Cuốc Đang Chạy</span>
-                                    <Car size={12} className="text-blue-600 flex-shrink-0" />
-                                </div>
-                                <div className="text-2xl font-bold text-blue-700 leading-none mt-0.5">{getActiveRidesCount()}</div>
-                                <div className="text-[10px] text-blue-600 mt-0 leading-tight">active rides</div>
-                            </div>
-
-                            {/* Cuốc Đang Chờ */}
-                            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg px-2 py-1.5 border border-orange-200">
-                                <div className="flex items-center justify-between mb-0">
-                                    <span className="text-xs font-semibold text-orange-700 uppercase leading-tight">Cuốc Đang Chờ</span>
-                                    <Clock size={12} className="text-orange-600 flex-shrink-0" />
-                                </div>
-                                <div className="text-2xl font-bold text-orange-700 leading-none mt-0.5">{getPendingRequestsCount()}</div>
-                                <div className="text-[10px] text-orange-600 mt-0 leading-tight">pending requests</div>
-                            </div>
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 mb-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wide flex items-center gap-1.5">
+                                <Grid3x3 size={14} className="text-emerald-600" />
+                                Dispatch Dashboard
+                            </h3>
                         </div>
-                        
-                        {/* Additional Stats Row */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 pt-3 border-t border-gray-200">
-                            {/* Tổng Tài Xế */}
-                            <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-                                <div className="text-[10px] text-gray-600 uppercase mb-0.5">Tổng Tài Xế</div>
-                                <div className="text-lg font-bold text-gray-800">{getTotalDriversCount()}</div>
-                            </div>
-
-                            {/* Hoàn Thành Hôm Nay */}
-                            <div className="bg-emerald-50 rounded-lg p-2 border border-emerald-200">
-                                <div className="text-[10px] text-emerald-700 uppercase mb-0.5">Hoàn Thành Hôm Nay</div>
-                                <div className="text-lg font-bold text-emerald-700">{getCompletedRidesTodayCount()}</div>
-                            </div>
-
-                            {/* Tỷ Lệ Online */}
-                            <div className="bg-blue-50 rounded-lg p-2 border border-blue-200">
-                                <div className="text-[10px] text-blue-700 uppercase mb-0.5">Tỷ Lệ Online</div>
-                                <div className="text-lg font-bold text-blue-700">
-                                    {getTotalDriversCount() > 0 
-                                        ? Math.round((getOnlineDriversCount() / getTotalDriversCount()) * 100) 
-                                        : 0}%
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                            {/* Drivers Online */}
+                            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-2.5 border border-green-200/60">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <Users size={14} className="text-green-600 flex-shrink-0" />
+                                    <span className="text-[10px] font-semibold text-green-700">Drivers Online</span>
                                 </div>
+                                <div className="text-xl font-bold text-green-700 leading-none">{getOnlineDriversCount()}</div>
+                                <div className="text-[9px] text-green-600 mt-0.5 opacity-75">of {getTotalDriversCount()} total</div>
                             </div>
 
-                            {/* Tỷ Lệ Bận */}
-                            <div className="bg-purple-50 rounded-lg p-2 border border-purple-200">
-                                <div className="text-[10px] text-purple-700 uppercase mb-0.5">Tỷ Lệ Bận</div>
-                                <div className="text-lg font-bold text-purple-700">
-                                    {getOnlineDriversCount() > 0 
-                                        ? Math.round((getActiveRidesCount() / getOnlineDriversCount()) * 100) 
-                                        : 0}%
+                            {/* Drivers Offline */}
+                            <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-lg p-2.5 border border-gray-200/60">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <Users size={14} className="text-gray-500 flex-shrink-0" />
+                                    <span className="text-[10px] font-semibold text-gray-600">Drivers Offline</span>
                                 </div>
+                                <div className="text-xl font-bold text-gray-700 leading-none">{getOfflineDriversCount()}</div>
+                            </div>
+
+                            {/* Active Rides */}
+                            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-2.5 border border-blue-200/60">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <Car size={14} className="text-blue-600 flex-shrink-0" />
+                                    <span className="text-[10px] font-semibold text-blue-700">Active Rides</span>
+                                </div>
+                                <div className="text-xl font-bold text-blue-700 leading-none">{getActiveRidesCount()}</div>
+                            </div>
+
+                            {/* Pending Requests */}
+                            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg p-2.5 border border-orange-200/60">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <Clock size={14} className="text-orange-600 flex-shrink-0" />
+                                    <span className="text-[10px] font-semibold text-orange-700">Pending Requests</span>
+                                </div>
+                                <div className="text-xl font-bold text-orange-700 leading-none">{getPendingRequestsCount()}</div>
+                            </div>
+
+                            {/* Completed Today */}
+                            <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg p-2.5 border border-emerald-200/60">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <CheckCircle size={14} className="text-emerald-600 flex-shrink-0" />
+                                    <span className="text-[10px] font-semibold text-emerald-700">Completed Today</span>
+                                </div>
+                                <div className="text-xl font-bold text-emerald-700 leading-none">{getCompletedRidesTodayCount()}</div>
                             </div>
                         </div>
                     </div>
@@ -3398,6 +3401,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                     )}
                 </div>
             </div>
+            
         </div>
     );
 };

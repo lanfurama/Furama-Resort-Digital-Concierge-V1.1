@@ -9,9 +9,14 @@ interface GuestLoginProps {
 }
 
 export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLanguage }) => {
-  const [checkInCode, setCheckInCode] = useState('');
+  // Load saved code from localStorage
+  const [checkInCode, setCheckInCode] = useState(() => {
+    const saved = localStorage.getItem('guest_check_in_code');
+    return saved || '';
+  });
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [rememberCode, setRememberCode] = useState(true);
   const { t } = useTranslation();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -29,6 +34,16 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLangu
       }
 
       if (foundUser) {
+        // Save check-in code to localStorage if remember is checked
+        if (rememberCode) {
+          localStorage.setItem('guest_check_in_code', checkInCode.trim().toUpperCase());
+          localStorage.setItem('guest_room_number', foundUser.roomNumber || '');
+        } else {
+          // Clear saved code if user unchecks remember
+          localStorage.removeItem('guest_check_in_code');
+          localStorage.removeItem('guest_room_number');
+        }
+        
         onLoginSuccess(foundUser);
         if (foundUser.language) {
           setLanguage(foundUser.language);
@@ -71,6 +86,22 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLangu
             <p className="text-xs text-gray-400 mt-2 text-center">
               Enter the 8-character code provided at check-in
             </p>
+            <p className="text-xs text-gray-500 mt-1.5 text-center font-medium">
+              This code will be provided by the administrator
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="rememberCode"
+              checked={rememberCode}
+              onChange={(e) => setRememberCode(e.target.checked)}
+              className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+            />
+            <label htmlFor="rememberCode" className="text-xs text-gray-600 cursor-pointer">
+              Remember this code on this device
+            </label>
           </div>
 
           {authError && (

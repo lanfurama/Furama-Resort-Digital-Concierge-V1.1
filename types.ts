@@ -45,6 +45,7 @@ export interface User {
   // Guest Access Control
   checkIn?: string; // ISO Date String
   checkOut?: string; // ISO Date String
+  checkInCode?: string; // Check-in code for guest login
   language?: string; // Preferred Language
   notes?: string; // Guest personal notes/preferences
   updatedAt?: number; // Timestamp of last update (for driver online status)

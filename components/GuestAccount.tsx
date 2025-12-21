@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, ServiceRequest, HotelReview } from '../types';
 import { getCompletedGuestOrders, updateUserNotes, rateServiceRequest, submitHotelReview, getHotelReview, updateUserLanguage, updateUser, addServiceRequest } from '../services/dataService';
-import { Clock, ShoppingBag, Car, Utensils, Sparkles, Waves, User as UserIcon, Save, Star, Hotel, ThumbsUp, Globe, ArrowLeft, Filter, Edit2, Lock, Eye, EyeOff, Calendar, X } from 'lucide-react';
+import { Clock, ShoppingBag, Car, Utensils, Sparkles, Waves, User as UserIcon, Save, Star, Hotel, ThumbsUp, Globe, ArrowLeft, Filter, Edit2, Lock, Eye, EyeOff, Calendar, X, Copy, Check } from 'lucide-react';
 import Loading from './Loading';
 import { useTranslation } from '../contexts/LanguageContext';
 
@@ -52,6 +52,33 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [isSavingProfile, setIsSavingProfile] = useState(false);
+    
+    // Check-in Code State
+    const [savedCheckInCode, setSavedCheckInCode] = useState<string | null>(null);
+    const [codeCopied, setCodeCopied] = useState(false);
+    
+    // Load saved check-in code from localStorage
+    useEffect(() => {
+        const savedCode = localStorage.getItem('guest_check_in_code');
+        const savedRoom = localStorage.getItem('guest_room_number');
+        // Only show code if it matches current user's room
+        if (savedCode && savedRoom === user.roomNumber) {
+            setSavedCheckInCode(savedCode);
+        }
+    }, [user.roomNumber]);
+    
+    const handleCopyCode = async () => {
+        if (savedCheckInCode) {
+            try {
+                await navigator.clipboard.writeText(savedCheckInCode);
+                setCodeCopied(true);
+                setTimeout(() => setCodeCopied(false), 2000);
+            } catch (error) {
+                console.error('Failed to copy code:', error);
+                alert('Failed to copy code. Please try again.');
+            }
+        }
+    };
     
     // Extend Stay State
     const [showExtendStayModal, setShowExtendStayModal] = useState(false);
@@ -542,6 +569,25 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                 </span>
                                 <span className="text-sm font-bold text-gray-800">••••••</span>
                             </div>
+                            {savedCheckInCode && (
+                                <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                                    <span className="text-xs font-semibold text-gray-600">Check-in Code</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm font-bold text-emerald-700 font-mono tracking-wider">{savedCheckInCode}</span>
+                                        <button
+                                            onClick={handleCopyCode}
+                                            className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all"
+                                            title="Copy code"
+                                        >
+                                            {codeCopied ? (
+                                                <Check size={14} className="text-emerald-600" />
+                                            ) : (
+                                                <Copy size={14} />
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
