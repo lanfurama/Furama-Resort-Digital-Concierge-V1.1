@@ -142,34 +142,60 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
         return rides.filter(r => r.status === BuggyStatus.SEARCHING).length;
     };
 
+    // Get total activities count (for badge display)
+    const getTotalActivitiesCount = () => {
+        const allActivities = getAllActivities();
+        const count = allActivities.length;
+        console.log('BuggyNotificationBell: Total activities count:', count);
+        return count;
+    };
+
     // Get all activities for dropdown
     const getAllActivities = () => {
+        console.log('BuggyNotificationBell: getAllActivities called');
+        console.log('BuggyNotificationBell: rides:', rides);
+        console.log('BuggyNotificationBell: showCompleted:', showCompleted, 'showAssigned:', showAssigned, 'showActive:', showActive);
+        
         const pendingRides = rides.filter(r => r.status === BuggyStatus.SEARCHING);
+        console.log('BuggyNotificationBell: pendingRides (SEARCHING):', pendingRides.length);
+        
         const activities: Array<{ ride: RideRequest; activityType: 'PENDING' | 'ASSIGNED' | 'ACTIVE' | 'COMPLETED' }> = [
             ...pendingRides.map(r => ({ ride: r, activityType: 'PENDING' as const }))
         ];
 
         if (showAssigned) {
             const assignedRides = rides.filter(r => r.status === BuggyStatus.ASSIGNED);
+            console.log('BuggyNotificationBell: assignedRides (ASSIGNED):', assignedRides.length);
             activities.push(...assignedRides.map(r => ({ ride: r, activityType: 'ASSIGNED' as const })));
         }
 
         if (showActive) {
             const activeRides = rides.filter(r => r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
+            console.log('BuggyNotificationBell: activeRides (ARRIVING/ON_TRIP):', activeRides.length);
             activities.push(...activeRides.map(r => ({ ride: r, activityType: 'ACTIVE' as const })));
         }
 
         if (showCompleted) {
-            const recentCompleted = rides
-                .filter(r => r.status === BuggyStatus.COMPLETED && r.completedAt)
+            const completedRides = rides
+                .filter(r => r.status === BuggyStatus.COMPLETED)
                 .filter(r => {
-                    const completedTime = r.completedAt || 0;
-                    return Date.now() - completedTime < 300000; // Last 5 minutes
+                    // Use completedAt if available, otherwise use timestamp
+                    const completedTime = r.completedAt || r.timestamp || 0;
+                    // Show completed rides from last 30 minutes (increased from 5 minutes for Reception)
+                    return Date.now() - completedTime < 1800000; // Last 30 minutes
                 })
-                .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0))
-                .slice(0, 5); // Show last 5 completed
-            activities.push(...recentCompleted.map(r => ({ ride: r, activityType: 'COMPLETED' as const })));
+                .sort((a, b) => {
+                    // Sort by completedAt if available, otherwise by timestamp
+                    const timeA = a.completedAt || a.timestamp || 0;
+                    const timeB = b.completedAt || b.timestamp || 0;
+                    return timeB - timeA;
+                })
+                .slice(0, 10); // Show last 10 completed (increased from 5)
+            console.log('BuggyNotificationBell: completedRides:', completedRides.length);
+            activities.push(...completedRides.map(r => ({ ride: r, activityType: 'COMPLETED' as const })));
         }
+        
+        console.log('BuggyNotificationBell: Total activities after filtering:', activities.length);
 
         return activities.sort((a, b) => {
             const timeA = a.activityType === 'COMPLETED' ? (a.ride.completedAt || 0) : a.ride.timestamp;
@@ -193,16 +219,16 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
             )}
 
             {/* Notification Bell */}
-            <div className="relative z-50" ref={notificationBellRef}>
+            <div className="relative z-[100]" ref={notificationBellRef}>
                 <button
                     onClick={() => setShowDropdown(!showDropdown)}
                     className="relative p-2 rounded-lg transition-all bg-emerald-800 text-white hover:bg-emerald-700"
                     title="View notifications"
                 >
                     <Bell size={18} />
-                    {getPendingCount() > 0 && (
+                    {getTotalActivitiesCount() > 0 && (
                         <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-emerald-900 animate-pulse">
-                            {getPendingCount() > 9 ? '9+' : getPendingCount()}
+                            {getTotalActivitiesCount() > 9 ? '9+' : getTotalActivitiesCount()}
                         </span>
                     )}
                 </button>
@@ -210,8 +236,8 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                 {/* Notification Dropdown */}
                 {showDropdown && (
                     <>
-                        <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)}></div>
-                        <div className="absolute right-0 mt-2 w-96 backdrop-blur-xl bg-white/95 rounded-2xl shadow-2xl border-2 border-gray-200/60 overflow-hidden z-50"
+                        <div className="fixed inset-0 z-[100]" onClick={() => setShowDropdown(false)}></div>
+                        <div className="absolute right-0 mt-2 w-96 backdrop-blur-xl bg-white/95 rounded-2xl shadow-2xl border-2 border-gray-200/60 overflow-hidden z-[101]"
                             style={{
                                 boxShadow: '0 20px 60px -15px rgba(0,0,0,0.3)'
                             }}

@@ -7,9 +7,10 @@ import { useTranslation } from '../contexts/LanguageContext';
 
 interface NotificationBellProps {
     userId: string;
+    variant?: 'dark' | 'light'; // 'dark' for dark backgrounds, 'light' for light backgrounds
 }
 
-const NotificationBell: React.FC<NotificationBellProps> = ({ userId }) => {
+const NotificationBell: React.FC<NotificationBellProps> = ({ userId, variant = 'dark' }) => {
     const { t } = useTranslation();
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [isOpen, setIsOpen] = useState(false);
@@ -18,9 +19,19 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId }) => {
     // Poll for notifications
     useEffect(() => {
         const fetch = async () => {
-            const list = await getNotifications(userId);
-            setNotifications(list);
-            setUnreadCount(list.filter(n => !n.isRead).length);
+            try {
+                if (!userId) {
+                    console.warn('NotificationBell: userId is empty');
+                    return;
+                }
+                console.log('NotificationBell: Fetching notifications for userId:', userId);
+                const list = await getNotifications(userId);
+                console.log('NotificationBell: Received notifications:', list);
+                setNotifications(list);
+                setUnreadCount(list.filter(n => !n.isRead).length);
+            } catch (error) {
+                console.error('NotificationBell: Error fetching notifications:', error);
+            }
         };
         
         fetch();
@@ -53,15 +64,23 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId }) => {
         }
     };
 
+    const isLight = variant === 'light';
+    
     return (
-        <div className="relative z-50">
+        <div className="relative z-[100]">
             <button 
                 onClick={toggleOpen}
-                className="relative p-2.5 rounded-xl hover:bg-white/10 transition-all duration-300 border border-white/10 hover:border-white/20 backdrop-blur-sm"
+                className={`relative p-1.5 rounded-lg transition-all duration-300 ${
+                    isLight 
+                        ? 'hover:bg-gray-100 border border-transparent' 
+                        : 'hover:bg-white/10 border border-white/10 hover:border-white/20 backdrop-blur-sm'
+                }`}
             >
-                <Bell className="w-5 h-5 text-white/90" strokeWidth={2.5} />
+                <Bell className={`w-5 h-5 ${isLight ? 'text-gray-600' : 'text-white/90'}`} strokeWidth={2.5} />
                 {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-gradient-to-r from-red-500 to-pink-600 text-white text-[10px] font-black flex items-center justify-center rounded-full shadow-lg border-2 border-emerald-800 animate-pulse">
+                    <span className={`absolute -top-0.5 -right-0.5 w-5 h-5 bg-gradient-to-r from-red-500 to-pink-600 text-white text-[10px] font-black flex items-center justify-center rounded-full shadow-lg border-2 ${
+                        isLight ? 'border-white' : 'border-emerald-800'
+                    } animate-pulse`}>
                         {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                 )}
@@ -69,8 +88,8 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId }) => {
 
             {isOpen && (
                 <>
-                    <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
-                    <div className="absolute right-0 mt-2 w-80 backdrop-blur-xl bg-white/95 rounded-2xl shadow-2xl border-2 border-gray-200/60 overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200"
+                    <div className="fixed inset-0 z-[100]" onClick={() => setIsOpen(false)}></div>
+                    <div className="absolute right-0 mt-2 w-80 backdrop-blur-xl bg-white/95 rounded-2xl shadow-2xl border-2 border-gray-200/60 overflow-hidden z-[101] animate-in fade-in zoom-in-95 duration-200"
                         style={{
                             boxShadow: '0 20px 60px -15px rgba(0,0,0,0.3)'
                         }}

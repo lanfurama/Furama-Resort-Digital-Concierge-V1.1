@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { getRides, updateRideStatus, getLastMessage, createManualRide, getLocations, updateDriverHeartbeat } from '../services/dataService';
 import { RideRequest, BuggyStatus } from '../types';
-import { Car, MapPin, Navigation, CheckCircle, Clock, MessageSquare, History, List, Plus, X, Loader2, User, Star, Volume2, Grid, LayoutGrid, Zap } from 'lucide-react';
+import { Car, MapPin, Navigation, CheckCircle, Clock, MessageSquare, History, Plus, X, Loader2, User, Star, Zap } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ServiceChat from './ServiceChat';
 
@@ -10,7 +10,6 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     const [rides, setRides] = useState<RideRequest[]>([]);
     const [myRideId, setMyRideId] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'REQUESTS' | 'HISTORY'>('REQUESTS');
-    const [displayMode, setDisplayMode] = useState<'list' | 'grid'>('list'); // List or Grid view
     const [driverInfo, setDriverInfo] = useState<{name: string, rating: number, location: string}>({
         name: 'Mr. Tuan',
         rating: 5,
@@ -353,12 +352,15 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         });
     
     // Get current driver ID from localStorage
+    // For notifications, we use roomNumber (which acts as username/ID for staff/driver)
     const getCurrentDriverId = (): string | null => {
         try {
             const savedUser = localStorage.getItem('furama_user');
             if (savedUser) {
                 const user = JSON.parse(savedUser);
-                return user.id || null;
+                // Use roomNumber for notifications (as it's used as recipientId)
+                // Fallback to id if roomNumber is not available
+                return user.roomNumber || user.id || null;
             }
         } catch (error) {
             console.error('Failed to get driver ID from localStorage:', error);
@@ -366,15 +368,33 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         return null;
     };
     
-    const currentDriverId = getCurrentDriverId();
+    // Get current driver's actual ID (not roomNumber) for matching with ride driverId
+    const getCurrentDriverActualId = (): string | null => {
+        try {
+            const savedUser = localStorage.getItem('furama_user');
+            if (savedUser) {
+                const user = JSON.parse(savedUser);
+                // For matching rides, use the actual user ID (not roomNumber)
+                // driverId in rides is the actual user ID from database
+                return user.id ? user.id.toString() : null;
+            }
+        } catch (error) {
+            console.error('Failed to get driver actual ID from localStorage:', error);
+        }
+        return null;
+    };
+    
+    const currentDriverId = getCurrentDriverId(); // For notifications
+    const currentDriverActualId = getCurrentDriverActualId(); // For matching rides
     
     // Filter history for this driver - show all completed rides that have a driverId set
-    // If we have currentDriverId, filter by it; otherwise show all completed rides with any driverId
+    // Match by actual driver ID (user.id), not roomNumber
     const historyRides = rides.filter(r => {
         if (r.status !== BuggyStatus.COMPLETED) return false;
-        if (currentDriverId) {
-            // Match by current driver ID (as string)
-            return r.driverId === currentDriverId || r.driverId === currentDriverId.toString();
+        if (currentDriverActualId) {
+            // Match by actual driver ID (as string)
+            // driverId in rides is stored as string from database driver_id
+            return r.driverId === currentDriverActualId || r.driverId === currentDriverActualId.toString();
         }
         // If no driver ID in localStorage, show all completed rides with any driverId
         return r.driverId !== undefined && r.driverId !== null;
@@ -472,38 +492,10 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 
                 {/* Right Icons */}
                 <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                    <button 
-                        onClick={() => setDisplayMode('list')}
-                        className={`p-1.5 rounded-lg transition-all ${
-                            displayMode === 'list' 
-                                ? 'bg-emerald-100 text-emerald-600' 
-                                : 'hover:bg-gray-100 text-gray-500'
-                        }`}
-                        title="List View"
-                    >
-                        <List size={18} />
-                    </button>
-                    <button 
-                        onClick={() => setDisplayMode('grid')}
-                        className={`p-1.5 rounded-lg transition-all ${
-                            displayMode === 'grid' 
-                                ? 'bg-emerald-100 text-emerald-600' 
-                                : 'hover:bg-gray-100 text-gray-500'
-                        }`}
-                        title="Grid View"
-                    >
-                        <LayoutGrid size={18} />
-                    </button>
-                    <button 
-                        onClick={() => {
-                            // Toggle sound/notifications - can be implemented later
-                            console.log('Toggle sound');
-                        }}
-                        className="p-1.5 rounded-lg hover:bg-gray-100 transition-all text-emerald-600"
-                        title="Sound"
-                    >
-                        <Volume2 size={18} />
-                    </button>
+                    {/* Notification Bell */}
+                    {currentDriverId && (
+                        <NotificationBell userId={currentDriverId} variant="light" />
+                    )}
                     <button 
                         onClick={onLogout}
                         className="p-1.5 rounded-lg hover:bg-gray-100 transition-all text-gray-500"

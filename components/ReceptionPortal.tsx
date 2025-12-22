@@ -1115,9 +1115,9 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                     localStorage.setItem('reception_sound_enabled', String(enabled));
                                 }}
                                 localStorageKey="reception_sound_enabled"
-                                showCompleted={false}
-                                showAssigned={false}
-                                showActive={false}
+                                showCompleted={true}
+                                showAssigned={true}
+                                showActive={true}
                             />
                         )}
                         <div className="text-right">

@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key, Car, Settings, RefreshCw, Zap, Grid3x3, CheckCircle, Map, AlertCircle, Info, Brain, ArrowRight, Loader2, Pencil, Bell } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key, Car, Settings, RefreshCw, Zap, Grid3x3, CheckCircle, Map, AlertCircle, Info, Brain, ArrowRight, Loader2, Pencil, Copy, Check } from 'lucide-react';
 import { getLocations, getLocationsSync, addLocation, updateLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, updateMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, updatePromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, getUsersSync, addUser, updateUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory, getRides, getRidesSync, updateRideStatus, generateCheckInCode } from '../services/dataService';
 import { parseAdminInput, generateTranslations } from '../services/geminiService';
 import { Location, MenuItem, ResortEvent, Promotion, KnowledgeItem, User, UserRole, Department, RoomType, Room, RideRequest, BuggyStatus } from '../types';
@@ -45,47 +45,11 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     // Loading state
     const [isLoading, setIsLoading] = useState(true);
     
-    // Notification State
-    const [notification, setNotification] = useState<{message: string, type: 'success' | 'info' | 'warning'} | null>(null);
-    const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
-    
-    // Sound notification state
+    // Sound state for BuggyNotificationBell
     const [soundEnabled, setSoundEnabled] = useState(() => {
         const saved = localStorage.getItem('admin_sound_enabled');
-        return saved !== null ? saved === 'true' : true; // Default to enabled
+        return saved !== null ? saved === 'true' : true;
     });
-    
-    // Track previous rides state to detect changes
-    const prevRidesRef = useRef<RideRequest[]>([]);
-    
-    // Helper: Play notification sound
-    const playNotificationSound = useCallback(() => {
-        if (!soundEnabled) return;
-        
-        try {
-            // Create audio context for a simple beep sound
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.frequency.value = 800; // Frequency in Hz
-            oscillator.type = 'sine';
-            
-            // Longer duration: 0.6 seconds with smoother fade
-            const duration = 0.6;
-            gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.3, audioContext.currentTime + 0.2); // Hold at 0.3 for 0.2s
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-            
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + duration);
-        } catch (error) {
-            console.error('Failed to play notification sound:', error);
-        }
-    }, [soundEnabled]);
     
     // Load data on mount
     useEffect(() => {
@@ -96,6 +60,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 let locationsData: Location[];
                 try {
                     locationsData = await getLocations();
+                    console.log('Locations loaded from database:', locationsData);
                 } catch (error) {
                     console.error('Failed to load locations from database, using sync:', error);
                     locationsData = getLocationsSync();
@@ -112,6 +77,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 let knowledgeData: KnowledgeItem[];
                 try {
                     knowledgeData = await getKnowledgeBase();
+                    console.log('Knowledge items loaded from database:', knowledgeData);
                 } catch (error) {
                     console.error('Failed to load knowledge items from database:', error);
                     knowledgeData = getKnowledgeBaseSync();
@@ -127,6 +93,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const usersData = await getUsers();
                     setUsers(usersData);
+                    console.log('Users loaded from database:', usersData);
                 } catch (error) {
                     console.error('Failed to load users from database:', error);
                     setUsers(getUsersSync());
@@ -135,6 +102,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const historyData = await getUnifiedHistory();
                     setServiceHistory(historyData);
+                    console.log('Service history loaded from database:', historyData);
                 } catch (error) {
                     console.error('Failed to load service history from database:', error);
                     setServiceHistory([]);
@@ -143,10 +111,10 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const ridesData = await getRides();
                     setRides(ridesData);
+                    console.log('Rides loaded from database:', ridesData);
                 } catch (error) {
                     console.error('Failed to load rides from database:', error);
-                    const syncRides = getRidesSync();
-                    setRides(syncRides);
+                    setRides(getRidesSync());
                 }
                 
                 // Debug: Check location ID matches
@@ -191,11 +159,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         }
     }, []);
     
-    // Helper: Get pending requests count
-    const getPendingRequestsCount = () => {
-        return rides.filter(r => r.status === BuggyStatus.SEARCHING).length;
-    };
-    
     // Auto-refresh rides and users when FLEET tab is active
     useEffect(() => {
         if (tab !== 'FLEET') return;
@@ -206,7 +169,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     getRides().catch(() => getRidesSync()),
                     getUsers().catch(() => getUsersSync())
                 ]);
-                
                 setRides(refreshedRides);
                 setUsers(refreshedUsers);
             } catch (error) {
@@ -216,12 +178,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         
         return () => clearInterval(refreshInterval);
     }, [tab]);
-    
-    // Save sound preference to localStorage
-    useEffect(() => {
-        localStorage.setItem('admin_sound_enabled', String(soundEnabled));
-    }, [soundEnabled]);
-    
+
     // Auto-assign logic: Automatically assign rides that have been waiting too long
     useEffect(() => {
         if (!fleetConfig.autoAssignEnabled || tab !== 'FLEET') return;
@@ -300,10 +257,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const [showGuestEditForm, setShowGuestEditForm] = useState(false);
     const [editGuest, setEditGuest] = useState<Partial<User>>({ lastName: '', roomNumber: '', villaType: '', language: 'English', checkIn: '', checkOut: '' });
     
-    // Check-in Code State
-    const [generatedCode, setGeneratedCode] = useState<{ code: string; guestName: string; roomNumber: string } | null>(null);
-    const [isGeneratingCode, setIsGeneratingCode] = useState(false);
-    
     const [showRoomForm, setShowRoomForm] = useState(false);
     const [newRoom, setNewRoom] = useState<{number: string, typeId: string}>({ number: '', typeId: '' });
     const [roomCsvFile, setRoomCsvFile] = useState<File | null>(null);
@@ -311,6 +264,15 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     // History Tab State
     const [historyFilterType, setHistoryFilterType] = useState<string>('ALL');
     const [historyFilterDate, setHistoryFilterDate] = useState<string>('');
+    
+    // Staff Role Filter State
+    const [staffRoleFilter, setStaffRoleFilter] = useState<UserRole | 'ALL'>('ALL');
+    
+    // Guest Status Filter State
+    const [guestStatusFilter, setGuestStatusFilter] = useState<'ALL' | 'Active' | 'Future' | 'Expired'>('ALL');
+    
+    // Copy state for check-in codes
+    const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
 
     const refreshData = async () => {
         // Load data asynchronously from API
@@ -343,6 +305,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         try {
             const historyData = await getUnifiedHistory();
             setServiceHistory(historyData);
+            console.log('Service history refreshed:', historyData);
         } catch (error) {
             console.error('Failed to refresh service history:', error);
             setServiceHistory([]);
@@ -457,7 +420,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             
             if (driver.updatedAt) {
                 const timeSinceUpdate = Date.now() - driver.updatedAt;
-                if (timeSinceUpdate < 30000) { // 30 seconds
+                if (timeSinceUpdate < 120000) { // 2 minutes
                     return true;
                 }
                 return false;
@@ -465,6 +428,11 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             
             return false;
         }).length;
+    };
+
+    // Helper: Get pending requests count
+    const getPendingRequestsCount = (): number => {
+        return rides.filter(r => r.status === BuggyStatus.SEARCHING).length;
     };
 
     // Helper: Calculate cost for a (driver, ride) pair
@@ -635,7 +603,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             
             if (driver.updatedAt) {
                 const timeSinceUpdate = Date.now() - driver.updatedAt;
-                if (timeSinceUpdate < 30000) {
+                if (timeSinceUpdate < 120000) {
                     return true;
                 }
             }
@@ -747,6 +715,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         if (!isAutoTriggered) {
             setAIAssignmentData(prev => prev ? { ...prev, status: 'completed' } : null);
         } else {
+            console.log(`[Auto-Assign] Successfully assigned ${assignmentCount} ride(s) automatically`);
         }
 
         // Refresh data after assignments
@@ -811,6 +780,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     try {
                         const refreshedEvents = await getEvents();
                         setEvents(refreshedEvents);
+                        console.log('Events refreshed after add:', refreshedEvents);
                     } catch (error) {
                         console.error('Failed to refresh events after add:', error);
                     }
@@ -827,6 +797,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     try {
                         const refreshedPromotions = await getPromotions();
                         setPromotions(refreshedPromotions);
+                        console.log('Promotions refreshed after add/update:', refreshedPromotions);
                     } catch (error) {
                         console.error('Failed to refresh promotions after add/update:', error);
                     }
@@ -837,6 +808,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     try {
                         const refreshedKnowledge = await getKnowledgeBase();
                         setKnowledge(refreshedKnowledge);
+                        console.log('Knowledge refreshed after add:', refreshedKnowledge);
                     } catch (error) {
                         console.error('Failed to refresh knowledge after add:', error);
                     }
@@ -869,6 +841,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             return;
         }
         try {
+            console.log('Adding user - Input:', newUser);
             await addUser({
                 lastName: newUser.lastName,
                 roomNumber: newUser.roomNumber,
@@ -903,6 +876,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             return;
         }
         try {
+            console.log('Adding guest - Input:', newGuest);
             await addUser({
                 lastName: newGuest.lastName,
                 roomNumber: newGuest.room,
@@ -941,6 +915,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         try {
             if (editingRoomType) {
                 // Update existing room type
+                console.log('Updating room type - Editing:', editingRoomType);
+                console.log('Updating room type - New Data:', newRoomType);
                 const updated = await updateRoomType(editingRoomType.id, {
                     name: newRoomType.name,
                     description: newRoomType.description || '',
@@ -967,6 +943,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             let refreshedLocations: Location[];
             try {
                 refreshedLocations = await getLocations();
+                console.log('Locations refreshed from database:', refreshedLocations);
             } catch (error) {
                 console.error('Failed to refresh locations from database:', error);
                 refreshedLocations = getLocationsSync();
@@ -975,6 +952,25 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             const refreshedRoomTypes = await getRoomTypes();
             setRoomTypes(refreshedRoomTypes);
             setLocations(refreshedLocations);
+            
+            console.log('Room types refreshed:', refreshedRoomTypes);
+            console.log('Locations refreshed:', refreshedLocations);
+            console.log('Checking location matches:', refreshedRoomTypes.map(rt => ({
+                name: rt.name,
+                locationId: rt.locationId,
+                locationIdType: typeof rt.locationId,
+                matchedLocation: rt.locationId ? refreshedLocations.find(l => {
+                    const match = String(l.id) === String(rt.locationId);
+                    if (!match && rt.locationId) {
+                        console.log('Location ID mismatch:', {
+                            roomTypeLocationId: rt.locationId,
+                            locationIdType: typeof rt.locationId,
+                            availableLocationIds: refreshedLocations.map(l => ({ id: l.id, idType: typeof l.id, name: l.name }))
+                        });
+                    }
+                    return match;
+                })?.name || 'NOT FOUND' : 'NONE'
+            })));
         } catch (error: any) {
             console.error('Failed to save room type:', error);
             const errorMessage = error?.message || error?.toString() || 'Unknown error';
@@ -1043,6 +1039,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     try {
                         const refreshedUsers = await getUsers();
                         setUsers(refreshedUsers);
+                        console.log('Users refreshed after CSV import:', refreshedUsers);
                     } catch (error) {
                         console.error('Failed to refresh users after CSV import:', error);
                     }
@@ -1098,12 +1095,14 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         }
         try {
             if (type === 'LOC') {
+                console.log('Deleting location with id/name:', id);
                 await deleteLocation(id);
                 console.log('Location deleted successfully, refreshing...');
                 // Refresh locations specifically after deleting
                 try {
                     const refreshedLocations = await getLocations();
                     setLocations(refreshedLocations);
+                    console.log('Locations refreshed after delete:', refreshedLocations);
                 } catch (error) {
                     console.error('Failed to refresh locations after delete:', error);
                     // Fallback to sync version
@@ -1119,6 +1118,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const refreshedEvents = await getEvents();
                     setEvents(refreshedEvents);
+                    console.log('Events refreshed after delete:', refreshedEvents);
                 } catch (error) {
                     console.error('Failed to refresh events after delete:', error);
                 }
@@ -1129,6 +1129,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const refreshedPromotions = await getPromotions();
                     setPromotions(refreshedPromotions);
+                    console.log('Promotions refreshed after delete:', refreshedPromotions);
                 } catch (error) {
                     console.error('Failed to refresh promotions after delete:', error);
                 }
@@ -1139,6 +1140,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const refreshedKnowledge = await getKnowledgeBase();
                     setKnowledge(refreshedKnowledge);
+                    console.log('Knowledge refreshed after delete:', refreshedKnowledge);
                 } catch (error) {
                     console.error('Failed to refresh knowledge after delete:', error);
                 }
@@ -1149,11 +1151,13 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const refreshedUsers = await getUsers();
                     setUsers(refreshedUsers);
+                    console.log('Users refreshed after delete:', refreshedUsers);
                 } catch (error) {
                     console.error('Failed to refresh users after delete:', error);
                 }
             }
             else if (type === 'ROOM_TYPE') {
+                console.log('Deleting room type:', id);
                 await deleteRoomType(id);
                 console.log('Room type deleted successfully');
             }
@@ -1173,6 +1177,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 try {
                     const refreshedMenu = await getMenu();
                     setMenu(refreshedMenu);
+                    console.log('Menu refreshed after delete:', refreshedMenu);
                 } catch (error) {
                     console.error('Failed to refresh menu after delete:', error);
                 }
@@ -1219,10 +1224,37 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         }
     };
 
+    // Helper function to determine guest status
+    const getGuestStatus = (guest: User): 'Active' | 'Future' | 'Expired' => {
+        const now = new Date();
+        const checkIn = guest.checkIn ? new Date(guest.checkIn) : null;
+        const checkOut = guest.checkOut ? new Date(guest.checkOut) : null;
+        
+        if (!checkIn) return 'Future';
+        
+        if (checkOut && checkOut < now) {
+            return 'Expired';
+        }
+        
+        if (checkIn > now) {
+            return 'Future';
+        }
+        
+        return 'Active';
+    };
+
     const filteredMenu = menuFilter === 'ALL' ? menu : menu.filter(m => m.category === menuFilter);
     const filteredLocations = locationFilter === 'ALL' ? locations : locations.filter(l => l.type === locationFilter);
-    const guestUsers = users.filter(u => u.role === UserRole.GUEST);
-    const staffUsers = users.filter(u => u.role !== UserRole.GUEST);
+    const guestUsers = users.filter(u => {
+        if (u.role !== UserRole.GUEST) return false;
+        if (guestStatusFilter === 'ALL') return true;
+        return getGuestStatus(u) === guestStatusFilter;
+    });
+    const staffUsers = users.filter(u => {
+        if (u.role === UserRole.GUEST) return false;
+        if (staffRoleFilter === 'ALL') return true;
+        return u.role === staffRoleFilter;
+    });
     
     // Filter History
     const filteredHistory = serviceHistory.filter(req => {
@@ -1356,6 +1388,25 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 </div>
                             </div>
                         )}
+                        
+                        {/* Guest Status Filter */}
+                        {tab === 'GUESTS' && (
+                            <div className="flex space-x-2 bg-white p-1.5 rounded-lg border border-gray-200">
+                                <div className="flex items-center space-x-1 px-2">
+                                    <Filter size={14} className="text-gray-400" />
+                                    <select 
+                                        className="text-sm text-gray-700 bg-transparent outline-none cursor-pointer"
+                                        value={guestStatusFilter}
+                                        onChange={(e) => setGuestStatusFilter(e.target.value)}
+                                    >
+                                        <option value="ALL">All Status</option>
+                                        <option value="Active">Active</option>
+                                        <option value="Future">Future</option>
+                                        <option value="Expired">Expired</option>
+                                    </select>
+                                </div>
+                            </div>
+                        )}
 
                         {tab === 'MENU' && (
                             <>
@@ -1388,7 +1439,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                     <button onClick={() => setLocationFilter('ALL')} className={`px-3 py-1 text-xs rounded ${locationFilter === 'ALL' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500'}`}>All</button>
                                     <button onClick={() => setLocationFilter('FACILITY')} className={`px-3 py-1 text-xs rounded ${locationFilter === 'FACILITY' ? 'bg-blue-100 text-blue-800 font-bold' : 'text-gray-500'}`}>Public Areas</button>
                                     <button onClick={() => setLocationFilter('VILLA')} className={`px-3 py-1 text-xs rounded ${locationFilter === 'VILLA' ? 'bg-purple-100 text-purple-800 font-bold' : 'text-gray-500'}`}>Villa</button>
-                                    <button onClick={() => setLocationFilter('RESTAURANT')} className={`px-3 py-1 text-xs rounded ${locationFilter === 'RESTAURANT' ? 'bg-orange-100 text-orange-800 font-bold' : 'text-gray-500'}`}>Restaurant</button>
                                 </div>
                                 <button 
                                     onClick={() => {
@@ -1414,13 +1464,23 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                         )}
                         
                         {tab === 'USERS' && user.role === UserRole.ADMIN && (
-                             <button 
-                                onClick={() => setShowUserForm(!showUserForm)}
-                                className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition flex-1 md:flex-none"
-                            >
-                                {showUserForm ? <X size={18}/> : <Plus size={18}/>}
-                                <span>Add Staff</span>
-                            </button>
+                            <>
+                                <div className="flex bg-white rounded-lg border border-gray-200 p-1">
+                                    <button onClick={() => setStaffRoleFilter('ALL')} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === 'ALL' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500'}`}>All</button>
+                                    <button onClick={() => setStaffRoleFilter(UserRole.ADMIN)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.ADMIN ? 'bg-red-100 text-red-800 font-bold' : 'text-gray-500'}`}>Admin</button>
+                                    <button onClick={() => setStaffRoleFilter(UserRole.SUPERVISOR)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.SUPERVISOR ? 'bg-amber-100 text-amber-800 font-bold' : 'text-gray-500'}`}>Supervisor</button>
+                                    <button onClick={() => setStaffRoleFilter(UserRole.STAFF)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.STAFF ? 'bg-blue-100 text-blue-800 font-bold' : 'text-gray-500'}`}>Staff</button>
+                                    <button onClick={() => setStaffRoleFilter(UserRole.DRIVER)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.DRIVER ? 'bg-emerald-100 text-emerald-800 font-bold' : 'text-gray-500'}`}>Driver</button>
+                                    <button onClick={() => setStaffRoleFilter(UserRole.RECEPTION)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.RECEPTION ? 'bg-purple-100 text-purple-800 font-bold' : 'text-gray-500'}`}>Reception</button>
+                                </div>
+                                <button 
+                                    onClick={() => setShowUserForm(!showUserForm)}
+                                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition flex-1 md:flex-none"
+                                >
+                                    {showUserForm ? <X size={18}/> : <Plus size={18}/>}
+                                    <span>Add Staff</span>
+                                </button>
+                            </>
                         )}
 
                         {tab === 'ROOMS' && roomView === 'TYPES' && (
@@ -2674,19 +2734,19 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                     <th className="p-4 text-sm font-semibold text-gray-600">Guest Info</th>
                                     <th className="p-4 text-sm font-semibold text-gray-600">Stay Duration</th>
                                     <th className="p-4 text-sm font-semibold text-gray-600">Status</th>
+                                    <th className="p-4 text-sm font-semibold text-gray-600">Check-in Code</th>
                                     <th className="p-4 text-sm font-semibold text-gray-600 text-right">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {guestUsers.map((u, i) => {
-                                    const now = new Date();
                                     const start = u.checkIn ? new Date(u.checkIn) : null;
                                     const end = u.checkOut ? new Date(u.checkOut) : null;
-                                    let status = 'Active';
+                                    const status = getGuestStatus(u);
                                     let statusColor = 'bg-green-100 text-green-700';
                                     
-                                    if (start && now < start) { status = 'Future'; statusColor = 'bg-blue-100 text-blue-700'; }
-                                    else if (end && now > end) { status = 'Expired'; statusColor = 'bg-gray-100 text-gray-500'; }
+                                    if (status === 'Future') { statusColor = 'bg-blue-100 text-blue-700'; }
+                                    else if (status === 'Expired') { statusColor = 'bg-gray-100 text-gray-500'; }
 
                                     return (
                                         <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
@@ -2708,86 +2768,94 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                                     {status}
                                                 </span>
                                             </td>
-                                            <td className="p-4 text-right">
-                                                <div className="flex items-center justify-end gap-1 relative z-10">
-                                                    {u.checkInCode ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <div 
-                                                                onClick={async () => {
+                                            <td className="p-4">
+                                                {u.checkInCode ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <code 
+                                                            onClick={async () => {
+                                                                if (u.checkInCode) {
                                                                     try {
-                                                                        await navigator.clipboard.writeText(u.checkInCode || '');
-                                                                        alert(`Check-in code "${u.checkInCode}" copied to clipboard!`);
+                                                                        await navigator.clipboard.writeText(u.checkInCode);
+                                                                        if (u.id) {
+                                                                            setCopiedCodeId(u.id);
+                                                                            setTimeout(() => setCopiedCodeId(null), 2000);
+                                                                        }
                                                                     } catch (error) {
                                                                         console.error('Failed to copy code:', error);
                                                                         alert('Failed to copy code. Please try again.');
                                                                     }
-                                                                }}
-                                                                className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 cursor-pointer hover:bg-emerald-100 hover:border-emerald-300 transition-all"
-                                                                title="Click to copy code"
-                                                            >
-                                                                <div className="text-[10px] text-emerald-600 font-semibold mb-0.5">Check-in Code</div>
-                                                                <div className="text-sm font-bold text-emerald-700 font-mono">{u.checkInCode}</div>
-                                                            </div>
-                                                            <button 
-                                                                onClick={async () => {
-                                                                    if (!u.id) return;
-                                                                    const confirmReset = window.confirm(
-                                                                        `Are you sure you want to reset the check-in code for ${u.lastName} (Room ${u.roomNumber})?\n\nThis will generate a new code and the old code will no longer work.`
-                                                                    );
-                                                                    if (!confirmReset) return;
-                                                                    
-                                                                    setIsGeneratingCode(true);
-                                                                    try {
-                                                                        const result = await generateCheckInCode(u.id);
-                                                                        setGeneratedCode({
-                                                                            code: result.checkInCode,
-                                                                            guestName: u.lastName,
-                                                                            roomNumber: u.roomNumber
-                                                                        });
-                                                                        // Update the user in the list
-                                                                        await refreshData();
-                                                                    } catch (error: any) {
-                                                                        alert(`Failed to generate check-in code: ${error.message || 'Unknown error'}`);
-                                                                    } finally {
-                                                                        setIsGeneratingCode(false);
-                                                                    }
-                                                                }}
-                                                                className="text-orange-600 hover:text-orange-700 p-2 relative z-10 cursor-pointer" 
-                                                                title="Reset Check-in Code"
-                                                                type="button"
-                                                                disabled={isGeneratingCode}
-                                                            >
-                                                                {isGeneratingCode ? <Loader2 size={16} className="animate-spin"/> : <Key size={16}/>}
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <button 
-                                                            onClick={async () => {
-                                                                if (!u.id) return;
-                                                                setIsGeneratingCode(true);
-                                                                try {
-                                                                    const result = await generateCheckInCode(u.id);
-                                                                    setGeneratedCode({
-                                                                        code: result.checkInCode,
-                                                                        guestName: u.lastName,
-                                                                        roomNumber: u.roomNumber
-                                                                    });
-                                                                    // Update the user in the list
-                                                                    await refreshData();
-                                                                } catch (error: any) {
-                                                                    alert(`Failed to generate check-in code: ${error.message || 'Unknown error'}`);
-                                                                } finally {
-                                                                    setIsGeneratingCode(false);
                                                                 }
                                                             }}
-                                                            className="text-blue-600 hover:text-blue-700 p-2 relative z-10 cursor-pointer" 
-                                                            title="Generate Check-in Code"
-                                                            type="button"
-                                                            disabled={isGeneratingCode}
+                                                            className="text-xs font-mono bg-gray-100 text-gray-800 px-2 py-1 rounded border border-gray-300 cursor-pointer hover:bg-gray-200 transition-colors select-all"
+                                                            title="Click to copy"
                                                         >
-                                                            {isGeneratingCode ? <Loader2 size={16} className="animate-spin"/> : <Key size={16}/>}
+                                                            {u.checkInCode}
+                                                        </code>
+                                                        {copiedCodeId === u.id ? (
+                                                            <Check size={14} className="text-green-600" title="Copied!" />
+                                                        ) : (
+                                                            <Copy 
+                                                                size={14} 
+                                                                className="text-gray-400 hover:text-gray-600 cursor-pointer" 
+                                                                title="Copy code"
+                                                                onClick={async () => {
+                                                                    if (u.checkInCode) {
+                                                                        try {
+                                                                            await navigator.clipboard.writeText(u.checkInCode);
+                                                                            if (u.id) {
+                                                                                setCopiedCodeId(u.id);
+                                                                                setTimeout(() => setCopiedCodeId(null), 2000);
+                                                                            }
+                                                                        } catch (error) {
+                                                                            console.error('Failed to copy code:', error);
+                                                                            alert('Failed to copy code. Please try again.');
+                                                                        }
+                                                                    }
+                                                                }}
+                                                            />
+                                                        )}
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (u.id) {
+                                                                    try {
+                                                                        const result = await generateCheckInCode(u.id);
+                                                                        alert(`New check-in code generated: ${result.checkInCode}`);
+                                                                        await refreshData();
+                                                                    } catch (error) {
+                                                                        console.error('Failed to generate check-in code:', error);
+                                                                        alert('Failed to generate check-in code. Please try again.');
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className="text-emerald-600 hover:text-emerald-700 p-1"
+                                                            title="Regenerate Code"
+                                                        >
+                                                            <RefreshCw size={14} />
                                                         </button>
-                                                    )}
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (u.id) {
+                                                                try {
+                                                                    const result = await generateCheckInCode(u.id);
+                                                                    alert(`Check-in code generated: ${result.checkInCode}`);
+                                                                    await refreshData();
+                                                                } catch (error) {
+                                                                    console.error('Failed to generate check-in code:', error);
+                                                                    alert('Failed to generate check-in code. Please try again.');
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="text-xs text-emerald-600 hover:text-emerald-700 px-2 py-1 border border-emerald-300 rounded hover:bg-emerald-50"
+                                                        title="Generate Check-in Code"
+                                                    >
+                                                        Generate Code
+                                                    </button>
+                                                )}
+                                            </td>
+                                            <td className="p-4 text-right">
+                                                <div className="flex items-center justify-end gap-1 relative z-10">
                                                     <button 
                                                         onClick={() => {
                                                             setEditingGuest(u);
@@ -2831,50 +2899,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 })}
                             </tbody>
                         </table>
-                        
-                        {/* Check-in Code Modal */}
-                        {generatedCode && (
-                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setGeneratedCode(null)}>
-                                <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                                    <div className="text-center">
-                                        <div className="mb-4">
-                                            <Key size={48} className="mx-auto text-emerald-600 mb-2"/>
-                                            <h3 className="text-xl font-bold text-gray-800 mb-2">Check-in Code Generated</h3>
-                                            <p className="text-sm text-gray-600">
-                                                Guest: <span className="font-semibold">{generatedCode.guestName}</span><br/>
-                                                Room: <span className="font-semibold">{generatedCode.roomNumber}</span>
-                                            </p>
-                                        </div>
-                                        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-6 mb-4">
-                                            <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Check-in Code</p>
-                                            <p className="text-4xl font-bold text-emerald-800 tracking-widest font-mono">
-                                                {generatedCode.code}
-                                            </p>
-                                        </div>
-                                        <p className="text-xs text-gray-500 mb-4">
-                                            Share this code with the guest. They can use it to log in to the app.
-                                        </p>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText(generatedCode.code);
-                                                    alert('Code copied to clipboard!');
-                                                }}
-                                                className="flex-1 bg-emerald-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-emerald-700 transition"
-                                            >
-                                                Copy Code
-                                            </button>
-                                            <button
-                                                onClick={() => setGeneratedCode(null)}
-                                                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300 transition"
-                                            >
-                                                Close
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                         </>
                     )}
                     
@@ -3645,6 +3669,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                             try {
                                                 const refreshedUsers = await getUsers();
                                                 setUsers(refreshedUsers);
+                                                console.log('Users refreshed after password reset:', refreshedUsers);
                                             } catch (error) {
                                                 console.error('Failed to refresh users after password reset:', error);
                                             }
@@ -3662,18 +3687,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                             </button>
                         </div>
                     </div>
-                </div>
-            )}
-            
-            {/* Notification Toast */}
-            {notification && (
-                <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-5 ${
-                    notification.type === 'success' ? 'bg-emerald-500' :
-                    notification.type === 'info' ? 'bg-blue-500' :
-                    'bg-amber-500'
-                } text-white px-6 py-3 rounded-lg shadow-2xl flex items-center gap-2 max-w-sm`}>
-                    <CheckCircle size={20} />
-                    <span className="font-semibold">{notification.message}</span>
                 </div>
             )}
         </div>
