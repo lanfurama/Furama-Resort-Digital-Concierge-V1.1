@@ -33,7 +33,9 @@ async function apiRequest<T>(
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: 'Network error' }));
     console.error('API Error:', errorData);
-    const error = new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
+    // Prioritize message field, then error field, then default message
+    const errorMessage = errorData.message || errorData.error || `HTTP error! status: ${response.status}`;
+    const error = new Error(errorMessage);
     (error as any).response = { status: response.status, body: errorData };
     throw error;
   }

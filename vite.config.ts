@@ -19,5 +19,13 @@ export default defineConfig(({ mode }) => {
                 '0.0.0.0',            // Để chấp nhận tất cả các địa chỉ IP
             ],
         },
+        // SPA fallback for client-side routing
+        build: {
+            rollupOptions: {
+                input: {
+                    main: './index.html',
+                },
+            },
+        },
     };
 });

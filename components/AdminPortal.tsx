@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key, Car, Settings, RefreshCw, Zap, Grid3x3, CheckCircle, Map, AlertCircle, Info, Brain, ArrowRight, Loader2, Pencil } from 'lucide-react';
-import { getLocations, getLocationsSync, addLocation, updateLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, updateMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, updatePromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, getUsersSync, addUser, updateUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory, getRides, getRidesSync, updateRideStatus } from '../services/dataService';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key, Car, Settings, RefreshCw, Zap, Grid3x3, CheckCircle, Map, AlertCircle, Info, Brain, ArrowRight, Loader2, Pencil, Bell } from 'lucide-react';
+import { getLocations, getLocationsSync, addLocation, updateLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, updateMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, updatePromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, getUsersSync, addUser, updateUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory, getRides, getRidesSync, updateRideStatus, generateCheckInCode } from '../services/dataService';
 import { parseAdminInput, generateTranslations } from '../services/geminiService';
 import { Location, MenuItem, ResortEvent, Promotion, KnowledgeItem, User, UserRole, Department, RoomType, Room, RideRequest, BuggyStatus } from '../types';
 import Loading from './Loading';
 import ReceptionPortal from './ReceptionPortal';
+import BuggyNotificationBell from './BuggyNotificationBell';
 
 interface AdminPortalProps {
     onLogout: () => void;
@@ -43,6 +44,48 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     
     // Loading state
     const [isLoading, setIsLoading] = useState(true);
+    
+    // Notification State
+    const [notification, setNotification] = useState<{message: string, type: 'success' | 'info' | 'warning'} | null>(null);
+    const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+    
+    // Sound notification state
+    const [soundEnabled, setSoundEnabled] = useState(() => {
+        const saved = localStorage.getItem('admin_sound_enabled');
+        return saved !== null ? saved === 'true' : true; // Default to enabled
+    });
+    
+    // Track previous rides state to detect changes
+    const prevRidesRef = useRef<RideRequest[]>([]);
+    
+    // Helper: Play notification sound
+    const playNotificationSound = useCallback(() => {
+        if (!soundEnabled) return;
+        
+        try {
+            // Create audio context for a simple beep sound
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800; // Frequency in Hz
+            oscillator.type = 'sine';
+            
+            // Longer duration: 0.6 seconds with smoother fade
+            const duration = 0.6;
+            gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.3, audioContext.currentTime + 0.2); // Hold at 0.3 for 0.2s
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration);
+        } catch (error) {
+            console.error('Failed to play notification sound:', error);
+        }
+    }, [soundEnabled]);
     
     // Load data on mount
     useEffect(() => {
@@ -102,7 +145,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     setRides(ridesData);
                 } catch (error) {
                     console.error('Failed to load rides from database:', error);
-                    setRides(getRidesSync());
+                    const syncRides = getRidesSync();
+                    setRides(syncRides);
                 }
                 
                 // Debug: Check location ID matches
@@ -147,6 +191,11 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         }
     }, []);
     
+    // Helper: Get pending requests count
+    const getPendingRequestsCount = () => {
+        return rides.filter(r => r.status === BuggyStatus.SEARCHING).length;
+    };
+    
     // Auto-refresh rides and users when FLEET tab is active
     useEffect(() => {
         if (tab !== 'FLEET') return;
@@ -157,6 +206,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     getRides().catch(() => getRidesSync()),
                     getUsers().catch(() => getUsersSync())
                 ]);
+                
                 setRides(refreshedRides);
                 setUsers(refreshedUsers);
             } catch (error) {
@@ -166,7 +216,12 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         
         return () => clearInterval(refreshInterval);
     }, [tab]);
-
+    
+    // Save sound preference to localStorage
+    useEffect(() => {
+        localStorage.setItem('admin_sound_enabled', String(soundEnabled));
+    }, [soundEnabled]);
+    
     // Auto-assign logic: Automatically assign rides that have been waiting too long
     useEffect(() => {
         if (!fleetConfig.autoAssignEnabled || tab !== 'FLEET') return;
@@ -244,6 +299,10 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const [editingGuest, setEditingGuest] = useState<User | null>(null);
     const [showGuestEditForm, setShowGuestEditForm] = useState(false);
     const [editGuest, setEditGuest] = useState<Partial<User>>({ lastName: '', roomNumber: '', villaType: '', language: 'English', checkIn: '', checkOut: '' });
+    
+    // Check-in Code State
+    const [generatedCode, setGeneratedCode] = useState<{ code: string; guestName: string; roomNumber: string } | null>(null);
+    const [isGeneratingCode, setIsGeneratingCode] = useState(false);
     
     const [showRoomForm, setShowRoomForm] = useState(false);
     const [newRoom, setNewRoom] = useState<{number: string, typeId: string}>({ number: '', typeId: '' });
@@ -406,11 +465,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             
             return false;
         }).length;
-    };
-
-    // Helper: Get pending requests count
-    const getPendingRequestsCount = (): number => {
-        return rides.filter(r => r.status === BuggyStatus.SEARCHING).length;
     };
 
     // Helper: Calculate cost for a (driver, ride) pair
@@ -1191,7 +1245,26 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                         <p className="text-xs text-emerald-300">System Management</p>
                     </div>
                 </div>
-                <button onClick={onLogout} className="text-sm bg-emerald-800 px-3 py-1 rounded hover:bg-emerald-700 border border-emerald-700">Logout</button>
+                <div className="flex items-center gap-3">
+                    {/* Notification Bell - Only show when FLEET tab is active */}
+                    {tab === 'FLEET' && (
+                        <BuggyNotificationBell
+                            rides={rides}
+                            users={users}
+                            onNavigate={() => setTab('FLEET')}
+                            soundEnabled={soundEnabled}
+                            onSoundToggle={(enabled) => {
+                                setSoundEnabled(enabled);
+                                localStorage.setItem('admin_sound_enabled', String(enabled));
+                            }}
+                            localStorageKey="admin_sound_enabled"
+                            showCompleted={true}
+                            showAssigned={true}
+                            showActive={true}
+                        />
+                    )}
+                    <button onClick={onLogout} className="text-sm bg-emerald-800 px-3 py-1 rounded hover:bg-emerald-700 border border-emerald-700">Logout</button>
+                </div>
             </header>
 
             {/* Navigation Tabs */}
@@ -2637,6 +2710,84 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                             </td>
                                             <td className="p-4 text-right">
                                                 <div className="flex items-center justify-end gap-1 relative z-10">
+                                                    {u.checkInCode ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <div 
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        await navigator.clipboard.writeText(u.checkInCode || '');
+                                                                        alert(`Check-in code "${u.checkInCode}" copied to clipboard!`);
+                                                                    } catch (error) {
+                                                                        console.error('Failed to copy code:', error);
+                                                                        alert('Failed to copy code. Please try again.');
+                                                                    }
+                                                                }}
+                                                                className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 cursor-pointer hover:bg-emerald-100 hover:border-emerald-300 transition-all"
+                                                                title="Click to copy code"
+                                                            >
+                                                                <div className="text-[10px] text-emerald-600 font-semibold mb-0.5">Check-in Code</div>
+                                                                <div className="text-sm font-bold text-emerald-700 font-mono">{u.checkInCode}</div>
+                                                            </div>
+                                                            <button 
+                                                                onClick={async () => {
+                                                                    if (!u.id) return;
+                                                                    const confirmReset = window.confirm(
+                                                                        `Are you sure you want to reset the check-in code for ${u.lastName} (Room ${u.roomNumber})?\n\nThis will generate a new code and the old code will no longer work.`
+                                                                    );
+                                                                    if (!confirmReset) return;
+                                                                    
+                                                                    setIsGeneratingCode(true);
+                                                                    try {
+                                                                        const result = await generateCheckInCode(u.id);
+                                                                        setGeneratedCode({
+                                                                            code: result.checkInCode,
+                                                                            guestName: u.lastName,
+                                                                            roomNumber: u.roomNumber
+                                                                        });
+                                                                        // Update the user in the list
+                                                                        await refreshData();
+                                                                    } catch (error: any) {
+                                                                        alert(`Failed to generate check-in code: ${error.message || 'Unknown error'}`);
+                                                                    } finally {
+                                                                        setIsGeneratingCode(false);
+                                                                    }
+                                                                }}
+                                                                className="text-orange-600 hover:text-orange-700 p-2 relative z-10 cursor-pointer" 
+                                                                title="Reset Check-in Code"
+                                                                type="button"
+                                                                disabled={isGeneratingCode}
+                                                            >
+                                                                {isGeneratingCode ? <Loader2 size={16} className="animate-spin"/> : <Key size={16}/>}
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <button 
+                                                            onClick={async () => {
+                                                                if (!u.id) return;
+                                                                setIsGeneratingCode(true);
+                                                                try {
+                                                                    const result = await generateCheckInCode(u.id);
+                                                                    setGeneratedCode({
+                                                                        code: result.checkInCode,
+                                                                        guestName: u.lastName,
+                                                                        roomNumber: u.roomNumber
+                                                                    });
+                                                                    // Update the user in the list
+                                                                    await refreshData();
+                                                                } catch (error: any) {
+                                                                    alert(`Failed to generate check-in code: ${error.message || 'Unknown error'}`);
+                                                                } finally {
+                                                                    setIsGeneratingCode(false);
+                                                                }
+                                                            }}
+                                                            className="text-blue-600 hover:text-blue-700 p-2 relative z-10 cursor-pointer" 
+                                                            title="Generate Check-in Code"
+                                                            type="button"
+                                                            disabled={isGeneratingCode}
+                                                        >
+                                                            {isGeneratingCode ? <Loader2 size={16} className="animate-spin"/> : <Key size={16}/>}
+                                                        </button>
+                                                    )}
                                                     <button 
                                                         onClick={() => {
                                                             setEditingGuest(u);
@@ -2680,6 +2831,50 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 })}
                             </tbody>
                         </table>
+                        
+                        {/* Check-in Code Modal */}
+                        {generatedCode && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setGeneratedCode(null)}>
+                                <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                                    <div className="text-center">
+                                        <div className="mb-4">
+                                            <Key size={48} className="mx-auto text-emerald-600 mb-2"/>
+                                            <h3 className="text-xl font-bold text-gray-800 mb-2">Check-in Code Generated</h3>
+                                            <p className="text-sm text-gray-600">
+                                                Guest: <span className="font-semibold">{generatedCode.guestName}</span><br/>
+                                                Room: <span className="font-semibold">{generatedCode.roomNumber}</span>
+                                            </p>
+                                        </div>
+                                        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-6 mb-4">
+                                            <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Check-in Code</p>
+                                            <p className="text-4xl font-bold text-emerald-800 tracking-widest font-mono">
+                                                {generatedCode.code}
+                                            </p>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mb-4">
+                                            Share this code with the guest. They can use it to log in to the app.
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(generatedCode.code);
+                                                    alert('Code copied to clipboard!');
+                                                }}
+                                                className="flex-1 bg-emerald-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-emerald-700 transition"
+                                            >
+                                                Copy Code
+                                            </button>
+                                            <button
+                                                onClick={() => setGeneratedCode(null)}
+                                                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300 transition"
+                                            >
+                                                Close
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         </>
                     )}
                     
@@ -3467,6 +3662,18 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+            
+            {/* Notification Toast */}
+            {notification && (
+                <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-5 ${
+                    notification.type === 'success' ? 'bg-emerald-500' :
+                    notification.type === 'info' ? 'bg-blue-500' :
+                    'bg-amber-500'
+                } text-white px-6 py-3 rounded-lg shadow-2xl flex items-center gap-2 max-w-sm`}>
+                    <CheckCircle size={20} />
+                    <span className="font-semibold">{notification.message}</span>
                 </div>
             )}
         </div>

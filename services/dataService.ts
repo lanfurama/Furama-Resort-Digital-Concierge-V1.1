@@ -209,6 +209,7 @@ export const getUsers = async (): Promise<User[]> => {
       department: 'All' as Department, // Default, database doesn't have department field
       checkIn: user.check_in ? (typeof user.check_in === 'string' ? user.check_in : new Date(user.check_in).toISOString()) : undefined,
       checkOut: user.check_out ? (typeof user.check_out === 'string' ? user.check_out : new Date(user.check_out).toISOString()) : undefined,
+      checkInCode: user.check_in_code || undefined,
       language: user.language || undefined,
       notes: user.notes || undefined,
       updatedAt: user.updated_at ? new Date(user.updated_at).getTime() : undefined,
@@ -407,6 +408,31 @@ export const resetUserPassword = async (userId: string, newPass: string): Promis
     // Fallback to local state
     users = users.map(u => u.id === userId ? { ...u, password: newPass } : u);
     throw error; // Re-throw để component có thể handle error
+  }
+};
+
+export const generateCheckInCode = async (userId: string): Promise<{ checkInCode: string; user: User }> => {
+  try {
+    const response = await apiClient.post<{ success: boolean; checkInCode: string; user: any }>(`/users/${userId}/generate-check-in-code`, {});
+    if (response.success && response.checkInCode) {
+      // Map database user to frontend User format
+      const frontendUser: User = {
+        id: response.user.id.toString(),
+        lastName: response.user.last_name,
+        roomNumber: response.user.room_number,
+        villaType: response.user.villa_type,
+        role: response.user.role as UserRole,
+        language: response.user.language || 'English',
+        checkIn: response.user.check_in ? new Date(response.user.check_in).toISOString() : undefined,
+        checkOut: response.user.check_out ? new Date(response.user.check_out).toISOString() : undefined,
+        checkInCode: response.checkInCode,
+      };
+      return { checkInCode: response.checkInCode, user: frontendUser };
+    }
+    throw new Error('Failed to generate check-in code');
+  } catch (error: any) {
+    console.error('Failed to generate check-in code:', error);
+    throw error;
   }
 };
 

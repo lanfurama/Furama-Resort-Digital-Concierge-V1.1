@@ -36,6 +36,7 @@ export interface User {
   lastName: string;
   roomNumber: string; // Acts as Username/ID for staff
   password?: string; // New field for staff auth
+  email?: string; // Email for notifications (Admin, Driver, Reception, Supervisor)
   villaType?: string; // Name of the Room Type
   role: UserRole;
   department?: Department; // Permission group

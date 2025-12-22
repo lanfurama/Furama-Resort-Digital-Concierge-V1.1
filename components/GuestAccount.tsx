@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, ServiceRequest, HotelReview } from '../types';
-import { getCompletedGuestOrders, updateUserNotes, rateServiceRequest, submitHotelReview, getHotelReview, updateUserLanguage, updateUser } from '../services/dataService';
-import { Clock, ShoppingBag, Car, Utensils, Sparkles, Waves, User as UserIcon, Save, Star, Hotel, ThumbsUp, Globe, ArrowLeft, Filter, Edit2, Lock, Eye, EyeOff } from 'lucide-react';
+import { getCompletedGuestOrders, updateUserNotes, rateServiceRequest, submitHotelReview, getHotelReview, updateUserLanguage, updateUser, addServiceRequest } from '../services/dataService';
+import { Clock, ShoppingBag, Car, Utensils, Sparkles, Waves, User as UserIcon, Save, Star, Hotel, ThumbsUp, Globe, ArrowLeft, Filter, Edit2, Lock, Eye, EyeOff, Calendar, X, Copy, Check } from 'lucide-react';
 import Loading from './Loading';
 import { useTranslation } from '../contexts/LanguageContext';
 
@@ -52,6 +52,39 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [isSavingProfile, setIsSavingProfile] = useState(false);
+    
+    // Check-in Code State
+    const [savedCheckInCode, setSavedCheckInCode] = useState<string | null>(null);
+    const [codeCopied, setCodeCopied] = useState(false);
+    
+    // Load saved check-in code from localStorage
+    useEffect(() => {
+        const savedCode = localStorage.getItem('guest_check_in_code');
+        const savedRoom = localStorage.getItem('guest_room_number');
+        // Only show code if it matches current user's room
+        if (savedCode && savedRoom === user.roomNumber) {
+            setSavedCheckInCode(savedCode);
+        }
+    }, [user.roomNumber]);
+    
+    const handleCopyCode = async () => {
+        if (savedCheckInCode) {
+            try {
+                await navigator.clipboard.writeText(savedCheckInCode);
+                setCodeCopied(true);
+                setTimeout(() => setCodeCopied(false), 2000);
+            } catch (error) {
+                console.error('Failed to copy code:', error);
+                alert('Failed to copy code. Please try again.');
+            }
+        }
+    };
+    
+    // Extend Stay State
+    const [showExtendStayModal, setShowExtendStayModal] = useState(false);
+    const [newCheckOutDate, setNewCheckOutDate] = useState('');
+    const [extendStayReason, setExtendStayReason] = useState('');
+    const [isSubmittingExtend, setIsSubmittingExtend] = useState(false);
     
     // Load history and hotel review on mount
     useEffect(() => {
@@ -536,6 +569,25 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                 </span>
                                 <span className="text-sm font-bold text-gray-800">••••••</span>
                             </div>
+                            {savedCheckInCode && (
+                                <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                                    <span className="text-xs font-semibold text-gray-600">Check-in Code</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm font-bold text-emerald-700 font-mono tracking-wider">{savedCheckInCode}</span>
+                                        <button
+                                            onClick={handleCopyCode}
+                                            className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all"
+                                            title="Copy code"
+                                        >
+                                            {codeCopied ? (
+                                                <Check size={14} className="text-emerald-600" />
+                                            ) : (
+                                                <Copy size={14} />
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -576,6 +628,25 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                 )}
                             </p>
                         </div>
+                        
+                        {/* Extend Stay Button */}
+                        {user.checkOut && (
+                            <div className="col-span-2 mt-3">
+                                <button
+                                    onClick={() => {
+                                        const currentCheckOut = new Date(user.checkOut!);
+                                        const minDate = new Date(currentCheckOut);
+                                        minDate.setDate(minDate.getDate() + 1); // At least 1 day after current check-out
+                                        setNewCheckOutDate(minDate.toISOString().split('T')[0]);
+                                        setShowExtendStayModal(true);
+                                    }}
+                                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2"
+                                >
+                                    <Calendar size={18} />
+                                    <span>Request to Extend Stay</span>
+                                </button>
+                            </div>
+                        )}
                         
                         {/* Language Selector */}
                         <div className="col-span-2 mt-2 pt-3 border-t-2 border-gray-100">
@@ -947,6 +1018,140 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                     })()}
                 </div>
             </div>
+            
+            {/* Extend Stay Modal */}
+            {showExtendStayModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                <Calendar className="text-amber-600" size={24} />
+                                Request to Extend Stay
+                            </h3>
+                            <button
+                                onClick={() => setShowExtendStayModal(false)}
+                                className="text-gray-400 hover:text-gray-600 transition"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Current Check-out Date
+                                </label>
+                                <p className="text-gray-600 bg-gray-50 p-3 rounded-lg">
+                                    {user.checkOut ? new Date(user.checkOut).toLocaleDateString(undefined, {
+                                        weekday: 'long',
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
+                                    }) : 'N/A'}
+                                </p>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    New Check-out Date <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="date"
+                                    value={newCheckOutDate}
+                                    onChange={(e) => setNewCheckOutDate(e.target.value)}
+                                    min={user.checkOut ? new Date(new Date(user.checkOut).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined}
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none transition"
+                                    required
+                                />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Reason (Optional)
+                                </label>
+                                <textarea
+                                    value={extendStayReason}
+                                    onChange={(e) => setExtendStayReason(e.target.value)}
+                                    placeholder="Please let us know why you'd like to extend your stay..."
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none transition resize-none"
+                                    rows={3}
+                                />
+                            </div>
+                            
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => {
+                                        setShowExtendStayModal(false);
+                                        setNewCheckOutDate('');
+                                        setExtendStayReason('');
+                                    }}
+                                    className="flex-1 py-3 px-4 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        if (!newCheckOutDate) {
+                                            alert('Please select a new check-out date');
+                                            return;
+                                        }
+                                        
+                                        setIsSubmittingExtend(true);
+                                        try {
+                                            const newDate = new Date(newCheckOutDate);
+                                            const currentDate = user.checkOut ? new Date(user.checkOut) : new Date();
+                                            
+                                            if (newDate <= currentDate) {
+                                                alert('New check-out date must be after current check-out date');
+                                                setIsSubmittingExtend(false);
+                                                return;
+                                            }
+                                            
+                                            const daysExtended = Math.ceil((newDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+                                            // Store new check-out date in ISO format at the end for easy parsing
+                                            const details = `Request to extend stay from ${currentDate.toLocaleDateString()} to ${newDate.toLocaleDateString()} (${daysExtended} day${daysExtended > 1 ? 's' : ''}). ${extendStayReason ? `Reason: ${extendStayReason}` : ''} [NEW_CHECKOUT_DATE:${newDate.toISOString()}]`;
+                                            
+                                            await addServiceRequest({
+                                                id: '',
+                                                type: 'EXTEND_STAY',
+                                                status: 'PENDING',
+                                                details: details,
+                                                roomNumber: user.roomNumber,
+                                                timestamp: Date.now(),
+                                                newCheckOutDate: newDate.toISOString()
+                                            });
+                                            
+                                            alert('Your extend stay request has been submitted. Reception will review and confirm shortly.');
+                                            setShowExtendStayModal(false);
+                                            setNewCheckOutDate('');
+                                            setExtendStayReason('');
+                                        } catch (error: any) {
+                                            console.error('Failed to submit extend stay request:', error);
+                                            alert(error.message || 'Failed to submit request. Please try again.');
+                                        } finally {
+                                            setIsSubmittingExtend(false);
+                                        }
+                                    }}
+                                    disabled={isSubmittingExtend || !newCheckOutDate}
+                                    className="flex-1 py-3 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-lg shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {isSubmittingExtend ? (
+                                        <>
+                                            <span className="animate-spin">⏳</span>
+                                            Submitting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Calendar size={18} />
+                                            Submit Request
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

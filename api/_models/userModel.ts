@@ -7,6 +7,7 @@ export interface User {
   villa_type?: string;
   role: 'GUEST' | 'ADMIN' | 'DRIVER' | 'STAFF' | 'SUPERVISOR' | 'RECEPTION';
   password?: string;
+  email?: string | null;
   language?: string | null;
   notes?: string | null;
   current_lat?: number | null;
@@ -14,6 +15,7 @@ export interface User {
   location_updated_at?: Date | null;
   check_in?: Date | null;
   check_out?: Date | null;
+  check_in_code?: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -34,6 +36,11 @@ export const userModel = {
     return result.rows[0] || null;
   },
 
+  async getByCheckInCode(checkInCode: string): Promise<User | null> {
+    const result = await pool.query('SELECT * FROM users WHERE check_in_code = $1', [checkInCode]);
+    return result.rows[0] || null;
+  },
+
   async getByRoomNumberAndPassword(roomNumber: string, password: string): Promise<User | null> {
     const result = await pool.query(
       'SELECT * FROM users WHERE room_number = $1 AND password = $2',
@@ -44,17 +51,19 @@ export const userModel = {
 
   async create(user: Omit<User, 'id' | 'created_at' | 'updated_at'>): Promise<User> {
     const result = await pool.query(
-      'INSERT INTO users (last_name, room_number, villa_type, role, password, language, notes, check_in, check_out) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+      'INSERT INTO users (last_name, room_number, villa_type, role, password, email, language, notes, check_in, check_out, check_in_code) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
       [
         user.last_name, 
         user.room_number, 
         user.villa_type || null, 
         user.role, 
         user.password || null, 
+        user.email || null,
         user.language || 'English', 
         user.notes || null,
         user.check_in || null,
-        user.check_out || null
+        user.check_out || null,
+        user.check_in_code || null
       ]
     );
     return result.rows[0];
@@ -87,6 +96,10 @@ export const userModel = {
       fields.push(`password = $${paramCount++}`);
       values.push(user.password);
     }
+    if (user.email !== undefined) {
+      fields.push(`email = $${paramCount++}`);
+      values.push(user.email || null);
+    }
     if (user.language !== undefined && user.language !== null) {
       console.log('Adding language to update:', user.language);
       fields.push(`language = $${paramCount++}`);
@@ -106,6 +119,10 @@ export const userModel = {
     if (user.check_out !== undefined) {
       fields.push(`check_out = $${paramCount++}`);
       values.push(user.check_out || null);
+    }
+    if (user.check_in_code !== undefined) {
+      fields.push(`check_in_code = $${paramCount++}`);
+      values.push(user.check_in_code || null);
     }
     if (user.current_lat !== undefined) {
       fields.push(`current_lat = $${paramCount++}`);

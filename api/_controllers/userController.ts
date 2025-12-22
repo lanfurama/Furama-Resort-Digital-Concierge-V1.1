@@ -127,5 +127,59 @@ export const userController = {
       res.status(500).json({ error: error.message });
     }
   },
+
+  // Generate check-in code for a guest (Admin/Supervisor only)
+  async generateCheckInCode(req: Request, res: Response) {
+    try {
+      const { userId } = req.params;
+      const id = parseInt(userId);
+
+      // Get the user
+      const user = await userModel.getById(id);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Only allow for GUEST role
+      if (user.role !== 'GUEST') {
+        return res.status(400).json({ error: 'Check-in code can only be generated for guests' });
+      }
+
+      // Generate a secure random code (8 characters, alphanumeric)
+      const generateCode = (): string => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude confusing characters like 0, O, I, 1
+        let code = '';
+        for (let i = 0; i < 8; i++) {
+          code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+      };
+
+      let checkInCode = generateCode();
+      
+      // Ensure code is unique (very unlikely collision, but check anyway)
+      let attempts = 0;
+      while (await userModel.getByCheckInCode(checkInCode) && attempts < 10) {
+        checkInCode = generateCode();
+        attempts++;
+      }
+
+      // Update user with the new check-in code
+      const updatedUser = await userModel.update(id, { check_in_code: checkInCode });
+      
+      if (!updatedUser) {
+        return res.status(500).json({ error: 'Failed to update user' });
+      }
+
+      res.json({
+        success: true,
+        checkInCode: checkInCode,
+        user: updatedUser
+      });
+    } catch (error: any) {
+      console.error('Error generating check-in code:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
 };
 

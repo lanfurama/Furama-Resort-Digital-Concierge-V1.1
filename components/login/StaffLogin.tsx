@@ -6,11 +6,10 @@ import { Eye, EyeOff } from 'lucide-react';
 interface StaffLoginProps {
   role: UserRole;
   onLoginSuccess: (user: any) => void;
-  onBack: () => void;
   setLanguage: (lang: string) => void;
 }
 
-export const StaffLogin: React.FC<StaffLoginProps> = ({ role, onLoginSuccess, onBack, setLanguage }) => {
+export const StaffLogin: React.FC<StaffLoginProps> = ({ role, onLoginSuccess, setLanguage }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
@@ -134,14 +133,6 @@ export const StaffLogin: React.FC<StaffLoginProps> = ({ role, onLoginSuccess, on
             ) : (
               <span>Login</span>
             )}
-          </button>
-
-          <button 
-            type="button"
-            onClick={onBack}
-            className="w-full text-emerald-800 font-semibold py-2 text-sm hover:text-emerald-900 transition"
-          >
-            ← Back to Role Selection
           </button>
         </form>
         

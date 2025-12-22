@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Car, Settings, RefreshCw, Zap, Users, List, Grid3x3, CheckCircle, MapPin, AlertCircle, Info, X, Map, Star, Loader2, Brain, ArrowRight, Clock, UtensilsCrossed, Building2, Utensils, Waves, Search } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Car, Settings, RefreshCw, Zap, Users, List, Grid3x3, CheckCircle, MapPin, AlertCircle, Info, X, Map, Star, Loader2, Brain, ArrowRight, Clock, UtensilsCrossed, Building2, Utensils, Waves, Search, Bell } from 'lucide-react';
 import { getRides, getRidesSync, getUsers, getUsersSync, updateRideStatus, getLocations, getServiceRequests, updateServiceStatus, requestRide } from '../services/dataService';
 import { User, UserRole, RideRequest, BuggyStatus, Location, ServiceRequest } from '../types';
 import { apiClient } from '../services/apiClient';
+import BuggyNotificationBell from './BuggyNotificationBell';
 
 interface ReceptionPortalProps {
     onLogout: () => void;
@@ -72,6 +73,12 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     const [isCreatingRide, setIsCreatingRide] = useState(false);
     const pickupDropdownRef = useRef<HTMLDivElement>(null);
     const destinationDropdownRef = useRef<HTMLDivElement>(null);
+    
+    // Sound notification state
+    const [soundEnabled, setSoundEnabled] = useState(() => {
+        const saved = localStorage.getItem('reception_sound_enabled');
+        return saved !== null ? saved === 'true' : true; // Default to enabled
+    });
 
     // Load data on mount
     useEffect(() => {
@@ -114,6 +121,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                     getUsers().catch(() => getUsersSync()),
                     getServiceRequests().catch(() => [])
                 ]);
+                
                 setRides(refreshedRides);
                 setUsers(refreshedUsers);
                 setServiceRequests(refreshedServices);
@@ -159,8 +167,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             const newGuestInfo: Record<string, { last_name: string; villa_type?: string | null }> = {};
             
             results.forEach(result => {
-                if (result) {
-                    newGuestInfo[result.roomNumber] = result.guestInfo;
+                if (result && result.roomNumber) {
+                    newGuestInfo[String(result.roomNumber)] = result.guestInfo;
                 }
             });
             
@@ -372,6 +380,39 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     // Helper: Get pending requests count
     const getPendingRequestsCount = (): number => {
         return rides.filter(r => r.status === BuggyStatus.SEARCHING).length;
+    };
+
+    // Helper: Get offline drivers count
+    const getOfflineDriversCount = (): number => {
+        const totalDrivers = users.filter(u => u.role === UserRole.DRIVER).length;
+        return totalDrivers - getOnlineDriversCount();
+    };
+
+    // Helper: Get active rides count (ASSIGNED, ARRIVING, ON_TRIP)
+    const getActiveRidesCount = (): number => {
+        return rides.filter(r => 
+            r.status === BuggyStatus.ASSIGNED || 
+            r.status === BuggyStatus.ARRIVING || 
+            r.status === BuggyStatus.ON_TRIP
+        ).length;
+    };
+
+    // Helper: Get completed rides count today
+    const getCompletedRidesTodayCount = (): number => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return rides.filter(r => {
+            if (r.status !== BuggyStatus.COMPLETED) return false;
+            if (!r.completedAt) return false;
+            const completedDate = new Date(r.completedAt);
+            completedDate.setHours(0, 0, 0, 0);
+            return completedDate.getTime() === today.getTime();
+        }).length;
+    };
+
+    // Helper: Get total drivers count
+    const getTotalDriversCount = (): number => {
+        return users.filter(u => u.role === UserRole.DRIVER).length;
     };
 
     // Service Request Helpers
@@ -1033,6 +1074,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+    
+    // Save sound preference to localStorage
+    useEffect(() => {
+        localStorage.setItem('reception_sound_enabled', String(soundEnabled));
+    }, [soundEnabled]);
 
     return (
         <div className={`${embedded ? '' : 'min-h-screen'} bg-gray-100 flex flex-col font-sans`}>
@@ -1057,6 +1103,23 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Notification Bell - Only show when BUGGY view mode */}
+                        {viewMode === 'BUGGY' && (
+                            <BuggyNotificationBell
+                                rides={rides}
+                                users={users}
+                                onNavigate={() => setViewMode('BUGGY')}
+                                soundEnabled={soundEnabled}
+                                onSoundToggle={(enabled) => {
+                                    setSoundEnabled(enabled);
+                                    localStorage.setItem('reception_sound_enabled', String(enabled));
+                                }}
+                                localStorageKey="reception_sound_enabled"
+                                showCompleted={false}
+                                showAssigned={false}
+                                showActive={false}
+                            />
+                        )}
                         <div className="text-right">
                             <div className="text-sm font-semibold">{user.lastName || 'Reception'}</div>
                             <div className="text-xs text-emerald-200">ID: {user.id || 'N/A'}</div>
@@ -1105,6 +1168,63 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                     {/* Buggy Fleet Dispatch */}
                     {viewMode === 'BUGGY' && (
                         <>
+                    {/* Dashboard Stats */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 mb-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wide flex items-center gap-1.5">
+                                <Grid3x3 size={14} className="text-emerald-600" />
+                                Dispatch Dashboard
+                            </h3>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                            {/* Drivers Online */}
+                            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-2.5 border border-green-200/60">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <Users size={14} className="text-green-600 flex-shrink-0" />
+                                    <span className="text-[10px] font-semibold text-green-700">Drivers Online</span>
+                                </div>
+                                <div className="text-xl font-bold text-green-700 leading-none">{getOnlineDriversCount()}</div>
+                                <div className="text-[9px] text-green-600 mt-0.5 opacity-75">of {getTotalDriversCount()} total</div>
+                            </div>
+
+                            {/* Drivers Offline */}
+                            <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-lg p-2.5 border border-gray-200/60">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <Users size={14} className="text-gray-500 flex-shrink-0" />
+                                    <span className="text-[10px] font-semibold text-gray-600">Drivers Offline</span>
+                                </div>
+                                <div className="text-xl font-bold text-gray-700 leading-none">{getOfflineDriversCount()}</div>
+                            </div>
+
+                            {/* Active Rides */}
+                            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-2.5 border border-blue-200/60">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <Car size={14} className="text-blue-600 flex-shrink-0" />
+                                    <span className="text-[10px] font-semibold text-blue-700">Active Rides</span>
+                                </div>
+                                <div className="text-xl font-bold text-blue-700 leading-none">{getActiveRidesCount()}</div>
+                            </div>
+
+                            {/* Pending Requests */}
+                            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg p-2.5 border border-orange-200/60">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <Clock size={14} className="text-orange-600 flex-shrink-0" />
+                                    <span className="text-[10px] font-semibold text-orange-700">Pending Requests</span>
+                                </div>
+                                <div className="text-xl font-bold text-orange-700 leading-none">{getPendingRequestsCount()}</div>
+                            </div>
+
+                            {/* Completed Today */}
+                            <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg p-2.5 border border-emerald-200/60">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <CheckCircle size={14} className="text-emerald-600 flex-shrink-0" />
+                                    <span className="text-[10px] font-semibold text-emerald-700">Completed Today</span>
+                                </div>
+                                <div className="text-xl font-bold text-emerald-700 leading-none">{getCompletedRidesTodayCount()}</div>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Fleet Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4 px-4 py-3">
                         <div className="flex items-center gap-2.5">
@@ -3281,6 +3401,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                     )}
                 </div>
             </div>
+            
         </div>
     );
 };

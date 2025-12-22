@@ -12,6 +12,7 @@ router.put('/:id', userController.update);
 router.put('/:id/location', userController.updateLocation);
 router.delete('/:id', userController.delete);
 router.post('/:id/offline', userController.markOffline);
+router.post('/:userId/generate-check-in-code', userController.generateCheckInCode);
 
 export default router;
 

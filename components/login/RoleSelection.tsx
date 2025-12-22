@@ -1,21 +1,13 @@
 import React from 'react';
 import { UserRole } from '../../types';
-import { User, Shield, Car, Briefcase, UserCheck, Building2 } from 'lucide-react';
+import { Shield, Car, Briefcase, UserCheck, Building2, ArrowLeft } from 'lucide-react';
 
 interface RoleSelectionProps {
   onSelectRole: (role: UserRole) => void;
+  onBack?: () => void;
 }
 
 const roleConfig = [
-  {
-    role: UserRole.GUEST,
-    label: 'Guest',
-    icon: User,
-    description: 'Room Number + Last Name',
-    color: 'from-emerald-500 to-teal-600',
-    bgColor: 'bg-emerald-50',
-    textColor: 'text-emerald-700'
-  },
   {
     role: UserRole.ADMIN,
     label: 'Administrator',
@@ -63,7 +55,7 @@ const roleConfig = [
   }
 ];
 
-export const RoleSelection: React.FC<RoleSelectionProps> = ({ onSelectRole }) => {
+export const RoleSelection: React.FC<RoleSelectionProps> = ({ onSelectRole, onBack }) => {
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col justify-center items-center p-6 relative overflow-hidden">
       {/* Background Accent */}
@@ -71,6 +63,15 @@ export const RoleSelection: React.FC<RoleSelectionProps> = ({ onSelectRole }) =>
       
       <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8 z-10 relative">
         <div className="text-center mb-8">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="absolute top-6 left-6 text-gray-400 hover:text-gray-600 transition flex items-center gap-2"
+            >
+              <ArrowLeft size={20} />
+              <span className="text-sm">Back</span>
+            </button>
+          )}
           <h1 className="font-serif text-3xl font-bold text-emerald-900 mb-2">FURAMA</h1>
           <p className="text-xs tracking-widest text-emerald-600 uppercase">Resort & Villas Danang</p>
           <div className="w-16 h-1 bg-amber-400 mx-auto mt-4"></div>
