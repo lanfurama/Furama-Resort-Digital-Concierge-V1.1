@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { getRides, updateRideStatus, getLastMessage, createManualRide, getLocations, updateDriverHeartbeat } from '../services/dataService';
+import { getRides, updateRideStatus, getLastMessage, createManualRide, getLocations, setDriverOnlineFor10Hours } from '../services/dataService';
 import { RideRequest, BuggyStatus } from '../types';
 import { Car, MapPin, Navigation, CheckCircle, Clock, MessageSquare, History, Plus, X, Loader2, User, Star, Zap } from 'lucide-react';
 import NotificationBell from './NotificationBell';
@@ -66,7 +66,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         loadLocations();
     }, []);
 
-    // Heartbeat: Update driver online status every 30 seconds
+    // Set driver online status to 10 hours on first login
     useEffect(() => {
         const savedUser = localStorage.getItem('furama_user');
         if (!savedUser) return;
@@ -75,17 +75,10 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             const user = JSON.parse(savedUser);
             if (!user.id) return;
             
-            // Send initial heartbeat immediately
-            updateDriverHeartbeat(user.id);
-            
-            // Send heartbeat every 30 seconds to keep driver online
-            const heartbeatInterval = setInterval(() => {
-                updateDriverHeartbeat(user.id);
-            }, 30000); // 30 seconds
-            
-            return () => clearInterval(heartbeatInterval);
+            // Set driver online for 10 hours on first login
+            setDriverOnlineFor10Hours(user.id);
         } catch (e) {
-            console.error('Failed to setup heartbeat:', e);
+            console.error('Failed to set driver online for 10 hours:', e);
         }
     }, []);
 

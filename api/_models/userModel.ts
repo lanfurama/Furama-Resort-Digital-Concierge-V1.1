@@ -275,5 +275,34 @@ export const userModel = {
       throw error;
     }
   },
+
+  // Set driver online status to 10 hours from now (for first login)
+  async setOnlineFor10Hours(id: number): Promise<User | null> {
+    try {
+      // Disable trigger temporarily to set updated_at to 10 hours from now
+      await pool.query('ALTER TABLE users DISABLE TRIGGER update_users_updated_at');
+      
+      // Set updated_at to 10 hours from now
+      const query = `UPDATE users SET updated_at = NOW() + INTERVAL '10 hours' WHERE id = $1 RETURNING *`;
+      console.log('[userModel.setOnlineFor10Hours] Setting driver online for 10 hours:', id);
+      
+      const result = await pool.query(query, [id]);
+      const updatedUser = result.rows[0];
+      
+      // Re-enable trigger
+      await pool.query('ALTER TABLE users ENABLE TRIGGER update_users_updated_at');
+      
+      console.log('[userModel.setOnlineFor10Hours] Driver set online for 10 hours, updated_at:', updatedUser?.updated_at);
+      return updatedUser || null;
+    } catch (error) {
+      // Make sure to re-enable trigger even if there's an error
+      try {
+        await pool.query('ALTER TABLE users ENABLE TRIGGER update_users_updated_at');
+      } catch (e) {
+        console.error('[userModel.setOnlineFor10Hours] Failed to re-enable trigger:', e);
+      }
+      throw error;
+    }
+  },
 };
 

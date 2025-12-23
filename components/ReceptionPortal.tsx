@@ -52,6 +52,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     
     // Track last auto-assign time to prevent too frequent calls
     const lastAutoAssignRef = useRef<number>(0);
+    const handleAutoAssignRef = useRef<((isAutoTriggered: boolean) => Promise<void>) | null>(null);
+    
+    // Current time state for countdown
+    const [currentTime, setCurrentTime] = useState(Date.now());
     
     // Cache for guest information by room number
     const [guestInfoCache, setGuestInfoCache] = useState<Record<string, { last_name: string; villa_type?: string | null }>>({});
@@ -110,6 +114,15 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                 console.error('Failed to load fleet config:', error);
             }
         }
+    }, []);
+
+    // Update current time every second for countdown
+    useEffect(() => {
+        const timeInterval = setInterval(() => {
+            setCurrentTime(Date.now());
+        }, 1000); // Update every second
+        
+        return () => clearInterval(timeInterval);
     }, []);
 
     // Auto-refresh rides, users, and service requests
@@ -184,33 +197,55 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     // Auto-assign logic: Automatically assign rides that have been waiting too long
     useEffect(() => {
         // Only run if auto-assign is enabled
-        if (!fleetConfig.autoAssignEnabled) return;
+        if (!fleetConfig.autoAssignEnabled) {
+            console.log('[Auto-Assign] Auto-assign is disabled');
+            return;
+        }
+
+        console.log('[Auto-Assign] Auto-assign is enabled, checking every 5 seconds...');
 
         const checkAndAutoAssign = async () => {
             const pendingRides = rides.filter(r => r.status === BuggyStatus.SEARCHING);
-            if (pendingRides.length === 0) return;
+            console.log(`[Auto-Assign] Checking ${pendingRides.length} pending ride(s)...`);
+            
+            if (pendingRides.length === 0) {
+                return;
+            }
 
             // Prevent too frequent auto-assign calls (at least 10 seconds between calls)
             const now = Date.now();
             if (now - lastAutoAssignRef.current < 10000) {
+                console.log('[Auto-Assign] Skipping - last auto-assign was less than 10 seconds ago');
                 return; // Skip if last auto-assign was less than 10 seconds ago
             }
 
             // Check if any ride has been waiting longer than maxWaitTimeBeforeAutoAssign
             const ridesToAutoAssign = pendingRides.filter(ride => {
                 const waitTime = Math.floor((now - ride.timestamp) / 1000); // seconds
-                return waitTime >= fleetConfig.maxWaitTimeBeforeAutoAssign;
+                const shouldAssign = waitTime >= fleetConfig.maxWaitTimeBeforeAutoAssign;
+                if (shouldAssign) {
+                    console.log(`[Auto-Assign] Ride ${ride.id} has been waiting ${waitTime}s (threshold: ${fleetConfig.maxWaitTimeBeforeAutoAssign}s)`);
+                }
+                return shouldAssign;
             });
 
             if (ridesToAutoAssign.length > 0) {
+                console.log(`[Auto-Assign] Found ${ridesToAutoAssign.length} ride(s) waiting over ${fleetConfig.maxWaitTimeBeforeAutoAssign}s, triggering auto-assign...`);
                 lastAutoAssignRef.current = now;
                 // Trigger auto-assign for these rides (silently, without showing modal)
-                await handleAutoAssign(true); // Pass true to indicate auto-triggered
+                if (handleAutoAssignRef.current) {
+                    await handleAutoAssignRef.current(true); // Pass true to indicate auto-triggered
+                }
+            } else {
+                console.log('[Auto-Assign] No rides need auto-assignment yet');
             }
         };
 
         // Check every 5 seconds if there are rides that need auto-assignment
         const autoAssignInterval = setInterval(checkAndAutoAssign, 5000);
+        
+        // Run immediately on mount
+        checkAndAutoAssign();
         
         return () => clearInterval(autoAssignInterval);
     }, [rides, fleetConfig.autoAssignEnabled, fleetConfig.maxWaitTimeBeforeAutoAssign]);
@@ -757,7 +792,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     };
 
     // AI Auto-Assign Logic with Cost-Based Algorithm
-    const handleAutoAssign = async (isAutoTriggered: boolean = false) => {
+    const handleAutoAssign = useCallback(async (isAutoTriggered: boolean = false) => {
         const pendingRidesList = rides.filter(r => r.status === BuggyStatus.SEARCHING);
         const driverUsers = users.filter(u => u.role === UserRole.DRIVER);
         const totalDrivers = driverUsers.length;
@@ -939,6 +974,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             setAIAssignmentData(prev => prev ? { ...prev, status: 'completed' } : null);
         } else {
             // For auto-triggered assignments, just log success
+            if (assignmentCount > 0) {
+                console.log(`[Auto-Assign] Successfully auto-assigned ${assignmentCount} ride(s)`);
+            } else {
+                console.log('[Auto-Assign] No assignments were made (no available drivers or other constraints)');
+            }
         }
 
         // Refresh data after assignments
@@ -949,7 +989,12 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             console.error('Failed to refresh rides after assignment:', error);
             setRides(getRidesSync());
         }
-    };
+    }, [rides, users, locations]);
+    
+    // Update ref whenever handleAutoAssign changes
+    useEffect(() => {
+        handleAutoAssignRef.current = handleAutoAssign;
+    }, [handleAutoAssign]);
 
     // Handle ending a buggy ride
     const handleEndRide = async (rideId: string) => {
@@ -1084,7 +1129,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         <div className={`${embedded ? '' : 'min-h-screen'} bg-gray-100 flex flex-col font-sans`}>
             {/* Header */}
             {!embedded && (
-                <header className="bg-emerald-900 text-white p-4 flex justify-between items-center shadow-lg sticky top-0 z-20">
+                <header className="bg-emerald-900 text-white py-2 px-4 flex justify-between items-center shadow-lg sticky top-0 z-20">
                     <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                             viewMode === 'BUGGY' ? 'bg-emerald-700' : 'bg-blue-600'
@@ -1168,63 +1213,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                     {/* Buggy Fleet Dispatch */}
                     {viewMode === 'BUGGY' && (
                         <>
-                    {/* Dashboard Stats */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 mb-4">
-                        <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wide flex items-center gap-1.5">
-                                <Grid3x3 size={14} className="text-emerald-600" />
-                                Dispatch Dashboard
-                            </h3>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                            {/* Drivers Online */}
-                            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-2.5 border border-green-200/60">
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <Users size={14} className="text-green-600 flex-shrink-0" />
-                                    <span className="text-[10px] font-semibold text-green-700">Drivers Online</span>
-                                </div>
-                                <div className="text-xl font-bold text-green-700 leading-none">{getOnlineDriversCount()}</div>
-                                <div className="text-[9px] text-green-600 mt-0.5 opacity-75">of {getTotalDriversCount()} total</div>
-                            </div>
-
-                            {/* Drivers Offline */}
-                            <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-lg p-2.5 border border-gray-200/60">
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <Users size={14} className="text-gray-500 flex-shrink-0" />
-                                    <span className="text-[10px] font-semibold text-gray-600">Drivers Offline</span>
-                                </div>
-                                <div className="text-xl font-bold text-gray-700 leading-none">{getOfflineDriversCount()}</div>
-                            </div>
-
-                            {/* Active Rides */}
-                            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-2.5 border border-blue-200/60">
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <Car size={14} className="text-blue-600 flex-shrink-0" />
-                                    <span className="text-[10px] font-semibold text-blue-700">Active Rides</span>
-                                </div>
-                                <div className="text-xl font-bold text-blue-700 leading-none">{getActiveRidesCount()}</div>
-                            </div>
-
-                            {/* Pending Requests */}
-                            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg p-2.5 border border-orange-200/60">
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <Clock size={14} className="text-orange-600 flex-shrink-0" />
-                                    <span className="text-[10px] font-semibold text-orange-700">Pending Requests</span>
-                                </div>
-                                <div className="text-xl font-bold text-orange-700 leading-none">{getPendingRequestsCount()}</div>
-                            </div>
-
-                            {/* Completed Today */}
-                            <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg p-2.5 border border-emerald-200/60">
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <CheckCircle size={14} className="text-emerald-600 flex-shrink-0" />
-                                    <span className="text-[10px] font-semibold text-emerald-700">Completed Today</span>
-                                </div>
-                                <div className="text-xl font-bold text-emerald-700 leading-none">{getCompletedRidesTodayCount()}</div>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* Fleet Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4 px-4 py-3">
                         <div className="flex items-center gap-2.5">
@@ -1256,7 +1244,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                 </div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-1.5 relative z-30">
+                        <div className="flex items-center gap-1.5 relative z-10">
                             <button 
                                 onClick={() => setShowFleetSettings(!showFleetSettings)}
                                 className={`p-1.5 rounded-md transition ${showFleetSettings ? 'bg-gray-200 text-gray-800' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
@@ -1283,20 +1271,57 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                 <RefreshCw size={18} />
                             </button>
                             <div className="relative group">
-                                <button 
-                                    onClick={async () => {
-                                        await handleAutoAssign();
-                                    }}
-                                    disabled={(() => {
-                                        const hasPendingRides = getPendingRequestsCount() > 0;
-                                        const hasOnlineDrivers = getOnlineDriversCount() > 0;
-                                        return !hasPendingRides || !hasOnlineDrivers;
-                                    })()}
-                                    className="bg-blue-600 text-white px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed relative"
-                                >
-                                    <Zap size={16} />
-                                    <span>Assign by AI</span>
-                                </button>
+                                {(() => {
+                                    const pendingRides = rides.filter(r => r.status === BuggyStatus.SEARCHING);
+                                    const hasPendingRides = pendingRides.length > 0;
+                                    const hasOnlineDrivers = getOnlineDriversCount() > 0;
+                                    
+                                    // Calculate countdown for auto assign
+                                    let countdownSeconds = null;
+                                    if (fleetConfig.autoAssignEnabled && hasPendingRides && hasOnlineDrivers) {
+                                        // Find the oldest pending ride
+                                        const oldestRide = pendingRides.reduce((oldest, ride) => {
+                                            return ride.timestamp < oldest.timestamp ? ride : oldest;
+                                        }, pendingRides[0]);
+                                        
+                                        const waitTimeSeconds = Math.floor((currentTime - oldestRide.timestamp) / 1000);
+                                        const remainingSeconds = fleetConfig.maxWaitTimeBeforeAutoAssign - waitTimeSeconds;
+                                        
+                                        if (remainingSeconds > 0) {
+                                            countdownSeconds = remainingSeconds;
+                                        } else {
+                                            countdownSeconds = 0; // Auto assign will trigger soon
+                                        }
+                                    }
+                                    
+                                    const formatCountdown = (seconds: number): string => {
+                                        if (seconds <= 0) return '0s';
+                                        const mins = Math.floor(seconds / 60);
+                                        const secs = seconds % 60;
+                                        if (mins > 0) {
+                                            return `${mins}m ${secs}s`;
+                                        }
+                                        return `${secs}s`;
+                                    };
+                                    
+                                    return (
+                                        <button 
+                                            onClick={async () => {
+                                                await handleAutoAssign();
+                                            }}
+                                            disabled={!hasPendingRides || !hasOnlineDrivers}
+                                            className="bg-blue-600 text-white px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed relative"
+                                        >
+                                            <Zap size={16} />
+                                            <span>Assign by AI</span>
+                                            {countdownSeconds !== null && (
+                                                <span className="ml-1 text-xs bg-blue-500/80 px-1.5 py-0.5 rounded font-bold">
+                                                    {countdownSeconds <= 0 ? 'NOW' : formatCountdown(countdownSeconds)}
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })()}
                                 {/* Enhanced Tooltip */}
                                 {(() => {
                                     const hasPendingRides = getPendingRequestsCount() > 0;
@@ -1349,6 +1374,55 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                     );
                                 })()}
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Dashboard Stats */}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
+                        {/* Drivers Online */}
+                        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-2 border border-green-200/60">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                                <Users size={12} className="text-green-600 flex-shrink-0" />
+                                <span className="text-xs font-semibold text-green-700">Drivers Online</span>
+                            </div>
+                            <div className="text-2xl font-bold text-green-700 leading-none">{getOnlineDriversCount()}</div>
+                            <div className="text-[9px] text-green-600 mt-0.5 opacity-75">of {getTotalDriversCount()} total</div>
+                        </div>
+
+                        {/* Drivers Offline */}
+                        <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-lg p-2 border border-gray-200/60">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                                <Users size={12} className="text-gray-500 flex-shrink-0" />
+                                <span className="text-xs font-semibold text-gray-600">Drivers Offline</span>
+                            </div>
+                            <div className="text-2xl font-bold text-gray-700 leading-none">{getOfflineDriversCount()}</div>
+                        </div>
+
+                        {/* Active Rides */}
+                        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-2 border border-blue-200/60">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                                <Car size={12} className="text-blue-600 flex-shrink-0" />
+                                <span className="text-xs font-semibold text-blue-700">Active Rides</span>
+                            </div>
+                            <div className="text-2xl font-bold text-blue-700 leading-none">{getActiveRidesCount()}</div>
+                        </div>
+
+                        {/* Pending Requests */}
+                        <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg p-2 border border-orange-200/60">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                                <Clock size={12} className="text-orange-600 flex-shrink-0" />
+                                <span className="text-xs font-semibold text-orange-700">Pending Requests</span>
+                            </div>
+                            <div className="text-2xl font-bold text-orange-700 leading-none">{getPendingRequestsCount()}</div>
+                        </div>
+
+                        {/* Completed Today */}
+                        <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg p-2 border border-emerald-200/60">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                                <CheckCircle size={12} className="text-emerald-600 flex-shrink-0" />
+                                <span className="text-xs font-semibold text-emerald-700">Completed Today</span>
+                            </div>
+                            <div className="text-2xl font-bold text-emerald-700 leading-none">{getCompletedRidesTodayCount()}</div>
                         </div>
                     </div>
 
@@ -1846,8 +1920,9 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                             driverViewMode === 'MAP' 
                                                 ? 'text-blue-600 bg-blue-50' 
                                                 : 'text-gray-400 hover:text-gray-600'
-                                        }`}
+                                        } disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-gray-400`}
                                         title="Map View"
+                                        disabled={true}
                                     >
                                         <Map size={14} />
                                     </button>
@@ -1956,7 +2031,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                 bgColor = 'bg-green-50';
                                                 borderColor = 'border-green-300';
                                                 statusBadgeClass = 'bg-green-500 text-white';
-                                                statusText = 'AVAILABLE';
+                                                statusText = 'ONLINE';
                                             } else if (driverStatus === 'NEAR_COMPLETION') {
                                                 bgColor = 'bg-blue-50';
                                                 borderColor = 'border-blue-300';
@@ -2007,11 +2082,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                 {driverStatus === 'AVAILABLE' && (
                                                                     <span className="text-[9px] bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
                                                                         READY
-                                                                    </span>
-                                                                )}
-                                                                {isNearCompletion && (
-                                                                    <span className="text-[9px] bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded font-bold animate-pulse">
-                                                                        SOON
                                                                     </span>
                                                                 )}
                                                             </div>
@@ -2107,7 +2177,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                             title="End Ride"
                                                                         >
                                                                             <CheckCircle size={12} />
-                                                                            End
+                                                                            Completed
                                                                         </button>
                                                                     )}
                                                                 </div>
@@ -2390,81 +2460,17 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                             )}
                         </div>
 
-                        {/* Column 3: Active Trips */}
+                        {/* Column 3: Recent Completed */}
                         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
                             <div className="flex justify-between items-center mb-3">
                                 <h3 className="font-bold text-sm text-gray-800">
-                                    Active Trips ({rides.filter(r => r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP).length})
+                                    Recent Completed
                                 </h3>
                             </div>
-                            <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                                {rides.filter(r => r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP).length === 0 ? (
-                                    <div className="text-center py-6 text-gray-400 text-xs">
-                                        No active trips.
-                                    </div>
-                                ) : (
-                                    rides.filter(r => r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP).map((ride) => {
-                                        const rideDriverId = ride.driverId ? String(ride.driverId) : '';
-                                        const driver = users.find(u => {
-                                            const userIdStr = u.id ? String(u.id) : '';
-                                            return userIdStr === rideDriverId;
-                                        });
-                                        const driverName = driver ? driver.lastName || 'Unknown' : 'Unknown';
-                                        
-                                        // Determine status display
-                                        let statusText = 'ASSIGNED';
-                                        let statusClass = 'bg-blue-100 text-blue-700';
-                                        if (ride.status === BuggyStatus.ON_TRIP) {
-                                            statusText = 'ON TRIP';
-                                            statusClass = 'bg-purple-100 text-purple-700';
-                                        } else if (ride.status === BuggyStatus.ARRIVING) {
-                                            statusText = 'ARRIVING';
-                                            statusClass = 'bg-orange-100 text-orange-700';
-                                        }
-                                        
-                                        return (
-                                            <div key={ride.id} className="bg-gray-50 p-2.5 rounded-md border border-gray-200">
-                                                <div className="flex items-start justify-between gap-2 mb-1.5">
-                                                    <div className="flex-1">
-                                                        <div className="font-bold text-sm text-gray-900 mb-0.5">Room {ride.roomNumber}</div>
-                                                        <div className="text-xs text-gray-600 mb-0.5">Driver: {driverName}</div>
-                                                        <div className="text-[11px] text-gray-500 mb-1.5">
-                                                            {ride.pickup} → {ride.destination}
-                                                        </div>
-                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${statusClass}`}>
-                                                            {statusText}
-                                                        </span>
-                                                    </div>
-                                                    {(ride.status === BuggyStatus.ARRIVING || ride.status === BuggyStatus.ASSIGNED) ? (
-                                                        <button
-                                                            onClick={() => handlePickupGuest(ride.id)}
-                                                            className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded transition-colors whitespace-nowrap"
-                                                            title="Pickup Guest"
-                                                        >
-                                                            <Users size={12} />
-                                                            Pickup Guest
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => handleEndRide(ride.id)}
-                                                            className="flex items-center gap-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded transition-colors whitespace-nowrap"
-                                                            title="End Ride"
-                                                        >
-                                                            <CheckCircle size={12} />
-                                                            End
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                )}
-                            </div>
-
+                            
                             {/* Recent Completed Section */}
-                            <div className="mt-4 pt-3 border-t border-gray-200">
-                                <h4 className="font-bold text-[10px] text-gray-500 uppercase mb-2 tracking-wider">RECENT COMPLETED.</h4>
-                                <div className="space-y-1.5 max-h-[280px] overflow-y-auto">
+                            <div className="pt-3">
+                                <div className="space-y-1.5 max-h-[450px] overflow-y-auto">
                                     {(() => {
                                         // Sort completed rides by completion time (most recent first)
                                         const completedRides = rides
@@ -2537,7 +2543,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                         <div className="flex flex-col items-end gap-1 flex-shrink-0">
                                                             <span className="flex items-center gap-0.5 text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">
                                                                 <CheckCircle size={9} />
-                                                                Done
+                                                                Completed
                                                             </span>
                                                             <span className="text-[9px] text-gray-400 font-medium">
                                                                 {timeAgoText}
@@ -2604,20 +2610,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                         />
                                     </div>
 
-                                    {/* Guest Name (Optional) */}
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                                            Guest Name (Optional)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={newRideData.guestName}
-                                            onChange={(e) => setNewRideData(prev => ({ ...prev, guestName: e.target.value }))}
-                                            placeholder="Auto-filled from room number"
-                                            className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                        />
-                                    </div>
-
                                     {/* Pickup Location */}
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">
@@ -2665,7 +2657,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                     {/* Locations Grid - 5 columns */}
                                                     <div className="overflow-y-auto max-h-64 p-2">
                                                         {getFilteredLocations(pickupSearchQuery, pickupFilterType).length > 0 ? (
-                                                            <div className="grid grid-cols-5 gap-2">
+                                                            <div className="grid grid-cols-4 gap-2">
                                                                 {getFilteredLocations(pickupSearchQuery, pickupFilterType).map((loc) => (
                                                                     <button
                                                                         key={loc.id}
@@ -2679,9 +2671,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                     >
                                                                         <div className="text-xs font-medium text-gray-900 break-words w-full leading-tight">
                                                                             {loc.name}
-                                                                        </div>
-                                                                        <div className="text-[10px] text-gray-500 mt-0.5">
-                                                                            {loc.type}
                                                                         </div>
                                                                     </button>
                                                                 ))}
@@ -2744,7 +2733,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                     {/* Locations Grid - 5 columns */}
                                                     <div className="overflow-y-auto max-h-64 p-2">
                                                         {getFilteredLocations(destinationSearchQuery, destinationFilterType).length > 0 ? (
-                                                            <div className="grid grid-cols-5 gap-2">
+                                                            <div className="grid grid-cols-4 gap-2">
                                                                 {getFilteredLocations(destinationSearchQuery, destinationFilterType).map((loc) => (
                                                                     <button
                                                                         key={loc.id}
@@ -2758,9 +2747,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                     >
                                                                         <div className="text-xs font-medium text-gray-900 break-words w-full leading-tight">
                                                                             {loc.name}
-                                                                        </div>
-                                                                        <div className="text-[10px] text-gray-500 mt-0.5">
-                                                                            {loc.type}
                                                                         </div>
                                                                     </button>
                                                                 ))}
@@ -3377,7 +3363,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                         <div className="flex flex-col items-end gap-1 flex-shrink-0">
                                                             <span className="flex items-center gap-0.5 text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">
                                                                 <CheckCircle size={9} />
-                                                                Done
+                                                                Completed
                                                             </span>
                                                             <span className="text-[9px] text-gray-400 font-medium">
                                                                 {timeAgoText}

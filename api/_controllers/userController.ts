@@ -181,5 +181,24 @@ export const userController = {
       res.status(500).json({ error: error.message });
     }
   },
+
+  // Set driver online status to 10 hours from now (for first login)
+  async setOnlineFor10Hours(req: Request, res: Response) {
+    try {
+      const id = parseInt(req.params.id);
+      console.log('[userController.setOnlineFor10Hours] Received request for driver ID:', id);
+      const user = await userModel.setOnlineFor10Hours(id);
+      if (!user) {
+        console.log('[userController.setOnlineFor10Hours] User not found:', id);
+        return res.status(404).json({ error: 'User not found' });
+      }
+      console.log('[userController.setOnlineFor10Hours] Successfully set driver online for 10 hours:', id, 'updated_at:', user.updated_at);
+      res.json(user);
+    } catch (error: any) {
+      console.error('[userController.setOnlineFor10Hours] Error setting driver online for 10 hours:', error);
+      console.error('[userController.setOnlineFor10Hours] Error stack:', error.stack);
+      res.status(500).json({ error: error.message });
+    }
+  },
 };
 

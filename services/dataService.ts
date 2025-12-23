@@ -502,6 +502,26 @@ export const markDriverOffline = async (userId: string): Promise<void> => {
   }
 };
 
+// Set driver online status to 10 hours from now (for first login)
+export const setDriverOnlineFor10Hours = async (userId: string): Promise<void> => {
+  try {
+    console.log('[First Login] Setting driver online for 10 hours, userId:', userId);
+    console.log('[First Login] Calling API: POST /users/' + userId + '/online-10hours');
+    const response = await apiClient.post(`/users/${userId}/online-10hours`, {});
+    console.log('[First Login] API response:', response);
+    console.log('[First Login] Driver set online for 10 hours successfully, updated_at:', response?.updated_at);
+  } catch (error: any) {
+    console.error('[First Login] Failed to set driver online for 10 hours:', error);
+    console.error('[First Login] Error details:', {
+      message: error?.message,
+      response: error?.response,
+      status: error?.response?.status,
+      data: error?.response?.data
+    });
+    // Silently fail - should still proceed even if this fails
+  }
+};
+
 // Update driver location (GPS coordinates)
 export const updateDriverLocation = async (userId: string, lat: number, lng: number): Promise<void> => {
   try {

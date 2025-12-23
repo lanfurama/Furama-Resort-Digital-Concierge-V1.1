@@ -2,15 +2,27 @@ import React from 'react';
 import { StaffLogin } from '../components/login/StaffLogin';
 import { UserRole } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
+import { setDriverOnlineFor10Hours } from '../services/dataService';
 
 const DriverLoginPage: React.FC = () => {
   const { setLanguage } = useTranslation();
 
-  const handleLoginSuccess = (user: any) => {
+  const handleLoginSuccess = async (user: any) => {
     localStorage.setItem('furama_user', JSON.stringify(user));
     if (user.language) {
       setLanguage(user.language as any);
     }
+    
+    // Set driver online for 10 hours on first login
+    if (user.id && user.role === UserRole.DRIVER) {
+      try {
+        await setDriverOnlineFor10Hours(user.id);
+      } catch (error) {
+        console.error('Failed to set driver online for 10 hours:', error);
+        // Continue with login even if this fails
+      }
+    }
+    
     window.location.href = '/driver';
   };
 
