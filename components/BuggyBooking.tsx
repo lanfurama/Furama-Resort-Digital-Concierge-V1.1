@@ -18,6 +18,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [activeRide, setActiveRide] = useState<RideRequest | undefined>(undefined);
   const [pickup, setPickup] = useState<string>(`Villa ${user.roomNumber}`);
   const [destination, setDestination] = useState<string>('');
+  const [guestCount, setGuestCount] = useState<number>(1); // Number of guests (1-7)
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoadingRide, setIsLoadingRide] = useState(true);
   const [isLoadingLocations, setIsLoadingLocations] = useState(true);
@@ -508,7 +509,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     
     setIsBooking(true); // Set booking state immediately to prevent double-click
     try {
-      const newRide = await requestRide(user.lastName, user.roomNumber, pickup, destination);
+      const newRide = await requestRide(user.lastName, user.roomNumber, pickup, destination, guestCount || 1);
       // Re-check status from server to ensure UI is in sync
       const updatedRide = await getActiveRideForUser(user.roomNumber);
       setActiveRide(updatedRide || newRide);
@@ -516,6 +517,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       activeRideRef.current = updatedRide || newRide;
       setPreviousStatus((updatedRide || newRide)?.status || null);
       setDestination(''); // Clear destination after booking
+      setGuestCount(1); // Reset guest count after booking
     } catch (error) {
       console.error('Failed to request ride:', error);
       alert('Failed to request ride. Please try again.');
@@ -1289,6 +1291,31 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                             </div>
                         </div>
                     )}
+                </div>
+
+                {/* Guest Count Input */}
+                <div className="relative group">
+                    <label className="text-[10px] font-semibold text-gray-600 mb-0.5 block">Number of Guests (1-7)</label>
+                    <div className="relative">
+                        <input
+                            type="number"
+                            min="1"
+                            max="7"
+                            value={guestCount}
+                            onChange={(e) => {
+                                const value = parseInt(e.target.value) || 1;
+                                if (value >= 1 && value <= 7) {
+                                    setGuestCount(value);
+                                }
+                            }}
+                            className="w-full pl-9 pr-3 py-1.5 text-sm bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg text-gray-900 font-semibold hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
+                            placeholder="1"
+                        />
+                        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-600">
+                            <span className="text-xs font-bold">👥</span>
+                        </div>
+                    </div>
+                    <p className="text-[9px] text-gray-500 mt-0.5">Maximum 7 guests per buggy</p>
                 </div>
             </div>
 

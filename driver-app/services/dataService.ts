@@ -1694,7 +1694,8 @@ export const getRides = async (): Promise<RideRequest[]> => {
         completedAt: r.drop_timestamp ? new Date(r.drop_timestamp).getTime() : (r.completed_at ? new Date(r.completed_at).getTime() : undefined),
         confirmedAt: r.assigned_timestamp ? new Date(r.assigned_timestamp).getTime() : (r.assigned_at ? new Date(r.assigned_at).getTime() : undefined),
       rating: r.rating || undefined,
-      feedback: r.feedback || undefined
+      feedback: r.feedback || undefined,
+      guestCount: r.guest_count || 1
       };
     });
     
@@ -1712,7 +1713,7 @@ export const getRides = async (): Promise<RideRequest[]> => {
 // Sync version for backward compatibility
 export const getRidesSync = () => rides;
 
-export const requestRide = async (guestName: string, roomNumber: string, pickup: string, destination: string): Promise<RideRequest> => {
+export const requestRide = async (guestName: string, roomNumber: string, pickup: string, destination: string, guestCount: number = 1): Promise<RideRequest> => {
   try {
     const dbRide = await apiClient.post<any>('/ride-requests', {
       guest_name: guestName,
@@ -1720,7 +1721,8 @@ export const requestRide = async (guestName: string, roomNumber: string, pickup:
       pickup,
       destination,
       status: 'SEARCHING',
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      guest_count: guestCount || 1
     });
     
     // Map database format to frontend format
@@ -1733,7 +1735,8 @@ export const requestRide = async (guestName: string, roomNumber: string, pickup:
       status: dbRide.status as BuggyStatus,
       timestamp: dbRide.timestamp,
       driverId: dbRide.driver_id ? dbRide.driver_id.toString() : undefined,
-      eta: dbRide.eta
+      eta: dbRide.eta,
+      guestCount: dbRide.guest_count || 1
     };
     
     // Notify drivers (if notification system exists)
@@ -1750,7 +1753,8 @@ export const requestRide = async (guestName: string, roomNumber: string, pickup:
       pickup,
       destination,
       status: BuggyStatus.SEARCHING,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      guestCount: guestCount || 1
     };
     rides = [...rides, newRide];
     return newRide;
@@ -1758,7 +1762,7 @@ export const requestRide = async (guestName: string, roomNumber: string, pickup:
 };
 
 // Driver creates ride manually (e.g. walk-in guest)
-export const createManualRide = async (driverId: string, roomNumber: string, pickup: string, destination: string): Promise<RideRequest> => {
+export const createManualRide = async (driverId: string, roomNumber: string, pickup: string, destination: string, guestCount: number = 1): Promise<RideRequest> => {
     try {
         // Try to find guest name if room number exists
         const allUsers = await getUsers().catch(() => getUsersSync());
@@ -1773,7 +1777,8 @@ export const createManualRide = async (driverId: string, roomNumber: string, pic
             status: 'ASSIGNED', // Directly assigned to the driver
             driver_id: parseInt(driverId) || null,
             timestamp: Date.now(),
-            eta: 0 // Assume driver is there
+            eta: 0, // Assume driver is there
+            guest_count: guestCount || 1
         };
         
         console.log('Creating manual ride via API - Input:', { driverId, roomNumber, pickup, destination });
@@ -1792,7 +1797,8 @@ export const createManualRide = async (driverId: string, roomNumber: string, pic
             status: dbRide.status as BuggyStatus,
             timestamp: dbRide.timestamp || (dbRide.created_at ? new Date(dbRide.created_at).getTime() : Date.now()),
             driverId: dbRide.driver_id ? dbRide.driver_id.toString() : driverId,
-            eta: dbRide.eta || 0
+            eta: dbRide.eta || 0,
+            guestCount: dbRide.guest_count || 1
         };
         
         // Update local cache
@@ -1822,7 +1828,8 @@ export const createManualRide = async (driverId: string, roomNumber: string, pic
             status: BuggyStatus.ASSIGNED,
             driverId: driverId,
             timestamp: Date.now(),
-            eta: 0
+            eta: 0,
+            guestCount: guestCount || 1
         };
         
         rides = [...rides, newRide];

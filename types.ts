@@ -137,6 +137,7 @@ export interface RideRequest {
   pickedUpAt?: number;
   completedAt?: number;
   confirmedAt?: number; // Timestamp when driver accepted the ride
+  guestCount?: number; // Number of guests (1-7, default 1)
 }
 
 export interface ServiceRequest {

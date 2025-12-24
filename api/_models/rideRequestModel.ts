@@ -12,6 +12,7 @@ export interface RideRequest {
   eta?: number;
   rating?: number | null;
   feedback?: string | null;
+  guest_count?: number; // Number of guests (1-7, default 1)
   created_at: Date;
   updated_at: Date;
   assigned_timestamp?: Date;
@@ -75,7 +76,7 @@ export const rideRequestModel = {
     }
 
     const result = await pool.query(
-      'INSERT INTO ride_requests (guest_name, room_number, pickup, destination, status, timestamp, driver_id, eta) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+      'INSERT INTO ride_requests (guest_name, room_number, pickup, destination, status, timestamp, driver_id, eta, guest_count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
       [
         rideRequest.guest_name,
         rideRequest.room_number,
@@ -84,7 +85,8 @@ export const rideRequestModel = {
         rideRequest.status,
         rideRequest.timestamp,
         rideRequest.driver_id || null,
-        rideRequest.eta || null
+        rideRequest.eta || null,
+        rideRequest.guest_count || 1
       ]
     );
     return result.rows[0];
@@ -164,6 +166,10 @@ export const rideRequestModel = {
     if (rideRequest.feedback !== undefined) {
       fields.push(`feedback = $${paramCount++}`);
       values.push(rideRequest.feedback || null);
+    }
+    if (rideRequest.guest_count !== undefined) {
+      fields.push(`guest_count = $${paramCount++}`);
+      values.push(rideRequest.guest_count);
     }
 
     if (fields.length === 0) {
