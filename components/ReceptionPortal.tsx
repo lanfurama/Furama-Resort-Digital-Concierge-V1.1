@@ -77,6 +77,76 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     const [showPickupDropdown, setShowPickupDropdown] = useState(false);
     const [showDestinationDropdown, setShowDestinationDropdown] = useState(false);
     const [isCreatingRide, setIsCreatingRide] = useState(false);
+    
+    // Merge Options Modal State
+    const [showMergeModal, setShowMergeModal] = useState(false);
+    
+    // Manual ride merging functions
+    const canCombineRides = (ride1: RideRequest, ride2: RideRequest): boolean => {
+        const totalGuests = (ride1.guestCount || 1) + (ride2.guestCount || 1);
+        return totalGuests <= 7 && ride1.status === BuggyStatus.SEARCHING && ride2.status === BuggyStatus.SEARCHING;
+    };
+    
+    const handleMergeRides = async (ride1Id: string, ride2Id: string) => {
+        try {
+            const ride1 = rides.find(r => r.id === ride1Id);
+            const ride2 = rides.find(r => r.id === ride2Id);
+            
+            if (!ride1 || !ride2) {
+                alert('Không tìm thấy chuyến xe để ghép');
+                return;
+            }
+            
+            if (!canCombineRides(ride1, ride2)) {
+                alert('Không thể ghép 2 chuyến này - vượt quá sức chứa 7 khách');
+                return;
+            }
+            
+            // Confirm with user
+            const totalGuests = (ride1.guestCount || 1) + (ride2.guestCount || 1);
+            const message = `🚐 Ghép chuyến?\n\n` +
+                `${ride1.roomNumber} (${ride1.guestCount || 1} khách): ${ride1.pickup} → ${ride1.destination}\n` +
+                `${ride2.roomNumber} (${ride2.guestCount || 1} khách): ${ride2.pickup} → ${ride2.destination}\n\n` +
+                `💺 Tổng: ${totalGuests}/7 khách\n\n` +
+                `📝 Lưu ý hành lý:\n` +
+                `- ${ride1.roomNumber}: ${ride1.notes || 'Không có ghi chú'}\n` +
+                `- ${ride2.roomNumber}: ${ride2.notes || 'Không có ghi chú'}\n\n` +
+                `⚠️ Hãy kiểm tra hành lý trước khi ghép chuyến!`;
+                
+            if (!confirm(message)) return;
+            
+            // Create merged ride with combined information
+            const mergedNotes = [ride1.notes, ride2.notes].filter(n => n?.trim()).join(' | ') || '';
+            const mergedGuestNames = [ride1.guestName, ride2.guestName].filter(n => n?.trim()).join(' + ') || 'Multiple Guests';
+            
+            // Use the ride with earlier timestamp as base, combine room numbers
+            const baseRide = ride1.timestamp <= ride2.timestamp ? ride1 : ride2;
+            const otherRide = ride1.timestamp <= ride2.timestamp ? ride2 : ride1;
+            
+            const mergedRide = {
+                ...baseRide,
+                roomNumber: `${ride1.roomNumber}+${ride2.roomNumber}`,
+                guestName: mergedGuestNames,
+                guestCount: totalGuests,
+                notes: mergedNotes,
+                timestamp: Math.min(ride1.timestamp, ride2.timestamp) // Use earliest timestamp
+            };
+            
+            // Update the base ride and delete the other
+            await updateRide(mergedRide);
+            await deleteRide(otherRide.id!);
+            
+            // Refresh rides list
+            const updatedRides = await getRides();
+            setRides(updatedRides);
+            
+            alert(`✅ Đã ghép chuyến thành công!\n\nRoom: ${mergedRide.roomNumber}\nTổng khách: ${totalGuests}`);
+            
+        } catch (error) {
+            console.error('Failed to merge rides:', error);
+            alert('❌ Lỗi khi ghép chuyến. Vui lòng thử lại.');
+        }
+    };
     const pickupDropdownRef = useRef<HTMLDivElement>(null);
     const destinationDropdownRef = useRef<HTMLDivElement>(null);
     
@@ -890,70 +960,21 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             await new Promise(resolve => setTimeout(resolve, 800));
         }
 
-        // Combine requests that can share the same buggy (total guest count <= 7)
-        // Priority: First combine rides with same pickup/destination, then combine any rides if total guests < 7
+        // Manual ride combining only - no automatic combining
+        // Each ride will be assigned individually unless manually combined by staff
         const MAX_BUGGY_CAPACITY = 7;
         const combinedRideGroups: Array<{ rides: RideRequest[]; totalGuests: number }> = [];
-        const unassignedRides = [...pendingRidesList];
         
-        // Step 1: Try to combine rides with same pickup and destination first (priority)
-        while (unassignedRides.length > 0) {
-            const baseRide = unassignedRides.shift()!;
-            const baseGuestCount = baseRide.guestCount || 1;
-            const group: RideRequest[] = [baseRide];
-            let totalGuests = baseGuestCount;
-            
-            // Look for other rides with same pickup and destination that can be combined
-            for (let i = unassignedRides.length - 1; i >= 0; i--) {
-                const otherRide = unassignedRides[i];
-                const otherGuestCount = otherRide.guestCount || 1;
-                
-                // Check if we can combine: same pickup and destination, and total guests <= 7
-                if (baseRide.pickup === otherRide.pickup && 
-                    baseRide.destination === otherRide.destination &&
-                    totalGuests + otherGuestCount <= MAX_BUGGY_CAPACITY) {
-                    group.push(otherRide);
-                    totalGuests += otherGuestCount;
-                    unassignedRides.splice(i, 1);
-                }
-            }
-            
-            combinedRideGroups.push({ rides: group, totalGuests });
-        }
+        // Create individual groups for each ride (no auto-combining)
+        pendingRidesList.forEach(ride => {
+            combinedRideGroups.push({ 
+                rides: [ride], 
+                totalGuests: ride.guestCount || 1 
+            });
+        });
         
-        // Step 2: Try to combine remaining rides with different pickup/destination if total guests < 7
-        // Re-process groups to see if we can merge smaller groups together
-        const finalGroups: Array<{ rides: RideRequest[]; totalGuests: number }> = [];
-        const processedGroups = new Set<number>();
-        
-        for (let i = 0; i < combinedRideGroups.length; i++) {
-            if (processedGroups.has(i)) continue;
-            
-            const baseGroup = combinedRideGroups[i];
-            const mergedGroup: RideRequest[] = [...baseGroup.rides];
-            let totalGuests = baseGroup.totalGuests;
-            
-            // Try to merge with other groups if total guests < 7
-            for (let j = i + 1; j < combinedRideGroups.length; j++) {
-                if (processedGroups.has(j)) continue;
-                
-                const otherGroup = combinedRideGroups[j];
-                const otherTotalGuests = otherGroup.totalGuests;
-                
-                // If combining these groups would not exceed capacity, merge them
-                if (totalGuests + otherTotalGuests <= MAX_BUGGY_CAPACITY) {
-                    mergedGroup.push(...otherGroup.rides);
-                    totalGuests += otherTotalGuests;
-                    processedGroups.add(j);
-                }
-            }
-            
-            processedGroups.add(i);
-            finalGroups.push({ rides: mergedGroup, totalGuests });
-        }
-        
-        // Use finalGroups as the combined ride groups
-        const finalCombinedRideGroups = finalGroups;
+        // Skip automatic combining - use individual rides for assignment
+        const finalCombinedRideGroups = combinedRideGroups;
         
         // Calculate cost for all (driver, ride group) pairs - ONLY for online drivers
         const assignments: Array<{ driver: User; rides: RideRequest[]; cost: number; totalGuests: number }> = [];
@@ -1132,16 +1153,14 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         }
 
         // Check for duplicate pending ride (any status except COMPLETED)
-        // Only allow creating new ride when the previous one with same info is COMPLETED
+        // Each room can only have ONE active ride request at a time
         const duplicateRide = rides.find(r => 
             r.roomNumber === newRideData.roomNumber &&
-            r.pickup === newRideData.pickup &&
-            r.destination === newRideData.destination &&
-            r.status !== BuggyStatus.COMPLETED // Block if there's any non-completed ride
+            r.status !== BuggyStatus.COMPLETED // Block if there's any non-completed ride for this room
         );
 
         if (duplicateRide) {
-            alert(`A pending ride already exists for Room ${newRideData.roomNumber} from ${newRideData.pickup} to ${newRideData.destination} (Status: ${duplicateRide.status}). Please wait for it to complete or cancel it first.`);
+            alert(`Room ${newRideData.roomNumber} already has an active ride request (${duplicateRide.pickup} → ${duplicateRide.destination}, Status: ${duplicateRide.status}). Please wait for it to complete or cancel it first.`);
             return;
         }
 
@@ -1327,7 +1346,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                     <span className="text-xs font-semibold text-gray-700">
                                         {getPendingRequestsCount()}
                                     </span>
-                                    <span className="text-[10px] text-gray-500">Pending</span>
+                                    <span className="text-sm text-gray-500">Pending</span>
                                 </div>
                                 <div className="w-px h-4 bg-gray-300"></div>
                                 <div className="flex items-center gap-1">
@@ -1335,7 +1354,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                     <span className="text-xs font-semibold text-gray-700">
                                         {getOnlineDriversCount()}
                                     </span>
-                                    <span className="text-[10px] text-gray-500">Online</span>
+                                    <span className="text-sm text-gray-500">Online</span>
                                 </div>
                             </div>
                         </div>
@@ -1828,9 +1847,33 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                         <Car size={14} />
                                         New Ride
                                     </button>
+                                    
+                                    {/* Merge Options Button */}
+                                    {(() => {
+                                        const pendingRides = rides.filter(r => r.status === BuggyStatus.SEARCHING);
+                                        let mergeCount = 0;
+                                        for (let i = 0; i < pendingRides.length - 1; i++) {
+                                            for (let j = i + 1; j < pendingRides.length; j++) {
+                                                if (canCombineRides(pendingRides[i], pendingRides[j])) {
+                                                    mergeCount++;
+                                                }
+                                            }
+                                        }
+                                        if (mergeCount === 0) return null;
+                                        return (
+                                            <button
+                                                onClick={() => setShowMergeModal(true)}
+                                                className="flex items-center gap-1 px-2.5 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded transition-colors"
+                                                title="View Merge Options"
+                                            >
+                                                🔗 Merge ({mergeCount})
+                                            </button>
+                                        );
+                                    })()}
+                                    
                                     {fleetConfig.autoAssignEnabled && (
                                         <div className="flex items-center gap-1.5">
-                                            <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-semibold">
+                                            <span className="text-sm bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-semibold">
                                                 Auto: {fleetConfig.maxWaitTimeBeforeAutoAssign}s
                                             </span>
                                             <span className="text-[9px] text-gray-500">(Active)</span>
@@ -1886,7 +1929,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                             })
                                             .sort((a, b) => b.waitTime - a.waitTime); // Longest wait first
                                         
-                                        return pendingRides.map(({ ride, waitTime }) => {
+                                        return pendingRides.map(({ ride, waitTime }, index) => {
                                             const waitMinutes = Math.floor(waitTime / 60);
                                             const waitSeconds = waitTime % 60;
                                             const rideType = getRideType(ride);
@@ -1901,41 +1944,52 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                             if (waitTime >= 600) { // 10+ minutes = urgent
                                                 urgencyLevel = 'urgent';
                                                 bgColor = 'bg-red-50';
-                                                borderColor = 'border-red-300';
+                                                borderColor = 'border-red-400';
                                                 textColor = 'text-red-900';
                                                 accentColor = 'bg-red-100';
                                             } else if (waitTime >= 300) { // 5-10 minutes = warning
                                                 urgencyLevel = 'warning';
                                                 bgColor = 'bg-orange-50';
-                                                borderColor = 'border-orange-300';
+                                                borderColor = 'border-orange-400';
                                                 textColor = 'text-orange-900';
                                                 accentColor = 'bg-orange-100';
+                                            } else {
+                                                bgColor = 'bg-white';
+                                                borderColor = 'border-gray-300';
+                                                textColor = 'text-gray-900';
+                                                accentColor = 'bg-gray-50';
                                             }
                                             
                                             return (
                                                 <div 
                                                     key={ride.id} 
-                                                    className={`${bgColor} ${borderColor} p-3 rounded-lg border-2 transition-all duration-200 ${
-                                                        urgencyLevel === 'urgent' ? 'shadow-md ring-2 ring-red-200' : 
-                                                        urgencyLevel === 'warning' ? 'shadow-sm' : ''
+                                                    className={`${bgColor} ${borderColor} p-2.5 rounded-lg border-2 transition-all duration-200 ${
+                                                        urgencyLevel === 'urgent' ? 'shadow-md border-l-4 border-l-red-600' : 
+                                                        urgencyLevel === 'warning' ? 'shadow-md border-l-4 border-l-orange-600' : 'shadow-sm border-l-4 border-l-blue-500'
                                                     }`}
                                                 >
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className={`font-bold text-sm ${textColor}`}>
+                                                    {/* Top Row: Room, Badges, Timer */}
+                                                    <div className="flex justify-between items-center mb-3">
+                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                            <div className={`font-semibold text-base ${textColor} flex-shrink-0`}>
                                                                 Room {ride.roomNumber}
                                                             </div>
+                                                            <div className={`text-sm font-medium text-gray-600 truncate`}>
+                                                                {ride.guestName}
+                                                            </div>
+                                                            
+                                                            {/* Service Type Badges */}
                                                             {rideType.labels.length > 0 && (
-                                                                <div className="flex gap-1">
+                                                                <div className="flex gap-1 flex-shrink-0">
                                                                     {rideType.labels.map((label, idx) => (
                                                                         <span 
                                                                             key={idx}
-                                                                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                                                            className={`text-xs font-medium px-2 py-1 rounded border ${
                                                                                 label === 'AC' 
-                                                                                    ? 'bg-purple-200 text-purple-800' 
+                                                                                    ? 'bg-purple-100 text-purple-700 border-purple-300' 
                                                                                     : label === 'PU'
-                                                                                    ? 'bg-blue-200 text-blue-800'
-                                                                                    : 'bg-emerald-200 text-emerald-800'
+                                                                                    ? 'bg-blue-100 text-blue-700 border-blue-300'
+                                                                                    : 'bg-green-100 text-green-700 border-green-300'
                                                                             }`}
                                                                         >
                                                                             {label}
@@ -1943,61 +1997,67 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                     ))}
                                                                 </div>
                                                             )}
+                                                            
                                                         </div>
-                                                        <div className={`flex items-center gap-1 ${urgencyLevel === 'urgent' ? 'text-red-700' : urgencyLevel === 'warning' ? 'text-orange-700' : 'text-gray-600'}`}>
-                                                            <span className="text-xs font-bold">
-                                                                ⏱ {waitMinutes}m {waitSeconds}s
-                                                            </span>
+                                                        
+                                                        {/* Wait Time */}
+                                                        <div className={`flex items-center gap-1 px-2 py-1 text-sm font-bold border rounded ${
+                                                            urgencyLevel === 'urgent' ? 'text-red-700 bg-red-100 border-red-300' : 
+                                                            urgencyLevel === 'warning' ? 'text-orange-700 bg-orange-100 border-orange-300' : 'text-gray-600 bg-gray-100 border-gray-300'
+                                                        } flex-shrink-0`}>
+                                                            <span>⏱</span>
+                                                            <span>{waitMinutes}m {waitSeconds}s</span>
                                                         </div>
                                                     </div>
                                                     
-                                                    <div className={`text-xs font-medium ${urgencyLevel === 'urgent' ? 'text-red-800' : urgencyLevel === 'warning' ? 'text-orange-800' : 'text-gray-700'} mb-2`}>
-                                                        {ride.guestName}
-                                                    </div>
-                                                    
-                                                    <div className="space-y-1.5">
-                                                        <div className={`flex items-start gap-2 ${accentColor} p-2 rounded-md`}>
-                                                            <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
-                                                                <div className={`w-2 h-2 rounded-full ${
-                                                                    rideType.labels.includes('PU') ? 'bg-blue-500' : 'bg-gray-400'
-                                                                }`}></div>
-                                                                <span className="text-[9px] font-semibold text-gray-600 uppercase">
-                                                                    {rideType.labels.includes('PU') ? 'Pick Up' : 'From'}
-                                                                </span>
-                                                            </div>
-                                                            <span className={`text-[11px] font-medium ${urgencyLevel === 'urgent' ? 'text-red-900' : urgencyLevel === 'warning' ? 'text-orange-900' : 'text-gray-800'} flex-1`}>
+                                                    {/* Route Row: Horizontal FROM -> TO */}
+                                                    <div className="flex items-center gap-3 mb-3">
+                                                        {/* From */}
+                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                            <div className={`w-2 h-2 rounded-full ${
+                                                                rideType.labels.includes('PU') ? 'bg-blue-500' : 'bg-gray-400'
+                                                            } flex-shrink-0`}></div>
+                                                            <span className="text-xs font-medium text-gray-500 uppercase border border-gray-300 px-2 py-0.5 rounded bg-gray-50">FROM</span>
+                                                            <span className={`text-sm font-medium ${textColor} truncate flex-1`}>
                                                                 {ride.pickup}
                                                             </span>
                                                         </div>
-                                                        <div className={`flex items-start gap-2 ${accentColor} p-2 rounded-md`}>
-                                                            <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
-                                                                <div className={`w-2 h-2 rounded-full ${
-                                                                    rideType.labels.includes('DO') ? 'bg-emerald-500' : 'bg-gray-400'
-                                                                }`}></div>
-                                                                <span className="text-[9px] font-semibold text-gray-600 uppercase">
-                                                                    {rideType.labels.includes('DO') ? 'Drop Off' : 'To'}
-                                                                </span>
-                                                            </div>
-                                                            <span className={`text-[11px] font-medium ${urgencyLevel === 'urgent' ? 'text-red-900' : urgencyLevel === 'warning' ? 'text-orange-900' : 'text-gray-800'} flex-1`}>
+                                                        
+                                                        {/* Arrow */}
+                                                        <div className="text-gray-400 text-base flex-shrink-0">→</div>
+                                                        
+                                                        {/* To */}
+                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                            <div className={`w-2 h-2 rounded-full ${
+                                                                rideType.labels.includes('DO') ? 'bg-green-500' : 'bg-gray-400'
+                                                            } flex-shrink-0`}></div>
+                                                            <span className="text-xs font-medium text-gray-500 uppercase border border-gray-300 px-2 py-0.5 rounded bg-gray-50">TO</span>
+                                                            <span className={`text-sm font-medium ${textColor} truncate flex-1`}>
                                                                 {ride.destination}
                                                             </span>
                                                         </div>
-                                                        
+                                                    </div>
+                                                    
+                                                    {/* Bottom Row: Guest Count & Notes - Inline */}
+                                                    <div className="flex items-center gap-3 text-sm">
                                                         {/* Guest Count */}
                                                         {(ride.guestCount && ride.guestCount > 1) && (
-                                                            <div className={`flex items-center gap-2 ${accentColor} p-2 rounded-md`}>
-                                                                <span className="text-[9px] font-semibold text-gray-600">👥</span>
-                                                                <span className={`text-[11px] font-medium ${urgencyLevel === 'urgent' ? 'text-red-900' : urgencyLevel === 'warning' ? 'text-orange-900' : 'text-gray-800'}`}>
-                                                                    {ride.guestCount} {ride.guestCount === 1 ? 'guest' : 'guests'}
+                                                            <div className={`flex items-center gap-1 px-2 py-1 rounded border ${
+                                                                urgencyLevel === 'urgent' ? 'bg-red-100 text-red-700 border-red-300' : 
+                                                                urgencyLevel === 'warning' ? 'bg-orange-100 text-orange-700 border-orange-300' : 'bg-blue-100 text-blue-700 border-blue-300'
+                                                            } flex-shrink-0`}>
+                                                                <span>👥</span>
+                                                                <span className="font-medium">
+                                                                    {ride.guestCount} guests
                                                                 </span>
                                                             </div>
                                                         )}
                                                         
-                                                        {/* Notes */}
+                                                        {/* Notes - Truncated */}
                                                         {ride.notes && ride.notes.trim() && (
-                                                            <div className={`flex items-start gap-2 bg-amber-50 border border-amber-200 p-2 rounded-md`}>
-                                                                <span className="text-[9px] font-semibold text-amber-700 flex-shrink-0 mt-0.5">📝</span>
-                                                                <span className={`text-[10px] font-medium text-amber-900 flex-1 break-words`}>
+                                                            <div className="flex items-center gap-2 flex-1 min-w-0 px-2 py-1 bg-amber-100 border border-amber-300 rounded">
+                                                                <span className="text-amber-600 flex-shrink-0">📝</span>
+                                                                <span className="font-medium text-amber-700 truncate">
                                                                     {ride.notes}
                                                                 </span>
                                                             </div>
@@ -2008,6 +2068,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                         });
                                     })()
                                 )}
+                                
                             </div>
                         </div>
 
@@ -2628,40 +2689,72 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                             return (
                                                 <div 
                                                     key={ride.id} 
-                                                    className="bg-gray-50 p-2.5 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors"
+                                                    className="bg-white p-3 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors shadow-sm"
                                                 >
-                                                    <div className="flex items-start justify-between gap-2 mb-1.5">
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-1.5 mb-1">
-                                                                <span className="text-xs font-bold text-gray-800">Room {ride.roomNumber}</span>
-                                                                {ride.rating && (
-                                                                    <div className="flex items-center gap-0.5">
-                                                                        <Star size={10} className="text-yellow-500 fill-yellow-500" />
-                                                                        <span className="text-[9px] font-semibold text-gray-600">{ride.rating}</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <div className="text-[10px] text-gray-600 mb-0.5">
+                                                    {/* Top Row: Room, Driver, Status */}
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                                            <span className="text-sm font-bold text-gray-800">Room {ride.roomNumber}</span>
+                                                            <span className="text-sm text-gray-600 truncate">
                                                                 <span className="font-medium">Driver:</span> {driverName}
-                                                            </div>
-                                                            <div className="text-[10px] text-gray-500 space-y-0.5">
-                                                                <div className="flex items-center gap-1">
-                                                                    <div className="w-1 h-1 rounded-full bg-blue-500"></div>
-                                                                    <span className="truncate" title={ride.pickup}>{truncateText(ride.pickup, 25)}</span>
+                                                            </span>
+                                                            {ride.rating && (
+                                                                <div className="flex items-center gap-1 bg-yellow-100 px-2 py-0.5 rounded border border-yellow-300 flex-shrink-0">
+                                                                    <Star size={12} className="text-yellow-600 fill-yellow-600" />
+                                                                    <span className="text-xs font-semibold text-yellow-700">{ride.rating}</span>
                                                                 </div>
-                                                                <div className="flex items-center gap-1">
-                                                                    <div className="w-1 h-1 rounded-full bg-emerald-500"></div>
-                                                                    <span className="truncate" title={ride.destination}>{truncateText(ride.destination, 25)}</span>
-                                                                </div>
-                                                            </div>
+                                                            )}
                                                         </div>
-                                                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                                            <span className="flex items-center gap-0.5 text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">
-                                                                <CheckCircle size={9} />
+                                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                                            <span className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium border border-green-300">
+                                                                <CheckCircle size={12} />
                                                                 Completed
                                                             </span>
-                                                            <span className="text-[9px] text-gray-400 font-medium">
+                                                            <span className="text-xs text-gray-500 font-medium">
                                                                 {timeAgoText}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Route Row: FROM -> TO horizontal */}
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        {/* From */}
+                                                        <div className="flex items-center gap-1 flex-1 min-w-0">
+                                                            <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0"></div>
+                                                            <span className="text-xs font-medium text-gray-500 uppercase border border-gray-300 px-1.5 py-0.5 rounded bg-gray-50">FROM</span>
+                                                            <span className="text-sm font-medium text-gray-700 truncate flex-1">
+                                                                {ride.pickup}
+                                                            </span>
+                                                        </div>
+                                                        
+                                                        {/* Arrow */}
+                                                        <div className="text-gray-400 text-sm flex-shrink-0">→</div>
+                                                        
+                                                        {/* To */}
+                                                        <div className="flex items-center gap-1 flex-1 min-w-0">
+                                                            <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0"></div>
+                                                            <span className="text-xs font-medium text-gray-500 uppercase border border-gray-300 px-1.5 py-0.5 rounded bg-gray-50">TO</span>
+                                                            <span className="text-sm font-medium text-gray-700 truncate flex-1">
+                                                                {ride.destination}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {/* Bottom Row: Guest Count & Notes */}
+                                                    <div className="flex items-center gap-3 text-sm">
+                                                        {/* Guest Count - Always show */}
+                                                        <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded border border-blue-300 flex-shrink-0">
+                                                            <span>👥</span>
+                                                            <span className="font-medium">
+                                                                {ride.guestCount || 1} guest{(ride.guestCount || 1) === 1 ? '' : 's'}
+                                                            </span>
+                                                        </div>
+                                                        
+                                                        {/* Notes - Show placeholder if empty */}
+                                                        <div className="flex items-center gap-2 flex-1 min-w-0 px-2 py-1 bg-amber-100 border border-amber-300 rounded">
+                                                            <span className="text-amber-600 flex-shrink-0">📝</span>
+                                                            <span className="font-medium text-amber-700 truncate">
+                                                                {(ride.notes && ride.notes.trim()) ? ride.notes : 'No special notes'}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -2679,6 +2772,146 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                         </div>
                     </div>
                         </>
+                    )}
+
+                    {/* Merge Options Modal */}
+                    {showMergeModal && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden relative">
+                                {/* Header */}
+                                <div className="bg-blue-600 text-white p-4 flex justify-between items-center rounded-t-xl flex-shrink-0">
+                                    <h3 className="text-lg font-bold flex items-center gap-2">
+                                        🔗 Merge Options
+                                    </h3>
+                                    <button
+                                        onClick={() => setShowMergeModal(false)}
+                                        className="text-white hover:text-gray-200 transition"
+                                    >
+                                        <X size={24} />
+                                    </button>
+                                </div>
+                                
+                                {/* Content */}
+                                <div className="p-4 overflow-y-auto flex-1">
+                                    {(() => {
+                                        const pendingRides = rides.filter(r => r.status === BuggyStatus.SEARCHING);
+                                        const mergeOptions: Array<{
+                                            ride1: RideRequest;
+                                            ride2: RideRequest;
+                                            totalGuests: number;
+                                            isSameRoute: boolean;
+                                            key: string;
+                                        }> = [];
+                                        
+                                        // Find all combinable pairs
+                                        for (let i = 0; i < pendingRides.length - 1; i++) {
+                                            for (let j = i + 1; j < pendingRides.length; j++) {
+                                                if (canCombineRides(pendingRides[i], pendingRides[j])) {
+                                                    const ride1 = pendingRides[i];
+                                                    const ride2 = pendingRides[j];
+                                                    const totalGuests = (ride1.guestCount || 1) + (ride2.guestCount || 1);
+                                                    const isSameRoute = ride1.pickup === ride2.pickup && ride1.destination === ride2.destination;
+                                                    
+                                                    mergeOptions.push({
+                                                        ride1, ride2, totalGuests, isSameRoute,
+                                                        key: `merge-${ride1.id}-${ride2.id}`
+                                                    });
+                                                }
+                                            }
+                                        }
+                                        
+                                        if (mergeOptions.length === 0) {
+                                            return (
+                                                <div className="text-center py-8 text-gray-500">
+                                                    <p className="text-lg">No merge options available</p>
+                                                    <p className="text-sm mt-2">Need at least 2 pending rides with combined guests ≤ 7</p>
+                                                </div>
+                                            );
+                                        }
+                                        
+                                        return (
+                                            <div className="space-y-3">
+                                                <p className="text-sm text-gray-600 mb-4">
+                                                    Found {mergeOptions.length} possible merge combination{mergeOptions.length > 1 ? 's' : ''}. 
+                                                    Click "Ghép" to combine rides.
+                                                </p>
+                                                {mergeOptions.map(({ ride1, ride2, totalGuests, isSameRoute, key }) => (
+                                                    <div key={key} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="font-semibold text-gray-800 flex items-center gap-2">
+                                                                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-sm">
+                                                                        Room {ride1.roomNumber}
+                                                                    </span>
+                                                                    <span className="text-blue-500">+</span>
+                                                                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-sm">
+                                                                        Room {ride2.roomNumber}
+                                                                    </span>
+                                                                </div>
+                                                                
+                                                                <div className="mt-2 space-y-1 text-sm">
+                                                                    <div className="flex items-center gap-2 text-gray-600">
+                                                                        <MapPin size={14} className="text-green-500 flex-shrink-0" />
+                                                                        <span className="truncate">{ride1.pickup} → {ride1.destination}</span>
+                                                                    </div>
+                                                                    {!isSameRoute && (
+                                                                        <div className="flex items-center gap-2 text-gray-600">
+                                                                            <MapPin size={14} className="text-orange-500 flex-shrink-0" />
+                                                                            <span className="truncate">{ride2.pickup} → {ride2.destination}</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                
+                                                                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                                                                    <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                                                        👥 {totalGuests}/7 guests
+                                                                    </span>
+                                                                    <span className={`px-2 py-1 rounded ${
+                                                                        isSameRoute ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                                                    }`}>
+                                                                        {isSameRoute ? '🎯 Same Route' : '🔄 Smart Route'}
+                                                                    </span>
+                                                                </div>
+                                                                
+                                                                {(ride1.notes || ride2.notes) && (
+                                                                    <div className="mt-2 text-xs text-gray-500 bg-amber-50 p-2 rounded border border-amber-200">
+                                                                        📝 <strong>Notes:</strong> {[ride1.notes, ride2.notes].filter(n => n?.trim()).join(' | ') || 'No notes'}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            
+                                                            <button
+                                                                onClick={() => {
+                                                                    handleMergeRides(ride1.id!, ride2.id!);
+                                                                    setShowMergeModal(false);
+                                                                }}
+                                                                className={`px-4 py-2 rounded-lg font-semibold text-sm transition hover:scale-105 flex-shrink-0 ${
+                                                                    isSameRoute 
+                                                                        ? 'bg-green-500 text-white hover:bg-green-600' 
+                                                                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                                                                }`}
+                                                            >
+                                                                🔗 Ghép
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                                
+                                {/* Footer */}
+                                <div className="p-4 border-t bg-gray-50 flex justify-end">
+                                    <button
+                                        onClick={() => setShowMergeModal(false)}
+                                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition"
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     )}
 
                     {/* Create New Ride Modal */}
@@ -2882,20 +3115,22 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                                             Số lượng khách <span className="text-red-500">*</span>
                                         </label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            max="7"
+                                        <select
                                             value={newRideData.guestCount || 1}
                                             onChange={(e) => {
-                                                const value = parseInt(e.target.value) || 1;
-                                                if (value >= 1 && value <= 7) {
-                                                    setNewRideData(prev => ({ ...prev, guestCount: value }));
-                                                }
+                                                const value = parseInt(e.target.value);
+                                                setNewRideData(prev => ({ ...prev, guestCount: value }));
                                             }}
-                                            placeholder="1"
                                             className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                        />
+                                        >
+                                            <option value={1}>1 khách</option>
+                                            <option value={2}>2 khách</option>
+                                            <option value={3}>3 khách</option>
+                                            <option value={4}>4 khách</option>
+                                            <option value={5}>5 khách</option>
+                                            <option value={6}>6 khách</option>
+                                            <option value={7}>7 khách</option>
+                                        </select>
                                         <p className="text-xs text-gray-500 mt-1">Tối đa 7 khách mỗi xe buggy</p>
                                     </div>
 
@@ -2974,7 +3209,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                     <span className="text-xs font-semibold text-gray-700">
                                         {getPendingServiceRequestsCount()}
                                     </span>
-                                    <span className="text-[10px] text-gray-500">Pending</span>
+                                    <span className="text-sm text-gray-500">Pending</span>
                                 </div>
                                 <div className="w-px h-4 bg-gray-300"></div>
                                 <div className="flex items-center gap-1">
@@ -2982,7 +3217,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                     <span className="text-xs font-semibold text-gray-700">
                                         {getConfirmedServiceRequestsCount()}
                                     </span>
-                                    <span className="text-[10px] text-gray-500">Confirmed</span>
+                                    <span className="text-sm text-gray-500">Confirmed</span>
                                 </div>
                             </div>
                         </div>
@@ -3546,4 +3781,5 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
 };
 
 export default ReceptionPortal;
+
 
