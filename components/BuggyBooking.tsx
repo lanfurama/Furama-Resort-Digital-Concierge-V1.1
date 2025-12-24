@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Clock, Car, Navigation, LocateFixed, XCircle, Search, Utensils, Coffee, Waves, Building2, CheckCircle, Loader2, ChevronDown } from 'lucide-react';
+import { MapPin, Clock, Car, Navigation, LocateFixed, XCircle, Search, Utensils, Coffee, Waves, Building2, CheckCircle, Loader2, ChevronDown, X } from 'lucide-react';
 import { BuggyStatus, User, RideRequest, Location } from '../types';
-import { getLocations, requestRide, getActiveRideForUser, cancelRide, getUsers } from '../services/dataService';
+import { getLocations, requestRide, getActiveRideForUser, cancelRide, getUsers, getRides } from '../services/dataService';
 import { THEME_COLORS, RESORT_CENTER } from '../constants';
 import ServiceChat from './ServiceChat';
 import { useTranslation } from '../contexts/LanguageContext';
@@ -19,6 +19,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [pickup, setPickup] = useState<string>(`Villa ${user.roomNumber}`);
   const [destination, setDestination] = useState<string>('');
   const [guestCount, setGuestCount] = useState<number>(1); // Number of guests (1-7)
+  const [notes, setNotes] = useState<string>(''); // Notes for luggage, lost items, or special instructions
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoadingRide, setIsLoadingRide] = useState(true);
   const [isLoadingLocations, setIsLoadingLocations] = useState(true);
@@ -51,6 +52,9 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   
   // Driver name state for chat label
   const [driverName, setDriverName] = useState<string>(t('driver'));
+  
+  // Shared ride information (if ride is combined with other rides)
+  const [sharedRidesInfo, setSharedRidesInfo] = useState<{ totalGuests: number; sharedCount: number } | null>(null);
   
   // Sound notification state
   const [soundEnabled, setSoundEnabled] = useState(() => {
@@ -279,17 +283,63 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                   }
               }
               
+              // Only update state if ride data actually changed to prevent unnecessary re-renders
+              const currentRide = activeRideRef.current;
+              const rideChanged = !currentRide || 
+                  currentRide.id !== ride?.id ||
+                  currentRide.status !== ride?.status ||
+                  currentRide.driverId !== ride?.driverId ||
+                  currentRide.guestCount !== ride?.guestCount ||
+                  currentRide.pickup !== ride?.pickup ||
+                  currentRide.destination !== ride?.destination;
+              
               // Update refs
               previousStatusRef.current = ride?.status || null;
               activeRideRef.current = ride;
               
-              // Update state
-              setPreviousStatus(ride?.status || null);
-              setActiveRide(ride);
-              // Restore destination from active ride if exists
-              if (ride && ride.destination) {
-                  setDestination(ride.destination);
+              // Only update state if something actually changed
+              if (rideChanged) {
+                  setPreviousStatus(ride?.status || null);
+                  setActiveRide(ride);
+                  // Restore destination from active ride if exists and changed
+                  if (ride && ride.destination && ride.destination !== destination) {
+                      setDestination(ride.destination);
+                  }
               }
+              
+              // Check for shared rides (if ride is combined with other rides)
+              // Only check when driver is assigned and status allows sharing, and only if driverId changed
+              if (ride && ride.driverId && (ride.status === BuggyStatus.ASSIGNED || ride.status === BuggyStatus.ARRIVING || ride.status === BuggyStatus.ON_TRIP)) {
+                  // Only check shared rides if driverId changed or we don't have sharedRidesInfo yet
+                  const shouldCheckShared = !currentRide || currentRide.driverId !== ride.driverId || !sharedRidesInfo;
+                  
+                  if (shouldCheckShared) {
+                      try {
+                          const allRides = await getRides();
+                          const sharedRides = allRides.filter(r => 
+                              r.id !== ride.id &&
+                              r.driverId === ride.driverId &&
+                              (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP)
+                          );
+                          
+                          if (sharedRides.length > 0) {
+                              const totalGuests = (ride.guestCount || 1) + sharedRides.reduce((sum, r) => sum + (r.guestCount || 1), 0);
+                              setSharedRidesInfo({ totalGuests, sharedCount: sharedRides.length });
+                          } else {
+                              setSharedRidesInfo(null);
+                          }
+                      } catch (error) {
+                          console.error('Failed to check shared rides:', error);
+                          setSharedRidesInfo(null);
+                      }
+                  }
+              } else {
+                  // Clear shared rides info if ride status doesn't allow sharing
+                  if (sharedRidesInfo) {
+                      setSharedRidesInfo(null);
+                  }
+              }
+              
               setIsLoadingRide(false);
           } catch (error) {
               if (!isMountedRef.current) return;
@@ -300,11 +350,24 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       
       checkStatus(); // Check immediately on mount
       
-      // Adaptive polling: faster when there's an active ride (3s), slower when no ride (10s)
+      // Adaptive polling: slower when SEARCHING to reduce flickering
       const scheduleNext = () => {
           if (!isMountedRef.current) return;
           
-          const pollingInterval = activeRideRef.current ? 3000 : 10000;
+          // Use longer intervals to reduce flickering:
+          // - SEARCHING: 5s (less frequent updates, status rarely changes)
+          // - ASSIGNED/ARRIVING: 3s (more frequent, driver is moving)
+          // - ON_TRIP: 3s (more frequent, trip in progress)
+          // - No ride: 10s (slow polling when idle)
+          let pollingInterval = 10000; // Default: no ride
+          if (activeRideRef.current) {
+              if (activeRideRef.current.status === BuggyStatus.SEARCHING) {
+                  pollingInterval = 5000; // 5s for SEARCHING to reduce flickering
+              } else {
+                  pollingInterval = 3000; // 3s for ASSIGNED/ARRIVING/ON_TRIP
+              }
+          }
+          
           const interval = setTimeout(() => {
               intervalsRef.current.delete(interval);
               if (isMountedRef.current) {
@@ -509,7 +572,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     
     setIsBooking(true); // Set booking state immediately to prevent double-click
     try {
-      const newRide = await requestRide(user.lastName, user.roomNumber, pickup, destination, guestCount || 1);
+      const newRide = await requestRide(user.lastName, user.roomNumber, pickup, destination, guestCount || 1, notes || undefined);
       // Re-check status from server to ensure UI is in sync
       const updatedRide = await getActiveRideForUser(user.roomNumber);
       setActiveRide(updatedRide || newRide);
@@ -518,6 +581,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       setPreviousStatus((updatedRide || newRide)?.status || null);
       setDestination(''); // Clear destination after booking
       setGuestCount(1); // Reset guest count after booking
+      setNotes(''); // Reset notes after booking
     } catch (error) {
       console.error('Failed to request ride:', error);
       alert('Failed to request ride. Please try again.');
@@ -848,6 +912,30 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                   </div>
                 </div>
                 
+                {/* Guest Count & Shared Ride Info */}
+                <div className="mt-2.5 pt-2.5 border-t border-gray-200 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                    <span className="font-semibold">👥</span>
+                    <span>{activeRide.guestCount || 1} {activeRide.guestCount === 1 ? 'guest' : 'guests'}</span>
+                  </div>
+                  {sharedRidesInfo && sharedRidesInfo.sharedCount > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-lg border border-blue-200">
+                      <span className="font-semibold">🔗</span>
+                      <span>Shared ride ({sharedRidesInfo.totalGuests} total guests)</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Notes */}
+                {activeRide.notes && activeRide.notes.trim() && (
+                  <div className="mt-2.5 pt-2.5 border-t border-gray-200">
+                    <div className="flex items-start gap-2 text-xs text-gray-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                      <span className="font-semibold text-amber-600 flex-shrink-0">📝</span>
+                      <span className="flex-1">{activeRide.notes}</span>
+                    </div>
+                  </div>
+                )}
+                
                 {/* Progress Bar */}
                 {(activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && (
                   <div className="mt-2.5 pt-2.5 border-t border-gray-200">
@@ -998,156 +1086,6 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                                 </div>
                                 <ChevronDown className={`w-4 h-4 text-blue-600 flex-shrink-0 transition-transform duration-200 ${showPickupDropdown ? 'rotate-180' : ''}`} />
                             </button>
-                            
-                            {/* Pickup Dropdown - Only show when button is clicked */}
-                            {showPickupDropdown && (
-                                <div className="mt-2 space-y-2 animate-in slide-in-from-top-2">
-                                    {/* Pickup Search Bar */}
-                                    <div className="relative">
-                                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-400 w-3.5 h-3.5" />
-                                        <input
-                                            type="text"
-                                            placeholder="Search pickup location..."
-                                            value={pickupSearchQuery}
-                                            onChange={(e) => setPickupSearchQuery(e.target.value)}
-                                            className="w-full pl-9 pr-3 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 bg-white border-2 border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all hover:border-blue-300 caret-blue-600"
-                                            style={{ caretColor: '#2563eb' }}
-                                        />
-                                    </div>
-                                    
-                                    {/* Pickup Filter Buttons */}
-                                    <div className="flex flex-wrap gap-1.5">
-                                        <button
-                                            onClick={() => setPickupFilterType('VILLA')}
-                                            className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-1.5 ${
-                                                pickupFilterType === 'VILLA'
-                                                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-300/50'
-                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                            }`}
-                                        >
-                                            <Building2 className="w-3.5 h-3.5" />
-                                            Villas
-                                        </button>
-                                        <button
-                                            onClick={() => setPickupFilterType('FACILITY')}
-                                            className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-1.5 ${
-                                                pickupFilterType === 'FACILITY'
-                                                    ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md shadow-purple-300/50'
-                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                            }`}
-                                        >
-                                            <Waves className="w-3.5 h-3.5" />
-                                            Facilities
-                                        </button>
-                                        <button
-                                            onClick={() => setPickupFilterType('RESTAURANT')}
-                                            className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-1.5 ${
-                                                pickupFilterType === 'RESTAURANT'
-                                                    ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-md shadow-pink-300/50'
-                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                            }`}
-                                        >
-                                            <Utensils className="w-3.5 h-3.5" />
-                                            Restaurants
-                                        </button>
-                                        <button
-                                            onClick={() => setPickupFilterType('ALL')}
-                                            className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 ${
-                                                pickupFilterType === 'ALL'
-                                                    ? 'bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-md shadow-indigo-300/50'
-                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                            }`}
-                                        >
-                                            All
-                                        </button>
-                                    </div>
-                                    
-                                    {/* Pickup Locations Dropdown */}
-                                    <div className="max-h-60 overflow-y-auto border-2 border-blue-200 rounded-lg bg-white p-2 scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-gray-100">
-                                        {locations
-                                            .filter(loc => {
-                                                const matchesSearch = !pickupSearchQuery || loc.name.toLowerCase().includes(pickupSearchQuery.toLowerCase());
-                                                const matchesFilter = pickupFilterType === 'ALL' || loc.type === pickupFilterType;
-                                                return matchesSearch && matchesFilter;
-                                            })
-                                            .sort((a, b) => a.name.localeCompare(b.name))
-                                            .length > 0 ? (
-                                                <div className="grid grid-cols-5 gap-2">
-                                                    {locations
-                                                        .filter(loc => {
-                                                            const matchesSearch = !pickupSearchQuery || loc.name.toLowerCase().includes(pickupSearchQuery.toLowerCase());
-                                                            const matchesFilter = pickupFilterType === 'ALL' || loc.type === pickupFilterType;
-                                                            return matchesSearch && matchesFilter;
-                                                        })
-                                                        .sort((a, b) => a.name.localeCompare(b.name))
-                                                        .map((loc) => {
-                                                            const isSameAsDestination = loc.name === destination;
-                                                            return (
-                                                                <button
-                                                                    key={loc.id || loc.name}
-                                                                    onClick={() => {
-                                                                        // Check if selected pickup is the same as destination
-                                                                        if (isSameAsDestination) {
-                                                                            setNotification({ 
-                                                                                message: 'Pickup and destination cannot be the same. Please choose a different location.', 
-                                                                                type: 'warning' 
-                                                                            });
-                                                                            setShowPickupDropdown(false);
-                                                                            setPickupSearchQuery('');
-                                                                            return;
-                                                                        }
-                                                                        setPickup(loc.name);
-                                                                        setShowPickupDropdown(false);
-                                                                        setPickupSearchQuery('');
-                                                                    }}
-                                                                    title={isSameAsDestination ? 'Cannot select same as destination location' : loc.name}
-                                                                    disabled={isSameAsDestination}
-                                                                    className={`group relative min-h-[80px] h-auto p-1.5 rounded-xl border-2 transition-all duration-300 flex flex-col items-center justify-center ${
-                                                                        pickup === loc.name
-                                                                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-blue-500 shadow-lg shadow-blue-300/50'
-                                                                            : isSameAsDestination
-                                                                            ? 'bg-red-50 border-red-200 opacity-60 cursor-not-allowed'
-                                                                            : 'bg-white border-gray-300 hover:border-blue-400 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 hover:shadow-md'
-                                                                    }`}
-                                                                >
-                                                                    {/* Icon */}
-                                                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center mb-1 flex-shrink-0 transition-all ${
-                                                                        pickup === loc.name 
-                                                                            ? 'bg-white/30' 
-                                                                            : isSameAsDestination
-                                                                            ? 'bg-red-100'
-                                                                            : 'bg-gradient-to-br from-blue-100 to-indigo-100 group-hover:from-blue-200 group-hover:to-indigo-200'
-                                                                    }`}>
-                                                                        <MapPin className={`w-3 h-3 ${
-                                                                            pickup === loc.name ? 'text-white' : isSameAsDestination ? 'text-red-600' : 'text-blue-700'
-                                                                        }`} />
-                                                                    </div>
-                                                                    
-                                                                    {/* Name */}
-                                                                    <div className={`text-[10px] font-bold text-center leading-tight px-0.5 break-words ${
-                                                                        pickup === loc.name ? 'text-white' : isSameAsDestination ? 'text-red-600' : 'text-gray-800'
-                                                                    }`}>
-                                                                        {loc.name}
-                                                                    </div>
-                                                                    
-                                                                    {/* Selected indicator */}
-                                                                    {pickup === loc.name && (
-                                                                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full flex items-center justify-center shadow-md">
-                                                                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-                                                                        </div>
-                                                                    )}
-                                                                </button>
-                                                            );
-                                                        })}
-                                                </div>
-                                            ) : (
-                                                <div className="text-center py-4 text-xs text-gray-500">
-                                                    No locations found
-                                                </div>
-                                            )}
-                                    </div>
-                                </div>
-                            )}
                         </>
                     )}
                 </div>
@@ -1166,141 +1104,13 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                         <ChevronDown className={`w-4 h-4 text-emerald-600 flex-shrink-0 transition-transform duration-200 ${showDestinationDropdown ? 'rotate-180' : ''}`} />
                     </button>
                     
-                    {/* Destination Dropdown - Only show when button is clicked */}
-                    {showDestinationDropdown && (
-                        <div className="mt-2 space-y-2 animate-in slide-in-from-top-2">
-                            {/* Destination Search Bar */}
-                            <div className="relative">
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-400 w-3.5 h-3.5" />
-                                <input
-                                    type="text"
-                                    placeholder="Search destination..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-9 pr-3 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 bg-white border-2 border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all hover:border-emerald-300 caret-emerald-600"
-                                    style={{ caretColor: '#10b981' }}
-                                />
-                            </div>
-                            
-                            {/* Destination Filter Buttons */}
-                            <div className="flex flex-wrap gap-1.5">
-                                <button
-                                    onClick={() => setFilterType('VILLA')}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-1.5 ${
-                                        filterType === 'VILLA'
-                                            ? 'bg-gradient-to-r from-blue-500 to-cyan-600 text-white shadow-md shadow-blue-300/50'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    }`}
-                                >
-                                    <Building2 className="w-3.5 h-3.5" />
-                                    Villas
-                                </button>
-                                <button
-                                    onClick={() => setFilterType('FACILITY')}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-1.5 ${
-                                        filterType === 'FACILITY'
-                                            ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-md shadow-purple-300/50'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    }`}
-                                >
-                                    <Waves className="w-3.5 h-3.5" />
-                                    Facilities
-                                </button>
-                                <button
-                                    onClick={() => setFilterType('RESTAURANT')}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-1.5 ${
-                                        filterType === 'RESTAURANT'
-                                            ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-md shadow-orange-300/50'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    }`}
-                                >
-                                    <Utensils className="w-3.5 h-3.5" />
-                                    Restaurants
-                                </button>
-                                <button
-                                    onClick={() => setFilterType('ALL')}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 ${
-                                        filterType === 'ALL'
-                                            ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-300/50'
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    }`}
-                                >
-                                    All
-                                </button>
-                            </div>
-                            
-                            {/* Destination Locations Dropdown */}
-                            <div className="max-h-60 overflow-y-auto border-2 border-emerald-200 rounded-lg bg-white p-2 scrollbar-thin scrollbar-thumb-emerald-300 scrollbar-track-gray-100">
-                                {filteredLocations.length > 0 ? (
-                                    <div className="grid grid-cols-5 gap-2">
-                                        {filteredLocations.map((loc) => {
-                                            const isSameAsPickup = loc.name === pickup;
-                                            return (
-                                                <button
-                                                    key={loc.id || loc.name}
-                                                    onClick={() => {
-                                                        handleSetDestination(loc.name);
-                                                        setShowDestinationDropdown(false);
-                                                        setSearchQuery('');
-                                                    }}
-                                                    title={isSameAsPickup ? 'Cannot select same as pickup location' : loc.name}
-                                                    disabled={isSameAsPickup}
-                                                    className={`group relative min-h-[80px] h-auto p-1.5 rounded-xl border-2 transition-all duration-300 flex flex-col items-center justify-center ${
-                                                        destinationToShow === loc.name
-                                                            ? 'bg-gradient-to-br from-amber-400 to-orange-500 border-amber-500 shadow-lg shadow-amber-300/50'
-                                                            : isSameAsPickup
-                                                            ? 'bg-red-50 border-red-200 opacity-60 cursor-not-allowed'
-                                                            : 'bg-white border-gray-300 hover:border-emerald-400 hover:bg-gradient-to-br hover:from-emerald-50 hover:to-teal-50 hover:shadow-md'
-                                                    }`}
-                                                >
-                                                    {/* Icon */}
-                                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center mb-1 flex-shrink-0 transition-all ${
-                                                        destinationToShow === loc.name 
-                                                            ? 'bg-white/30' 
-                                                            : isSameAsPickup
-                                                            ? 'bg-red-100'
-                                                            : 'bg-gradient-to-br from-emerald-100 to-teal-100 group-hover:from-emerald-200 group-hover:to-teal-200'
-                                                    }`}>
-                                                        <MapPin className={`w-3 h-3 ${
-                                                            destinationToShow === loc.name ? 'text-white' : isSameAsPickup ? 'text-red-600' : 'text-emerald-700'
-                                                        }`} />
-                                                    </div>
-                                                    
-                                                    {/* Name */}
-                                                    <div className={`text-[10px] font-bold text-center leading-tight px-0.5 break-words ${
-                                                        destinationToShow === loc.name ? 'text-white' : isSameAsPickup ? 'text-red-600' : 'text-gray-800'
-                                                    }`}>
-                                                        {loc.name}
-                                                    </div>
-                                                    
-                                                    {/* Selected indicator */}
-                                                    {destinationToShow === loc.name && (
-                                                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full flex items-center justify-center shadow-md">
-                                                            <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div>
-                                                        </div>
-                                                    )}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-4 text-xs text-gray-500">
-                                        No locations found
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
                 </div>
 
-                {/* Guest Count Input */}
+                {/* Guest Count Dropdown */}
                 <div className="relative group">
                     <label className="text-[10px] font-semibold text-gray-600 mb-0.5 block">Number of Guests (1-7)</label>
                     <div className="relative">
-                        <input
-                            type="number"
-                            min="1"
-                            max="7"
+                        <select
                             value={guestCount}
                             onChange={(e) => {
                                 const value = parseInt(e.target.value) || 1;
@@ -1308,14 +1118,36 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                                     setGuestCount(value);
                                 }
                             }}
-                            className="w-full pl-9 pr-3 py-1.5 text-sm bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg text-gray-900 font-semibold hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
-                            placeholder="1"
-                        />
-                        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-600">
+                            className="w-full pl-9 pr-3 py-1.5 text-sm bg-white border-2 border-blue-200 rounded-lg text-gray-900 font-semibold hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all appearance-none cursor-pointer"
+                        >
+                            {[1, 2, 3, 4, 5, 6, 7].map((num) => (
+                                <option key={num} value={num}>
+                                    {num} {num === 1 ? 'guest' : 'guests'}
+                                </option>
+                            ))}
+                        </select>
+                        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none">
                             <span className="text-xs font-bold">👥</span>
+                        </div>
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none">
+                            <ChevronDown size={16} className="text-blue-600" />
                         </div>
                     </div>
                     <p className="text-[9px] text-gray-500 mt-0.5">Maximum 7 guests per buggy</p>
+                </div>
+
+                {/* Notes Input */}
+                <div className="relative group">
+                    <label className="text-[10px] font-semibold text-gray-600 mb-0.5 block">Notes (Optional)</label>
+                    <textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="E.g., 3 large suitcases, fragile items, special instructions..."
+                        rows={3}
+                        maxLength={500}
+                        className="w-full px-3 py-2 text-sm bg-gradient-to-r from-gray-50 to-gray-100 border-2 border-gray-200 rounded-lg text-gray-900 font-medium hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all resize-none"
+                    />
+                    <p className="text-[9px] text-gray-500 mt-0.5">Luggage info or special instructions</p>
                 </div>
             </div>
 
@@ -1353,6 +1185,358 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                 </button>
             </div>
         </div>
+      )}
+
+      {/* Pickup Location Modal */}
+      {showPickupDropdown && (
+        <>
+          {/* Overlay */}
+          <div 
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => {
+              setShowPickupDropdown(false);
+              setPickupSearchQuery('');
+            }}
+          />
+          {/* Modal */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+            <div 
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50 flex-shrink-0">
+                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <LocateFixed className="w-5 h-5 text-blue-600" />
+                  Select Pickup Location
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowPickupDropdown(false);
+                    setPickupSearchQuery('');
+                  }}
+                  className="p-1.5 hover:bg-gray-200 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+              
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {/* Pickup Search Bar */}
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Search pickup location..."
+                    value={pickupSearchQuery}
+                    onChange={(e) => setPickupSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 bg-white border-2 border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all hover:border-blue-300 caret-blue-600"
+                    style={{ caretColor: '#2563eb' }}
+                  />
+                </div>
+                
+                {/* Pickup Filter Buttons */}
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setPickupFilterType('VILLA')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-1.5 ${
+                      pickupFilterType === 'VILLA'
+                        ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-300/50'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Building2 className="w-3.5 h-3.5" />
+                    Villas
+                  </button>
+                  <button
+                    onClick={() => setPickupFilterType('FACILITY')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-1.5 ${
+                      pickupFilterType === 'FACILITY'
+                        ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md shadow-purple-300/50'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Waves className="w-3.5 h-3.5" />
+                    Facilities
+                  </button>
+                  <button
+                    onClick={() => setPickupFilterType('RESTAURANT')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-1.5 ${
+                      pickupFilterType === 'RESTAURANT'
+                        ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-md shadow-pink-300/50'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Utensils className="w-3.5 h-3.5" />
+                    Restaurants
+                  </button>
+                  <button
+                    onClick={() => setPickupFilterType('ALL')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 ${
+                      pickupFilterType === 'ALL'
+                        ? 'bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-md shadow-indigo-300/50'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    All
+                  </button>
+                </div>
+                
+                {/* Pickup Locations Grid */}
+                <div className="max-h-[50vh] overflow-y-auto border-2 border-blue-200 rounded-lg bg-white p-3 scrollbar-thin scrollbar-thumb-blue-300 scrollbar-track-gray-100">
+                  {locations
+                    .filter(loc => {
+                      const matchesSearch = !pickupSearchQuery || loc.name.toLowerCase().includes(pickupSearchQuery.toLowerCase());
+                      const matchesFilter = pickupFilterType === 'ALL' || loc.type === pickupFilterType;
+                      return matchesSearch && matchesFilter;
+                    })
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .length > 0 ? (
+                      <div className="grid grid-cols-5 gap-2">
+                        {locations
+                          .filter(loc => {
+                            const matchesSearch = !pickupSearchQuery || loc.name.toLowerCase().includes(pickupSearchQuery.toLowerCase());
+                            const matchesFilter = pickupFilterType === 'ALL' || loc.type === pickupFilterType;
+                            return matchesSearch && matchesFilter;
+                          })
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map((loc) => {
+                            const isSameAsDestination = loc.name === destination;
+                            return (
+                              <button
+                                key={loc.id || loc.name}
+                                onClick={() => {
+                                  // Check if selected pickup is the same as destination
+                                  if (isSameAsDestination) {
+                                    setNotification({ 
+                                      message: 'Pickup and destination cannot be the same. Please choose a different location.', 
+                                      type: 'warning' 
+                                    });
+                                    setShowPickupDropdown(false);
+                                    setPickupSearchQuery('');
+                                    return;
+                                  }
+                                  setPickup(loc.name);
+                                  setShowPickupDropdown(false);
+                                  setPickupSearchQuery('');
+                                }}
+                                title={isSameAsDestination ? 'Cannot select same as destination location' : loc.name}
+                                disabled={isSameAsDestination}
+                                className={`group relative min-h-[80px] h-auto p-1.5 rounded-xl border-2 transition-all duration-300 flex flex-col items-center justify-center ${
+                                  pickup === loc.name
+                                    ? 'bg-gradient-to-br from-blue-500 to-indigo-600 border-blue-500 shadow-lg shadow-blue-300/50'
+                                    : isSameAsDestination
+                                    ? 'bg-red-50 border-red-200 opacity-60 cursor-not-allowed'
+                                    : 'bg-white border-gray-300 hover:border-blue-400 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 hover:shadow-md'
+                                }`}
+                              >
+                                {/* Icon */}
+                                <div className={`w-6 h-6 rounded-lg flex items-center justify-center mb-1 flex-shrink-0 transition-all ${
+                                  pickup === loc.name 
+                                    ? 'bg-white/30' 
+                                    : isSameAsDestination
+                                    ? 'bg-red-100'
+                                    : 'bg-gradient-to-br from-blue-100 to-indigo-100 group-hover:from-blue-200 group-hover:to-indigo-200'
+                                }`}>
+                                  <MapPin className={`w-3 h-3 ${
+                                    pickup === loc.name ? 'text-white' : isSameAsDestination ? 'text-red-600' : 'text-blue-700'
+                                  }`} />
+                                </div>
+                                
+                                {/* Name */}
+                                <div className={`text-[10px] font-bold text-center leading-tight px-0.5 break-words ${
+                                  pickup === loc.name ? 'text-white' : isSameAsDestination ? 'text-red-600' : 'text-gray-800'
+                                }`}>
+                                  {loc.name}
+                                </div>
+                                
+                                {/* Selected indicator */}
+                                {pickup === loc.name && (
+                                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full flex items-center justify-center shadow-md">
+                                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-xs text-gray-500">
+                        No locations found
+                      </div>
+                    )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Destination Location Modal */}
+      {showDestinationDropdown && (
+        <>
+          {/* Overlay */}
+          <div 
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => {
+              setShowDestinationDropdown(false);
+              setSearchQuery('');
+            }}
+          />
+          {/* Modal */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+            <div 
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-emerald-50 to-teal-50 flex-shrink-0">
+                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-emerald-600" />
+                  Select Destination
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowDestinationDropdown(false);
+                    setSearchQuery('');
+                  }}
+                  className="p-1.5 hover:bg-gray-200 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+              
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {/* Destination Search Bar */}
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Search destination..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 bg-white border-2 border-emerald-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all hover:border-emerald-300 caret-emerald-600"
+                    style={{ caretColor: '#10b981' }}
+                  />
+                </div>
+                
+                {/* Destination Filter Buttons */}
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setFilterType('VILLA')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-1.5 ${
+                      filterType === 'VILLA'
+                        ? 'bg-gradient-to-r from-blue-500 to-cyan-600 text-white shadow-md shadow-blue-300/50'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Building2 className="w-3.5 h-3.5" />
+                    Villas
+                  </button>
+                  <button
+                    onClick={() => setFilterType('FACILITY')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-1.5 ${
+                      filterType === 'FACILITY'
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-md shadow-purple-300/50'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Waves className="w-3.5 h-3.5" />
+                    Facilities
+                  </button>
+                  <button
+                    onClick={() => setFilterType('RESTAURANT')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 flex items-center gap-1.5 ${
+                      filterType === 'RESTAURANT'
+                        ? 'bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-md shadow-orange-300/50'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Utensils className="w-3.5 h-3.5" />
+                    Restaurants
+                  </button>
+                  <button
+                    onClick={() => setFilterType('ALL')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all duration-300 ${
+                      filterType === 'ALL'
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-300/50'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    All
+                  </button>
+                </div>
+                
+                {/* Destination Locations Grid */}
+                <div className="max-h-[50vh] overflow-y-auto border-2 border-emerald-200 rounded-lg bg-white p-3 scrollbar-thin scrollbar-thumb-emerald-300 scrollbar-track-gray-100">
+                  {filteredLocations.length > 0 ? (
+                    <div className="grid grid-cols-5 gap-2">
+                      {filteredLocations.map((loc) => {
+                        const isSameAsPickup = loc.name === pickup;
+                        return (
+                          <button
+                            key={loc.id || loc.name}
+                            onClick={() => {
+                              handleSetDestination(loc.name);
+                              setShowDestinationDropdown(false);
+                              setSearchQuery('');
+                            }}
+                            title={isSameAsPickup ? 'Cannot select same as pickup location' : loc.name}
+                            disabled={isSameAsPickup}
+                            className={`group relative min-h-[80px] h-auto p-1.5 rounded-xl border-2 transition-all duration-300 flex flex-col items-center justify-center ${
+                              destinationToShow === loc.name
+                                ? 'bg-gradient-to-br from-amber-400 to-orange-500 border-amber-500 shadow-lg shadow-amber-300/50'
+                                : isSameAsPickup
+                                ? 'bg-red-50 border-red-200 opacity-60 cursor-not-allowed'
+                                : 'bg-white border-gray-300 hover:border-emerald-400 hover:bg-gradient-to-br hover:from-emerald-50 hover:to-teal-50 hover:shadow-md'
+                            }`}
+                          >
+                            {/* Icon */}
+                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center mb-1 flex-shrink-0 transition-all ${
+                              destinationToShow === loc.name 
+                                ? 'bg-white/30' 
+                                : isSameAsPickup
+                                ? 'bg-red-100'
+                                : 'bg-gradient-to-br from-emerald-100 to-teal-100 group-hover:from-emerald-200 group-hover:to-teal-200'
+                            }`}>
+                              <MapPin className={`w-3 h-3 ${
+                                destinationToShow === loc.name ? 'text-white' : isSameAsPickup ? 'text-red-600' : 'text-emerald-700'
+                              }`} />
+                            </div>
+                            
+                            {/* Name */}
+                            <div className={`text-[10px] font-bold text-center leading-tight px-0.5 break-words ${
+                              destinationToShow === loc.name ? 'text-white' : isSameAsPickup ? 'text-red-600' : 'text-gray-800'
+                            }`}>
+                              {loc.name}
+                            </div>
+                            
+                            {/* Selected indicator */}
+                            {destinationToShow === loc.name && (
+                              <div className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full flex items-center justify-center shadow-md">
+                                <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-xs text-gray-500">
+                      No locations found
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Chat Widget: Connected to 'BUGGY' service - Only show when driver has accepted */}

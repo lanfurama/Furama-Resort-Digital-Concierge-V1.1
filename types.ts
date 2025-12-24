@@ -138,6 +138,7 @@ export interface RideRequest {
   completedAt?: number;
   confirmedAt?: number; // Timestamp when driver accepted the ride
   guestCount?: number; // Number of guests (1-7, default 1)
+  notes?: string; // General notes: luggage info, lost items, special instructions
 }
 
 export interface ServiceRequest {
@@ -156,6 +157,8 @@ export interface ServiceRequest {
   rating?: number;   // 1-5 Stars
   feedback?: string; // User comment
   newCheckOutDate?: string; // For EXTEND_STAY type: requested new check-out date
+  guestCount?: number; // Number of guests (for BUGGY type)
+  notes?: string; // Notes for luggage, lost items, or special instructions (for BUGGY type)
 }
 
 export interface HotelReview {

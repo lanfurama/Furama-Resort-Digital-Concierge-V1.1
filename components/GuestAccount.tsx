@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, ServiceRequest, HotelReview } from '../types';
-import { getCompletedGuestOrders, updateUserNotes, rateServiceRequest, submitHotelReview, getHotelReview, updateUserLanguage, updateUser, addServiceRequest } from '../services/dataService';
-import { Clock, ShoppingBag, Car, Utensils, Sparkles, Waves, User as UserIcon, Save, Star, Hotel, ThumbsUp, Globe, ArrowLeft, Filter, Edit2, Lock, Eye, EyeOff, Calendar, X, Copy, Check } from 'lucide-react';
+import { User, ServiceRequest, HotelReview, UserRole } from '../types';
+import { getCompletedGuestOrders, updateUserNotes, rateServiceRequest, submitHotelReview, getHotelReview, updateUserLanguage, updateUser, addServiceRequest, updateRideNotes, getRideById, getUsers, sendNotification } from '../services/dataService';
+import { Clock, ShoppingBag, Car, Utensils, Sparkles, Waves, User as UserIcon, Save, Star, Hotel, ThumbsUp, Globe, ArrowLeft, Filter, Edit2, Lock, Eye, EyeOff, Calendar, X, Copy, Check, AlertCircle } from 'lucide-react';
 import Loading from './Loading';
 import { useTranslation } from '../contexts/LanguageContext';
 
@@ -82,6 +82,12 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
     
     // Extend Stay State
     const [showExtendStayModal, setShowExtendStayModal] = useState(false);
+    
+    // Lost Item State
+    const [showLostItemModal, setShowLostItemModal] = useState(false);
+    const [lostItemRideId, setLostItemRideId] = useState<string | null>(null);
+    const [lostItemDescription, setLostItemDescription] = useState('');
+    const [isSubmittingLostItem, setIsSubmittingLostItem] = useState(false);
     const [newCheckOutDate, setNewCheckOutDate] = useState('');
     const [extendStayReason, setExtendStayReason] = useState('');
     const [isSubmittingExtend, setIsSubmittingExtend] = useState(false);
@@ -317,6 +323,93 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
             alert(t('error_submit_rating') || `Failed to submit rating: ${error.message || 'Please try again.'}`);
         } finally {
             setIsSubmittingRating(false);
+        }
+    };
+
+    const handleSubmitLostItem = async () => {
+        if (!lostItemRideId || !lostItemDescription.trim() || isSubmittingLostItem) return;
+        
+        setIsSubmittingLostItem(true);
+        try {
+            // Get existing ride to retrieve current notes
+            const ride = await getRideById(lostItemRideId);
+            if (!ride) {
+                throw new Error('Ride not found');
+            }
+            
+            const existingNotes = ride.notes || '';
+            
+            // Append lost item info to notes
+            const timestamp = new Date().toLocaleString();
+            const lostItemNote = `[Lost Item Report - ${timestamp}] ${lostItemDescription.trim()}`;
+            const updatedNotes = existingNotes ? `${existingNotes}\n${lostItemNote}` : lostItemNote;
+            
+            await updateRideNotes(lostItemRideId, updatedNotes);
+            
+            // Send notifications to reception, admin, and driver
+            try {
+                const allUsers = await getUsers();
+                const receptionAdmins = allUsers.filter(u => 
+                    u.role === UserRole.RECEPTION || u.role === UserRole.ADMIN || u.role === UserRole.SUPERVISOR
+                );
+                const drivers = allUsers.filter(u => u.role === UserRole.DRIVER);
+                
+                const notificationMessage = `Room ${ride.roomNumber} (${ride.guestName}) reported a lost item on buggy ride from ${ride.pickup} to ${ride.destination}: ${lostItemDescription.trim()}`;
+                
+                // Notify reception, admin, supervisor
+                for (const staff of receptionAdmins) {
+                    await sendNotification(
+                        staff.roomNumber,
+                        'Lost Item Report - Buggy Service',
+                        notificationMessage,
+                        'WARNING'
+                    );
+                }
+                
+                // Notify driver (if ride has driver assigned)
+                if (ride.driverId) {
+                    const assignedDriver = drivers.find(d => d.id === ride.driverId);
+                    if (assignedDriver) {
+                        await sendNotification(
+                            assignedDriver.roomNumber,
+                            'Lost Item Report - Your Buggy Ride',
+                            notificationMessage,
+                            'WARNING'
+                        );
+                    }
+                } else {
+                    // Notify all drivers if no specific driver assigned
+                    for (const driver of drivers) {
+                        await sendNotification(
+                            driver.roomNumber,
+                            'Lost Item Report - Buggy Service',
+                            notificationMessage,
+                            'WARNING'
+                        );
+                    }
+                }
+                
+                console.log(`Sent lost item notifications: ${receptionAdmins.length} staff, ${drivers.length} drivers`);
+            } catch (notifError: any) {
+                // Log error but don't fail the lost item report
+                console.error('Failed to send notifications for lost item:', notifError);
+            }
+            
+            // Close modal and reset
+            setShowLostItemModal(false);
+            setLostItemRideId(null);
+            setLostItemDescription('');
+            
+            // Refresh history
+            const updatedHistory = await getCompletedGuestOrders(user.roomNumber);
+            setHistory(updatedHistory);
+            
+            alert('Lost item reported successfully! Our staff will contact you soon.');
+        } catch (error: any) {
+            console.error('Failed to submit lost item:', error);
+            alert(`Failed to report lost item: ${error.message || 'Please try again.'}`);
+        } finally {
+            setIsSubmittingLostItem(false);
         }
     };
 
@@ -872,7 +965,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                             <select
                                 value={serviceFilter}
                                 onChange={(e) => setServiceFilter(e.target.value as 'ALL' | 'DINING' | 'SPA' | 'POOL' | 'BUGGY' | 'BUTLER')}
-                                className="text-[10px] font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                className="text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                             >
                                 <option value="ALL">All</option>
                                 <option value="BUGGY">{t('buggy')}</option>
@@ -911,7 +1004,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                         ) : (
                             <div className="space-y-3">
                                 {filteredHistory.map((req, i) => (
-                                <div key={i} className="backdrop-blur-sm bg-white/95 p-4 rounded-2xl shadow-lg border-2 border-gray-100/60 flex flex-col transition-all hover:shadow-xl"
+                                <div key={i} className="backdrop-blur-sm bg-white/95 p-3 rounded-2xl shadow-lg border-2 border-gray-100/60 flex flex-col transition-all hover:shadow-xl"
                                     style={{
                                         boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1)'
                                     }}
@@ -933,6 +1026,76 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                                 </span>
                                             </div>
                                             <p className="text-xs text-gray-600 mt-1 line-clamp-1 font-medium">{getTranslatedDetails(req)}</p>
+                                            
+                                            {/* Guest Count and Notes (Only for BUGGY) */}
+                                            {req.type === 'BUGGY' && (() => {
+                                                // Parse notes to separate lost item reports from regular notes
+                                                const notes = req.notes || '';
+                                                const lostItemReports: string[] = [];
+                                                let regularNotes = '';
+                                                
+                                                if (notes && notes.trim()) {
+                                                    const lines = notes.split('\n');
+                                                    lines.forEach(line => {
+                                                        const trimmedLine = line.trim();
+                                                        if (trimmedLine.startsWith('[Lost Item Report -')) {
+                                                            // Extract description from [Lost Item Report - timestamp] description
+                                                            const match = trimmedLine.match(/\[Lost Item Report - .+?\] (.+)/);
+                                                            if (match && match[1]) {
+                                                                lostItemReports.push(match[1].trim());
+                                                            } else {
+                                                                // Fallback: remove the prefix and use the rest
+                                                                const withoutPrefix = trimmedLine.replace(/\[Lost Item Report - .+?\]\s*/, '');
+                                                                if (withoutPrefix.trim()) {
+                                                                    lostItemReports.push(withoutPrefix.trim());
+                                                                }
+                                                            }
+                                                        } else if (trimmedLine) {
+                                                            regularNotes += (regularNotes ? '\n' : '') + trimmedLine;
+                                                        }
+                                                    });
+                                                }
+                                                
+                                                return (
+                                                    <div className="mt-1.5 space-y-1.5">
+                                                        {req.guestCount && (
+                                                            <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                                                                <span className="font-semibold">👥</span>
+                                                                <span>{req.guestCount} {req.guestCount === 1 ? 'guest' : 'guests'}</span>
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Regular Notes */}
+                                                        {regularNotes && regularNotes.trim() && (
+                                                            <div className="flex items-start gap-1.5 text-xs text-gray-700 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
+                                                                <span className="font-semibold text-amber-600 flex-shrink-0 mt-0.5">📝</span>
+                                                                <span className="flex-1 line-clamp-2">{regularNotes}</span>
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Lost Item Reports */}
+                                                        {lostItemReports.length > 0 && (
+                                                            <div className="space-y-1">
+                                                                {lostItemReports.map((report, idx) => (
+                                                                    <div key={idx} className="flex items-start gap-1.5 text-xs text-red-700 bg-red-50 px-2 py-1 rounded-lg border border-red-200">
+                                                                        <AlertCircle size={12} className="text-red-600 flex-shrink-0 mt-0.5" />
+                                                                        <span className="flex-1 font-medium">Lost Item: {report}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Debug: Show raw notes if exists (remove in production) */}
+                                                        {notes && notes.trim() && !regularNotes && lostItemReports.length === 0 && (
+                                                            <div className="flex items-start gap-1.5 text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded-lg border border-gray-200">
+                                                                <span className="font-semibold text-gray-400 flex-shrink-0 mt-0.5">📝</span>
+                                                                <span className="flex-1 line-clamp-2">{notes}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+                                            
                                             <p className="text-[10px] text-gray-500 mt-2 flex items-center gap-1">
                                                 <Clock size={11} className="text-gray-400" />
                                                 {new Date(req.timestamp).toLocaleString()}
@@ -942,7 +1105,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
 
                                     {/* RATING AREA (Only for Completed Orders) */}
                                     {req.status === 'COMPLETED' && (
-                                        <div className="mt-3 pt-3 border-t-2 border-gray-100">
+                                        <div className="mt-3 pt-3 border-t-2 border-gray-100 space-y-2">
                                             {req.rating ? (
                                                 <div className="flex items-center justify-between bg-gradient-to-r from-amber-50 to-yellow-50 p-2 rounded-xl border border-amber-200">
                                                     <div className="flex text-amber-400 gap-0.5">
@@ -1000,13 +1163,30 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <button 
-                                                        onClick={() => setActiveRatingId(req.id)}
-                                                        className="w-full py-2 flex items-center justify-center text-xs text-emerald-700 font-bold bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 rounded-xl transition-all border-2 border-emerald-200 hover:border-emerald-300 shadow-md"
-                                                    >
-                                                        <ThumbsUp size={14} className="mr-1.5"/> 
-                                                        {t('rate_service')}
-                                                    </button>
+                                                    <div className="flex gap-2">
+                                                        <button 
+                                                            onClick={() => setActiveRatingId(req.id)}
+                                                            className="flex-1 py-2 flex items-center justify-center text-xs text-emerald-700 font-bold bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 rounded-xl transition-all border-2 border-emerald-200 hover:border-emerald-300 shadow-md"
+                                                        >
+                                                            <ThumbsUp size={14} className="mr-1.5"/> 
+                                                            {t('rate_service')}
+                                                        </button>
+                                                        
+                                                        {/* Lost Item Report Button (Only for BUGGY) */}
+                                                        {req.type === 'BUGGY' && (
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setLostItemRideId(req.id);
+                                                                    setLostItemDescription('');
+                                                                    setShowLostItemModal(true);
+                                                                }}
+                                                                className="flex-1 py-2 flex items-center justify-center text-xs text-amber-700 font-bold bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 rounded-xl transition-all border-2 border-amber-200 hover:border-amber-300 shadow-md"
+                                                            >
+                                                                <AlertCircle size={14} className="mr-1.5"/> 
+                                                                Report Lost Item
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 )
                                             )}
                                         </div>
@@ -1144,6 +1324,82 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                         <>
                                             <Calendar size={18} />
                                             Submit Request
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Lost Item Modal */}
+            {showLostItemModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                <AlertCircle className="text-amber-600" size={24} />
+                                Report Lost Item
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setShowLostItemModal(false);
+                                    setLostItemRideId(null);
+                                    setLostItemDescription('');
+                                }}
+                                className="text-gray-400 hover:text-gray-600 transition"
+                                disabled={isSubmittingLostItem}
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Describe the lost item
+                                </label>
+                                <textarea
+                                    value={lostItemDescription}
+                                    onChange={(e) => setLostItemDescription(e.target.value)}
+                                    placeholder="E.g., iPhone 14 Pro, black wallet, blue backpack..."
+                                    rows={4}
+                                    maxLength={500}
+                                    className="w-full px-3 py-2 text-sm bg-white border-2 border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all resize-none"
+                                    disabled={isSubmittingLostItem}
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Please provide as much detail as possible (color, brand, model, etc.)
+                                </p>
+                            </div>
+                            
+                            <div className="flex space-x-2">
+                                <button
+                                    onClick={() => {
+                                        setShowLostItemModal(false);
+                                        setLostItemRideId(null);
+                                        setLostItemDescription('');
+                                    }}
+                                    disabled={isSubmittingLostItem}
+                                    className="flex-1 py-2.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg border-2 border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSubmitLostItem}
+                                    disabled={isSubmittingLostItem || !lostItemDescription.trim()}
+                                    className="flex-1 py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-lg shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {isSubmittingLostItem ? (
+                                        <>
+                                            <span className="animate-spin">⏳</span>
+                                            Submitting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <AlertCircle size={18} />
+                                            Submit Report
                                         </>
                                     )}
                                 </button>

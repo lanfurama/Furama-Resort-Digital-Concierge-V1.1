@@ -2025,7 +2025,10 @@ export const getActiveRideForUser = async (roomNumber: string): Promise<RideRequ
       eta: dbRide.eta,
       confirmedAt: dbRide.assigned_timestamp ? new Date(dbRide.assigned_timestamp).getTime() : (dbRide.assigned_at ? new Date(dbRide.assigned_at).getTime() : (dbRide.status === 'ASSIGNED' && dbRide.updated_at ? new Date(dbRide.updated_at).getTime() : undefined)),
       pickedUpAt: dbRide.pick_timestamp ? new Date(dbRide.pick_timestamp).getTime() : (dbRide.picked_up_at ? new Date(dbRide.picked_up_at).getTime() : undefined),
-      completedAt: dbRide.drop_timestamp ? new Date(dbRide.drop_timestamp).getTime() : (dbRide.completed_at ? new Date(dbRide.completed_at).getTime() : undefined)
+      completedAt: dbRide.drop_timestamp ? new Date(dbRide.drop_timestamp).getTime() : (dbRide.completed_at ? new Date(dbRide.completed_at).getTime() : undefined),
+      rating: dbRide.rating || undefined,
+      feedback: dbRide.feedback || undefined,
+      guestCount: dbRide.guest_count || 1
     };
   } catch (error) {
     console.error('Failed to get active ride:', error);

@@ -135,6 +135,7 @@ export interface RideRequest {
   completedAt?: number;
   confirmedAt?: number; // Timestamp when driver accepted the ride
   guestCount?: number; // Number of guests (1-7, default 1)
+  notes?: string; // General notes: luggage info, lost items, special instructions
 }
 
 export interface ServiceRequest {

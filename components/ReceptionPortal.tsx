@@ -66,7 +66,9 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         roomNumber: '',
         pickup: '',
         destination: '',
-        guestName: ''
+        guestName: '',
+        guestCount: 1,
+        notes: ''
     });
     const [pickupSearchQuery, setPickupSearchQuery] = useState('');
     const [destinationSearchQuery, setDestinationSearchQuery] = useState('');
@@ -889,19 +891,19 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         }
 
         // Combine requests that can share the same buggy (total guest count <= 7)
-        // Group requests by similar pickup/destination and combine if total guests <= 7
+        // Priority: First combine rides with same pickup/destination, then combine any rides if total guests < 7
         const MAX_BUGGY_CAPACITY = 7;
         const combinedRideGroups: Array<{ rides: RideRequest[]; totalGuests: number }> = [];
         const unassignedRides = [...pendingRidesList];
         
-        // Try to combine rides with same pickup and destination first
+        // Step 1: Try to combine rides with same pickup and destination first (priority)
         while (unassignedRides.length > 0) {
             const baseRide = unassignedRides.shift()!;
             const baseGuestCount = baseRide.guestCount || 1;
             const group: RideRequest[] = [baseRide];
             let totalGuests = baseGuestCount;
             
-            // Look for other rides that can be combined
+            // Look for other rides with same pickup and destination that can be combined
             for (let i = unassignedRides.length - 1; i >= 0; i--) {
                 const otherRide = unassignedRides[i];
                 const otherGuestCount = otherRide.guestCount || 1;
@@ -919,13 +921,47 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             combinedRideGroups.push({ rides: group, totalGuests });
         }
         
+        // Step 2: Try to combine remaining rides with different pickup/destination if total guests < 7
+        // Re-process groups to see if we can merge smaller groups together
+        const finalGroups: Array<{ rides: RideRequest[]; totalGuests: number }> = [];
+        const processedGroups = new Set<number>();
+        
+        for (let i = 0; i < combinedRideGroups.length; i++) {
+            if (processedGroups.has(i)) continue;
+            
+            const baseGroup = combinedRideGroups[i];
+            const mergedGroup: RideRequest[] = [...baseGroup.rides];
+            let totalGuests = baseGroup.totalGuests;
+            
+            // Try to merge with other groups if total guests < 7
+            for (let j = i + 1; j < combinedRideGroups.length; j++) {
+                if (processedGroups.has(j)) continue;
+                
+                const otherGroup = combinedRideGroups[j];
+                const otherTotalGuests = otherGroup.totalGuests;
+                
+                // If combining these groups would not exceed capacity, merge them
+                if (totalGuests + otherTotalGuests <= MAX_BUGGY_CAPACITY) {
+                    mergedGroup.push(...otherGroup.rides);
+                    totalGuests += otherTotalGuests;
+                    processedGroups.add(j);
+                }
+            }
+            
+            processedGroups.add(i);
+            finalGroups.push({ rides: mergedGroup, totalGuests });
+        }
+        
+        // Use finalGroups as the combined ride groups
+        const finalCombinedRideGroups = finalGroups;
+        
         // Calculate cost for all (driver, ride group) pairs - ONLY for online drivers
         const assignments: Array<{ driver: User; rides: RideRequest[]; cost: number; totalGuests: number }> = [];
         
         // Create a Set of online driver IDs for quick lookup
         const onlineDriverIds = new Set(onlineDrivers.map(d => d.id ? String(d.id) : ''));
         
-        for (const group of combinedRideGroups) {
+        for (const group of finalCombinedRideGroups) {
             // Use the first ride in the group for cost calculation (representative ride)
             const representativeRide = group.rides[0];
             
@@ -1118,7 +1154,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                 guestName = guest ? guest.lastName : `Guest ${newRideData.roomNumber}`;
             }
 
-            await requestRide(guestName || `Guest ${newRideData.roomNumber}`, newRideData.roomNumber, newRideData.pickup, newRideData.destination);
+            await requestRide(guestName || `Guest ${newRideData.roomNumber}`, newRideData.roomNumber, newRideData.pickup, newRideData.destination, newRideData.guestCount || 1, newRideData.notes || undefined);
             
             // Refresh rides list
             const refreshedRides = await getRides();
@@ -1126,7 +1162,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
 
             // Close modal and reset form
             setShowCreateRideModal(false);
-            setNewRideData({ roomNumber: '', pickup: '', destination: '', guestName: '' });
+            setNewRideData({ roomNumber: '', pickup: '', destination: '', guestName: '', guestCount: 1, notes: '' });
             setPickupSearchQuery('');
             setDestinationSearchQuery('');
         } catch (error: any) {
@@ -1946,6 +1982,26 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                 {ride.destination}
                                                             </span>
                                                         </div>
+                                                        
+                                                        {/* Guest Count */}
+                                                        {(ride.guestCount && ride.guestCount > 1) && (
+                                                            <div className={`flex items-center gap-2 ${accentColor} p-2 rounded-md`}>
+                                                                <span className="text-[9px] font-semibold text-gray-600">👥</span>
+                                                                <span className={`text-[11px] font-medium ${urgencyLevel === 'urgent' ? 'text-red-900' : urgencyLevel === 'warning' ? 'text-orange-900' : 'text-gray-800'}`}>
+                                                                    {ride.guestCount} {ride.guestCount === 1 ? 'guest' : 'guests'}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {/* Notes */}
+                                                        {ride.notes && ride.notes.trim() && (
+                                                            <div className={`flex items-start gap-2 bg-amber-50 border border-amber-200 p-2 rounded-md`}>
+                                                                <span className="text-[9px] font-semibold text-amber-700 flex-shrink-0 mt-0.5">📝</span>
+                                                                <span className={`text-[10px] font-medium text-amber-900 flex-1 break-words`}>
+                                                                    {ride.notes}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             );
@@ -2628,14 +2684,14 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                     {/* Create New Ride Modal */}
                     {showCreateRideModal && (
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-visible relative">
+                            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden relative">
                                 {/* Header */}
-                                <div className="bg-emerald-600 text-white p-4 flex justify-between items-center rounded-t-xl">
+                                <div className="bg-emerald-600 text-white p-4 flex justify-between items-center rounded-t-xl flex-shrink-0">
                                     <h3 className="text-lg font-bold">Create New Ride</h3>
                                     <button
                                         onClick={() => {
                                             setShowCreateRideModal(false);
-                                            setNewRideData({ roomNumber: '', pickup: '', destination: '', guestName: '' });
+                                            setNewRideData({ roomNumber: '', pickup: '', destination: '', guestName: '', guestCount: 1, notes: '' });
                                             setPickupSearchQuery('');
                                             setDestinationSearchQuery('');
                                         }}
@@ -2646,7 +2702,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                 </div>
 
                                 {/* Form */}
-                                <div className="p-6 space-y-4">
+                                <div className="p-6 space-y-4 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-300 scrollbar-track-gray-100 flex-1">
                                     {/* Room Number */}
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">
@@ -2820,14 +2876,52 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                             )}
                                         </div>
                                     </div>
+
+                                    {/* Number of Guests */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                            Số lượng khách <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="7"
+                                            value={newRideData.guestCount || 1}
+                                            onChange={(e) => {
+                                                const value = parseInt(e.target.value) || 1;
+                                                if (value >= 1 && value <= 7) {
+                                                    setNewRideData(prev => ({ ...prev, guestCount: value }));
+                                                }
+                                            }}
+                                            placeholder="1"
+                                            className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Tối đa 7 khách mỗi xe buggy</p>
+                                    </div>
+
+                                    {/* Notes */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                            Notes (Optional)
+                                        </label>
+                                        <textarea
+                                            value={newRideData.notes}
+                                            onChange={(e) => setNewRideData(prev => ({ ...prev, notes: e.target.value }))}
+                                            placeholder="E.g., 3 large suitcases, fragile items..."
+                                            rows={3}
+                                            maxLength={500}
+                                            className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Luggage info or special instructions</p>
+                                    </div>
                                 </div>
 
                                 {/* Footer */}
-                                <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-end gap-3 rounded-b-xl">
+                                <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-end gap-3 rounded-b-xl flex-shrink-0">
                                     <button
                                         onClick={() => {
                                             setShowCreateRideModal(false);
-                                            setNewRideData({ roomNumber: '', pickup: '', destination: '', guestName: '' });
+                                            setNewRideData({ roomNumber: '', pickup: '', destination: '', guestName: '', guestCount: 1, notes: '' });
                                             setPickupSearchQuery('');
                                             setDestinationSearchQuery('');
                                         }}

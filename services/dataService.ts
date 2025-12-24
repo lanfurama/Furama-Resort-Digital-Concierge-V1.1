@@ -1721,7 +1721,8 @@ export const getRides = async (): Promise<RideRequest[]> => {
         confirmedAt: r.assigned_timestamp ? new Date(r.assigned_timestamp).getTime() : (r.assigned_at ? new Date(r.assigned_at).getTime() : undefined),
       rating: r.rating || undefined,
       feedback: r.feedback || undefined,
-      guestCount: r.guest_count || 1
+      guestCount: r.guest_count || 1,
+      notes: r.notes || undefined
       };
     });
     
@@ -1739,7 +1740,7 @@ export const getRides = async (): Promise<RideRequest[]> => {
 // Sync version for backward compatibility
 export const getRidesSync = () => rides;
 
-export const requestRide = async (guestName: string, roomNumber: string, pickup: string, destination: string, guestCount: number = 1): Promise<RideRequest> => {
+export const requestRide = async (guestName: string, roomNumber: string, pickup: string, destination: string, guestCount: number = 1, notes?: string): Promise<RideRequest> => {
   try {
     const dbRide = await apiClient.post<any>('/ride-requests', {
       guest_name: guestName,
@@ -1748,7 +1749,8 @@ export const requestRide = async (guestName: string, roomNumber: string, pickup:
       destination,
       status: 'SEARCHING',
       timestamp: Date.now(),
-      guest_count: guestCount || 1
+      guest_count: guestCount || 1,
+      notes: notes || null
     });
     
     // Map database format to frontend format
@@ -1762,7 +1764,8 @@ export const requestRide = async (guestName: string, roomNumber: string, pickup:
       timestamp: dbRide.timestamp,
       driverId: dbRide.driver_id ? dbRide.driver_id.toString() : undefined,
       eta: dbRide.eta,
-      guestCount: dbRide.guest_count || 1
+      guestCount: dbRide.guest_count || 1,
+      notes: dbRide.notes || undefined
     };
     
     // Notify drivers (if notification system exists)
@@ -1780,7 +1783,8 @@ export const requestRide = async (guestName: string, roomNumber: string, pickup:
       destination,
       status: BuggyStatus.SEARCHING,
       timestamp: Date.now(),
-      guestCount: guestCount || 1
+      guestCount: guestCount || 1,
+      notes: notes || undefined
     };
     rides = [...rides, newRide];
     return newRide;
@@ -1824,7 +1828,8 @@ export const createManualRide = async (driverId: string, roomNumber: string, pic
             timestamp: dbRide.timestamp || (dbRide.created_at ? new Date(dbRide.created_at).getTime() : Date.now()),
             driverId: dbRide.driver_id ? dbRide.driver_id.toString() : driverId,
             eta: dbRide.eta || 0,
-            guestCount: dbRide.guest_count || 1
+            guestCount: dbRide.guest_count || 1,
+            notes: dbRide.notes || undefined
         };
         
         // Update local cache
@@ -1861,6 +1866,63 @@ export const createManualRide = async (driverId: string, roomNumber: string, pic
         rides = [...rides, newRide];
         throw error; // Re-throw để component có thể handle error
     }
+};
+
+export const getRideById = async (rideId: string): Promise<RideRequest | null> => {
+  try {
+    const dbRide = await apiClient.get<any>(`/ride-requests/${rideId}`);
+    
+    // Map database format to frontend format
+    let reqTimestamp: number;
+    if (dbRide.timestamp && typeof dbRide.timestamp === 'number' && dbRide.timestamp > 0) {
+      reqTimestamp = dbRide.timestamp;
+    } else if (dbRide.created_at) {
+      const createdDate = new Date(dbRide.created_at);
+      reqTimestamp = isNaN(createdDate.getTime()) ? Date.now() : createdDate.getTime();
+    } else {
+      reqTimestamp = Date.now();
+    }
+    
+    return {
+      id: dbRide.id.toString(),
+      guestName: dbRide.guest_name || dbRide.guestName || 'Guest',
+      roomNumber: dbRide.room_number || dbRide.roomNumber,
+      pickup: dbRide.pickup,
+      destination: dbRide.destination,
+      status: dbRide.status as BuggyStatus,
+      timestamp: reqTimestamp,
+      driverId: dbRide.driver_id ? dbRide.driver_id.toString() : undefined,
+      eta: dbRide.eta || undefined,
+      pickedUpAt: dbRide.pick_timestamp ? new Date(dbRide.pick_timestamp).getTime() : (dbRide.picked_up_at ? new Date(dbRide.picked_up_at).getTime() : undefined),
+      completedAt: dbRide.drop_timestamp ? new Date(dbRide.drop_timestamp).getTime() : (dbRide.completed_at ? new Date(dbRide.completed_at).getTime() : undefined),
+      confirmedAt: dbRide.assigned_timestamp ? new Date(dbRide.assigned_timestamp).getTime() : (dbRide.assigned_at ? new Date(dbRide.assigned_at).getTime() : undefined),
+      rating: dbRide.rating || undefined,
+      feedback: dbRide.feedback || undefined,
+      guestCount: dbRide.guest_count || 1,
+      notes: dbRide.notes || undefined
+    };
+  } catch (error) {
+    console.error('Failed to get ride by id:', error);
+    return null;
+  }
+};
+
+export const updateRideNotes = async (rideId: string, notes: string): Promise<void> => {
+  try {
+    const updateData: any = {
+      notes: notes || null
+    };
+
+    console.log('Updating ride notes via API - Ride ID:', rideId);
+    console.log('Updating ride notes via API - Update Data:', updateData);
+
+    await apiClient.put<any>(`/ride-requests/${rideId}`, updateData);
+
+    console.log('Ride notes updated successfully');
+  } catch (error) {
+    console.error('Failed to update ride notes:', error);
+    throw error;
+  }
 };
 
 export const updateRideStatus = async (rideId: string, status: BuggyStatus, driverId?: string, eta?: number): Promise<void> => {
@@ -2051,7 +2113,11 @@ export const getActiveRideForUser = async (roomNumber: string): Promise<RideRequ
       eta: dbRide.eta,
       confirmedAt: dbRide.assigned_timestamp ? new Date(dbRide.assigned_timestamp).getTime() : (dbRide.assigned_at ? new Date(dbRide.assigned_at).getTime() : (dbRide.status === 'ASSIGNED' && dbRide.updated_at ? new Date(dbRide.updated_at).getTime() : undefined)),
       pickedUpAt: dbRide.pick_timestamp ? new Date(dbRide.pick_timestamp).getTime() : (dbRide.picked_up_at ? new Date(dbRide.picked_up_at).getTime() : undefined),
-      completedAt: dbRide.drop_timestamp ? new Date(dbRide.drop_timestamp).getTime() : (dbRide.completed_at ? new Date(dbRide.completed_at).getTime() : undefined)
+      completedAt: dbRide.drop_timestamp ? new Date(dbRide.drop_timestamp).getTime() : (dbRide.completed_at ? new Date(dbRide.completed_at).getTime() : undefined),
+      rating: dbRide.rating || undefined,
+      feedback: dbRide.feedback || undefined,
+      guestCount: dbRide.guest_count || 1,
+      notes: dbRide.notes || undefined
     };
   } catch (error) {
     console.error('Failed to get active ride:', error);
@@ -2552,7 +2618,9 @@ export const getUnifiedHistory = async (): Promise<ServiceRequest[]> => {
       arrivingAt: r.arriving_at ? new Date(r.arriving_at).getTime() : (r.status === 'ARRIVING' && r.updated_at ? new Date(r.updated_at).getTime() : undefined),
       completedAt: r.completed_at ? new Date(r.completed_at).getTime() : (r.status === 'COMPLETED' && r.updated_at ? new Date(r.updated_at).getTime() : undefined),
       rating: r.rating || undefined,
-      feedback: r.feedback || undefined
+      feedback: r.feedback || undefined,
+      guestCount: r.guest_count || 1,
+      notes: r.notes || undefined
     }));
 
     const combined = [...apiServiceRequests, ...buggyHistory];
@@ -2574,7 +2642,9 @@ export const getUnifiedHistory = async (): Promise<ServiceRequest[]> => {
       arrivingAt: r.status === BuggyStatus.ARRIVING ? r.timestamp : undefined,
       completedAt: r.completedAt,
       rating: r.rating,
-      feedback: r.feedback
+      feedback: r.feedback,
+      guestCount: r.guestCount || 1,
+      notes: r.notes || undefined
     }));
 
     const combined = [...serviceRequests, ...buggyHistory];

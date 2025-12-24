@@ -643,66 +643,170 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
             await new Promise(resolve => setTimeout(resolve, 800));
         }
 
-        // Calculate cost for all (driver, ride) pairs
-        const assignments: Array<{ driver: User; ride: RideRequest; cost: number }> = [];
+        // Combine requests that can share the same buggy (total guest count <= 7)
+        // Priority: First combine rides with same pickup/destination, then combine any rides if total guests < 7
+        const MAX_BUGGY_CAPACITY = 7;
+        const combinedRideGroups: Array<{ rides: RideRequest[]; totalGuests: number }> = [];
+        const unassignedRides = [...pendingRidesList];
         
-        for (const ride of pendingRidesList) {
+        // Step 1: Try to combine rides with same pickup and destination first (priority)
+        while (unassignedRides.length > 0) {
+            const baseRide = unassignedRides.shift()!;
+            const baseGuestCount = baseRide.guestCount || 1;
+            const group: RideRequest[] = [baseRide];
+            let totalGuests = baseGuestCount;
+            
+            // Look for other rides with same pickup and destination that can be combined
+            for (let i = unassignedRides.length - 1; i >= 0; i--) {
+                const otherRide = unassignedRides[i];
+                const otherGuestCount = otherRide.guestCount || 1;
+                
+                // Check if we can combine: same pickup and destination, and total guests <= 7
+                if (baseRide.pickup === otherRide.pickup && 
+                    baseRide.destination === otherRide.destination &&
+                    totalGuests + otherGuestCount <= MAX_BUGGY_CAPACITY) {
+                    group.push(otherRide);
+                    totalGuests += otherGuestCount;
+                    unassignedRides.splice(i, 1);
+                }
+            }
+            
+            combinedRideGroups.push({ rides: group, totalGuests });
+        }
+        
+        // Step 2: Try to combine remaining rides with different pickup/destination if total guests < 7
+        // Re-process groups to see if we can merge smaller groups together
+        const finalGroups: Array<{ rides: RideRequest[]; totalGuests: number }> = [];
+        const processedGroups = new Set<number>();
+        
+        for (let i = 0; i < combinedRideGroups.length; i++) {
+            if (processedGroups.has(i)) continue;
+            
+            const baseGroup = combinedRideGroups[i];
+            const mergedGroup: RideRequest[] = [...baseGroup.rides];
+            let totalGuests = baseGroup.totalGuests;
+            
+            // Try to merge with other groups if total guests < 7
+            for (let j = i + 1; j < combinedRideGroups.length; j++) {
+                if (processedGroups.has(j)) continue;
+                
+                const otherGroup = combinedRideGroups[j];
+                const otherTotalGuests = otherGroup.totalGuests;
+                
+                // If combining these groups would not exceed capacity, merge them
+                if (totalGuests + otherTotalGuests <= MAX_BUGGY_CAPACITY) {
+                    mergedGroup.push(...otherGroup.rides);
+                    totalGuests += otherTotalGuests;
+                    processedGroups.add(j);
+                }
+            }
+            
+            processedGroups.add(i);
+            finalGroups.push({ rides: mergedGroup, totalGuests });
+        }
+        
+        // Use finalGroups as the combined ride groups
+        const finalCombinedRideGroups = finalGroups;
+
+        // Calculate cost for all (driver, ride group) pairs - ONLY for online drivers
+        const assignments: Array<{ driver: User; rides: RideRequest[]; cost: number; totalGuests: number }> = [];
+        
+        // Create a Set of online driver IDs for quick lookup
+        const onlineDriverIds = new Set(onlineDrivers.map(d => d.id ? String(d.id) : ''));
+        
+        for (const group of finalCombinedRideGroups) {
+            // Use the first ride in the group for cost calculation (representative ride)
+            const representativeRide = group.rides[0];
+            
+            // Only calculate cost for online drivers
             for (const driver of allDrivers) {
-                const cost = calculateAssignmentCost(driver, ride);
-                assignments.push({ driver, ride, cost });
+                const driverIdStr = driver.id ? String(driver.id) : '';
+                // Skip offline drivers
+                if (!onlineDriverIds.has(driverIdStr)) {
+                    continue;
+                }
+                const cost = calculateAssignmentCost(driver, representativeRide);
+                assignments.push({ driver, rides: group.rides, cost, totalGuests: group.totalGuests });
             }
         }
         
-        // Sort by cost (lowest first)
-        assignments.sort((a, b) => a.cost - b.cost);
+        // Sort by cost (lowest first) - groups with more combined rides get slight priority
+        assignments.sort((a, b) => {
+            if (a.cost === b.cost) {
+                // If same cost, prefer groups with more rides (better efficiency)
+                return b.rides.length - a.rides.length;
+            }
+            return a.cost - b.cost;
+        });
         
         // Update to matching status (only if showing modal)
         if (!isAutoTriggered) {
             setAIAssignmentData(prev => prev ? { ...prev, status: 'matching' } : null);
             await new Promise(resolve => setTimeout(resolve, 600));
         }
-        
-        // Greedy assignment: assign each ride to the best available driver
+
+        // Greedy assignment: assign each ride group to the best available driver
         const assignedRides = new Set<string>();
         const assignedDrivers = new Set<string>();
-        const finalAssignments: Array<{ driver: User; ride: RideRequest; cost: number; isChainTrip?: boolean }> = [];
+        const finalAssignments: Array<{ driver: User; rides: RideRequest[]; cost: number; isChainTrip?: boolean; totalGuests: number }> = [];
         
         for (const assignment of assignments) {
-            const rideId = assignment.ride.id;
+            // Check if any ride in the group is already assigned
+            const hasAssignedRide = assignment.rides.some(r => assignedRides.has(r.id));
             const driverId = assignment.driver.id ? String(assignment.driver.id) : '';
             
-            if (assignedRides.has(rideId) || assignedDrivers.has(driverId)) {
+            // Skip if any ride in group is already assigned or driver is already assigned
+            if (hasAssignedRide || assignedDrivers.has(driverId)) {
                 continue;
             }
             
+            // Check if driver can take this ride group (if busy, only allow chain trips)
             const driverActiveRides = rides.filter(r => {
                 const rideDriverId = r.driverId ? String(r.driverId) : '';
                 return rideDriverId === driverId && 
                     (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
             });
             
+            // Check total capacity: active rides + new group
+            const activeRidesGuestCount = driverActiveRides.reduce((sum, r) => sum + (r.guestCount || 1), 0);
+            if (activeRidesGuestCount + assignment.totalGuests > MAX_BUGGY_CAPACITY) {
+                continue; // Would exceed capacity
+            }
+            
             let isChainTrip = false;
             if (driverActiveRides.length > 0) {
+                // Driver is busy - only allow if it's a chain trip (cost is very negative)
                 if (assignment.cost > -5000) {
-                    continue;
+                    continue; // Not a chain trip, skip
                 }
                 isChainTrip = true;
             }
             
-            assignedRides.add(rideId);
+            // Assign all rides in this group to the driver
+            assignment.rides.forEach(ride => assignedRides.add(ride.id));
             assignedDrivers.add(driverId);
             finalAssignments.push({ ...assignment, isChainTrip });
         }
 
+        // Convert ride groups back to individual assignments for display and execution
+        const displayAssignments = finalAssignments.flatMap(assignment => 
+            assignment.rides.map(ride => ({
+                driver: assignment.driver,
+                ride: ride,
+                cost: assignment.cost,
+                isChainTrip: assignment.isChainTrip
+            }))
+        );
+
         // Update modal with assignments (only if showing modal)
         if (!isAutoTriggered) {
-            setAIAssignmentData(prev => prev ? { ...prev, status: 'matching', assignments: finalAssignments } : null);
+            setAIAssignmentData(prev => prev ? { ...prev, status: 'matching', assignments: displayAssignments } : null);
             await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         // Execute assignments
         let assignmentCount = 0;
-        for (const { driver, ride } of finalAssignments) {
+        for (const { driver, ride } of displayAssignments) {
             try {
                 await updateRideStatus(ride.id, BuggyStatus.ASSIGNED, driver.id, 5);
                 assignmentCount++;
