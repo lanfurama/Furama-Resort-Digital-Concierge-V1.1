@@ -24,7 +24,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     const [showFleetSettings, setShowFleetSettings] = useState(false);
     const [fleetConfig, setFleetConfig] = useState({
         maxWaitTimeBeforeAutoAssign: 300, // seconds
-        autoAssignEnabled: true
+        autoAssignEnabled: false // Default OFF - manual control only
     });
     
     // Driver View Mode State
@@ -36,7 +36,16 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         status: 'analyzing' | 'matching' | 'completed' | 'error';
         pendingRides: RideRequest[];
         onlineDrivers: User[];
-        assignments: Array<{ driver: User; ride: RideRequest; cost: number; isChainTrip?: boolean }>;
+        assignments: Array<{ 
+            driver: User; 
+            ride: RideRequest; 
+            cost: number; 
+            isChainTrip?: boolean;
+            pickupLat?: number;
+            pickupLng?: number;
+            destinationLat?: number;
+            destinationLng?: number;
+        }>;
         errorMessage?: string;
     } | null>(null);
     
@@ -74,8 +83,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     const [destinationSearchQuery, setDestinationSearchQuery] = useState('');
     const [pickupFilterType, setPickupFilterType] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('ALL');
     const [destinationFilterType, setDestinationFilterType] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('ALL');
-    const [showPickupDropdown, setShowPickupDropdown] = useState(false);
-    const [showDestinationDropdown, setShowDestinationDropdown] = useState(false);
+    const [showPickupModal, setShowPickupModal] = useState(false);
+    const [showDestinationModal, setShowDestinationModal] = useState(false);
     const [isCreatingRide, setIsCreatingRide] = useState(false);
     
     // Merge Options Modal State
@@ -85,6 +94,428 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     const canCombineRides = (ride1: RideRequest, ride2: RideRequest): boolean => {
         const totalGuests = (ride1.guestCount || 1) + (ride2.guestCount || 1);
         return totalGuests <= 7 && ride1.status === BuggyStatus.SEARCHING && ride2.status === BuggyStatus.SEARCHING;
+    };
+    
+    // Calculate optimal route when merging two rides - returns detailed segments with guest info
+    interface RouteSegment {
+        from: string;
+        to: string;
+        fromLat?: number;
+        fromLng?: number;
+        toLat?: number;
+        toLng?: number;
+        roomNumber: string;
+        guestName: string;
+        guestCount: number;
+    }
+    
+    const calculateOptimalMergeRoute = (ride1: RideRequest, ride2: RideRequest): { 
+        pickup: string; 
+        destination: string; 
+        routePath: string[]; 
+        segments: RouteSegment[];
+        isChainTrip: boolean 
+    } => {
+        // Helper function to resolve coordinates for a location
+        const getLocationCoords = (locationName: string) => {
+            const coords = resolveLocationCoordinates(locationName);
+            return coords ? { lat: coords.lat, lng: coords.lng } : { lat: undefined, lng: undefined };
+        };
+        
+        // Same route - keep as is
+        if (ride1.pickup === ride2.pickup && ride1.destination === ride2.destination) {
+            const pickupCoords = getLocationCoords(ride1.pickup);
+            const destCoords = getLocationCoords(ride1.destination);
+            return {
+                pickup: ride1.pickup,
+                destination: ride1.destination,
+                routePath: [ride1.pickup, ride1.destination],
+                segments: [
+                    {
+                        from: ride1.pickup,
+                        to: ride1.destination,
+                        fromLat: pickupCoords.lat,
+                        fromLng: pickupCoords.lng,
+                        toLat: destCoords.lat,
+                        toLng: destCoords.lng,
+                        roomNumber: `${ride1.roomNumber}+${ride2.roomNumber}`,
+                        guestName: [ride1.guestName, ride2.guestName].filter(n => n?.trim()).join(' + ') || 'Multiple Guests',
+                        guestCount: (ride1.guestCount || 1) + (ride2.guestCount || 1)
+                    }
+                ],
+                isChainTrip: false
+            };
+        }
+        
+        // Chain trip possibilities:
+        // Case 1: ride1 ends where ride2 starts (ride1.destination === ride2.pickup)
+        // Example: D03 → D06 và D06 → D07 → D03 → D06 → D07
+        if (ride1.destination === ride2.pickup) {
+            const ride1PickupCoords = getLocationCoords(ride1.pickup);
+            const ride1DestCoords = getLocationCoords(ride1.destination);
+            const ride2PickupCoords = getLocationCoords(ride2.pickup);
+            const ride2DestCoords = getLocationCoords(ride2.destination);
+            return {
+                pickup: ride1.pickup,
+                destination: ride2.destination,
+                routePath: [ride1.pickup, ride1.destination, ride2.destination],
+                segments: [
+                    {
+                        from: ride1.pickup,
+                        to: ride1.destination,
+                        fromLat: ride1PickupCoords.lat,
+                        fromLng: ride1PickupCoords.lng,
+                        toLat: ride1DestCoords.lat,
+                        toLng: ride1DestCoords.lng,
+                        roomNumber: ride1.roomNumber,
+                        guestName: ride1.guestName || 'Guest',
+                        guestCount: ride1.guestCount || 1
+                    },
+                    {
+                        from: ride2.pickup,
+                        to: ride2.destination,
+                        fromLat: ride2PickupCoords.lat,
+                        fromLng: ride2PickupCoords.lng,
+                        toLat: ride2DestCoords.lat,
+                        toLng: ride2DestCoords.lng,
+                        roomNumber: ride2.roomNumber,
+                        guestName: ride2.guestName || 'Guest',
+                        guestCount: ride2.guestCount || 1
+                    }
+                ],
+                isChainTrip: true
+            };
+        }
+        
+        // Case 2: ride2 ends where ride1 starts (ride2.destination === ride1.pickup)
+        // Example: D06 → D07 và D03 → D06 → D03 → D06 → D07
+        if (ride2.destination === ride1.pickup) {
+            const ride1PickupCoords = getLocationCoords(ride1.pickup);
+            const ride1DestCoords = getLocationCoords(ride1.destination);
+            const ride2PickupCoords = getLocationCoords(ride2.pickup);
+            const ride2DestCoords = getLocationCoords(ride2.destination);
+            return {
+                pickup: ride2.pickup,
+                destination: ride1.destination,
+                routePath: [ride2.pickup, ride2.destination, ride1.destination],
+                segments: [
+                    {
+                        from: ride2.pickup,
+                        to: ride2.destination,
+                        fromLat: ride2PickupCoords.lat,
+                        fromLng: ride2PickupCoords.lng,
+                        toLat: ride2DestCoords.lat,
+                        toLng: ride2DestCoords.lng,
+                        roomNumber: ride2.roomNumber,
+                        guestName: ride2.guestName || 'Guest',
+                        guestCount: ride2.guestCount || 1
+                    },
+                    {
+                        from: ride1.pickup,
+                        to: ride1.destination,
+                        fromLat: ride1PickupCoords.lat,
+                        fromLng: ride1PickupCoords.lng,
+                        toLat: ride1DestCoords.lat,
+                        toLng: ride1DestCoords.lng,
+                        roomNumber: ride1.roomNumber,
+                        guestName: ride1.guestName || 'Guest',
+                        guestCount: ride1.guestCount || 1
+                    }
+                ],
+                isChainTrip: true
+            };
+        }
+        
+        // Case 3: ride1 starts where ride2 ends (ride1.pickup === ride2.destination)
+        // Example: D06 → D07 và D03 → D06 → D03 → D06 → D07 (same as Case 2, just reversed)
+        if (ride1.pickup === ride2.destination) {
+            const ride1PickupCoords = getLocationCoords(ride1.pickup);
+            const ride1DestCoords = getLocationCoords(ride1.destination);
+            const ride2PickupCoords = getLocationCoords(ride2.pickup);
+            const ride2DestCoords = getLocationCoords(ride2.destination);
+            return {
+                pickup: ride2.pickup,
+                destination: ride1.destination,
+                routePath: [ride2.pickup, ride2.destination, ride1.destination],
+                segments: [
+                    {
+                        from: ride2.pickup,
+                        to: ride2.destination,
+                        fromLat: ride2PickupCoords.lat,
+                        fromLng: ride2PickupCoords.lng,
+                        toLat: ride2DestCoords.lat,
+                        toLng: ride2DestCoords.lng,
+                        roomNumber: ride2.roomNumber,
+                        guestName: ride2.guestName || 'Guest',
+                        guestCount: ride2.guestCount || 1
+                    },
+                    {
+                        from: ride1.pickup,
+                        to: ride1.destination,
+                        fromLat: ride1PickupCoords.lat,
+                        fromLng: ride1PickupCoords.lng,
+                        toLat: ride1DestCoords.lat,
+                        toLng: ride1DestCoords.lng,
+                        roomNumber: ride1.roomNumber,
+                        guestName: ride1.guestName || 'Guest',
+                        guestCount: ride1.guestCount || 1
+                    }
+                ],
+                isChainTrip: true
+            };
+        }
+        
+        // Case 4: ride2 starts where ride1 ends (ride2.pickup === ride1.destination)
+        // Example: D03 → D06 và D06 → D07 → D03 → D06 → D07 (same as Case 1, just reversed)
+        if (ride2.pickup === ride1.destination) {
+            const ride1PickupCoords = getLocationCoords(ride1.pickup);
+            const ride1DestCoords = getLocationCoords(ride1.destination);
+            const ride2PickupCoords = getLocationCoords(ride2.pickup);
+            const ride2DestCoords = getLocationCoords(ride2.destination);
+            return {
+                pickup: ride1.pickup,
+                destination: ride2.destination,
+                routePath: [ride1.pickup, ride1.destination, ride2.destination],
+                segments: [
+                    {
+                        from: ride1.pickup,
+                        to: ride1.destination,
+                        fromLat: ride1PickupCoords.lat,
+                        fromLng: ride1PickupCoords.lng,
+                        toLat: ride1DestCoords.lat,
+                        toLng: ride1DestCoords.lng,
+                        roomNumber: ride1.roomNumber,
+                        guestName: ride1.guestName || 'Guest',
+                        guestCount: ride1.guestCount || 1
+                    },
+                    {
+                        from: ride2.pickup,
+                        to: ride2.destination,
+                        fromLat: ride2PickupCoords.lat,
+                        fromLng: ride2PickupCoords.lng,
+                        toLat: ride2DestCoords.lat,
+                        toLng: ride2DestCoords.lng,
+                        roomNumber: ride2.roomNumber,
+                        guestName: ride2.guestName || 'Guest',
+                        guestCount: ride2.guestCount || 1
+                    }
+                ],
+                isChainTrip: true
+            };
+        }
+        
+        // No chain trip possible - optimize route based on actual lat/lng distances
+        // Get all coordinates
+        const pickup1Coords = getLocationCoords(ride1.pickup);
+        const dest1Coords = getLocationCoords(ride1.destination);
+        const pickup2Coords = getLocationCoords(ride2.pickup);
+        const dest2Coords = getLocationCoords(ride2.destination);
+        
+        // If we don't have coordinates for all points, fallback to simple logic
+        if (!pickup1Coords.lat || !dest1Coords.lat || !pickup2Coords.lat || !dest2Coords.lat) {
+            const baseRide = ride1.timestamp <= ride2.timestamp ? ride1 : ride2;
+            const otherRide = ride1.timestamp <= ride2.timestamp ? ride2 : ride1;
+            const finalPickup = baseRide.pickup;
+            const finalDestination = [baseRide.destination, otherRide.destination].find(d => d !== finalPickup) || otherRide.destination;
+            
+            return {
+                pickup: finalPickup,
+                destination: finalDestination,
+                routePath: [finalPickup, finalDestination],
+                segments: [
+                    {
+                        from: baseRide.pickup,
+                        to: baseRide.destination,
+                        fromLat: pickup1Coords.lat,
+                        fromLng: pickup1Coords.lng,
+                        toLat: dest1Coords.lat,
+                        toLng: dest1Coords.lng,
+                        roomNumber: baseRide.roomNumber,
+                        guestName: baseRide.guestName || 'Guest',
+                        guestCount: baseRide.guestCount || 1
+                    },
+                    {
+                        from: otherRide.pickup,
+                        to: otherRide.destination,
+                        fromLat: pickup2Coords.lat,
+                        fromLng: pickup2Coords.lng,
+                        toLat: dest2Coords.lat,
+                        toLng: dest2Coords.lng,
+                        roomNumber: otherRide.roomNumber,
+                        guestName: otherRide.guestName || 'Guest',
+                        guestCount: otherRide.guestCount || 1
+                    }
+                ],
+                isChainTrip: false
+            };
+        }
+        
+        // Calculate distances between all points using lat/lng
+        const getDistance = (from: string, to: string): number => {
+            const fromCoords = getLocationCoords(from);
+            const toCoords = getLocationCoords(to);
+            if (!fromCoords?.lat || !toCoords?.lat) return Infinity;
+            return calculateDistance(
+                { lat: fromCoords.lat, lng: fromCoords.lng },
+                { lat: toCoords.lat, lng: toCoords.lng }
+            );
+        };
+        
+        // Try all valid route permutations (pickup must come before destination)
+        // There are only a few valid permutations: 4! = 24 total, but with constraints much fewer
+        const allPoints = [ride1.pickup, ride1.destination, ride2.pickup, ride2.destination];
+        const validRoutes: Array<{ path: string[]; totalDistance: number }> = [];
+        
+        // Generate permutations with constraint: pickup must come before destination
+        const generateRoutes = (current: string[], remaining: string[]): void => {
+            if (remaining.length === 0) {
+                // Validate: ride1.pickup must come before ride1.destination
+                if (current.indexOf(ride1.pickup) >= current.indexOf(ride1.destination)) return;
+                // Validate: ride2.pickup must come before ride2.destination
+                if (current.indexOf(ride2.pickup) >= current.indexOf(ride2.destination)) return;
+                
+                // Calculate total distance
+                let totalDistance = 0;
+                for (let i = 0; i < current.length - 1; i++) {
+                    totalDistance += getDistance(current[i], current[i + 1]);
+                }
+                
+                validRoutes.push({ path: [...current], totalDistance });
+                return;
+            }
+            
+            remaining.forEach((point, idx) => {
+                const newRemaining = [...remaining];
+                newRemaining.splice(idx, 1);
+                generateRoutes([...current, point], newRemaining);
+            });
+        };
+        
+        generateRoutes([], allPoints);
+        
+        if (validRoutes.length === 0) {
+            // Fallback
+            const baseRide = ride1.timestamp <= ride2.timestamp ? ride1 : ride2;
+            const otherRide = ride1.timestamp <= ride2.timestamp ? ride2 : ride1;
+            return {
+                pickup: baseRide.pickup,
+                destination: otherRide.destination,
+                routePath: [baseRide.pickup, baseRide.destination, otherRide.destination],
+                segments: [
+                    {
+                        from: baseRide.pickup,
+                        to: baseRide.destination,
+                        fromLat: pickup1Coords.lat,
+                        fromLng: pickup1Coords.lng,
+                        toLat: dest1Coords.lat,
+                        toLng: dest1Coords.lng,
+                        roomNumber: baseRide.roomNumber,
+                        guestName: baseRide.guestName || 'Guest',
+                        guestCount: baseRide.guestCount || 1
+                    },
+                    {
+                        from: otherRide.pickup,
+                        to: otherRide.destination,
+                        fromLat: pickup2Coords.lat,
+                        fromLng: pickup2Coords.lng,
+                        toLat: dest2Coords.lat,
+                        toLng: dest2Coords.lng,
+                        roomNumber: otherRide.roomNumber,
+                        guestName: otherRide.guestName || 'Guest',
+                        guestCount: otherRide.guestCount || 1
+                    }
+                ],
+                isChainTrip: false
+            };
+        }
+        
+        // Find route with minimum total distance
+        validRoutes.sort((a, b) => a.totalDistance - b.totalDistance);
+        const optimalPath = validRoutes[0].path;
+        
+        // Build segments based on optimal path
+        const segments: RouteSegment[] = [];
+        let guest1PickedUp = false;
+        let guest2PickedUp = false;
+        let guest1Dropped = false;
+        let guest2Dropped = false;
+        
+        for (let i = 0; i < optimalPath.length - 1; i++) {
+            const from = optimalPath[i];
+            const to = optimalPath[i + 1];
+            
+            // Track guest pickup/dropoff
+            if (from === ride1.pickup) guest1PickedUp = true;
+            if (from === ride2.pickup) guest2PickedUp = true;
+            if (to === ride1.destination && guest1PickedUp) guest1Dropped = true;
+            if (to === ride2.destination && guest2PickedUp) guest2Dropped = true;
+            
+            // Determine which guests are on board during this segment
+            const onBoardGuests: Array<{ name: string; roomNumber: string; count: number }> = [];
+            if (guest1PickedUp && !guest1Dropped) {
+                onBoardGuests.push({ 
+                    name: ride1.guestName || 'Guest', 
+                    roomNumber: ride1.roomNumber, 
+                    count: ride1.guestCount || 1 
+                });
+            }
+            if (guest2PickedUp && !guest2Dropped) {
+                onBoardGuests.push({ 
+                    name: ride2.guestName || 'Guest', 
+                    roomNumber: ride2.roomNumber, 
+                    count: ride2.guestCount || 1 
+                });
+            }
+            
+            // Only create segment if there are guests on board
+            if (onBoardGuests.length > 0) {
+                const fromCoords = getLocationCoords(from);
+                const toCoords = getLocationCoords(to);
+                
+                segments.push({
+                    from,
+                    to,
+                    fromLat: fromCoords?.lat,
+                    fromLng: fromCoords?.lng,
+                    toLat: toCoords?.lat,
+                    toLng: toCoords?.lng,
+                    roomNumber: onBoardGuests.map(g => g.roomNumber).join(' + '),
+                    guestName: onBoardGuests.map(g => g.name).join(' + '),
+                    guestCount: onBoardGuests.reduce((sum, g) => sum + g.count, 0)
+                });
+            }
+        }
+        
+        return {
+            pickup: optimalPath[0],
+            destination: optimalPath[optimalPath.length - 1],
+            routePath: optimalPath,
+            segments: segments.length > 0 ? segments : [
+                {
+                    from: ride1.pickup,
+                    to: ride1.destination,
+                    fromLat: pickup1Coords.lat,
+                    fromLng: pickup1Coords.lng,
+                    toLat: dest1Coords.lat,
+                    toLng: dest1Coords.lng,
+                    roomNumber: ride1.roomNumber,
+                    guestName: ride1.guestName || 'Guest',
+                    guestCount: ride1.guestCount || 1
+                },
+                {
+                    from: ride2.pickup,
+                    to: ride2.destination,
+                    fromLat: pickup2Coords.lat,
+                    fromLng: pickup2Coords.lng,
+                    toLat: dest2Coords.lat,
+                    toLng: dest2Coords.lng,
+                    roomNumber: ride2.roomNumber,
+                    guestName: ride2.guestName || 'Guest',
+                    guestCount: ride2.guestCount || 1
+                }
+            ],
+            isChainTrip: false
+        };
     };
     
     const handleMergeRides = async (ride1Id: string, ride2Id: string) => {
@@ -102,12 +533,29 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                 return;
             }
             
+            // Calculate optimal route for merged ride
+            const optimalRoute = calculateOptimalMergeRoute(ride1, ride2);
+            
             // Confirm with user
             const totalGuests = (ride1.guestCount || 1) + (ride2.guestCount || 1);
+            const routePathDisplay = optimalRoute.routePath.join(' → ');
+            const routeInfo = optimalRoute.isChainTrip 
+                ? `\n🔗 Chain Trip (Tối ưu): ${routePathDisplay}`
+                : `\n📍 Merged Route: ${routePathDisplay}`;
+            
+            // Build detailed route segments info
+            const segmentsInfo = optimalRoute.segments.map((segment, idx) => 
+                `\n${idx + 1}. ${segment.from} → ${segment.to}\n   Room #${segment.roomNumber} • ${segment.guestName} • ${segment.guestCount} pax`
+            ).join('');
+            
             const message = `🚐 Ghép chuyến?\n\n` +
-                `${ride1.roomNumber} (${ride1.guestCount || 1} khách): ${ride1.pickup} → ${ride1.destination}\n` +
-                `${ride2.roomNumber} (${ride2.guestCount || 1} khách): ${ride2.pickup} → ${ride2.destination}\n\n` +
-                `💺 Tổng: ${totalGuests}/7 khách\n\n` +
+                `📋 Original Requests:\n` +
+                `- Room #${ride1.roomNumber} (${ride1.guestCount || 1} khách): ${ride1.pickup} → ${ride1.destination}\n` +
+                `- Room #${ride2.roomNumber} (${ride2.guestCount || 1} khách): ${ride2.pickup} → ${ride2.destination}` +
+                routeInfo +
+                `\n\n📍 Route Details (Step by Step):` +
+                segmentsInfo +
+                `\n\n💺 Tổng: ${totalGuests}/7 khách\n\n` +
                 `📝 Lưu ý hành lý:\n` +
                 `- ${ride1.roomNumber}: ${ride1.notes || 'Không có ghi chú'}\n` +
                 `- ${ride2.roomNumber}: ${ride2.notes || 'Không có ghi chú'}\n\n` +
@@ -121,7 +569,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             
             // Use the ride with earlier timestamp as base, combine room numbers
             const baseRide = ride1.timestamp <= ride2.timestamp ? ride1 : ride2;
-            const otherRide = ride1.timestamp <= ride2.timestamp ? ride2 : ride1;
             
             const mergedRide = {
                 ...baseRide,
@@ -129,6 +576,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                 guestName: mergedGuestNames,
                 guestCount: totalGuests,
                 notes: mergedNotes,
+                pickup: optimalRoute.pickup,
+                destination: optimalRoute.destination,
                 timestamp: Math.min(ride1.timestamp, ride2.timestamp) // Use earliest timestamp
             };
             
@@ -147,8 +596,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             alert('❌ Lỗi khi ghép chuyến. Vui lòng thử lại.');
         }
     };
-    const pickupDropdownRef = useRef<HTMLDivElement>(null);
-    const destinationDropdownRef = useRef<HTMLDivElement>(null);
     
     // Sound notification state
     const [soundEnabled, setSoundEnabled] = useState(() => {
@@ -960,21 +1407,23 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             await new Promise(resolve => setTimeout(resolve, 800));
         }
 
-        // Manual ride combining only - no automatic combining
-        // Each ride will be assigned individually unless manually combined by staff
+        // IMPORTANT: Manual merge only - NO automatic merging during assignment
+        // Each ride will be assigned individually unless manually merged by staff using the Merge button
+        // Rides can only be merged manually through the Merge Options modal
         const MAX_BUGGY_CAPACITY = 7;
-        const combinedRideGroups: Array<{ rides: RideRequest[]; totalGuests: number }> = [];
+        const rideGroups: Array<{ rides: RideRequest[]; totalGuests: number }> = [];
         
-        // Create individual groups for each ride (no auto-combining)
+        // Create individual groups for each ride - NO automatic combining/merging
+        // Staff must manually merge rides using the Merge Options feature if they want to combine rides
         pendingRidesList.forEach(ride => {
-            combinedRideGroups.push({ 
-                rides: [ride], 
+            rideGroups.push({ 
+                rides: [ride],  // Each ride is in its own group - no merging
                 totalGuests: ride.guestCount || 1 
             });
         });
         
-        // Skip automatic combining - use individual rides for assignment
-        const finalCombinedRideGroups = combinedRideGroups;
+        // Use individual rides for assignment - no automatic merging
+        const finalRideGroups = rideGroups;
         
         // Calculate cost for all (driver, ride group) pairs - ONLY for online drivers
         const assignments: Array<{ driver: User; rides: RideRequest[]; cost: number; totalGuests: number }> = [];
@@ -982,9 +1431,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         // Create a Set of online driver IDs for quick lookup
         const onlineDriverIds = new Set(onlineDrivers.map(d => d.id ? String(d.id) : ''));
         
-        for (const group of finalCombinedRideGroups) {
-            // Use the first ride in the group for cost calculation (representative ride)
-            const representativeRide = group.rides[0];
+        // Calculate cost for each individual ride with each online driver
+        // Note: Each group contains only 1 ride (no automatic merging)
+        for (const group of finalRideGroups) {
+            // Each group contains exactly 1 ride (no automatic merging)
+            const ride = group.rides[0];
             
             // Only calculate cost for online drivers
             for (const driver of allDrivers) {
@@ -993,16 +1444,19 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                 if (!onlineDriverIds.has(driverIdStr)) {
                     continue;
                 }
-                const cost = calculateAssignmentCost(driver, representativeRide);
+                const cost = calculateAssignmentCost(driver, ride);
                 assignments.push({ driver, rides: group.rides, cost, totalGuests: group.totalGuests });
             }
         }
         
-        // Sort by cost (lowest first) - groups with more combined rides get slight priority
+        // Sort by cost (lowest first)
+        // Note: All groups have exactly 1 ride, so rides.length comparison is not meaningful for merging
         assignments.sort((a, b) => {
             if (a.cost === b.cost) {
-                // If same cost, prefer groups with more rides (better efficiency)
-                return b.rides.length - a.rides.length;
+                // If same cost, prefer earlier requests (by timestamp)
+                const aTimestamp = a.rides[0]?.timestamp || 0;
+                const bTimestamp = b.rides[0]?.timestamp || 0;
+                return aTimestamp - bTimestamp;
             }
             return a.cost - b.cost;
         });
@@ -1013,29 +1467,39 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             await new Promise(resolve => setTimeout(resolve, 600));
         }
         
-        // Greedy assignment: assign each ride group to the best available driver
+        // Greedy assignment: assign each individual ride to the best available driver
+        // IMPORTANT: Each ride is assigned individually - NO automatic merging during assignment
+        // IMPORTANT: Each driver can only be assigned ONE ride at a time (no multiple assignments)
+        // Rides can only be merged manually by staff using the Merge Options feature
         const assignedRides = new Set<string>();
         const assignedDrivers = new Set<string>();
         const finalAssignments: Array<{ driver: User; rides: RideRequest[]; cost: number; isChainTrip?: boolean; totalGuests: number }> = [];
         
         for (const assignment of assignments) {
-            // Check if any ride in the group is already assigned
-            const hasAssignedRide = assignment.rides.some(r => assignedRides.has(r.id));
-            const driverId = assignment.driver.id ? String(assignment.driver.id) : '';
+            // Each assignment contains exactly 1 ride (no automatic merging)
+            const ride = assignment.rides[0];
             
-            // Skip if any ride in group is already assigned or driver is already assigned
-            if (hasAssignedRide || assignedDrivers.has(driverId)) {
+            // Check if this ride is already assigned
+            if (assignedRides.has(ride.id)) {
                 continue;
             }
             
-            // Check if driver can take this ride group (if busy, only allow chain trips)
+            const driverId = assignment.driver.id ? String(assignment.driver.id) : '';
+            
+            // IMPORTANT: Each driver can only be assigned ONE ride per auto-assign cycle
+            // This prevents automatic merging or multiple assignments to the same driver
+            if (assignedDrivers.has(driverId)) {
+                continue; // Driver already assigned a ride in this cycle
+            }
+            
+            // Check if driver can take this ride (if busy, only allow chain trips)
             const driverActiveRides = rides.filter(r => {
                 const rideDriverId = r.driverId ? String(r.driverId) : '';
                 return rideDriverId === driverId && 
                     (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
             });
             
-            // Check total capacity: active rides + new group
+            // Check total capacity: active rides + this single ride
             const activeRidesGuestCount = driverActiveRides.reduce((sum, r) => sum + (r.guestCount || 1), 0);
             if (activeRidesGuestCount + assignment.totalGuests > MAX_BUGGY_CAPACITY) {
                 continue; // Would exceed capacity
@@ -1050,38 +1514,47 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                 isChainTrip = true;
             }
             
-            // Assign all rides in this group to the driver
-            assignment.rides.forEach(ride => assignedRides.add(ride.id));
-            assignedDrivers.add(driverId);
+            // Assign this individual ride to the driver (no merging, no multiple assignments)
+            assignedRides.add(ride.id);
+            assignedDrivers.add(driverId); // Mark driver as assigned to prevent multiple assignments
             finalAssignments.push({ ...assignment, isChainTrip });
         }
 
         // Update modal with assignments (only if showing modal)
-        // Convert ride groups back to individual assignments for display
-        const displayAssignments = finalAssignments.flatMap(assignment => 
-            assignment.rides.map(ride => ({
+        // Each assignment already contains exactly 1 ride (no merging)
+        // Resolve coordinates for pickup and destination locations
+        const displayAssignments = finalAssignments.map(assignment => {
+            const ride = assignment.rides[0]; // Each group has exactly 1 ride
+            const pickupCoords = resolveLocationCoordinates(ride.pickup);
+            const destinationCoords = resolveLocationCoordinates(ride.destination);
+            
+            return {
                 driver: assignment.driver,
                 ride: ride,
                 cost: assignment.cost,
-                isChainTrip: assignment.isChainTrip
-            }))
-        );
+                isChainTrip: assignment.isChainTrip,
+                pickupLat: pickupCoords?.lat,
+                pickupLng: pickupCoords?.lng,
+                destinationLat: destinationCoords?.lat,
+                destinationLng: destinationCoords?.lng
+            };
+        });
         if (!isAutoTriggered) {
             setAIAssignmentData(prev => prev ? { ...prev, status: 'matching', assignments: displayAssignments } : null);
             await new Promise(resolve => setTimeout(resolve, 500));
         }
 
-        // Execute assignments (assign all rides in each group to the same driver)
+        // Execute assignments - assign each individual ride to its driver
+        // IMPORTANT: Each ride is assigned individually - NO automatic merging
         let assignmentCount = 0;
         for (const { driver, rides } of finalAssignments) {
             try {
-                // Assign all rides in the group to the same driver
-                for (const ride of rides) {
-                    await updateRideStatus(ride.id, BuggyStatus.ASSIGNED, driver.id, 5); // 5 min ETA
-                    assignmentCount++;
-                }
+                // Each group contains exactly 1 ride (no automatic merging)
+                const ride = rides[0];
+                await updateRideStatus(ride.id, BuggyStatus.ASSIGNED, driver.id, 5); // 5 min ETA
+                assignmentCount++;
             } catch (error) {
-                console.error(`Failed to assign ride group to driver ${driver.id}:`, error);
+                console.error(`Failed to assign ride to driver ${driver.id}:`, error);
             }
         }
 
@@ -1092,6 +1565,9 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             // For auto-triggered assignments, just log success
             if (assignmentCount > 0) {
                 console.log(`[Auto-Assign] Successfully auto-assigned ${assignmentCount} ride(s)`);
+                // Auto-disable auto assign after successful assignment
+                setFleetConfig(prev => ({ ...prev, autoAssignEnabled: false }));
+                console.log('[Auto-Assign] Auto assign has been automatically disabled after assignment');
             } else {
                 console.log('[Auto-Assign] No assignments were made (no available drivers or other constraints)');
             }
@@ -1142,8 +1618,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
 
     // Handle creating new ride
     const handleCreateRide = async () => {
-        if (!newRideData.roomNumber || !newRideData.pickup || !newRideData.destination) {
-            alert('Please fill in all required fields (Room Number, Pickup, Destination)');
+        if (!newRideData.guestName || !newRideData.pickup || !newRideData.destination) {
+            alert('Please fill in all required fields (Guest Name, Pickup, Destination)');
             return;
         }
 
@@ -1153,27 +1629,34 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         }
 
         // Check for duplicate pending ride (any status except COMPLETED)
-        // Each room can only have ONE active ride request at a time
-        const duplicateRide = rides.find(r => 
-            r.roomNumber === newRideData.roomNumber &&
-            r.status !== BuggyStatus.COMPLETED // Block if there's any non-completed ride for this room
-        );
+        // Only check by guest name (not room number)
+        const duplicateRide = rides.find(r => {
+            if (r.status === BuggyStatus.COMPLETED) return false;
+            
+            // Only check by guest name
+            if (newRideData.guestName && newRideData.guestName.trim() !== '') {
+                if (r.guestName && r.guestName.toLowerCase() === newRideData.guestName.toLowerCase()) {
+                    return true;
+                }
+            }
+            
+            return false;
+        });
 
         if (duplicateRide) {
-            alert(`Room ${newRideData.roomNumber} already has an active ride request (${duplicateRide.pickup} → ${duplicateRide.destination}, Status: ${duplicateRide.status}). Please wait for it to complete or cancel it first.`);
+            const identifier = newRideData.guestName || 'Guest';
+            alert(`${identifier} already has an active ride request (${duplicateRide.pickup} → ${duplicateRide.destination}, Status: ${duplicateRide.status}). Please wait for it to complete or cancel it first.`);
             return;
         }
 
         setIsCreatingRide(true);
         try {
-            // Get guest name from room number if available
-            let guestName = newRideData.guestName;
-            if (!guestName && newRideData.roomNumber) {
-                const guest = users.find(u => u.roomNumber === newRideData.roomNumber && u.role === UserRole.GUEST);
-                guestName = guest ? guest.lastName : `Guest ${newRideData.roomNumber}`;
-            }
-
-            await requestRide(guestName || `Guest ${newRideData.roomNumber}`, newRideData.roomNumber, newRideData.pickup, newRideData.destination, newRideData.guestCount || 1, newRideData.notes || undefined);
+            // Use guest name from input, fallback to room number if available
+            const guestName = newRideData.guestName || (newRideData.roomNumber ? `Guest ${newRideData.roomNumber}` : 'Guest');
+            // Only send room number if it's not empty, otherwise send null to avoid backend duplicate check
+            const roomNumber = (newRideData.roomNumber && newRideData.roomNumber.trim() !== '') ? newRideData.roomNumber : null;
+            
+            await requestRide(guestName, roomNumber || '', newRideData.pickup, newRideData.destination, newRideData.guestCount || 1, newRideData.notes || undefined);
             
             // Refresh rides list
             const refreshedRides = await getRides();
@@ -1219,20 +1702,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         return filtered.sort((a, b) => a.name.localeCompare(b.name));
     };
 
-    // Handle click outside dropdowns
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (pickupDropdownRef.current && !pickupDropdownRef.current.contains(event.target as Node)) {
-                setShowPickupDropdown(false);
-            }
-            if (destinationDropdownRef.current && !destinationDropdownRef.current.contains(event.target as Node)) {
-                setShowDestinationDropdown(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
     
     // Save sound preference to localStorage
     useEffect(() => {
@@ -1720,13 +2189,19 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                             </div>
                                                                         </div>
                                                                         <div className="space-y-1 text-xs">
-                                                                            <div className="flex items-center gap-1 text-gray-600">
-                                                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                                                                            <div className="flex items-center gap-1 text-gray-600 flex-wrap">
+                                                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0"></div>
                                                                                 <span className="truncate">{assignment.ride.pickup}</span>
+                                                                                {(assignment.pickupLat !== undefined && assignment.pickupLng !== undefined) && (
+                                                                                    <span className="text-[10px] text-blue-600 font-mono">({assignment.pickupLat}, {assignment.pickupLng})</span>
+                                                                                )}
                                                                             </div>
-                                                                            <div className="flex items-center gap-1 text-gray-600">
-                                                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                                                                            <div className="flex items-center gap-1 text-gray-600 flex-wrap">
+                                                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></div>
                                                                                 <span className="truncate">{assignment.ride.destination}</span>
+                                                                                {(assignment.destinationLat !== undefined && assignment.destinationLng !== undefined) && (
+                                                                                    <span className="text-[10px] text-emerald-600 font-mono">({assignment.destinationLat}, {assignment.destinationLng})</span>
+                                                                                )}
                                                                             </div>
                                                                         </div>
                                                                         <div className="mt-2 flex items-center gap-2 text-[10px]">
@@ -1788,7 +2263,17 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                 )}
                                                             </div>
                                                             <div className="text-xs text-gray-600 space-y-0.5">
-                                                                <div className="truncate">{assignment.ride.pickup} → {assignment.ride.destination}</div>
+                                                                <div className="flex items-center gap-1 flex-wrap">
+                                                                    <span className="truncate">{assignment.ride.pickup}</span>
+                                                                    {(assignment.pickupLat !== undefined && assignment.pickupLng !== undefined) && (
+                                                                        <span className="text-[9px] text-blue-600 font-mono">({assignment.pickupLat}, {assignment.pickupLng})</span>
+                                                                    )}
+                                                                    <span className="text-gray-400">→</span>
+                                                                    <span className="truncate">{assignment.ride.destination}</span>
+                                                                    {(assignment.destinationLat !== undefined && assignment.destinationLng !== undefined) && (
+                                                                        <span className="text-[9px] text-emerald-600 font-mono">({assignment.destinationLat}, {assignment.destinationLng})</span>
+                                                                    )}
+                                                                </div>
                                                                 <div className="text-gray-500">Driver at: {driverLocation}</div>
                                                             </div>
                                                         </div>
@@ -1881,14 +2366,34 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                         );
                                     })()}
                                     
-                                    {fleetConfig.autoAssignEnabled && (
-                                        <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                        {/* Toggle Switch */}
+                                        <button
+                                            onClick={() => setFleetConfig({...fleetConfig, autoAssignEnabled: !fleetConfig.autoAssignEnabled})}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 ${
+                                                fleetConfig.autoAssignEnabled ? 'bg-emerald-600' : 'bg-gray-300'
+                                            }`}
+                                            title={fleetConfig.autoAssignEnabled ? 'Disable Auto Assign' : 'Enable Auto Assign'}
+                                        >
+                                            <span
+                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                    fleetConfig.autoAssignEnabled ? 'translate-x-5' : 'translate-x-1'
+                                                }`}
+                                            />
+                                        </button>
+                                        
+                                        {/* Auto Assign Info */}
+                                        {fleetConfig.autoAssignEnabled && (
                                             <span className="text-sm bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-semibold">
                                                 Auto: {fleetConfig.maxWaitTimeBeforeAutoAssign}s
                                             </span>
-                                            <span className="text-[9px] text-gray-500">(Active)</span>
-                                        </div>
-                                    )}
+                                        )}
+                                        {!fleetConfig.autoAssignEnabled && (
+                                            <span className="text-xs text-gray-500 font-medium">
+                                                Auto: Off
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                             <div className="space-y-2 flex-1 overflow-y-auto">
@@ -2128,9 +2633,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                     {driverRides.length} job{driverRides.length > 1 ? 's' : ''}
                                                                 </span>
                                                             )}
-                                                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${style.badge}`}>
-                                                                {style.text}
-                                                            </span>
+                                                            {driverStatus !== 'NEAR_COMPLETION' && (
+                                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${style.badge}`}>
+                                                                    {style.text}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </div>
                                                     
@@ -2159,7 +2666,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                                         ride.status === BuggyStatus.ARRIVING ? 'bg-blue-100 text-blue-700' :
                                                                                         'bg-amber-100 text-amber-700'
                                                                                     }`}>
-                                                                                        {ride.status === BuggyStatus.ON_TRIP ? 'TRIP' :
+                                                                                        {ride.status === BuggyStatus.ON_TRIP ? 'ON-TRIP' :
                                                                                          ride.status === BuggyStatus.ARRIVING ? 'ARRIVING' : 'ASSIGNED'}
                                                                                     </span>
                                                                                     {tripProgress !== null && (
@@ -2176,13 +2683,20 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                                 onClick={() => ride.status === BuggyStatus.ON_TRIP 
                                                                                     ? handleEndRide(ride.id) 
                                                                                     : handlePickupGuest(ride.id)}
-                                                                                className={`text-[10px] px-2 py-1 rounded font-medium transition-colors flex-shrink-0 ${
+                                                                                className={`text-[10px] px-2 py-1 rounded font-medium transition-colors flex-shrink-0 flex items-center gap-1 ${
                                                                                     ride.status === BuggyStatus.ON_TRIP
                                                                                         ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
                                                                                         : 'bg-blue-500 hover:bg-blue-600 text-white'
                                                                                 }`}
                                                                             >
-                                                                                {ride.status === BuggyStatus.ON_TRIP ? 'Done' : 'Pickup'}
+                                                                                {ride.status === BuggyStatus.ON_TRIP ? (
+                                                                                    <>
+                                                                                        <CheckCircle size={12} />
+                                                                                        <span>Completed</span>
+                                                                                    </>
+                                                                                ) : (
+                                                                                    'Pickup'
+                                                                                )}
                                                                             </button>
                                                                         </div>
                                                                     </div>
@@ -2531,7 +3045,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                             )}
                                                         </div>
                                                         <div className="flex items-center gap-1.5 flex-shrink-0">
-                                                            <span className="text-[9px] px-1 py-0.5 rounded font-bold bg-green-100 text-green-700">DONE</span>
+                                                            <span className="text-[9px] px-1 py-0.5 rounded font-bold bg-green-100 text-green-700">COMPLETED</span>
                                                             <span className="text-[10px] text-gray-500">{timeAgoText}</span>
                                                         </div>
                                                     </div>
@@ -2594,6 +3108,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                             totalGuests: number;
                                             isSameRoute: boolean;
                                             key: string;
+                                            optimalRoute: { pickup: string; destination: string; routePath: string[]; segments: RouteSegment[]; isChainTrip: boolean };
                                         }> = [];
                                         
                                         // Find all combinable pairs
@@ -2603,11 +3118,13 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                     const ride1 = pendingRides[i];
                                                     const ride2 = pendingRides[j];
                                                     const totalGuests = (ride1.guestCount || 1) + (ride2.guestCount || 1);
+                                                    const optimalRoute = calculateOptimalMergeRoute(ride1, ride2);
                                                     const isSameRoute = ride1.pickup === ride2.pickup && ride1.destination === ride2.destination;
                                                     
                                                     mergeOptions.push({
-                                                        ride1, ride2, totalGuests, isSameRoute,
-                                                        key: `merge-${ride1.id}-${ride2.id}`
+                                                        ride1, ride2, totalGuests, isSameRoute: isSameRoute || optimalRoute.isChainTrip,
+                                                        key: `merge-${ride1.id}-${ride2.id}`,
+                                                        optimalRoute
                                                     });
                                                 }
                                             }
@@ -2627,38 +3144,194 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                 <p className="text-sm text-gray-600 mb-3">
                                                     Found {mergeOptions.length} merge option{mergeOptions.length > 1 ? 's' : ''}. Click "Merge" to combine.
                                                 </p>
-                                                {mergeOptions.map(({ ride1, ride2, totalGuests, isSameRoute, key }) => (
+                                                {mergeOptions.map(({ ride1, ride2, totalGuests, isSameRoute, key, optimalRoute }) => (
                                                     <div key={key} className="p-2 bg-blue-50 border border-blue-200 rounded-lg">
                                                         <div className="flex items-center justify-between gap-2">
                                                             <div className="flex-1 min-w-0">
-                                                                {/* Header row: Rooms + Tags */}
+                                                                {/* Header row: Guest Names + Tags */}
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                                     <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-xs font-medium">
-                                                                        #{ride1.roomNumber}
+                                                                        {ride1.guestName || 'Guest'}
                                                                     </span>
                                                                     <span className="text-blue-400 text-xs">+</span>
                                                                     <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-xs font-medium">
-                                                                        #{ride2.roomNumber}
+                                                                        {ride2.guestName || 'Guest'}
                                                                     </span>
                                                                     <span className="text-gray-400 text-xs">•</span>
                                                                     <span className="text-xs text-gray-600">{totalGuests}/7 pax</span>
                                                                     <span className={`text-xs px-1.5 py-0.5 rounded ${
                                                                         isSameRoute ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                                                                     }`}>
-                                                                        {isSameRoute ? 'Same' : 'Chain'}
+                                                                        {isSameRoute ? 'Same' : optimalRoute.isChainTrip ? 'Chain' : 'Merge'}
                                                                     </span>
                                                                 </div>
                                                                 
-                                                                {/* Route info - compact */}
-                                                                <div className="mt-1 text-xs text-gray-600 flex items-center gap-1">
-                                                                    <MapPin size={10} className="text-green-500 flex-shrink-0" />
+                                                                {/* Original routes */}
+                                                                <div className="mt-1 text-xs text-gray-500 flex items-center gap-1 flex-wrap">
                                                                     <span className="truncate">{ride1.pickup} → {ride1.destination}</span>
-                                                                    {!isSameRoute && (
-                                                                        <>
-                                                                            <span className="text-gray-400 mx-0.5">|</span>
-                                                                            <span className="truncate">{ride2.pickup} → {ride2.destination}</span>
-                                                                        </>
-                                                                    )}
+                                                                    <span className="text-gray-400 mx-0.5">+</span>
+                                                                    <span className="truncate">{ride2.pickup} → {ride2.destination}</span>
+                                                                </div>
+                                                                
+                                                                {/* Optimal merged route - show detailed segments */}
+                                                                <div className="mt-3">
+                                                                    <div className="text-xs text-emerald-700 font-bold mb-3 flex items-center gap-1.5">
+                                                                        <MapPin size={14} className="text-emerald-600" />
+                                                                        <span>Optimized Route:</span>
+                                                                    </div>
+                                                                    <div className="bg-gradient-to-r from-emerald-50 via-green-50 to-teal-50 rounded-lg border-2 border-emerald-400 shadow-md p-4">
+                                                                        {(() => {
+                                                                            // Track guest pickup/dropoff status
+                                                                            const guestStatus: Record<string, { pickedUp: boolean; dropped: boolean; roomNumber: string; guestCount: number }> = {
+                                                                                [ride1.guestName || 'Guest1']: { pickedUp: false, dropped: false, roomNumber: ride1.roomNumber, guestCount: ride1.guestCount || 1 },
+                                                                                [ride2.guestName || 'Guest2']: { pickedUp: false, dropped: false, roomNumber: ride2.roomNumber, guestCount: ride2.guestCount || 1 }
+                                                                            };
+                                                                            
+                                                                            const allActions: Array<{
+                                                                                type: 'pickup' | 'dropoff' | 'move';
+                                                                                location: string;
+                                                                                guests: Array<{ name: string; roomNumber: string; guestCount: number }>;
+                                                                                segment?: RouteSegment;
+                                                                            }> = [];
+                                                                            
+                                                                            // Process each segment to extract actions
+                                                                            optimalRoute.segments.forEach((segment, idx) => {
+                                                                                // Determine which guests are picked up at segment.from
+                                                                                const pickedUpGuests: Array<{ name: string; roomNumber: string; guestCount: number }> = [];
+                                                                                if (segment.from === ride1.pickup && !guestStatus[ride1.guestName || 'Guest1'].pickedUp) {
+                                                                                    pickedUpGuests.push({ name: ride1.guestName || 'Guest', roomNumber: ride1.roomNumber, guestCount: ride1.guestCount || 1 });
+                                                                                    guestStatus[ride1.guestName || 'Guest1'].pickedUp = true;
+                                                                                }
+                                                                                if (segment.from === ride2.pickup && !guestStatus[ride2.guestName || 'Guest2'].pickedUp) {
+                                                                                    pickedUpGuests.push({ name: ride2.guestName || 'Guest', roomNumber: ride2.roomNumber, guestCount: ride2.guestCount || 1 });
+                                                                                    guestStatus[ride2.guestName || 'Guest2'].pickedUp = true;
+                                                                                }
+                                                                                
+                                                                                // Determine which guests are dropped off at segment.to
+                                                                                const droppedGuests: Array<{ name: string; roomNumber: string; guestCount: number }> = [];
+                                                                                if (segment.to === ride1.destination && guestStatus[ride1.guestName || 'Guest1'].pickedUp && !guestStatus[ride1.guestName || 'Guest1'].dropped) {
+                                                                                    droppedGuests.push({ name: ride1.guestName || 'Guest', roomNumber: ride1.roomNumber, guestCount: ride1.guestCount || 1 });
+                                                                                    guestStatus[ride1.guestName || 'Guest1'].dropped = true;
+                                                                                }
+                                                                                if (segment.to === ride2.destination && guestStatus[ride2.guestName || 'Guest2'].pickedUp && !guestStatus[ride2.guestName || 'Guest2'].dropped) {
+                                                                                    droppedGuests.push({ name: ride2.guestName || 'Guest', roomNumber: ride2.roomNumber, guestCount: ride2.guestCount || 1 });
+                                                                                    guestStatus[ride2.guestName || 'Guest2'].dropped = true;
+                                                                                }
+                                                                                
+                                                                                // Add pickup action if any
+                                                                                if (pickedUpGuests.length > 0) {
+                                                                                    allActions.push({
+                                                                                        type: 'pickup',
+                                                                                        location: segment.from,
+                                                                                        guests: pickedUpGuests,
+                                                                                        segment
+                                                                                    });
+                                                                                }
+                                                                                
+                                                                                // Add dropoff action if any
+                                                                                if (droppedGuests.length > 0) {
+                                                                                    allActions.push({
+                                                                                        type: 'dropoff',
+                                                                                        location: segment.to,
+                                                                                        guests: droppedGuests,
+                                                                                        segment
+                                                                                    });
+                                                                                }
+                                                                                
+                                                                                // Always add move/transit action to show the route
+                                                                                allActions.push({
+                                                                                    type: 'move',
+                                                                                    location: `${segment.from} → ${segment.to}`,
+                                                                                    guests: [],
+                                                                                    segment
+                                                                                });
+                                                                            });
+                                                                            
+                                                                            // If no actions were created, show segments directly
+                                                                            if (allActions.length === 0 && optimalRoute.segments.length > 0) {
+                                                                                return (
+                                                                                    <div className="space-y-2.5">
+                                                                                        {optimalRoute.segments.map((segment, idx) => (
+                                                                                            <div key={idx} className="flex items-start gap-3">
+                                                                                                <div className="flex-shrink-0 w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-sm mt-0.5">
+                                                                                                    {idx + 1}
+                                                                                                </div>
+                                                                                                <div className="flex-1 flex items-center gap-2 flex-wrap">
+                                                                                                    <span className="bg-white px-2.5 py-1 rounded-md border-2 border-emerald-300 font-bold text-xs text-black">{segment.from}</span>
+                                                                                                    <ArrowRight size={14} className="text-emerald-600 flex-shrink-0" />
+                                                                                                    <span className="bg-white px-2.5 py-1 rounded-md border-2 border-emerald-300 font-bold text-xs text-black">{segment.to}</span>
+                                                                                                    <span className="text-emerald-600 text-xs">({segment.guestName}, Room: {segment.roomNumber}, {segment.guestCount} pax)</span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        ))}
+                                                                                    </div>
+                                                                                );
+                                                                            }
+                                                                            
+                                                                            return (
+                                                                                <div className="space-y-2.5">
+                                                                                    {allActions.map((action, idx) => (
+                                                                                        <div key={idx} className="flex items-start gap-3">
+                                                                                            {/* Step number */}
+                                                                                            <div className="flex-shrink-0 w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-sm mt-0.5">
+                                                                                                {idx + 1}
+                                                                                            </div>
+                                                                                            
+                                                                                            {/* Action content */}
+                                                                                            <div className="flex-1">
+                                                                                                {action.type === 'pickup' && (
+                                                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                                                        <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5 shadow-sm text-xs">
+                                                                                                            <Users size={13} />
+                                                                                                            Đón khách
+                                                                                                        </span>
+                                                                                                        {action.guests.map((guest, gIdx) => (
+                                                                                                            <span key={gIdx} className="bg-white text-emerald-900 px-2.5 py-1 rounded-md border border-emerald-200 font-semibold shadow-sm text-xs">
+                                                                                                                {guest.name}
+                                                                                                            </span>
+                                                                                                        ))}
+                                                                                                        <span className="text-emerald-700 font-semibold text-xs">tại</span>
+                                                                                                        <span className="bg-white px-2.5 py-1 rounded-md border-2 border-emerald-300 font-bold text-xs text-black">{action.location}</span>
+                                                                                                        {action.segment && (
+                                                                                                            <span className="text-emerald-600 text-[10px]">(Room: {action.segment.roomNumber}, {action.segment.guestCount} pax)</span>
+                                                                                                        )}
+                                                                                                    </div>
+                                                                                                )}
+                                                                                                
+                                                                                                {action.type === 'dropoff' && (
+                                                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                                                        <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5 shadow-sm text-xs">
+                                                                                                            <CheckCircle size={13} />
+                                                                                                            Thả khách
+                                                                                                        </span>
+                                                                                                        {action.guests.map((guest, gIdx) => (
+                                                                                                            <span key={gIdx} className="bg-white text-emerald-900 px-2.5 py-1 rounded-md border border-emerald-200 font-semibold shadow-sm text-xs">
+                                                                                                                {guest.name}
+                                                                                                            </span>
+                                                                                                        ))}
+                                                                                                        <span className="text-emerald-700 font-semibold text-xs">tại</span>
+                                                                                                        <span className="bg-white px-2.5 py-1 rounded-md border-2 border-emerald-300 font-bold text-xs text-black">{action.location}</span>
+                                                                                                        {action.segment && (
+                                                                                                            <span className="text-emerald-600 text-[10px]">(Room: {action.segment.roomNumber}, {action.segment.guestCount} pax)</span>
+                                                                                                        )}
+                                                                                                    </div>
+                                                                                                )}
+                                                                                                
+                                                                                                {action.type === 'move' && action.segment && (
+                                                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                                                        <span className="bg-white px-2.5 py-1 rounded-md border-2 border-emerald-300 font-bold text-xs text-black">{action.segment.from}</span>
+                                                                                                        <ArrowRight size={14} className="text-emerald-600 flex-shrink-0" />
+                                                                                                        <span className="bg-white px-2.5 py-1 rounded-md border-2 border-emerald-300 font-bold text-xs text-black">{action.segment.to}</span>
+                                                                                                        <span className="text-emerald-600 text-xs">({action.segment.guestName}, Room: {action.segment.roomNumber}, {action.segment.guestCount} pax)</span>
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            );
+                                                                        })()}
+                                                                    </div>
                                                                 </div>
                                                                 
                                                                 {/* Notes - inline if exists */}
@@ -2708,7 +3381,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden relative">
                                 {/* Header */}
-                                <div className="bg-emerald-600 text-white p-4 flex justify-between items-center rounded-t-xl flex-shrink-0">
+                                <div className="bg-emerald-600 text-white p-3 flex justify-between items-center rounded-t-xl flex-shrink-0">
                                     <h3 className="text-lg font-bold">Create New Ride</h3>
                                     <button
                                         onClick={() => {
@@ -2724,184 +3397,90 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                 </div>
 
                                 {/* Form */}
-                                <div className="p-6 space-y-4 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-300 scrollbar-track-gray-100 flex-1">
-                                    {/* Room Number */}
+                                <div className="p-4 space-y-3 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-300 scrollbar-track-gray-100 flex-1">
+                                    {/* Guest Name */}
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                                            Room Number <span className="text-red-500">*</span>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                            Guest Name <span className="text-red-500">*</span>
                                         </label>
                                         <input
                                             type="text"
-                                            value={newRideData.roomNumber}
+                                            value={newRideData.guestName}
                                             onChange={(e) => {
-                                                const roomNum = e.target.value;
-                                                setNewRideData(prev => ({ ...prev, roomNumber: roomNum }));
-                                                // Auto-fill guest name if available
-                                                const guest = users.find(u => u.roomNumber === roomNum && u.role === UserRole.GUEST);
-                                                if (guest) {
-                                                    setNewRideData(prev => ({ ...prev, guestName: guest.lastName }));
+                                                const guestName = e.target.value;
+                                                setNewRideData(prev => ({ ...prev, guestName: guestName }));
+                                                // Try to find room number from guest name
+                                                const guest = users.find(u => u.lastName?.toLowerCase() === guestName.toLowerCase() && u.role === UserRole.GUEST);
+                                                if (guest && guest.roomNumber) {
+                                                    setNewRideData(prev => ({ ...prev, roomNumber: guest.roomNumber }));
                                                 }
                                             }}
-                                            placeholder="e.g. 101, 205"
+                                            placeholder="eg: Smith"
                                             className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                         />
                                     </div>
 
                                     {/* Pickup Location */}
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">
                                             Pickup Location <span className="text-red-500">*</span>
                                         </label>
-                                        <div className="relative" ref={pickupDropdownRef}>
-                                            <input
-                                                type="text"
-                                                value={newRideData.pickup || pickupSearchQuery}
-                                                onChange={(e) => {
-                                                    const value = e.target.value;
-                                                    setPickupSearchQuery(value);
-                                                    setNewRideData(prev => ({ ...prev, pickup: '' }));
-                                                    setShowPickupDropdown(true);
-                                                }}
-                                                onFocus={(e) => {
-                                                    if (newRideData.pickup) {
-                                                        setPickupSearchQuery(newRideData.pickup);
-                                                        setNewRideData(prev => ({ ...prev, pickup: '' }));
-                                                        e.target.select();
-                                                    }
-                                                    setShowPickupDropdown(true);
-                                                }}
-                                                placeholder="Search or select pickup location"
-                                                className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                            />
-                                            {showPickupDropdown && (
-                                                <div className="absolute z-[60] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-hidden flex flex-col">
-                                                    {/* Filter Buttons */}
-                                                    <div className="p-2 border-b border-gray-200 flex gap-1 flex-wrap">
-                                                        {(['ALL', 'VILLA', 'FACILITY', 'RESTAURANT'] as const).map((type) => (
-                                                            <button
-                                                                key={type}
-                                                                onClick={() => setPickupFilterType(type)}
-                                                                className={`px-2 py-1 text-xs font-semibold rounded transition ${
-                                                                    pickupFilterType === type
-                                                                        ? 'bg-emerald-600 text-white'
-                                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                                }`}
-                                                            >
-                                                                {type === 'ALL' ? 'All' : type}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                    {/* Locations Grid - 5 columns */}
-                                                    <div className="overflow-y-auto max-h-64 p-2">
-                                                        {getFilteredLocations(pickupSearchQuery, pickupFilterType).length > 0 ? (
-                                                            <div className="grid grid-cols-4 gap-2">
-                                                                {getFilteredLocations(pickupSearchQuery, pickupFilterType).map((loc) => (
-                                                                    <button
-                                                                        key={loc.id}
-                                                                        onClick={() => {
-                                                                            setNewRideData(prev => ({ ...prev, pickup: loc.name }));
-                                                                            setPickupSearchQuery('');
-                                                                            setShowPickupDropdown(false);
-                                                                        }}
-                                                                        className="flex flex-col items-center justify-center p-2 border border-gray-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition text-center min-h-[60px]"
-                                                                        title={loc.name}
-                                                                    >
-                                                                        <div className="text-xs font-medium text-gray-900 break-words w-full leading-tight">
-                                                                            {loc.name}
-                                                                        </div>
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                        ) : (
-                                                            <div className="text-center py-4 text-gray-500 text-sm">
-                                                                No locations found
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setPickupSearchQuery('');
+                                                setPickupFilterType('ALL');
+                                                setShowPickupModal(true);
+                                            }}
+                                            className={`w-full px-3 py-2 bg-white text-left text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 hover:border-emerald-400 transition ${
+                                                newRideData.pickup ? 'font-medium' : 'text-gray-500'
+                                            }`}
+                                        >
+                                            {newRideData.pickup || 'Click to select pickup location'}
+                                        </button>
+                                        {newRideData.pickup && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setNewRideData(prev => ({ ...prev, pickup: '' }))}
+                                                className="text-xs text-red-500 hover:text-red-700 mt-1"
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
                                     </div>
 
                                     {/* Destination */}
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">
                                             Destination <span className="text-red-500">*</span>
                                         </label>
-                                        <div className="relative" ref={destinationDropdownRef}>
-                                            <input
-                                                type="text"
-                                                value={newRideData.destination || destinationSearchQuery}
-                                                onChange={(e) => {
-                                                    const value = e.target.value;
-                                                    setDestinationSearchQuery(value);
-                                                    setNewRideData(prev => ({ ...prev, destination: '' }));
-                                                    setShowDestinationDropdown(true);
-                                                }}
-                                                onFocus={(e) => {
-                                                    if (newRideData.destination) {
-                                                        setDestinationSearchQuery(newRideData.destination);
-                                                        setNewRideData(prev => ({ ...prev, destination: '' }));
-                                                        e.target.select();
-                                                    }
-                                                    setShowDestinationDropdown(true);
-                                                }}
-                                                placeholder="Search or select destination"
-                                                className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                            />
-                                            {showDestinationDropdown && (
-                                                <div className="absolute z-[60] w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-hidden flex flex-col">
-                                                    {/* Filter Buttons */}
-                                                    <div className="p-2 border-b border-gray-200 flex gap-1 flex-wrap">
-                                                        {(['ALL', 'VILLA', 'FACILITY', 'RESTAURANT'] as const).map((type) => (
-                                                            <button
-                                                                key={type}
-                                                                onClick={() => setDestinationFilterType(type)}
-                                                                className={`px-2 py-1 text-xs font-semibold rounded transition ${
-                                                                    destinationFilterType === type
-                                                                        ? 'bg-emerald-600 text-white'
-                                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                                }`}
-                                                            >
-                                                                {type === 'ALL' ? 'All' : type}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                    {/* Locations Grid - 5 columns */}
-                                                    <div className="overflow-y-auto max-h-64 p-2">
-                                                        {getFilteredLocations(destinationSearchQuery, destinationFilterType).length > 0 ? (
-                                                            <div className="grid grid-cols-4 gap-2">
-                                                                {getFilteredLocations(destinationSearchQuery, destinationFilterType).map((loc) => (
-                                                                    <button
-                                                                        key={loc.id}
-                                                                        onClick={() => {
-                                                                            setNewRideData(prev => ({ ...prev, destination: loc.name }));
-                                                                            setDestinationSearchQuery('');
-                                                                            setShowDestinationDropdown(false);
-                                                                        }}
-                                                                        className="flex flex-col items-center justify-center p-2 border border-gray-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition text-center min-h-[60px]"
-                                                                        title={loc.name}
-                                                                    >
-                                                                        <div className="text-xs font-medium text-gray-900 break-words w-full leading-tight">
-                                                                            {loc.name}
-                                                                        </div>
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                        ) : (
-                                                            <div className="text-center py-4 text-gray-500 text-sm">
-                                                                No locations found
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setDestinationSearchQuery('');
+                                                setDestinationFilterType('ALL');
+                                                setShowDestinationModal(true);
+                                            }}
+                                            className={`w-full px-3 py-2 bg-white text-left text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 hover:border-emerald-400 transition ${
+                                                newRideData.destination ? 'font-medium' : 'text-gray-500'
+                                            }`}
+                                        >
+                                            {newRideData.destination || 'Click to select destination'}
+                                        </button>
+                                        {newRideData.destination && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setNewRideData(prev => ({ ...prev, destination: '' }))}
+                                                className="text-xs text-red-500 hover:text-red-700 mt-1"
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
                                     </div>
 
                                     {/* Number of Guests */}
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">
                                             Số lượng khách <span className="text-red-500">*</span>
                                         </label>
                                         <select
@@ -2925,7 +3504,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
 
                                     {/* Notes */}
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">
                                             Notes (Optional)
                                         </label>
                                         <textarea
@@ -2941,7 +3520,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                 </div>
 
                                 {/* Footer */}
-                                <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-end gap-3 rounded-b-xl flex-shrink-0">
+                                <div className="border-t border-gray-200 p-3 bg-gray-50 flex justify-end gap-3 rounded-b-xl flex-shrink-0">
                                     <button
                                         onClick={() => {
                                             setShowCreateRideModal(false);
@@ -2956,7 +3535,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                     </button>
                                     <button
                                         onClick={handleCreateRide}
-                                        disabled={isCreatingRide || !newRideData.roomNumber || !newRideData.pickup || !newRideData.destination}
+                                        disabled={isCreatingRide || !newRideData.guestName || !newRideData.pickup || !newRideData.destination}
                                         className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                     >
                                         {isCreatingRide ? (
@@ -2970,6 +3549,248 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                 Create Ride
                                             </>
                                         )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Location Selection Modal - Pickup */}
+                    {showPickupModal && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden relative">
+                                {/* Header */}
+                                <div className="bg-emerald-600 text-white p-4 flex justify-between items-center rounded-t-xl flex-shrink-0">
+                                    <h3 className="text-lg font-bold">Select Pickup Location</h3>
+                                    <button
+                                        onClick={() => {
+                                            setShowPickupModal(false);
+                                            setPickupSearchQuery('');
+                                        }}
+                                        className="hover:bg-emerald-700 rounded-full p-1 transition"
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                </div>
+
+                                {/* Search Bar */}
+                                <div className="p-4 border-b-2 border-gray-300 flex-shrink-0">
+                                    <input
+                                        type="text"
+                                        value={pickupSearchQuery}
+                                        onChange={(e) => setPickupSearchQuery(e.target.value)}
+                                        placeholder="Search locations..."
+                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                                        autoFocus
+                                    />
+                                </div>
+
+                                {/* Filter Buttons */}
+                                <div className="p-3 border-b-2 border-gray-300 flex gap-2 flex-wrap flex-shrink-0">
+                                    {(['ALL', 'VILLA', 'FACILITY', 'RESTAURANT'] as const).map((type) => (
+                                        <button
+                                            key={type}
+                                            onClick={() => setPickupFilterType(type)}
+                                            className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition ${
+                                                pickupFilterType === type
+                                                    ? 'bg-emerald-600 text-white'
+                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            {type === 'ALL' ? 'All' : type}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Locations Grid */}
+                                <div className="flex-1 overflow-y-auto p-4">
+                                    {getFilteredLocations(pickupSearchQuery, pickupFilterType).length > 0 ? (
+                                        <>
+                                            {newRideData.destination && (
+                                                <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                                                    <p className="text-xs text-amber-700">
+                                                        ⚠️ Cannot select the same location as destination ({newRideData.destination})
+                                                    </p>
+                                                </div>
+                                            )}
+                                            <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+                                                {getFilteredLocations(pickupSearchQuery, pickupFilterType).map((loc) => {
+                                                    const isSameAsDestination = newRideData.destination && loc.name === newRideData.destination;
+                                                    return (
+                                                        <button
+                                                            key={loc.id}
+                                                            onClick={() => {
+                                                                if (isSameAsDestination) {
+                                                                    alert('⚠️ Pickup và Destination không được trùng nhau!\n\n⚠️ Pickup and Destination cannot be the same!');
+                                                                    return;
+                                                                }
+                                                                setNewRideData(prev => ({ ...prev, pickup: loc.name }));
+                                                                setPickupSearchQuery('');
+                                                                setShowPickupModal(false);
+                                                            }}
+                                                            disabled={isSameAsDestination}
+                                                            className={`flex flex-col items-center justify-center p-3 border-2 rounded-lg transition text-center min-h-[80px] group ${
+                                                                isSameAsDestination
+                                                                    ? 'border-red-300 bg-red-50 cursor-not-allowed opacity-60'
+                                                                    : 'border-gray-300 hover:bg-emerald-50 hover:border-emerald-500'
+                                                            }`}
+                                                            title={isSameAsDestination ? `Cannot select same as destination (${newRideData.destination})` : loc.name}
+                                                        >
+                                                            <div className={`text-sm font-medium break-words w-full leading-tight ${
+                                                                isSameAsDestination
+                                                                    ? 'text-red-600'
+                                                                    : 'text-gray-900 group-hover:text-emerald-700'
+                                                            }`}>
+                                                                {loc.name}
+                                                            </div>
+                                                            {isSameAsDestination && (
+                                                                <div className="text-[10px] text-red-500 mt-1">Same as destination</div>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="text-center py-12 text-gray-500">
+                                            <MapPin size={48} className="mx-auto mb-3 text-gray-300" />
+                                            <p className="text-lg font-medium">No locations found</p>
+                                            <p className="text-sm mt-1">Try a different search term or filter</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Footer */}
+                                <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-end rounded-b-xl flex-shrink-0">
+                                    <button
+                                        onClick={() => {
+                                            setShowPickupModal(false);
+                                            setPickupSearchQuery('');
+                                        }}
+                                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition font-medium text-gray-700"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Location Selection Modal - Destination */}
+                    {showDestinationModal && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden relative">
+                                {/* Header */}
+                                <div className="bg-emerald-600 text-white p-4 flex justify-between items-center rounded-t-xl flex-shrink-0">
+                                    <h3 className="text-lg font-bold">Select Destination</h3>
+                                    <button
+                                        onClick={() => {
+                                            setShowDestinationModal(false);
+                                            setDestinationSearchQuery('');
+                                        }}
+                                        className="hover:bg-emerald-700 rounded-full p-1 transition"
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                </div>
+
+                                {/* Search Bar */}
+                                <div className="p-4 border-b-2 border-gray-300 flex-shrink-0">
+                                    <input
+                                        type="text"
+                                        value={destinationSearchQuery}
+                                        onChange={(e) => setDestinationSearchQuery(e.target.value)}
+                                        placeholder="Search locations..."
+                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                                        autoFocus
+                                    />
+                                </div>
+
+                                {/* Filter Buttons */}
+                                <div className="p-3 border-b-2 border-gray-300 flex gap-2 flex-wrap flex-shrink-0">
+                                    {(['ALL', 'VILLA', 'FACILITY', 'RESTAURANT'] as const).map((type) => (
+                                        <button
+                                            key={type}
+                                            onClick={() => setDestinationFilterType(type)}
+                                            className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition ${
+                                                destinationFilterType === type
+                                                    ? 'bg-emerald-600 text-white'
+                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            {type === 'ALL' ? 'All' : type}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Locations Grid */}
+                                <div className="flex-1 overflow-y-auto p-4">
+                                    {getFilteredLocations(destinationSearchQuery, destinationFilterType).length > 0 ? (
+                                        <>
+                                            {newRideData.pickup && (
+                                                <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                                                    <p className="text-xs text-amber-700">
+                                                        ⚠️ Cannot select the same location as pickup ({newRideData.pickup})
+                                                    </p>
+                                                </div>
+                                            )}
+                                            <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+                                                {getFilteredLocations(destinationSearchQuery, destinationFilterType).map((loc) => {
+                                                    const isSameAsPickup = newRideData.pickup && loc.name === newRideData.pickup;
+                                                    return (
+                                                        <button
+                                                            key={loc.id}
+                                                            onClick={() => {
+                                                                if (isSameAsPickup) {
+                                                                    alert('⚠️ Pickup và Destination không được trùng nhau!\n\n⚠️ Pickup and Destination cannot be the same!');
+                                                                    return;
+                                                                }
+                                                                setNewRideData(prev => ({ ...prev, destination: loc.name }));
+                                                                setDestinationSearchQuery('');
+                                                                setShowDestinationModal(false);
+                                                            }}
+                                                            disabled={isSameAsPickup}
+                                                            className={`flex flex-col items-center justify-center p-3 border-2 rounded-lg transition text-center min-h-[80px] group ${
+                                                                isSameAsPickup
+                                                                    ? 'border-red-300 bg-red-50 cursor-not-allowed opacity-60'
+                                                                    : 'border-gray-300 hover:bg-emerald-50 hover:border-emerald-500'
+                                                            }`}
+                                                            title={isSameAsPickup ? `Cannot select same as pickup (${newRideData.pickup})` : loc.name}
+                                                        >
+                                                            <div className={`text-sm font-medium break-words w-full leading-tight ${
+                                                                isSameAsPickup
+                                                                    ? 'text-red-600'
+                                                                    : 'text-gray-900 group-hover:text-emerald-700'
+                                                            }`}>
+                                                                {loc.name}
+                                                            </div>
+                                                            {isSameAsPickup && (
+                                                                <div className="text-[10px] text-red-500 mt-1">Same as pickup</div>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="text-center py-12 text-gray-500">
+                                            <MapPin size={48} className="mx-auto mb-3 text-gray-300" />
+                                            <p className="text-lg font-medium">No locations found</p>
+                                            <p className="text-sm mt-1">Try a different search term or filter</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Footer */}
+                                <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-end rounded-b-xl flex-shrink-0">
+                                    <button
+                                        onClick={() => {
+                                            setShowDestinationModal(false);
+                                            setDestinationSearchQuery('');
+                                        }}
+                                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition font-medium text-gray-700"
+                                    >
+                                        Cancel
                                     </button>
                                 </div>
                             </div>

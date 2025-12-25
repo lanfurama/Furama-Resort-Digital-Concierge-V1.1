@@ -57,22 +57,24 @@ export const rideRequestModel = {
   },
 
   async create(rideRequest: Omit<RideRequest, 'id' | 'created_at' | 'updated_at'>): Promise<RideRequest> {
-    // Check for duplicate pending ride (same room_number and status is not COMPLETED)
-    // Each room can only have ONE active ride request at a time
-    const duplicateCheck = await pool.query(
-      `SELECT * FROM ride_requests 
-       WHERE room_number = $1 
-       AND status != 'COMPLETED'
-       ORDER BY timestamp DESC 
-       LIMIT 1`,
-      [rideRequest.room_number]
-    );
-
-    if (duplicateCheck.rows.length > 0) {
-      const duplicate = duplicateCheck.rows[0];
-      throw new Error(
-        `Duplicate ride request: Room ${rideRequest.room_number} already has an active ride request (${duplicate.pickup} → ${duplicate.destination}, Status: ${duplicate.status}). Please wait for it to complete or cancel it first.`
+    // Check for duplicate pending ride by guest_name (not room_number)
+    // Only check duplicate if guest_name is provided
+    if (rideRequest.guest_name && rideRequest.guest_name.trim() !== '') {
+      const duplicateCheck = await pool.query(
+        `SELECT * FROM ride_requests 
+         WHERE LOWER(guest_name) = LOWER($1) 
+         AND status != 'COMPLETED'
+         ORDER BY timestamp DESC 
+         LIMIT 1`,
+        [rideRequest.guest_name]
       );
+
+      if (duplicateCheck.rows.length > 0) {
+        const duplicate = duplicateCheck.rows[0];
+        throw new Error(
+          `Duplicate ride request: ${rideRequest.guest_name} already has an active ride request (${duplicate.pickup} → ${duplicate.destination}, Status: ${duplicate.status}). Please wait for it to complete or cancel it first.`
+        );
+      }
     }
 
     const result = await pool.query(

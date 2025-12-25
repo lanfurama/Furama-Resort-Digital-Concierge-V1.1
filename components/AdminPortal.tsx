@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key, Car, Settings, RefreshCw, Zap, Grid3x3, CheckCircle, Map, AlertCircle, Info, Brain, ArrowRight, Loader2, Pencil, Copy, Check } from 'lucide-react';
+import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key, Car, Settings, RefreshCw, Zap, Grid3x3, CheckCircle, AlertCircle, Info, Brain, ArrowRight, Loader2, Pencil, Copy, Check, Search } from 'lucide-react';
 import { getLocations, getLocationsSync, addLocation, updateLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, updateMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, updatePromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, getUsersSync, addUser, updateUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory, getRides, getRidesSync, updateRideStatus, generateCheckInCode } from '../services/dataService';
 import { parseAdminInput, generateTranslations } from '../services/geminiService';
 import { Location, MenuItem, ResortEvent, Promotion, KnowledgeItem, User, UserRole, Department, RoomType, Room, RideRequest, BuggyStatus } from '../types';
@@ -215,6 +215,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const [showAiInput, setShowAiInput] = useState(false);
     const [menuFilter, setMenuFilter] = useState<'ALL' | 'Dining' | 'Spa' | 'Pool' | 'Butler'>('ALL');
     const [locationFilter, setLocationFilter] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('ALL');
+    const [locationSearch, setLocationSearch] = useState<string>('');
 
     // New User State (Staff)
     const [newUser, setNewUser] = useState<Partial<User>>({ role: UserRole.STAFF, department: 'Dining' });
@@ -1348,7 +1349,13 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     };
 
     const filteredMenu = menuFilter === 'ALL' ? menu : menu.filter(m => m.category === menuFilter);
-    const filteredLocations = locationFilter === 'ALL' ? locations : locations.filter(l => l.type === locationFilter);
+    const filteredLocations = locations.filter(l => {
+        // Filter by type
+        const matchesType = locationFilter === 'ALL' || l.type === locationFilter;
+        // Filter by search query
+        const matchesSearch = !locationSearch || l.name.toLowerCase().includes(locationSearch.toLowerCase());
+        return matchesType && matchesSearch;
+    });
     const guestUsers = users.filter(u => {
         if (u.role !== UserRole.GUEST) return false;
         if (guestStatusFilter === 'ALL') return true;
@@ -1539,10 +1546,52 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
 
                         {tab === 'LOCATIONS' && (
                             <>
+                                {/* Search Input */}
+                                <div className="flex-1 md:flex-none min-w-[200px]">
+                                    <div className="relative">
+                                        <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            value={locationSearch}
+                                            onChange={(e) => setLocationSearch(e.target.value)}
+                                            placeholder="Search locations..."
+                                            className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                                        />
+                                        {locationSearch && (
+                                            <button
+                                                onClick={() => setLocationSearch('')}
+                                                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                                 <div className="flex bg-white rounded-lg border border-gray-200 p-1">
-                                    <button onClick={() => setLocationFilter('ALL')} className={`px-3 py-1 text-xs rounded ${locationFilter === 'ALL' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500'}`}>All</button>
-                                    <button onClick={() => setLocationFilter('FACILITY')} className={`px-3 py-1 text-xs rounded ${locationFilter === 'FACILITY' ? 'bg-blue-100 text-blue-800 font-bold' : 'text-gray-500'}`}>Public Areas</button>
-                                    <button onClick={() => setLocationFilter('VILLA')} className={`px-3 py-1 text-xs rounded ${locationFilter === 'VILLA' ? 'bg-purple-100 text-purple-800 font-bold' : 'text-gray-500'}`}>Villa</button>
+                                    <button onClick={() => setLocationFilter('ALL')} className={`px-3 py-1 text-xs rounded flex items-center gap-1.5 ${locationFilter === 'ALL' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500'}`}>
+                                        <span>All</span>
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] ${locationFilter === 'ALL' ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-600'}`}>
+                                            {locations.length}
+                                        </span>
+                                    </button>
+                                    <button onClick={() => setLocationFilter('FACILITY')} className={`px-3 py-1 text-xs rounded flex items-center gap-1.5 ${locationFilter === 'FACILITY' ? 'bg-blue-100 text-blue-800 font-bold' : 'text-gray-500'}`}>
+                                        <span>Public Areas</span>
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] ${locationFilter === 'FACILITY' ? 'bg-blue-200 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                                            {locations.filter(l => l.type === 'FACILITY').length}
+                                        </span>
+                                    </button>
+                                    <button onClick={() => setLocationFilter('VILLA')} className={`px-3 py-1 text-xs rounded flex items-center gap-1.5 ${locationFilter === 'VILLA' ? 'bg-purple-100 text-purple-800 font-bold' : 'text-gray-500'}`}>
+                                        <span>Villa</span>
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] ${locationFilter === 'VILLA' ? 'bg-purple-200 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                                            {locations.filter(l => l.type === 'VILLA').length}
+                                        </span>
+                                    </button>
+                                    <button onClick={() => setLocationFilter('RESTAURANT')} className={`px-3 py-1 text-xs rounded flex items-center gap-1.5 ${locationFilter === 'RESTAURANT' ? 'bg-amber-100 text-amber-800 font-bold' : 'text-gray-500'}`}>
+                                        <span>Restaurant</span>
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] ${locationFilter === 'RESTAURANT' ? 'bg-amber-200 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
+                                            {locations.filter(l => l.type === 'RESTAURANT').length}
+                                        </span>
+                                    </button>
                                 </div>
                                 <button 
                                     onClick={() => {
@@ -1552,9 +1601,9 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                             setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
                                         }
                                     }}
-                                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition flex-1 md:flex-none"
+                                    className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition flex-1 md:flex-none text-sm"
                                 >
-                                    {showLocationForm && !editingLocation ? <X size={18}/> : <Plus size={18}/>}
+                                    {showLocationForm && !editingLocation ? <X size={16}/> : <Plus size={16}/>}
                                     <span>{showLocationForm && !editingLocation ? 'Cancel' : 'Add Location'}</span>
                                 </button>
                             </>
@@ -1629,9 +1678,9 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                         {['LOCATIONS', 'MENU', 'EVENTS', 'KNOWLEDGE'].includes(tab) && (
                             <button 
                                 onClick={() => setShowAiInput(!showAiInput)}
-                                className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition flex-1 md:flex-none"
+                                className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition flex-1 md:flex-none text-sm"
                             >
-                                {showAiInput ? <X size={18}/> : <Plus size={18}/>}
+                                {showAiInput ? <X size={16}/> : <Plus size={16}/>}
                                 <span>{showAiInput ? 'Cancel' : 'Smart Add'}</span>
                             </button>
                         )}
@@ -2079,48 +2128,52 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                     </div>
                                 </div>
                             )}
-                        <table className="w-full text-left">
-                            <thead className="bg-gray-50 border-b border-gray-200">
-                                <tr>
-                                    <th className="p-4 text-sm font-semibold text-gray-600">Name</th>
-                                    <th className="p-4 text-sm font-semibold text-gray-600 hidden md:table-cell">Coordinates</th>
-                                    <th className="p-4 text-sm font-semibold text-gray-600 text-right">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredLocations.map((loc) => (
-                                    <tr key={loc.id || loc.name} className="border-b border-gray-100 hover:bg-gray-50">
-                                        <td className="p-4 font-medium text-gray-800">
-                                            {loc.name}
-                                            <div className="md:hidden text-xs text-gray-400 mt-1">{loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}</div>
-                                        </td>
-                                        <td className="p-4 text-sm font-mono text-gray-500 hidden md:table-cell">{loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}</td>
-                                        <td className="p-4 text-right">
-                                            <div className="flex items-center justify-end gap-1 relative z-10">
-                                                <button 
-                                                    onClick={() => {
-                                                        setEditingLocation(loc);
-                                                        setNewLocation({
-                                                            name: loc.name,
-                                                            lat: loc.lat,
-                                                            lng: loc.lng,
-                                                            type: loc.type || 'FACILITY'
-                                                        });
-                                                        setShowLocationForm(true);
-                                                    }}
-                                                    className="text-emerald-600 hover:text-emerald-700 p-2 relative z-10 cursor-pointer" 
-                                                    title="Edit"
-                                                    type="button"
-                                                >
-                                                    <Pencil size={16}/>
-                                                </button>
-                                                <button onClick={() => handleDelete(loc.id || loc.name, 'LOC')} className="text-red-500 hover:text-red-700 p-2 relative z-10 cursor-pointer" type="button"><Trash2 size={16}/></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                            
+                            {/* List View */}
+                            {(
+                                <table className="w-full text-left">
+                                    <thead className="bg-gray-50 border-b border-gray-200">
+                                        <tr>
+                                            <th className="p-4 text-sm font-semibold text-gray-600">Name</th>
+                                            <th className="p-4 text-sm font-semibold text-gray-600 hidden md:table-cell">Coordinates</th>
+                                            <th className="p-4 text-sm font-semibold text-gray-600 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredLocations.map((loc) => (
+                                            <tr key={loc.id || loc.name} className="border-b border-gray-100 hover:bg-gray-50">
+                                                <td className="p-4 font-medium text-gray-800">
+                                                    {loc.name}
+                                                    <div className="md:hidden text-xs text-gray-400 mt-1 font-mono">{loc.lat}, {loc.lng}</div>
+                                                </td>
+                                                <td className="p-4 text-sm font-mono text-gray-500 hidden md:table-cell">{loc.lat}, {loc.lng}</td>
+                                                <td className="p-4 text-right">
+                                                    <div className="flex items-center justify-end gap-1 relative z-10">
+                                                        <button 
+                                                            onClick={() => {
+                                                                setEditingLocation(loc);
+                                                                setNewLocation({
+                                                                    name: loc.name,
+                                                                    lat: loc.lat,
+                                                                    lng: loc.lng,
+                                                                    type: loc.type || 'FACILITY'
+                                                                });
+                                                                setShowLocationForm(true);
+                                                            }}
+                                                            className="text-emerald-600 hover:text-emerald-700 p-2 relative z-10 cursor-pointer" 
+                                                            title="Edit"
+                                                            type="button"
+                                                        >
+                                                            <Pencil size={16}/>
+                                                        </button>
+                                                        <button onClick={() => handleDelete(loc.id || loc.name, 'LOC')} className="text-red-500 hover:text-red-700 p-2 relative z-10 cursor-pointer" type="button"><Trash2 size={16}/></button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
                         </>
                     )}
                     
