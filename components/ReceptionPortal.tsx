@@ -444,22 +444,28 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             const from = optimalPath[i];
             const to = optimalPath[i + 1];
             
-            // Track guest pickup/dropoff
+            // Track guest pickup/dropoff BEFORE determining on-board guests
+            // This ensures we track state at the START of the segment
+            const wasGuest1PickedUp = guest1PickedUp;
+            const wasGuest2PickedUp = guest2PickedUp;
+            
+            // Update pickup status at the START of segment (from location)
             if (from === ride1.pickup) guest1PickedUp = true;
             if (from === ride2.pickup) guest2PickedUp = true;
-            if (to === ride1.destination && guest1PickedUp) guest1Dropped = true;
-            if (to === ride2.destination && guest2PickedUp) guest2Dropped = true;
             
             // Determine which guests are on board during this segment
+            // Guests are on board if they were picked up before or at the start of this segment
             const onBoardGuests: Array<{ name: string; roomNumber: string; count: number }> = [];
-            if (guest1PickedUp && !guest1Dropped) {
+            if (guest1PickedUp && to !== ride1.destination) {
+                // Guest1 is on board if picked up and not dropped at destination yet
                 onBoardGuests.push({ 
                     name: ride1.guestName || 'Guest', 
                     roomNumber: ride1.roomNumber, 
                     count: ride1.guestCount || 1 
                 });
             }
-            if (guest2PickedUp && !guest2Dropped) {
+            if (guest2PickedUp && to !== ride2.destination) {
+                // Guest2 is on board if picked up and not dropped at destination yet
                 onBoardGuests.push({ 
                     name: ride2.guestName || 'Guest', 
                     roomNumber: ride2.roomNumber, 
@@ -467,23 +473,26 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                 });
             }
             
-            // Only create segment if there are guests on board
-            if (onBoardGuests.length > 0) {
-                const fromCoords = getLocationCoords(from);
-                const toCoords = getLocationCoords(to);
-                
-                segments.push({
-                    from,
-                    to,
-                    fromLat: fromCoords?.lat,
-                    fromLng: fromCoords?.lng,
-                    toLat: toCoords?.lat,
-                    toLng: toCoords?.lng,
-                    roomNumber: onBoardGuests.map(g => g.roomNumber).join(' + '),
-                    guestName: onBoardGuests.map(g => g.name).join(' + '),
-                    guestCount: onBoardGuests.reduce((sum, g) => sum + g.count, 0)
-                });
-            }
+            // Always create segment for the route, even if no guests on board yet
+            // This ensures we show the complete route path
+            const fromCoords = getLocationCoords(from);
+            const toCoords = getLocationCoords(to);
+            
+            segments.push({
+                from,
+                to,
+                fromLat: fromCoords?.lat,
+                fromLng: fromCoords?.lng,
+                toLat: toCoords?.lat,
+                toLng: toCoords?.lng,
+                roomNumber: onBoardGuests.length > 0 ? onBoardGuests.map(g => g.roomNumber).join(' + ') : '',
+                guestName: onBoardGuests.length > 0 ? onBoardGuests.map(g => g.name).join(' + ') : '',
+                guestCount: onBoardGuests.reduce((sum, g) => sum + g.count, 0)
+            });
+            
+            // Update dropoff status AFTER creating segment (at destination)
+            if (to === ride1.destination && guest1PickedUp) guest1Dropped = true;
+            if (to === ride2.destination && guest2PickedUp) guest2Dropped = true;
         }
         
         return {
@@ -1060,8 +1069,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         const isAvailable = driverActiveRides.length === 0;
         const currentRide = driverActiveRides[0];
         
-        // Check if driver has GPS location
-        const hasGpsLocation = driver.currentLat !== undefined && driver.currentLng !== undefined;
+        // TEMPORARILY DISABLED: GPS-based location logic (Phase 1 - drivers don't use app)
+        // Use time-based priority only: Driver near completion > Available driver > Busy driver
         
         // Calculate wait time in seconds (longer wait = higher priority = lower cost)
         const waitTimeSeconds = Math.floor((Date.now() - ride.timestamp) / 1000);
@@ -1069,94 +1078,56 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
         
         let cost = 0;
         
-        if (hasGpsLocation) {
-            // Driver has GPS location: Use distance-based calculation
-            const driverCoords = { lat: driver.currentLat!, lng: driver.currentLng! };
-            const pickupCoords = resolveLocationCoordinates(ride.pickup);
+        if (isAvailable) {
+            // Driver is AVAILABLE: Medium priority (not as good as near-completion)
+            cost = 5000; // Base cost for available drivers
+        } else if (currentRide) {
+            // Driver is BUSY: Calculate how close they are to completing current ride
+            const now = Date.now();
+            let rideDuration = 0;
             
-            if (!pickupCoords) {
-                return 1000000; // Very high cost if can't resolve pickup
+            // Calculate ride duration based on status
+            if (currentRide.status === BuggyStatus.ON_TRIP && currentRide.pickedUpAt) {
+                // Driver is on trip: time since pickup
+                rideDuration = now - currentRide.pickedUpAt;
+            } else if (currentRide.status === BuggyStatus.ARRIVING && currentRide.confirmedAt) {
+                // Driver is arriving: time since assignment
+                rideDuration = now - currentRide.confirmedAt;
+            } else if (currentRide.status === BuggyStatus.ASSIGNED && currentRide.confirmedAt) {
+                // Driver is assigned: time since assignment
+                rideDuration = now - currentRide.confirmedAt;
             }
             
-            // Calculate distance from driver's current GPS location to pickup point (in meters)
-            let distance = calculateDistance(driverCoords, pickupCoords);
-            cost = distance; // Start with distance as base cost
+            // Average ride duration is about 5-10 minutes (300000-600000 ms)
+            // Drivers who have been on trip for > 5 minutes are likely near completion
+            const rideDurationMinutes = rideDuration / (1000 * 60);
             
-            if (isAvailable) {
-                // Driver is AVAILABLE: Low cost (subtract a bonus)
-                cost -= 5000; // Available drivers get priority
-            } else if (currentRide) {
-                // Driver is BUSY: Check for Chain Trip opportunity
-                const dropoffCoords = resolveLocationCoordinates(currentRide.destination);
-                if (dropoffCoords) {
-                    const chainDistance = calculateDistance(dropoffCoords, pickupCoords);
-                    // If drop-off is very close to new pickup (Chain Trip), give very low cost
-                    if (chainDistance < 200) { // Within 200 meters = Chain Trip
-                        cost = chainDistance - 10000; // Very low cost for chain trips
-                    } else {
-                        // Busy driver but not a chain trip: higher cost
-                        cost += 10000; // Penalty for busy drivers
-                    }
-                } else {
-                    // Can't resolve drop-off location, use distance from current GPS location
-                    cost += 10000; // Penalty for busy drivers
+            if (rideDurationMinutes >= 5) {
+                // Driver is likely near completion: HIGH PRIORITY (very low cost)
+                // The longer the ride, the lower the cost (closer to completion)
+                cost = 1000 - (rideDurationMinutes - 5) * 200; // Lower cost for longer rides
+                cost = Math.max(0, cost); // Don't go negative
+            } else if (rideDurationMinutes >= 3) {
+                // Driver is getting close: Medium-high priority
+                cost = 2000;
+            } else {
+                // Driver just started: Lower priority
+                cost = 8000; // Higher cost for drivers who just started
+            }
+            
+            // Check for chain trip opportunity (based on location names, not GPS)
+            const dropoffCoords = resolveLocationCoordinates(currentRide.destination);
+            const pickupCoords = resolveLocationCoordinates(ride.pickup);
+            if (dropoffCoords && pickupCoords) {
+                const chainDistance = calculateDistance(dropoffCoords, pickupCoords);
+                if (chainDistance < 200) {
+                    // Chain trip: Very high priority
+                    cost = chainDistance - 10000; // Very low cost for chain trips
                 }
             }
         } else {
-            // Driver does NOT have GPS location: Use time-based priority
-            // Priority: Driver near completion of current ride > Available driver > Busy driver
-            
-            if (isAvailable) {
-                // Driver is AVAILABLE: Medium priority (not as good as near-completion)
-                cost = 5000; // Base cost for available drivers without GPS
-            } else if (currentRide) {
-                // Driver is BUSY: Calculate how close they are to completing current ride
-                const now = Date.now();
-                let rideDuration = 0;
-                
-                // Calculate ride duration based on status
-                if (currentRide.status === BuggyStatus.ON_TRIP && currentRide.pickedUpAt) {
-                    // Driver is on trip: time since pickup
-                    rideDuration = now - currentRide.pickedUpAt;
-                } else if (currentRide.status === BuggyStatus.ARRIVING && currentRide.confirmedAt) {
-                    // Driver is arriving: time since assignment
-                    rideDuration = now - currentRide.confirmedAt;
-                } else if (currentRide.status === BuggyStatus.ASSIGNED && currentRide.confirmedAt) {
-                    // Driver is assigned: time since assignment
-                    rideDuration = now - currentRide.confirmedAt;
-                }
-                
-                // Average ride duration is about 5-10 minutes (300000-600000 ms)
-                // Drivers who have been on trip for > 5 minutes are likely near completion
-                const rideDurationMinutes = rideDuration / (1000 * 60);
-                
-                if (rideDurationMinutes >= 5) {
-                    // Driver is likely near completion: HIGH PRIORITY (very low cost)
-                    // The longer the ride, the lower the cost (closer to completion)
-                    cost = 1000 - (rideDurationMinutes - 5) * 200; // Lower cost for longer rides
-                    cost = Math.max(0, cost); // Don't go negative
-                } else if (rideDurationMinutes >= 3) {
-                    // Driver is getting close: Medium-high priority
-                    cost = 2000;
-                } else {
-                    // Driver just started: Lower priority
-                    cost = 8000; // Higher cost for drivers who just started
-                }
-                
-                // Also check for chain trip opportunity (if we can resolve locations)
-                const dropoffCoords = resolveLocationCoordinates(currentRide.destination);
-                const pickupCoords = resolveLocationCoordinates(ride.pickup);
-                if (dropoffCoords && pickupCoords) {
-                    const chainDistance = calculateDistance(dropoffCoords, pickupCoords);
-                    if (chainDistance < 200) {
-                        // Chain trip: Very high priority
-                        cost = chainDistance - 10000; // Very low cost for chain trips
-                    }
-                }
-            } else {
-                // Driver is OFFLINE or unknown status: Very high cost
-                cost = 100000;
-            }
+            // Driver is OFFLINE or unknown status: Very high cost
+            cost = 100000;
         }
         
         // Subtract wait time bonus (longer wait = lower cost = higher priority)
@@ -1449,15 +1420,80 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             }
         }
         
-        // Sort by cost (lowest first)
-        // Note: All groups have exactly 1 ride, so rides.length comparison is not meaningful for merging
+        // Sort assignments with priority order:
+        // 1. Driver proximity to pickup (distance-based cost)
+        // 2. Guest wait time (longer wait = higher priority)
+        // 3. Driver near completion of current ride (chain trip opportunity)
         assignments.sort((a, b) => {
-            if (a.cost === b.cost) {
-                // If same cost, prefer earlier requests (by timestamp)
-                const aTimestamp = a.rides[0]?.timestamp || 0;
-                const bTimestamp = b.rides[0]?.timestamp || 0;
-                return aTimestamp - bTimestamp;
+            const rideA = a.rides[0];
+            const rideB = b.rides[0];
+            
+            // Priority 1: Driver proximity (distance-based cost)
+            // Lower cost means closer driver
+            if (Math.abs(a.cost - b.cost) > 100) {
+                // Significant cost difference (>100) = prioritize by distance
+                return a.cost - b.cost;
             }
+            
+            // Priority 2: Guest wait time (longer wait = higher priority)
+            const waitTimeA = Date.now() - (rideA?.timestamp || 0);
+            const waitTimeB = Date.now() - (rideB?.timestamp || 0);
+            if (Math.abs(waitTimeA - waitTimeB) > 30000) {
+                // Significant wait time difference (>30s) = prioritize longer wait
+                return waitTimeB - waitTimeA; // Longer wait first
+            }
+            
+            // Priority 3: Driver near completion (chain trip)
+            // Check if drivers are busy and near completion
+            const driverAId = a.driver.id ? String(a.driver.id) : '';
+            const driverBId = b.driver.id ? String(b.driver.id) : '';
+            const activeRidesA = rides.filter(r => {
+                const rideDriverId = r.driverId ? String(r.driverId) : '';
+                return rideDriverId === driverAId && 
+                    (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
+            });
+            const activeRidesB = rides.filter(r => {
+                const rideDriverId = r.driverId ? String(r.driverId) : '';
+                return rideDriverId === driverBId && 
+                    (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
+            });
+            
+            const currentRideA = activeRidesA[0];
+            const currentRideB = activeRidesB[0];
+            
+            if (currentRideA && !currentRideB) {
+                // Driver A is busy, Driver B is available - prefer B
+                return 1;
+            }
+            if (!currentRideA && currentRideB) {
+                // Driver A is available, Driver B is busy - prefer A
+                return -1;
+            }
+            if (currentRideA && currentRideB) {
+                // Both busy - check ride duration (near completion)
+                const now = Date.now();
+                let durationA = 0;
+                let durationB = 0;
+                
+                if (currentRideA.status === BuggyStatus.ON_TRIP && currentRideA.pickedUpAt) {
+                    durationA = now - currentRideA.pickedUpAt;
+                } else if (currentRideA.confirmedAt) {
+                    durationA = now - currentRideA.confirmedAt;
+                }
+                
+                if (currentRideB.status === BuggyStatus.ON_TRIP && currentRideB.pickedUpAt) {
+                    durationB = now - currentRideB.pickedUpAt;
+                } else if (currentRideB.confirmedAt) {
+                    durationB = now - currentRideB.confirmedAt;
+                }
+                
+                // Prefer driver closer to completion (longer duration)
+                if (Math.abs(durationA - durationB) > 60000) { // >1 minute difference
+                    return durationB - durationA; // Longer duration first (closer to completion)
+                }
+            }
+            
+            // Final tie-breaker: cost
             return a.cost - b.cost;
         });
         
@@ -2090,7 +2126,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 {/* Header */}
-                                <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex items-center justify-between">
+                                <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-3 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
                                             <Brain size={24} className="text-white" />
@@ -2184,24 +2220,18 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                                 <Car size={16} className="text-emerald-600" />
                                                                             </div>
                                                                             <div>
-                                                                                <div className="font-bold text-sm text-gray-800">Room {assignment.ride.roomNumber}</div>
-                                                                                <div className="text-xs text-gray-500">{assignment.ride.guestName}</div>
+                                                                                <div className="font-bold text-sm text-gray-800">{assignment.ride.guestName || `Guest ${assignment.ride.roomNumber}`}</div>
+                                                                                <div className="text-xs text-gray-500">Room {assignment.ride.roomNumber}</div>
                                                                             </div>
                                                                         </div>
                                                                         <div className="space-y-1 text-xs">
                                                                             <div className="flex items-center gap-1 text-gray-600 flex-wrap">
                                                                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0"></div>
                                                                                 <span className="truncate">{assignment.ride.pickup}</span>
-                                                                                {(assignment.pickupLat !== undefined && assignment.pickupLng !== undefined) && (
-                                                                                    <span className="text-[10px] text-blue-600 font-mono">({assignment.pickupLat}, {assignment.pickupLng})</span>
-                                                                                )}
                                                                             </div>
                                                                             <div className="flex items-center gap-1 text-gray-600 flex-wrap">
                                                                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></div>
                                                                                 <span className="truncate">{assignment.ride.destination}</span>
-                                                                                {(assignment.destinationLat !== undefined && assignment.destinationLng !== undefined) && (
-                                                                                    <span className="text-[10px] text-emerald-600 font-mono">({assignment.destinationLat}, {assignment.destinationLng})</span>
-                                                                                )}
                                                                             </div>
                                                                         </div>
                                                                         <div className="mt-2 flex items-center gap-2 text-[10px]">
@@ -2253,7 +2283,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                 <div className="flex items-center gap-2">
                                                                     <CheckCircle size={16} className="text-green-600" />
                                                                     <span className="font-bold text-sm text-gray-800">
-                                                                        {assignment.driver.lastName} → Room {assignment.ride.roomNumber}
+                                                                        {assignment.driver.lastName} → {assignment.ride.guestName || `Guest ${assignment.ride.roomNumber}`}
                                                                     </span>
                                                                 </div>
                                                                 {assignment.isChainTrip && (
@@ -2265,14 +2295,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                             <div className="text-xs text-gray-600 space-y-0.5">
                                                                 <div className="flex items-center gap-1 flex-wrap">
                                                                     <span className="truncate">{assignment.ride.pickup}</span>
-                                                                    {(assignment.pickupLat !== undefined && assignment.pickupLng !== undefined) && (
-                                                                        <span className="text-[9px] text-blue-600 font-mono">({assignment.pickupLat}, {assignment.pickupLng})</span>
-                                                                    )}
                                                                     <span className="text-gray-400">→</span>
                                                                     <span className="truncate">{assignment.ride.destination}</span>
-                                                                    {(assignment.destinationLat !== undefined && assignment.destinationLng !== undefined) && (
-                                                                        <span className="text-[9px] text-emerald-600 font-mono">({assignment.destinationLat}, {assignment.destinationLng})</span>
-                                                                    )}
                                                                 </div>
                                                                 <div className="text-gray-500">Driver at: {driverLocation}</div>
                                                             </div>
@@ -2309,7 +2333,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
 
                                 {/* Footer */}
                                 {(aiAssignmentData.status === 'completed' || aiAssignmentData.status === 'error') && (
-                                    <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-end">
+                                    <div className="border-t border-gray-200 p-3 bg-gray-50 flex justify-end">
                                         <button
                                             onClick={() => {
                                                 setShowAIAssignment(false);
@@ -2403,39 +2427,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                     </div>
                                 ) : (
                                     (() => {
-                                        // Helper function to determine ride type
-                                        const getRideType = (ride: RideRequest): { type: 'PU' | 'DO' | 'AC' | 'OTHER', labels: string[] } => {
-                                            const pickupLower = ride.pickup.toLowerCase();
-                                            const destLower = ride.destination.toLowerCase();
-                                            const labels: string[] = [];
-                                            
-                                            // Check for Airport Concierge
-                                            if (pickupLower.includes('airport') || destLower.includes('airport') || 
-                                                pickupLower.includes('sân bay') || destLower.includes('sân bay')) {
-                                                labels.push('AC');
-                                                return { type: 'AC', labels };
-                                            }
-                                            
-                                            // Check for Pick Up (from room)
-                                            const pickupIsRoom = pickupLower.includes('room') || pickupLower.includes('villa') || 
-                                                                pickupLower.match(/\b\d{3}\b/) || pickupLower.includes('phòng');
-                                            // Check for Drop Off (to room)
-                                            const destIsRoom = destLower.includes('room') || destLower.includes('villa') || 
-                                                             destLower.match(/\b\d{3}\b/) || destLower.includes('phòng');
-                                            
-                                            if (pickupIsRoom && !destIsRoom) {
-                                                labels.push('PU');
-                                            }
-                                            if (destIsRoom && !pickupIsRoom) {
-                                                labels.push('DO');
-                                            }
-                                            if (pickupIsRoom && destIsRoom) {
-                                                labels.push('PU', 'DO');
-                                            }
-                                            
-                                            return { type: labels.length > 0 ? (labels[0] as 'PU' | 'DO') : 'OTHER', labels };
-                                        };
-                                        
                                         // Sort by wait time (longest first) and map to display
                                         const pendingRides = rides.filter(r => r.status === BuggyStatus.SEARCHING)
                                             .map(ride => {
@@ -2447,7 +2438,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                         return pendingRides.map(({ ride, waitTime }, index) => {
                                             const waitMinutes = Math.floor(waitTime / 60);
                                             const waitSeconds = waitTime % 60;
-                                            const rideType = getRideType(ride);
                                             
                                             // Determine urgency level based on wait time
                                             let urgencyLevel: 'normal' | 'warning' | 'urgent' = 'normal';
@@ -2469,12 +2459,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                             <span className="font-semibold text-sm text-gray-800">#{ride.roomNumber}</span>
                                                             <span className="text-xs text-gray-500 truncate">{ride.guestName}</span>
                                                             <span className="text-[10px] text-gray-500">{ride.guestCount || 1} pax</span>
-                                                            {rideType.labels.map((label, idx) => (
-                                                                <span key={idx} className={`text-[9px] px-1 py-0.5 rounded font-bold ${
-                                                                    label === 'AC' ? 'bg-purple-100 text-purple-700' :
-                                                                    label === 'PU' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                                                                }`}>{label}</span>
-                                                            ))}
                                                         </div>
                                                         <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${style.badge}`}>
                                                             {waitMinutes}m {waitSeconds}s
@@ -3086,7 +3070,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                             <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden relative">
                                 {/* Header */}
-                                <div className="bg-blue-600 text-white p-4 flex justify-between items-center rounded-t-xl flex-shrink-0">
+                                <div className="bg-blue-600 text-white p-3 flex justify-between items-center rounded-t-xl flex-shrink-0">
                                     <h3 className="text-lg font-bold flex items-center gap-2">
                                         🔗 Merge Options
                                     </h3>
@@ -3148,15 +3132,17 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                     <div key={key} className="p-2 bg-blue-50 border border-blue-200 rounded-lg">
                                                         <div className="flex items-center justify-between gap-2">
                                                             <div className="flex-1 min-w-0">
-                                                                {/* Header row: Guest Names + Tags */}
+                                                                {/* Header row: Guest Names + Tags + Routes */}
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                                     <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-xs font-medium">
                                                                         {ride1.guestName || 'Guest'}
                                                                     </span>
+                                                                    <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md border border-gray-300 font-semibold text-xs">({ride1.pickup} → {ride1.destination})</span>
                                                                     <span className="text-blue-400 text-xs">+</span>
                                                                     <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-xs font-medium">
                                                                         {ride2.guestName || 'Guest'}
                                                                     </span>
+                                                                    <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md border border-gray-300 font-semibold text-xs">({ride2.pickup} → {ride2.destination})</span>
                                                                     <span className="text-gray-400 text-xs">•</span>
                                                                     <span className="text-xs text-gray-600">{totalGuests}/7 pax</span>
                                                                     <span className={`text-xs px-1.5 py-0.5 rounded ${
@@ -3166,20 +3152,13 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                     </span>
                                                                 </div>
                                                                 
-                                                                {/* Original routes */}
-                                                                <div className="mt-1 text-xs text-gray-500 flex items-center gap-1 flex-wrap">
-                                                                    <span className="truncate">{ride1.pickup} → {ride1.destination}</span>
-                                                                    <span className="text-gray-400 mx-0.5">+</span>
-                                                                    <span className="truncate">{ride2.pickup} → {ride2.destination}</span>
-                                                                </div>
-                                                                
                                                                 {/* Optimal merged route - show detailed segments */}
                                                                 <div className="mt-3">
-                                                                    <div className="text-xs text-emerald-700 font-bold mb-3 flex items-center gap-1.5">
-                                                                        <MapPin size={14} className="text-emerald-600" />
-                                                                        <span>Optimized Route:</span>
+                                                                    <div className="text-xs text-gray-700 font-semibold mb-2 flex items-center gap-1.5">
+                                                                        <MapPin size={13} className="text-gray-600" />
+                                                                        <span>Optimized Route</span>
                                                                     </div>
-                                                                    <div className="bg-gradient-to-r from-emerald-50 via-green-50 to-teal-50 rounded-lg border-2 border-emerald-400 shadow-md p-4">
+                                                                    <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
                                                                         {(() => {
                                                                             // Track guest pickup/dropoff status
                                                                             const guestStatus: Record<string, { pickedUp: boolean; dropped: boolean; roomNumber: string; guestCount: number }> = {
@@ -3208,11 +3187,16 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                                 }
                                                                                 
                                                                                 // Determine which guests are dropped off at segment.to
+                                                                                // Check both rides - both guests can be dropped at the same location
                                                                                 const droppedGuests: Array<{ name: string; roomNumber: string; guestCount: number }> = [];
+                                                                                
+                                                                                // Check ride1
                                                                                 if (segment.to === ride1.destination && guestStatus[ride1.guestName || 'Guest1'].pickedUp && !guestStatus[ride1.guestName || 'Guest1'].dropped) {
                                                                                     droppedGuests.push({ name: ride1.guestName || 'Guest', roomNumber: ride1.roomNumber, guestCount: ride1.guestCount || 1 });
                                                                                     guestStatus[ride1.guestName || 'Guest1'].dropped = true;
                                                                                 }
+                                                                                
+                                                                                // Check ride2 - can be dropped at the same location as ride1
                                                                                 if (segment.to === ride2.destination && guestStatus[ride2.guestName || 'Guest2'].pickedUp && !guestStatus[ride2.guestName || 'Guest2'].dropped) {
                                                                                     droppedGuests.push({ name: ride2.guestName || 'Guest', roomNumber: ride2.roomNumber, guestCount: ride2.guestCount || 1 });
                                                                                     guestStatus[ride2.guestName || 'Guest2'].dropped = true;
@@ -3238,14 +3222,139 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                                     });
                                                                                 }
                                                                                 
-                                                                                // Always add move/transit action to show the route
-                                                                                allActions.push({
-                                                                                    type: 'move',
-                                                                                    location: `${segment.from} → ${segment.to}`,
-                                                                                    guests: [],
-                                                                                    segment
-                                                                                });
+                                                                                // Only add move/transit action if there's no pickup/dropoff at the destination
+                                                                                // This prevents redundant move actions when we already have pickup/dropoff actions
+                                                                                const hasActionAtDestination = pickedUpGuests.length > 0 || droppedGuests.length > 0;
+                                                                                if (!hasActionAtDestination) {
+                                                                                    allActions.push({
+                                                                                        type: 'move',
+                                                                                        location: `${segment.from} → ${segment.to}`,
+                                                                                        guests: [],
+                                                                                        segment
+                                                                                    });
+                                                                                } else if (pickedUpGuests.length === 0 && droppedGuests.length === 0) {
+                                                                                    // Only add move if there's no action at destination AND no action at source
+                                                                                    // But if we have pickup at source, we still need move to show route
+                                                                                    const nextSegment = optimalRoute.segments[idx + 1];
+                                                                                    const needsMoveToShowRoute = segment.from !== segment.to;
+                                                                                    if (needsMoveToShowRoute) {
+                                                                                        allActions.push({
+                                                                                            type: 'move',
+                                                                                            location: `${segment.from} → ${segment.to}`,
+                                                                                            guests: [],
+                                                                                            segment
+                                                                                        });
+                                                                                    }
+                                                                                }
                                                                             });
+                                                                            
+                                                                            // Merge consecutive actions: if move action ends at a location and next action is pickup/dropoff at that location
+                                                                            // Also merge multiple dropoff/pickup actions at the same location
+                                                                            const mergedActions: typeof allActions = [];
+                                                                            for (let i = 0; i < allActions.length; i++) {
+                                                                                const current = allActions[i];
+                                                                                const next = allActions[i + 1];
+                                                                                
+                                                                                // If current is move action and next is pickup at the destination
+                                                                                if (current.type === 'move' && current.segment && next && next.type === 'pickup' && next.location === current.segment.to) {
+                                                                                    // Collect all consecutive pickup actions at the same location
+                                                                                    const allPickupGuests = [...next.guests];
+                                                                                    let j = i + 2;
+                                                                                    while (j < allActions.length && allActions[j].type === 'pickup' && allActions[j].location === next.location) {
+                                                                                        allPickupGuests.push(...allActions[j].guests);
+                                                                                        j++;
+                                                                                    }
+                                                                                    
+                                                                                    // Merge: show move with pickup info
+                                                                                    mergedActions.push({
+                                                                                        type: 'pickup',
+                                                                                        location: next.location,
+                                                                                        guests: allPickupGuests,
+                                                                                        segment: current.segment
+                                                                                    });
+                                                                                    i = j - 1; // Skip all merged actions
+                                                                                }
+                                                                                // If current is move action and next is dropoff at the destination
+                                                                                else if (current.type === 'move' && current.segment && next && next.type === 'dropoff' && next.location === current.segment.to) {
+                                                                                    // Collect all consecutive dropoff actions at the same location (including move actions that lead to the same dropoff)
+                                                                                    const allDropoffGuests = [...next.guests];
+                                                                                    let j = i + 2;
+                                                                                    // Skip any move actions that lead to the same dropoff location
+                                                                                    while (j < allActions.length) {
+                                                                                        if (allActions[j].type === 'dropoff' && allActions[j].location === next.location) {
+                                                                                            allDropoffGuests.push(...allActions[j].guests);
+                                                                                            j++;
+                                                                                        } else if (allActions[j].type === 'move' && allActions[j].segment && allActions[j].segment.to === next.location) {
+                                                                                            // Skip move actions that lead to the same dropoff location
+                                                                                            j++;
+                                                                                        } else {
+                                                                                            break;
+                                                                                        }
+                                                                                    }
+                                                                                    
+                                                                                    // Merge: show move with dropoff info
+                                                                                    mergedActions.push({
+                                                                                        type: 'dropoff',
+                                                                                        location: next.location,
+                                                                                        guests: allDropoffGuests,
+                                                                                        segment: current.segment
+                                                                                    });
+                                                                                    i = j - 1; // Skip all merged actions
+                                                                                }
+                                                                                // If current is dropoff and next is move to the same location, merge them (dropoff before move)
+                                                                                else if (current.type === 'dropoff' && next && next.type === 'move' && next.segment && next.segment.to === current.location && next.segment.from === current.segment?.from) {
+                                                                                    // Merge: show move with dropoff info
+                                                                                    mergedActions.push({
+                                                                                        type: 'dropoff',
+                                                                                        location: current.location,
+                                                                                        guests: current.guests,
+                                                                                        segment: current.segment
+                                                                                    });
+                                                                                    i++; // Skip next move action as it's merged
+                                                                                }
+                                                                                // If current is dropoff and next is also dropoff at the same location, merge them
+                                                                                else if (current.type === 'dropoff' && next && next.type === 'dropoff' && next.location === current.location) {
+                                                                                    const allDropoffGuests = [...current.guests, ...next.guests];
+                                                                                    mergedActions.push({
+                                                                                        type: 'dropoff',
+                                                                                        location: current.location,
+                                                                                        guests: allDropoffGuests,
+                                                                                        segment: current.segment || next.segment
+                                                                                    });
+                                                                                    i++; // Skip next action as it's merged
+                                                                                }
+                                                                                // If current is pickup and next is move to the same location, merge them (pickup before move)
+                                                                                else if (current.type === 'pickup' && next && next.type === 'move' && next.segment && next.segment.to === current.location && next.segment.from === current.segment?.from) {
+                                                                                    // Merge: show move with pickup info
+                                                                                    mergedActions.push({
+                                                                                        type: 'pickup',
+                                                                                        location: current.location,
+                                                                                        guests: current.guests,
+                                                                                        segment: current.segment
+                                                                                    });
+                                                                                    i++; // Skip next move action as it's merged
+                                                                                }
+                                                                                // Skip standalone move actions that duplicate dropoff/pickup locations
+                                                                                else if (current.type === 'move' && current.segment) {
+                                                                                    // Check if this move is redundant (same as previous dropoff/pickup)
+                                                                                    const prevAction = mergedActions[mergedActions.length - 1];
+                                                                                    if (prevAction && (
+                                                                                        (prevAction.type === 'dropoff' && prevAction.location === current.segment.to) ||
+                                                                                        (prevAction.type === 'pickup' && prevAction.location === current.segment.to)
+                                                                                    )) {
+                                                                                        // Skip this redundant move action
+                                                                                        continue;
+                                                                                    }
+                                                                                    mergedActions.push(current);
+                                                                                }
+                                                                                else {
+                                                                                    mergedActions.push(current);
+                                                                                }
+                                                                            }
+                                                                            
+                                                                            // Replace allActions with mergedActions
+                                                                            allActions.length = 0;
+                                                                            allActions.push(...mergedActions);
                                                                             
                                                                             // If no actions were created, show segments directly
                                                                             if (allActions.length === 0 && optimalRoute.segments.length > 0) {
@@ -3253,14 +3362,13 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                                     <div className="space-y-2.5">
                                                                                         {optimalRoute.segments.map((segment, idx) => (
                                                                                             <div key={idx} className="flex items-start gap-3">
-                                                                                                <div className="flex-shrink-0 w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-sm mt-0.5">
+                                                                                                <div className="flex-shrink-0 w-6 h-6 bg-white border-2 border-gray-300 text-gray-700 rounded-full flex items-center justify-center text-xs font-semibold shadow-sm">
                                                                                                     {idx + 1}
                                                                                                 </div>
-                                                                                                <div className="flex-1 flex items-center gap-2 flex-wrap">
-                                                                                                    <span className="bg-white px-2.5 py-1 rounded-md border-2 border-emerald-300 font-bold text-xs text-black">{segment.from}</span>
-                                                                                                    <ArrowRight size={14} className="text-emerald-600 flex-shrink-0" />
-                                                                                                    <span className="bg-white px-2.5 py-1 rounded-md border-2 border-emerald-300 font-bold text-xs text-black">{segment.to}</span>
-                                                                                                    <span className="text-emerald-600 text-xs">({segment.guestName}, Room: {segment.roomNumber}, {segment.guestCount} pax)</span>
+                                                                                                <div className="flex-1 flex items-center gap-1.5 text-xs pt-0.5">
+                                                                                                    <span className="bg-white text-gray-900 px-2 py-0.5 rounded border border-gray-300 font-semibold shadow-sm">{segment.from}</span>
+                                                                                                    <ArrowRight size={11} className="text-gray-400" />
+                                                                                                    <span className="bg-white text-gray-900 px-2 py-0.5 rounded border border-gray-300 font-semibold shadow-sm">{segment.to}</span>
                                                                                                 </div>
                                                                                             </div>
                                                                                         ))}
@@ -3273,58 +3381,73 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                                     {allActions.map((action, idx) => (
                                                                                         <div key={idx} className="flex items-start gap-3">
                                                                                             {/* Step number */}
-                                                                                            <div className="flex-shrink-0 w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-sm mt-0.5">
+                                                                                            <div className="flex-shrink-0 w-6 h-6 bg-white border-2 border-gray-300 text-gray-700 rounded-full flex items-center justify-center text-xs font-semibold shadow-sm">
                                                                                                 {idx + 1}
                                                                                             </div>
                                                                                             
                                                                                             {/* Action content */}
-                                                                                            <div className="flex-1">
+                                                                                            <div className="flex-1 min-w-0 pt-0.5">
                                                                                                 {action.type === 'pickup' && (
-                                                                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                                                                        <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5 shadow-sm text-xs">
-                                                                                                            <Users size={13} />
-                                                                                                            Đón khách
-                                                                                                        </span>
-                                                                                                        {action.guests.map((guest, gIdx) => (
-                                                                                                            <span key={gIdx} className="bg-white text-emerald-900 px-2.5 py-1 rounded-md border border-emerald-200 font-semibold shadow-sm text-xs">
-                                                                                                                {guest.name}
-                                                                                                            </span>
-                                                                                                        ))}
-                                                                                                        <span className="text-emerald-700 font-semibold text-xs">tại</span>
-                                                                                                        <span className="bg-white px-2.5 py-1 rounded-md border-2 border-emerald-300 font-bold text-xs text-black">{action.location}</span>
-                                                                                                        {action.segment && (
-                                                                                                            <span className="text-emerald-600 text-[10px]">(Room: {action.segment.roomNumber}, {action.segment.guestCount} pax)</span>
+                                                                                                    <div className="flex flex-col gap-1.5">
+                                                                                                        {/* Route path if exists */}
+                                                                                                        {action.segment && action.segment.from !== action.location && (
+                                                                                                            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                                                                                                                <span className="font-medium">{action.segment.from}</span>
+                                                                                                                <ArrowRight size={11} className="text-gray-400" />
+                                                                                                                <span className="font-medium">{action.location}</span>
+                                                                                                            </div>
                                                                                                         )}
+                                                                                                        {/* Action details */}
+                                                                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                                                                            <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-800 px-2.5 py-1 rounded-md border border-blue-200 font-medium text-xs">
+                                                                                                                <Users size={11} />
+                                                                                                                Pick up
+                                                                                                            </span>
+                                                                                                            {action.guests.map((guest, gIdx) => (
+                                                                                                                <span key={gIdx} className="bg-white text-gray-800 px-2 py-0.5 rounded border border-gray-300 font-medium text-xs shadow-sm">
+                                                                                                                    {guest.name}
+                                                                                                                </span>
+                                                                                                            ))}
+                                                                                                            <span className="text-gray-500 text-xs font-medium">at</span>
+                                                                                                            <span className="bg-white text-gray-900 px-2 py-0.5 rounded border border-gray-300 font-semibold text-xs shadow-sm">{action.location}</span>
+                                                                                                        </div>
                                                                                                     </div>
                                                                                                 )}
                                                                                                 
                                                                                                 {action.type === 'dropoff' && (
-                                                                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                                                                        <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1.5 shadow-sm text-xs">
-                                                                                                            <CheckCircle size={13} />
-                                                                                                            Thả khách
-                                                                                                        </span>
-                                                                                                        {action.guests.map((guest, gIdx) => (
-                                                                                                            <span key={gIdx} className="bg-white text-emerald-900 px-2.5 py-1 rounded-md border border-emerald-200 font-semibold shadow-sm text-xs">
-                                                                                                                {guest.name}
-                                                                                                            </span>
-                                                                                                        ))}
-                                                                                                        <span className="text-emerald-700 font-semibold text-xs">tại</span>
-                                                                                                        <span className="bg-white px-2.5 py-1 rounded-md border-2 border-emerald-300 font-bold text-xs text-black">{action.location}</span>
-                                                                                                        {action.segment && (
-                                                                                                            <span className="text-emerald-600 text-[10px]">(Room: {action.segment.roomNumber}, {action.segment.guestCount} pax)</span>
+                                                                                                    <div className="flex flex-col gap-1.5">
+                                                                                                        {/* Route path if exists */}
+                                                                                                        {action.segment && action.segment.from !== action.location && (
+                                                                                                            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                                                                                                                <span className="font-medium">{action.segment.from}</span>
+                                                                                                                <ArrowRight size={11} className="text-gray-400" />
+                                                                                                                <span className="font-medium">{action.location}</span>
+                                                                                                            </div>
                                                                                                         )}
+                                                                                                        {/* Action details */}
+                                                                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                                                                            <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-800 px-2.5 py-1 rounded-md border border-green-200 font-medium text-xs">
+                                                                                                                <CheckCircle size={11} />
+                                                                                                                Drop off
+                                                                                                            </span>
+                                                                                                            {action.guests.map((guest, gIdx) => (
+                                                                                                                <span key={gIdx} className="bg-white text-gray-800 px-2 py-0.5 rounded border border-gray-300 font-medium text-xs shadow-sm">
+                                                                                                                    {guest.name}
+                                                                                                                </span>
+                                                                                                            ))}
+                                                                                                            <span className="text-gray-500 text-xs font-medium">at</span>
+                                                                                                            <span className="bg-white text-gray-900 px-2 py-0.5 rounded border border-gray-300 font-semibold text-xs shadow-sm">{action.location}</span>
+                                                                                                        </div>
                                                                                                     </div>
                                                                                                 )}
                                                                                                 
                                                                                                 {action.type === 'move' && action.segment && (
-                                                                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                                                                        <span className="bg-white px-2.5 py-1 rounded-md border-2 border-emerald-300 font-bold text-xs text-black">{action.segment.from}</span>
-                                                                                                        <ArrowRight size={14} className="text-emerald-600 flex-shrink-0" />
-                                                                                                        <span className="bg-white px-2.5 py-1 rounded-md border-2 border-emerald-300 font-bold text-xs text-black">{action.segment.to}</span>
-                                                                                                        <span className="text-emerald-600 text-xs">({action.segment.guestName}, Room: {action.segment.roomNumber}, {action.segment.guestCount} pax)</span>
-                                                                                                    </div>
-                                                                                                )}
+                                                                    <div className="flex items-center gap-1.5 text-xs">
+                                                                        <span className="bg-white text-gray-900 px-2 py-0.5 rounded border border-gray-300 font-semibold shadow-sm">{action.segment.from}</span>
+                                                                        <ArrowRight size={11} className="text-gray-400" />
+                                                                        <span className="bg-white text-gray-900 px-2 py-0.5 rounded border border-gray-300 font-semibold shadow-sm">{action.segment.to}</span>
+                                                                    </div>
+                                                                )}
                                                                                             </div>
                                                                                         </div>
                                                                                     ))}

@@ -74,8 +74,9 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                 if (prevRide.status === BuggyStatus.SEARCHING && newRide.status === BuggyStatus.ASSIGNED) {
                     const driver = users.find(u => u.id === newRide.driverId);
                     const driverName = driver ? driver.lastName : 'Driver';
+                    const guestName = newRide.guestName || `Guest ${newRide.roomNumber}`;
                     setNotification({
-                        message: `✅ Driver ${driverName} accepted booking for Room ${newRide.roomNumber}`,
+                        message: `✅ Driver ${driverName} accepted booking for ${guestName}`,
                         type: 'success'
                     });
                     playNotificationSound();
@@ -86,9 +87,10 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                     (newRide.status === BuggyStatus.ARRIVING || newRide.status === BuggyStatus.ON_TRIP)) {
                     const driver = users.find(u => u.id === newRide.driverId);
                     const driverName = driver ? driver.lastName : 'Driver';
+                    const guestName = newRide.guestName || `Guest ${newRide.roomNumber}`;
                     const action = newRide.status === BuggyStatus.ARRIVING ? 'arrived' : 'picked up';
                     setNotification({
-                        message: `🚗 Driver ${driverName} ${action} guest from Room ${newRide.roomNumber}`,
+                        message: `🚗 Driver ${driverName} ${action} ${guestName}`,
                         type: 'info'
                     });
                     playNotificationSound();
@@ -98,8 +100,9 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                 if (prevRide.status !== BuggyStatus.COMPLETED && newRide.status === BuggyStatus.COMPLETED) {
                     const driver = users.find(u => u.id === newRide.driverId);
                     const driverName = driver ? driver.lastName : 'Driver';
+                    const guestName = newRide.guestName || `Guest ${newRide.roomNumber}`;
                     setNotification({
-                        message: `✅ Buggy completed: Room ${newRide.roomNumber} (${newRide.pickup} → ${newRide.destination})`,
+                        message: `✅ Buggy completed: ${guestName} (${newRide.pickup} → ${newRide.destination})`,
                         type: 'success'
                     });
                     playNotificationSound();
@@ -109,8 +112,9 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
             // Notify new requests
             if (newRequests.length > 0) {
                 if (newRequests.length === 1) {
+                    const guestName = newRequests[0].guestName || `Guest ${newRequests[0].roomNumber}`;
                     setNotification({
-                        message: `🆕 New buggy request from Room ${newRequests[0].roomNumber}`,
+                        message: `🆕 New buggy request from ${guestName}`,
                         type: 'info'
                     });
                 } else {
@@ -324,10 +328,11 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                                                                 {displayTime}
                                                             </span>
                                                         </div>
-                                                        <h4 className="text-sm font-bold mb-1 text-gray-900">Room {ride.roomNumber}</h4>
+                                                        <h4 className="text-sm font-bold mb-1 text-gray-900">{ride.guestName || `Guest ${ride.roomNumber}`}</h4>
                                                         <p className="text-xs text-gray-500 leading-relaxed">
                                                             {ride.pickup} → {ride.destination}
                                                         </p>
+                                                        <p className="text-[10px] text-gray-400 mt-0.5">Room {ride.roomNumber}</p>
                                                         {activityType === 'PENDING' && (
                                                             <p className="text-[10px] text-orange-600 mt-1 font-semibold">
                                                                 Waiting: {Math.floor((Date.now() - ride.timestamp) / 1000 / 60)} min
