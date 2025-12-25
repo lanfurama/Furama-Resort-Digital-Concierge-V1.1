@@ -258,6 +258,11 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const [showGuestEditForm, setShowGuestEditForm] = useState(false);
     const [editGuest, setEditGuest] = useState<Partial<User>>({ lastName: '', roomNumber: '', villaType: '', language: 'English', checkIn: '', checkOut: '' });
     
+    // Staff Edit State
+    const [editingStaff, setEditingStaff] = useState<User | null>(null);
+    const [showStaffEditForm, setShowStaffEditForm] = useState(false);
+    const [editStaff, setEditStaff] = useState<Partial<User>>({ lastName: '', roomNumber: '', department: '', role: UserRole.STAFF });
+    
     const [showRoomForm, setShowRoomForm] = useState(false);
     const [newRoom, setNewRoom] = useState<{number: string, typeId: string}>({ number: '', typeId: '' });
     const [roomCsvFile, setRoomCsvFile] = useState<File | null>(null);
@@ -2664,6 +2669,22 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                             </span>
                                         </td>
                                         <td className="p-4 text-right flex justify-end space-x-1">
+                                            <button 
+                                                onClick={() => {
+                                                    setEditingStaff(u);
+                                                    setEditStaff({ 
+                                                        lastName: u.lastName || '', 
+                                                        roomNumber: u.roomNumber || '', 
+                                                        department: u.department || '', 
+                                                        role: u.role || UserRole.STAFF 
+                                                    });
+                                                    setShowStaffEditForm(true);
+                                                }} 
+                                                className="text-blue-500 hover:text-blue-700 p-2"
+                                                title="Edit Staff"
+                                            >
+                                                <Pencil size={16}/>
+                                            </button>
                                             <button onClick={() => { setResetPasswordUserId(u.id || ''); setResetNewPassword(''); }} className="text-amber-500 hover:text-amber-700 p-2"><Key size={16}/></button>
                                             <button onClick={() => handleDelete(u.id || '', 'USER')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16}/></button>
                                         </td>
@@ -2671,6 +2692,120 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                                 ))}
                             </tbody>
                         </table>
+                    )}
+
+                    {/* Staff Edit Modal */}
+                    {showStaffEditForm && (
+                        <div 
+                            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in"
+                            onClick={() => {
+                                setEditingStaff(null);
+                                setEditStaff({ lastName: '', roomNumber: '', department: '', role: UserRole.STAFF });
+                                setShowStaffEditForm(false);
+                            }}
+                        >
+                            <div 
+                                className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[90vw] max-w-lg p-6 animate-in slide-in-from-top-5 relative"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <button
+                                    onClick={() => {
+                                        setEditingStaff(null);
+                                        setEditStaff({ lastName: '', roomNumber: '', department: '', role: UserRole.STAFF });
+                                        setShowStaffEditForm(false);
+                                    }}
+                                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                                    aria-label="Close"
+                                >
+                                    <X size={20} />
+                                </button>
+                                <h3 className="text-lg font-bold text-gray-800 mb-4 pr-8">Edit Staff</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Last Name</label>
+                                        <input 
+                                            type="text"
+                                            className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                            value={editStaff.lastName || ''}
+                                            onChange={e => setEditStaff({...editStaff, lastName: e.target.value})}
+                                            placeholder="e.g. Smith"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 mb-1">ID / Room Number</label>
+                                        <input 
+                                            type="text"
+                                            className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                            value={editStaff.roomNumber || ''}
+                                            onChange={e => setEditStaff({...editStaff, roomNumber: e.target.value})}
+                                            placeholder="e.g. STAFF001"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Department</label>
+                                        <input 
+                                            type="text"
+                                            className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                            value={editStaff.department || ''}
+                                            onChange={e => setEditStaff({...editStaff, department: e.target.value})}
+                                            placeholder="e.g. Reception, Housekeeping"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Role</label>
+                                        <select
+                                            className="w-full border border-gray-300 rounded p-2 text-sm bg-gray-50 text-gray-900"
+                                            value={editStaff.role || UserRole.STAFF}
+                                            onChange={e => setEditStaff({...editStaff, role: e.target.value as UserRole})}
+                                        >
+                                            <option value={UserRole.STAFF}>Staff</option>
+                                            <option value={UserRole.SUPERVISOR}>Supervisor</option>
+                                            <option value={UserRole.ADMIN}>Admin</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex justify-end gap-2 pt-4">
+                                        <button
+                                            onClick={() => {
+                                                setEditingStaff(null);
+                                                setEditStaff({ lastName: '', roomNumber: '', department: '', role: UserRole.STAFF });
+                                                setShowStaffEditForm(false);
+                                            }}
+                                            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={async () => {
+                                                if (!editStaff.lastName || !editStaff.roomNumber) {
+                                                    alert('Please enter last name and ID.');
+                                                    return;
+                                                }
+                                                try {
+                                                    if (editingStaff && editingStaff.id) {
+                                                        const userToUpdate: Partial<User> = {
+                                                            ...editStaff
+                                                        };
+                                                        await updateUser(editingStaff.id, userToUpdate as User);
+                                                        const updatedUsers = await getUsers();
+                                                        setUsers(updatedUsers);
+                                                        alert(`Staff "${editStaff.lastName}" updated successfully!`);
+                                                        setEditingStaff(null);
+                                                        setEditStaff({ lastName: '', roomNumber: '', department: '', role: UserRole.STAFF });
+                                                        setShowStaffEditForm(false);
+                                                    }
+                                                } catch (error) {
+                                                    console.error('Error updating staff:', error);
+                                                    alert('Failed to update staff. Please try again.');
+                                                }
+                                            }}
+                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition"
+                                        >
+                                            Save Changes
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     )}
                     
                     {tab === 'GUESTS' && (
