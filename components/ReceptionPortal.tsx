@@ -1494,49 +1494,59 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                     {/* Dashboard Stats */}
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4">
                         {/* Drivers Online */}
-                        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-2 border border-green-200/60">
-                            <div className="flex items-center gap-1.5 mb-0.5">
-                                <Users size={12} className="text-green-600 flex-shrink-0" />
-                                <span className="text-xs font-semibold text-green-700">Drivers Online</span>
+                        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-md p-1.5 border border-green-200/60">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1">
+                                    <Users size={14} className="text-green-600 flex-shrink-0" />
+                                    <span className="text-sm font-medium text-green-700">Drivers Online</span>
+                                </div>
+                                <span className="text-lg font-bold text-green-700">{getOnlineDriversCount()}</span>
                             </div>
-                            <div className="text-2xl font-bold text-green-700 leading-none">{getOnlineDriversCount()}</div>
-                            <div className="text-[9px] text-green-600 mt-0.5 opacity-75">of {getTotalDriversCount()} total</div>
+                            <div className="text-xs text-green-600 opacity-75">of {getTotalDriversCount()} total</div>
                         </div>
 
                         {/* Drivers Offline */}
-                        <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-lg p-2 border border-gray-200/60">
-                            <div className="flex items-center gap-1.5 mb-0.5">
-                                <Users size={12} className="text-gray-500 flex-shrink-0" />
-                                <span className="text-xs font-semibold text-gray-600">Drivers Offline</span>
+                        <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-md p-1.5 border border-gray-200/60">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1">
+                                    <Users size={14} className="text-gray-500 flex-shrink-0" />
+                                    <span className="text-sm font-medium text-gray-600">Drivers Offline</span>
+                                </div>
+                                <span className="text-lg font-bold text-gray-700">{getOfflineDriversCount()}</span>
                             </div>
-                            <div className="text-2xl font-bold text-gray-700 leading-none">{getOfflineDriversCount()}</div>
                         </div>
 
                         {/* Active Rides */}
-                        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-2 border border-blue-200/60">
-                            <div className="flex items-center gap-1.5 mb-0.5">
-                                <Car size={12} className="text-blue-600 flex-shrink-0" />
-                                <span className="text-xs font-semibold text-blue-700">Active Rides</span>
+                        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-md p-1.5 border border-blue-200/60">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1">
+                                    <Car size={14} className="text-blue-600 flex-shrink-0" />
+                                    <span className="text-sm font-medium text-blue-700">Active Rides</span>
+                                </div>
+                                <span className="text-lg font-bold text-blue-700">{getActiveRidesCount()}</span>
                             </div>
-                            <div className="text-2xl font-bold text-blue-700 leading-none">{getActiveRidesCount()}</div>
                         </div>
 
                         {/* Pending Requests */}
-                        <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg p-2 border border-orange-200/60">
-                            <div className="flex items-center gap-1.5 mb-0.5">
-                                <Clock size={12} className="text-orange-600 flex-shrink-0" />
-                                <span className="text-xs font-semibold text-orange-700">Pending Requests</span>
+                        <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-md p-1.5 border border-orange-200/60">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1">
+                                    <Clock size={14} className="text-orange-600 flex-shrink-0" />
+                                    <span className="text-sm font-medium text-orange-700">Pending Requests</span>
+                                </div>
+                                <span className="text-lg font-bold text-orange-700">{getPendingRequestsCount()}</span>
                             </div>
-                            <div className="text-2xl font-bold text-orange-700 leading-none">{getPendingRequestsCount()}</div>
                         </div>
 
                         {/* Completed Today */}
-                        <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg p-2 border border-emerald-200/60">
-                            <div className="flex items-center gap-1.5 mb-0.5">
-                                <CheckCircle size={12} className="text-emerald-600 flex-shrink-0" />
-                                <span className="text-xs font-semibold text-emerald-700">Completed Today</span>
+                        <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-md p-1.5 border border-emerald-200/60">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1">
+                                    <CheckCircle size={14} className="text-emerald-600 flex-shrink-0" />
+                                    <span className="text-sm font-medium text-emerald-700">Completed Today</span>
+                                </div>
+                                <span className="text-lg font-bold text-emerald-700">{getCompletedRidesTodayCount()}</span>
                             </div>
-                            <div className="text-2xl font-bold text-emerald-700 leading-none">{getCompletedRidesTodayCount()}</div>
                         </div>
                     </div>
 
@@ -1833,7 +1843,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                     {/* Three Columns Layout */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         {/* Column 1: Pending Requests */}
-                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 flex flex-col max-h-[600px]">
                             <div className="flex justify-between items-center mb-3">
                                 <h3 className="font-bold text-sm text-gray-800">
                                     Pending Requests ({rides.filter(r => r.status === BuggyStatus.SEARCHING).length})
@@ -1881,7 +1891,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                     )}
                                 </div>
                             </div>
-                            <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                            <div className="space-y-2 flex-1 overflow-y-auto">
                                 {rides.filter(r => r.status === BuggyStatus.SEARCHING).length === 0 ? (
                                     <div className="text-center py-6 text-gray-400 text-xs">
                                         No pending requests.
@@ -1936,133 +1946,51 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                             
                                             // Determine urgency level based on wait time
                                             let urgencyLevel: 'normal' | 'warning' | 'urgent' = 'normal';
-                                            let bgColor = 'bg-gray-50';
-                                            let borderColor = 'border-gray-200';
-                                            let textColor = 'text-gray-900';
-                                            let accentColor = 'bg-gray-100';
+                                            if (waitTime >= 600) urgencyLevel = 'urgent';
+                                            else if (waitTime >= 300) urgencyLevel = 'warning';
                                             
-                                            if (waitTime >= 600) { // 10+ minutes = urgent
-                                                urgencyLevel = 'urgent';
-                                                bgColor = 'bg-red-50';
-                                                borderColor = 'border-red-400';
-                                                textColor = 'text-red-900';
-                                                accentColor = 'bg-red-100';
-                                            } else if (waitTime >= 300) { // 5-10 minutes = warning
-                                                urgencyLevel = 'warning';
-                                                bgColor = 'bg-orange-50';
-                                                borderColor = 'border-orange-400';
-                                                textColor = 'text-orange-900';
-                                                accentColor = 'bg-orange-100';
-                                            } else {
-                                                bgColor = 'bg-white';
-                                                borderColor = 'border-gray-300';
-                                                textColor = 'text-gray-900';
-                                                accentColor = 'bg-gray-50';
-                                            }
+                                            const styles = {
+                                                urgent: { bg: 'bg-red-50', border: 'border-red-300', badge: 'bg-red-100 text-red-700' },
+                                                warning: { bg: 'bg-orange-50', border: 'border-orange-300', badge: 'bg-orange-100 text-orange-700' },
+                                                normal: { bg: 'bg-white', border: 'border-gray-200', badge: 'bg-gray-100 text-gray-600' }
+                                            };
+                                            const style = styles[urgencyLevel];
                                             
                                             return (
-                                                <div 
-                                                    key={ride.id} 
-                                                    className={`${bgColor} ${borderColor} p-2.5 rounded-lg border-2 transition-all duration-200 ${
-                                                        urgencyLevel === 'urgent' ? 'shadow-md border-l-4 border-l-red-600' : 
-                                                        urgencyLevel === 'warning' ? 'shadow-md border-l-4 border-l-orange-600' : 'shadow-sm border-l-4 border-l-blue-500'
-                                                    }`}
-                                                >
-                                                    {/* Top Row: Room, Badges, Timer */}
-                                                    <div className="flex justify-between items-center mb-3">
-                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                            <div className={`font-semibold text-base ${textColor} flex-shrink-0`}>
-                                                                Room {ride.roomNumber}
-                                                            </div>
-                                                            <div className={`text-sm font-medium text-gray-600 truncate`}>
-                                                                {ride.guestName}
-                                                            </div>
-                                                            
-                                                            {/* Service Type Badges */}
-                                                            {rideType.labels.length > 0 && (
-                                                                <div className="flex gap-1 flex-shrink-0">
-                                                                    {rideType.labels.map((label, idx) => (
-                                                                        <span 
-                                                                            key={idx}
-                                                                            className={`text-xs font-medium px-2 py-1 rounded border ${
-                                                                                label === 'AC' 
-                                                                                    ? 'bg-purple-100 text-purple-700 border-purple-300' 
-                                                                                    : label === 'PU'
-                                                                                    ? 'bg-blue-100 text-blue-700 border-blue-300'
-                                                                                    : 'bg-green-100 text-green-700 border-green-300'
-                                                                            }`}
-                                                                        >
-                                                                            {label}
-                                                                        </span>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                            
+                                                <div key={ride.id} className={`${style.bg} ${style.border} p-2 rounded-lg border transition-all duration-200`}>
+                                                    {/* Header Row: Room + Guest + Pax + Wait Time */}
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            <span className="font-semibold text-sm text-gray-800">#{ride.roomNumber}</span>
+                                                            <span className="text-xs text-gray-500 truncate">{ride.guestName}</span>
+                                                            <span className="text-[10px] text-gray-500">{ride.guestCount || 1} pax</span>
+                                                            {rideType.labels.map((label, idx) => (
+                                                                <span key={idx} className={`text-[9px] px-1 py-0.5 rounded font-bold ${
+                                                                    label === 'AC' ? 'bg-purple-100 text-purple-700' :
+                                                                    label === 'PU' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                                                                }`}>{label}</span>
+                                                            ))}
                                                         </div>
-                                                        
-                                                        {/* Wait Time */}
-                                                        <div className={`flex items-center gap-1 px-2 py-1 text-sm font-bold border rounded ${
-                                                            urgencyLevel === 'urgent' ? 'text-red-700 bg-red-100 border-red-300' : 
-                                                            urgencyLevel === 'warning' ? 'text-orange-700 bg-orange-100 border-orange-300' : 'text-gray-600 bg-gray-100 border-gray-300'
-                                                        } flex-shrink-0`}>
-                                                            <span>⏱</span>
-                                                            <span>{waitMinutes}m {waitSeconds}s</span>
-                                                        </div>
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${style.badge}`}>
+                                                            {waitMinutes}m {waitSeconds}s
+                                                        </span>
                                                     </div>
                                                     
-                                                    {/* Route Row: Horizontal FROM -> TO */}
-                                                    <div className="flex items-center gap-3 mb-3">
-                                                        {/* From */}
-                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                            <div className={`w-2 h-2 rounded-full ${
-                                                                rideType.labels.includes('PU') ? 'bg-blue-500' : 'bg-gray-400'
-                                                            } flex-shrink-0`}></div>
-                                                            <span className="text-xs font-medium text-gray-500 uppercase border border-gray-300 px-2 py-0.5 rounded bg-gray-50">FROM</span>
-                                                            <span className={`text-sm font-medium ${textColor} truncate flex-1`}>
-                                                                {ride.pickup}
-                                                            </span>
-                                                        </div>
-                                                        
-                                                        {/* Arrow */}
-                                                        <div className="text-gray-400 text-base flex-shrink-0">→</div>
-                                                        
-                                                        {/* To */}
-                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                            <div className={`w-2 h-2 rounded-full ${
-                                                                rideType.labels.includes('DO') ? 'bg-green-500' : 'bg-gray-400'
-                                                            } flex-shrink-0`}></div>
-                                                            <span className="text-xs font-medium text-gray-500 uppercase border border-gray-300 px-2 py-0.5 rounded bg-gray-50">TO</span>
-                                                            <span className={`text-sm font-medium ${textColor} truncate flex-1`}>
-                                                                {ride.destination}
-                                                            </span>
-                                                        </div>
+                                                    {/* Route Row */}
+                                                    <div className="flex items-center gap-1.5 text-xs mt-1">
+                                                        <span className="text-gray-500">From:</span>
+                                                        <span className="text-gray-700 font-medium truncate">{ride.pickup}</span>
+                                                        <span className="text-gray-400">→</span>
+                                                        <span className="text-gray-500">To:</span>
+                                                        <span className="text-gray-700 font-medium truncate">{ride.destination}</span>
                                                     </div>
                                                     
-                                                    {/* Bottom Row: Guest Count & Notes - Inline */}
-                                                    <div className="flex items-center gap-3 text-sm">
-                                                        {/* Guest Count */}
-                                                        {(ride.guestCount && ride.guestCount > 1) && (
-                                                            <div className={`flex items-center gap-1 px-2 py-1 rounded border ${
-                                                                urgencyLevel === 'urgent' ? 'bg-red-100 text-red-700 border-red-300' : 
-                                                                urgencyLevel === 'warning' ? 'bg-orange-100 text-orange-700 border-orange-300' : 'bg-blue-100 text-blue-700 border-blue-300'
-                                                            } flex-shrink-0`}>
-                                                                <span>👥</span>
-                                                                <span className="font-medium">
-                                                                    {ride.guestCount} guests
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        
-                                                        {/* Notes - Truncated */}
-                                                        {ride.notes && ride.notes.trim() && (
-                                                            <div className="flex items-center gap-2 flex-1 min-w-0 px-2 py-1 bg-amber-100 border border-amber-300 rounded">
-                                                                <span className="text-amber-600 flex-shrink-0">📝</span>
-                                                                <span className="font-medium text-amber-700 truncate">
-                                                                    {ride.notes}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    {/* Notes - if exists */}
+                                                    {ride.notes && ride.notes.trim() && (
+                                                        <div className="text-[10px] text-amber-600 truncate mt-0.5">
+                                                            Note: {ride.notes}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         });
@@ -2117,32 +2045,21 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                 return rideDriverId === driverIdStr && 
                                                     (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
                                             });
-                                            const currentRide = driverRides[0];
-                                            const hasActiveRide = currentRide && 
-                                                (currentRide.status === BuggyStatus.ASSIGNED || 
-                                                 currentRide.status === BuggyStatus.ARRIVING || 
-                                                 currentRide.status === BuggyStatus.ON_TRIP);
+                                            const hasActiveRide = driverRides.length > 0;
                                             
                                             // Determine driver status
                                             let driverStatus: 'AVAILABLE' | 'BUSY' | 'NEAR_COMPLETION' | 'OFFLINE' = 'OFFLINE';
-                                            let isNearCompletion = false;
                                             
                                             if (hasActiveRide) {
-                                                // Check if trip is near completion (ON_TRIP status and has been on trip for a while)
-                                                if (currentRide.status === BuggyStatus.ON_TRIP) {
-                                                    const tripDuration = currentRide.pickedUpAt 
-                                                        ? Math.floor((Date.now() - currentRide.pickedUpAt) / 1000)
-                                                        : 0;
-                                                    // If on trip for more than 3 minutes, consider near completion
-                                                    if (tripDuration > 180) {
-                                                        driverStatus = 'NEAR_COMPLETION';
-                                                        isNearCompletion = true;
-                                                    } else {
-                                                        driverStatus = 'BUSY';
+                                                // Check if any trip is near completion
+                                                const hasNearCompletion = driverRides.some(r => {
+                                                    if (r.status === BuggyStatus.ON_TRIP && r.pickedUpAt) {
+                                                        const tripDuration = Math.floor((Date.now() - r.pickedUpAt) / 1000);
+                                                        return tripDuration > 180;
                                                     }
-                                                } else {
-                                                    driverStatus = 'BUSY';
-                                                }
+                                                    return false;
+                                                });
+                                                driverStatus = hasNearCompletion ? 'NEAR_COMPLETION' : 'BUSY';
                                             } else {
                                                 // Check if driver has recent heartbeat (updated_at within last 30 seconds)
                                                 // This is the PRIMARY way to determine if driver is online
@@ -2172,7 +2089,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                             else if (driverStatus === 'BUSY') priorityScore = 3;
                                             else priorityScore = 4; // OFFLINE
                                             
-                                            return { driver, currentRide, hasActiveRide, driverStatus, isNearCompletion, priorityScore };
+                                            return { driver, driverRides, hasActiveRide, driverStatus, priorityScore };
                                         }).sort((a, b) => {
                                             // Sort by priority score first
                                             if (a.priorityScore !== b.priorityScore) {
@@ -2182,182 +2099,95 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                             return a.driver.lastName.localeCompare(b.driver.lastName);
                                         });
                                     
-                                        return sortedDrivers.map(({ driver, currentRide, hasActiveRide, driverStatus, isNearCompletion }) => {
-                                            const driverIdStr = driver.id ? String(driver.id) : '';
-                                            const driverDisplayName = driver.lastName || 'Unknown Driver';
-                                            
-                                            // Get driver location
+                                        return sortedDrivers.map(({ driver, driverRides, hasActiveRide, driverStatus }) => {
+                                            const driverDisplayName = driver.lastName || 'Unknown';
                                             const driverLocation = getDriverLocation(driver);
                                             
-                                            // Calculate trip progress if on trip
-                                            let tripProgress = null;
-                                            if (currentRide && currentRide.status === BuggyStatus.ON_TRIP && currentRide.pickedUpAt) {
-                                                const tripDuration = Math.floor((Date.now() - currentRide.pickedUpAt) / 1000);
-                                                const tripMinutes = Math.floor(tripDuration / 60);
-                                                tripProgress = tripMinutes;
-                                            }
-                                            
-                                            // Determine styling based on status
-                                            let bgColor = 'bg-gray-50';
-                                            let borderColor = 'border-gray-200';
-                                            let statusBadgeClass = '';
-                                            let statusText = '';
-                                            
-                                            if (driverStatus === 'AVAILABLE') {
-                                                bgColor = 'bg-green-50';
-                                                borderColor = 'border-green-300';
-                                                statusBadgeClass = 'bg-green-500 text-white';
-                                                statusText = 'ONLINE';
-                                            } else if (driverStatus === 'NEAR_COMPLETION') {
-                                                bgColor = 'bg-blue-50';
-                                                borderColor = 'border-blue-300';
-                                                statusBadgeClass = 'bg-blue-500 text-white';
-                                                statusText = 'NEAR DONE';
-                                            } else if (driverStatus === 'BUSY') {
-                                                bgColor = 'bg-orange-50';
-                                                borderColor = 'border-orange-300';
-                                                statusBadgeClass = 'bg-orange-500 text-white';
-                                                statusText = 'BUSY';
-                                            } else {
-                                                bgColor = 'bg-gray-50';
-                                                borderColor = 'border-gray-200';
-                                                statusBadgeClass = 'bg-gray-400 text-white';
-                                                statusText = 'OFFLINE';
-                                            }
+                                            // Status styling
+                                            const statusStyles = {
+                                                AVAILABLE: { bg: 'bg-green-50', border: 'border-green-300', badge: 'bg-green-500 text-white', text: 'ONLINE' },
+                                                NEAR_COMPLETION: { bg: 'bg-blue-50', border: 'border-blue-300', badge: 'bg-blue-500 text-white', text: 'FINISHING' },
+                                                BUSY: { bg: 'bg-orange-50', border: 'border-orange-300', badge: 'bg-orange-500 text-white', text: 'BUSY' },
+                                                OFFLINE: { bg: 'bg-gray-50', border: 'border-gray-200', badge: 'bg-gray-400 text-white', text: 'OFFLINE' }
+                                            };
+                                            const style = statusStyles[driverStatus];
 
                                             return (
-                                                <div 
-                                                    key={driver.id} 
-                                                    className={`${bgColor} ${borderColor} p-3 rounded-lg border-2 transition-all duration-200 ${
-                                                        driverStatus === 'AVAILABLE' ? 'shadow-sm ring-1 ring-green-200' :
-                                                        driverStatus === 'NEAR_COMPLETION' ? 'shadow-md ring-2 ring-blue-300' :
-                                                        driverStatus === 'BUSY' ? 'shadow-sm' : ''
-                                                    }`}
-                                                >
-                                                    <div className="flex items-start gap-2.5 mb-2">
-                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                                            driverStatus === 'AVAILABLE' ? 'bg-green-200' :
-                                                            driverStatus === 'NEAR_COMPLETION' ? 'bg-blue-200' :
-                                                            driverStatus === 'BUSY' ? 'bg-orange-200' : 'bg-gray-200'
-                                                        }`}>
-                                                            <Users size={16} className={
-                                                                driverStatus === 'AVAILABLE' ? 'text-green-700' :
-                                                                driverStatus === 'NEAR_COMPLETION' ? 'text-blue-700' :
-                                                                driverStatus === 'BUSY' ? 'text-orange-700' : 'text-gray-600'
-                                                            } />
+                                                <div key={driver.id} className={`${style.bg} ${style.border} p-2 rounded-lg border transition-all duration-200`}>
+                                                    {/* Driver Header - Compact */}
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className="font-bold text-sm text-gray-800">{driverDisplayName}</span>
+                                                            <span className="text-[10px] text-gray-500 flex items-center">
+                                                                <MapPin size={9} className="mr-0.5" />{driverLocation}
+                                                            </span>
                                                         </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <div className={`font-bold text-sm ${
-                                                                    driverStatus === 'AVAILABLE' ? 'text-green-900' :
-                                                                    driverStatus === 'NEAR_COMPLETION' ? 'text-blue-900' :
-                                                                    driverStatus === 'BUSY' ? 'text-orange-900' : 'text-gray-900'
-                                                                }`}>
-                                                                    {driverDisplayName}
-                                                                </div>
-                                                                {driverStatus === 'AVAILABLE' && (
-                                                                    <span className="text-[9px] bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
-                                                                        READY
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <div className={`text-[11px] flex items-center ${
-                                                                driverStatus === 'AVAILABLE' ? 'text-green-700' :
-                                                                driverStatus === 'NEAR_COMPLETION' ? 'text-blue-700' :
-                                                                driverStatus === 'BUSY' ? 'text-orange-700' : 'text-gray-500'
-                                                            }`}>
-                                                                <MapPin size={10} className="mr-1" />
-                                                                {driverLocation}
-                                                            </div>
+                                                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                            {hasActiveRide && (
+                                                                <span className="text-[10px] text-gray-600 font-medium">
+                                                                    {driverRides.length} job{driverRides.length > 1 ? 's' : ''}
+                                                                </span>
+                                                            )}
+                                                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${style.badge}`}>
+                                                                {style.text}
+                                                            </span>
                                                         </div>
-                                                        <span className={`text-[10px] px-2 py-1 rounded font-bold whitespace-nowrap ${statusBadgeClass}`}>
-                                                            {statusText}
-                                                        </span>
                                                     </div>
                                                     
-                                                    {currentRide && hasActiveRide && (
-                                                        <div className={`mt-2 rounded-md p-2 border ${
-                                                            isNearCompletion ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'
-                                                        }`}>
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex items-center gap-2 mb-1">
-                                                                        <span className={`text-xs font-bold whitespace-nowrap ${
-                                                                            isNearCompletion ? 'text-blue-700' : 'text-orange-700'
-                                                                        }`}>
-                                                                            Job:
-                                                                        </span>
-                                                                        <span className={`text-sm font-semibold truncate ${
-                                                                            isNearCompletion ? 'text-blue-900' : 'text-orange-900'
-                                                                        }`}>
-                                                                            Room {currentRide.roomNumber}
-                                                                        </span>
-                                                                        <span className={`text-[11px] px-2 py-0.5 rounded font-bold ${
-                                                                            currentRide.status === BuggyStatus.ON_TRIP
-                                                                                ? 'bg-emerald-200 text-emerald-900'
-                                                                                : currentRide.status === BuggyStatus.ARRIVING
-                                                                                ? 'bg-blue-200 text-blue-900'
-                                                                                : 'bg-blue-200 text-blue-900'
-                                                                        }`}>
-                                                                            {currentRide.status === BuggyStatus.ON_TRIP ? 'ON TRIP' :
-                                                                             currentRide.status === BuggyStatus.ARRIVING ? 'ARRIVING' : 'ASSIGNED'}
-                                                                        </span>
-                                                                    </div>
-                                                                    {guestInfoCache[currentRide.roomNumber] && (
-                                                                        <div className={`text-xs mb-1 ${
-                                                                            isNearCompletion ? 'text-blue-600' : 'text-orange-600'
-                                                                        }`}>
-                                                                            <span className="font-semibold">Khách:</span> {guestInfoCache[currentRide.roomNumber].last_name}
-                                                                            {guestInfoCache[currentRide.roomNumber].villa_type && (
-                                                                                <span className="ml-2 text-[10px] opacity-75">
-                                                                                    ({guestInfoCache[currentRide.roomNumber].villa_type})
-                                                                                </span>
-                                                                            )}
+                                                    {/* Active Rides - Compact List */}
+                                                    {hasActiveRide && (
+                                                        <div className="mt-1.5 space-y-1">
+                                                            {driverRides.map((ride, idx) => {
+                                                                const tripProgress = ride.status === BuggyStatus.ON_TRIP && ride.pickedUpAt
+                                                                    ? Math.floor((Date.now() - ride.pickedUpAt) / 60000)
+                                                                    : null;
+                                                                const guestInfo = guestInfoCache[ride.roomNumber];
+                                                                
+                                                                return (
+                                                                    <div key={ride.id || idx} className="bg-white/60 rounded px-2 py-1.5 border border-gray-200/50">
+                                                                        <div className="flex items-center justify-between gap-2">
+                                                                            <div className="flex-1 min-w-0">
+                                                                                {/* Room + Status + Route inline */}
+                                                                                <div className="flex items-center gap-1.5 text-xs">
+                                                                                    <span className="font-semibold text-gray-800">#{ride.roomNumber}</span>
+                                                                                    {guestInfo && (
+                                                                                        <span className="text-gray-500 truncate">{guestInfo.last_name}</span>
+                                                                                    )}
+                                                                                    <span className="text-[9px] text-gray-500">{ride.guestCount || 1} pax</span>
+                                                                                    <span className={`text-[9px] px-1 py-0.5 rounded font-bold ${
+                                                                                        ride.status === BuggyStatus.ON_TRIP ? 'bg-emerald-100 text-emerald-700' :
+                                                                                        ride.status === BuggyStatus.ARRIVING ? 'bg-blue-100 text-blue-700' :
+                                                                                        'bg-amber-100 text-amber-700'
+                                                                                    }`}>
+                                                                                        {ride.status === BuggyStatus.ON_TRIP ? 'TRIP' :
+                                                                                         ride.status === BuggyStatus.ARRIVING ? 'ARRIVING' : 'ASSIGNED'}
+                                                                                    </span>
+                                                                                    {tripProgress !== null && (
+                                                                                        <span className="text-[9px] text-gray-500">{tripProgress}m</span>
+                                                                                    )}
+                                                                                </div>
+                                                                                {/* Route */}
+                                                                                <div className="text-[10px] text-gray-600 truncate mt-0.5">
+                                                                                    {ride.pickup} → {ride.destination}
+                                                                                </div>
+                                                                            </div>
+                                                                            {/* Action Button */}
+                                                                            <button
+                                                                                onClick={() => ride.status === BuggyStatus.ON_TRIP 
+                                                                                    ? handleEndRide(ride.id) 
+                                                                                    : handlePickupGuest(ride.id)}
+                                                                                className={`text-[10px] px-2 py-1 rounded font-medium transition-colors flex-shrink-0 ${
+                                                                                    ride.status === BuggyStatus.ON_TRIP
+                                                                                        ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                                                                                        : 'bg-blue-500 hover:bg-blue-600 text-white'
+                                                                                }`}
+                                                                            >
+                                                                                {ride.status === BuggyStatus.ON_TRIP ? 'Done' : 'Pickup'}
+                                                                            </button>
                                                                         </div>
-                                                                    )}
-                                                                    <div className={`text-xs flex items-center gap-2 ${
-                                                                        isNearCompletion ? 'text-blue-700' : 'text-orange-700'
-                                                                    }`}>
-                                                                        <span className="flex items-center gap-1 truncate">
-                                                                            <div className="w-1.5 h-1.5 rounded-full bg-gray-500 flex-shrink-0"></div>
-                                                                            <span className="truncate">{currentRide.pickup}</span>
-                                                                        </span>
-                                                                        <span className="text-gray-400 font-bold">→</span>
-                                                                        <span className="flex items-center gap-1 truncate">
-                                                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></div>
-                                                                            <span className="truncate">{currentRide.destination}</span>
-                                                                        </span>
                                                                     </div>
-                                                                </div>
-                                                                <div className="flex items-center gap-2 flex-shrink-0">
-                                                                    {tripProgress !== null && (
-                                                                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded whitespace-nowrap ${
-                                                                            isNearCompletion ? 'bg-blue-200 text-blue-900' : 'bg-orange-200 text-orange-900'
-                                                                        }`}>
-                                                                            {tripProgress}m
-                                                                        </span>
-                                                                    )}
-                                                                    {(currentRide.status === BuggyStatus.ARRIVING || currentRide.status === BuggyStatus.ASSIGNED) ? (
-                                                                        <button
-                                                                            onClick={() => handlePickupGuest(currentRide.id)}
-                                                                            className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded transition-colors whitespace-nowrap"
-                                                                            title="Pickup Guest"
-                                                                        >
-                                                                            <Users size={12} />
-                                                                            Pickup Guest
-                                                                        </button>
-                                                                    ) : (
-                                                                        <button
-                                                                            onClick={() => handleEndRide(currentRide.id)}
-                                                                            className="flex items-center gap-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded transition-colors whitespace-nowrap"
-                                                                            title="End Ride"
-                                                                        >
-                                                                            <CheckCircle size={12} />
-                                                                            Completed
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     )}
                                                 </div>
@@ -2687,77 +2517,40 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                             };
                                             
                                             return (
-                                                <div 
-                                                    key={ride.id} 
-                                                    className="bg-white p-3 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors shadow-sm"
-                                                >
-                                                    {/* Top Row: Room, Driver, Status */}
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                            <span className="text-sm font-bold text-gray-800">Room {ride.roomNumber}</span>
-                                                            <span className="text-sm text-gray-600 truncate">
-                                                                <span className="font-medium">Driver:</span> {driverName}
-                                                            </span>
+                                                <div key={ride.id} className="bg-gray-50 p-2 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                                                    {/* Header Row: Room + Driver + Pax + Time */}
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                            <span className="font-semibold text-sm text-gray-800">#{ride.roomNumber}</span>
+                                                            <span className="text-xs text-gray-500">{driverName}</span>
+                                                            <span className="text-[10px] text-gray-500">{ride.guestCount || 1} pax</span>
                                                             {ride.rating && (
-                                                                <div className="flex items-center gap-1 bg-yellow-100 px-2 py-0.5 rounded border border-yellow-300 flex-shrink-0">
-                                                                    <Star size={12} className="text-yellow-600 fill-yellow-600" />
-                                                                    <span className="text-xs font-semibold text-yellow-700">{ride.rating}</span>
-                                                                </div>
+                                                                <span className="text-[9px] px-1 py-0.5 rounded font-bold bg-yellow-100 text-yellow-700">
+                                                                    ★{ride.rating}
+                                                                </span>
                                                             )}
                                                         </div>
-                                                        <div className="flex items-center gap-2 flex-shrink-0">
-                                                            <span className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium border border-green-300">
-                                                                <CheckCircle size={12} />
-                                                                Completed
-                                                            </span>
-                                                            <span className="text-xs text-gray-500 font-medium">
-                                                                {timeAgoText}
-                                                            </span>
+                                                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                            <span className="text-[9px] px-1 py-0.5 rounded font-bold bg-green-100 text-green-700">DONE</span>
+                                                            <span className="text-[10px] text-gray-500">{timeAgoText}</span>
                                                         </div>
                                                     </div>
                                                     
-                                                    {/* Route Row: FROM -> TO horizontal */}
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        {/* From */}
-                                                        <div className="flex items-center gap-1 flex-1 min-w-0">
-                                                            <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0"></div>
-                                                            <span className="text-xs font-medium text-gray-500 uppercase border border-gray-300 px-1.5 py-0.5 rounded bg-gray-50">FROM</span>
-                                                            <span className="text-sm font-medium text-gray-700 truncate flex-1">
-                                                                {ride.pickup}
-                                                            </span>
-                                                        </div>
-                                                        
-                                                        {/* Arrow */}
-                                                        <div className="text-gray-400 text-sm flex-shrink-0">→</div>
-                                                        
-                                                        {/* To */}
-                                                        <div className="flex items-center gap-1 flex-1 min-w-0">
-                                                            <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0"></div>
-                                                            <span className="text-xs font-medium text-gray-500 uppercase border border-gray-300 px-1.5 py-0.5 rounded bg-gray-50">TO</span>
-                                                            <span className="text-sm font-medium text-gray-700 truncate flex-1">
-                                                                {ride.destination}
-                                                            </span>
-                                                        </div>
+                                                    {/* Route Row */}
+                                                    <div className="flex items-center gap-1.5 text-xs mt-1">
+                                                        <span className="text-gray-500">From:</span>
+                                                        <span className="text-gray-700 font-medium truncate">{ride.pickup}</span>
+                                                        <span className="text-gray-400">→</span>
+                                                        <span className="text-gray-500">To:</span>
+                                                        <span className="text-gray-700 font-medium truncate">{ride.destination}</span>
                                                     </div>
                                                     
-                                                    {/* Bottom Row: Guest Count & Notes */}
-                                                    <div className="flex items-center gap-3 text-sm">
-                                                        {/* Guest Count - Always show */}
-                                                        <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded border border-blue-300 flex-shrink-0">
-                                                            <span>👥</span>
-                                                            <span className="font-medium">
-                                                                {ride.guestCount || 1} guest{(ride.guestCount || 1) === 1 ? '' : 's'}
-                                                            </span>
+                                                    {/* Notes - if exists */}
+                                                    {ride.notes && ride.notes.trim() && (
+                                                        <div className="text-[10px] text-amber-600 truncate mt-0.5">
+                                                            Note: {ride.notes}
                                                         </div>
-                                                        
-                                                        {/* Notes - Show placeholder if empty */}
-                                                        <div className="flex items-center gap-2 flex-1 min-w-0 px-2 py-1 bg-amber-100 border border-amber-300 rounded">
-                                                            <span className="text-amber-600 flex-shrink-0">📝</span>
-                                                            <span className="font-medium text-amber-700 truncate">
-                                                                {(ride.notes && ride.notes.trim()) ? ride.notes : 'No special notes'}
-                                                            </span>
-                                                        </div>
-                                                    </div>
+                                                    )}
                                                 </div>
                                             );
                                         });
@@ -2830,52 +2623,48 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                         }
                                         
                                         return (
-                                            <div className="space-y-3">
-                                                <p className="text-sm text-gray-600 mb-4">
-                                                    Found {mergeOptions.length} possible merge combination{mergeOptions.length > 1 ? 's' : ''}. 
-                                                    Click "Ghép" to combine rides.
+                                            <div className="space-y-2">
+                                                <p className="text-sm text-gray-600 mb-3">
+                                                    Found {mergeOptions.length} merge option{mergeOptions.length > 1 ? 's' : ''}. Click "Merge" to combine.
                                                 </p>
                                                 {mergeOptions.map(({ ride1, ride2, totalGuests, isSameRoute, key }) => (
-                                                    <div key={key} className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                                        <div className="flex items-start justify-between gap-3">
+                                                    <div key={key} className="p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                                                        <div className="flex items-center justify-between gap-2">
                                                             <div className="flex-1 min-w-0">
-                                                                <div className="font-semibold text-gray-800 flex items-center gap-2">
-                                                                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-sm">
-                                                                        Room {ride1.roomNumber}
+                                                                {/* Header row: Rooms + Tags */}
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-xs font-medium">
+                                                                        #{ride1.roomNumber}
                                                                     </span>
-                                                                    <span className="text-blue-500">+</span>
-                                                                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-sm">
-                                                                        Room {ride2.roomNumber}
+                                                                    <span className="text-blue-400 text-xs">+</span>
+                                                                    <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-xs font-medium">
+                                                                        #{ride2.roomNumber}
+                                                                    </span>
+                                                                    <span className="text-gray-400 text-xs">•</span>
+                                                                    <span className="text-xs text-gray-600">{totalGuests}/7 pax</span>
+                                                                    <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                                                        isSameRoute ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                                                    }`}>
+                                                                        {isSameRoute ? 'Same' : 'Chain'}
                                                                     </span>
                                                                 </div>
                                                                 
-                                                                <div className="mt-2 space-y-1 text-sm">
-                                                                    <div className="flex items-center gap-2 text-gray-600">
-                                                                        <MapPin size={14} className="text-green-500 flex-shrink-0" />
-                                                                        <span className="truncate">{ride1.pickup} → {ride1.destination}</span>
-                                                                    </div>
+                                                                {/* Route info - compact */}
+                                                                <div className="mt-1 text-xs text-gray-600 flex items-center gap-1">
+                                                                    <MapPin size={10} className="text-green-500 flex-shrink-0" />
+                                                                    <span className="truncate">{ride1.pickup} → {ride1.destination}</span>
                                                                     {!isSameRoute && (
-                                                                        <div className="flex items-center gap-2 text-gray-600">
-                                                                            <MapPin size={14} className="text-orange-500 flex-shrink-0" />
+                                                                        <>
+                                                                            <span className="text-gray-400 mx-0.5">|</span>
                                                                             <span className="truncate">{ride2.pickup} → {ride2.destination}</span>
-                                                                        </div>
+                                                                        </>
                                                                     )}
                                                                 </div>
                                                                 
-                                                                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                                                                    <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                                                                        👥 {totalGuests}/7 guests
-                                                                    </span>
-                                                                    <span className={`px-2 py-1 rounded ${
-                                                                        isSameRoute ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                                                                    }`}>
-                                                                        {isSameRoute ? '🎯 Same Route' : '🔄 Smart Route'}
-                                                                    </span>
-                                                                </div>
-                                                                
+                                                                {/* Notes - inline if exists */}
                                                                 {(ride1.notes || ride2.notes) && (
-                                                                    <div className="mt-2 text-xs text-gray-500 bg-amber-50 p-2 rounded border border-amber-200">
-                                                                        📝 <strong>Notes:</strong> {[ride1.notes, ride2.notes].filter(n => n?.trim()).join(' | ') || 'No notes'}
+                                                                    <div className="mt-1 text-xs text-amber-600 truncate">
+                                                                        Note: {[ride1.notes, ride2.notes].filter(n => n?.trim()).join(' | ')}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -2885,13 +2674,13 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                                     handleMergeRides(ride1.id!, ride2.id!);
                                                                     setShowMergeModal(false);
                                                                 }}
-                                                                className={`px-4 py-2 rounded-lg font-semibold text-sm transition hover:scale-105 flex-shrink-0 ${
+                                                                className={`px-3 py-1.5 rounded-md font-medium text-xs transition hover:scale-105 flex-shrink-0 ${
                                                                     isSameRoute 
                                                                         ? 'bg-green-500 text-white hover:bg-green-600' 
                                                                         : 'bg-blue-500 text-white hover:bg-blue-600'
                                                                 }`}
                                                             >
-                                                                🔗 Ghép
+                                                                Merge
                                                             </button>
                                                         </div>
                                                     </div>
