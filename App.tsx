@@ -146,14 +146,26 @@ const AppContent: React.FC = () => {
     setLanguage('English'); // Reset to default
     localStorage.removeItem('furama_user');
     
-    // Redirect về collection login cho các role: reception, staff, driver, supervisor
-    if (userRole === UserRole.RECEPTION || 
-        userRole === UserRole.STAFF || 
-        userRole === UserRole.DRIVER || 
-        userRole === UserRole.SUPERVISOR) {
-      navigate('/fu25ad/login');
-    } else {
-      navigate('/');
+    // Redirect về trang login của role tương ứng
+    switch (userRole) {
+      case UserRole.RECEPTION:
+        navigate('/reception/login');
+        break;
+      case UserRole.STAFF:
+        navigate('/staff/login');
+        break;
+      case UserRole.DRIVER:
+        navigate('/driver/login');
+        break;
+      case UserRole.SUPERVISOR:
+        navigate('/supervisor/login');
+        break;
+      case UserRole.ADMIN:
+        navigate('/admin/login');
+        break;
+      default:
+        navigate('/');
+        break;
     }
   };
 

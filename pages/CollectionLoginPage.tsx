@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { StaffLogin } from '../components/login/StaffLogin';
 import { UserRole } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
@@ -7,7 +8,18 @@ import { Briefcase, Building2, Car, UserCheck, ArrowLeft } from 'lucide-react';
 
 const CollectionLoginPage: React.FC = () => {
   const { setLanguage } = useTranslation();
+  const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
+  
+  // Mapping từ role sang route path
+  const roleToRouteMap: Record<UserRole, string> = {
+    [UserRole.RECEPTION]: '/reception/login',
+    [UserRole.STAFF]: '/staff/login',
+    [UserRole.DRIVER]: '/driver/login',
+    [UserRole.SUPERVISOR]: '/supervisor/login',
+    [UserRole.ADMIN]: '/admin/login',
+    [UserRole.GUEST]: '/login'
+  };
 
   // Chỉ hiển thị 4 role được yêu cầu
   const allowedRoles = [
@@ -128,8 +140,8 @@ const CollectionLoginPage: React.FC = () => {
             return (
               <button
                 key={config.role}
-                onClick={() => setSelectedRole(config.role)}
-                className={`${config.bgColor} ${config.borderColor} p-6 rounded-xl shadow-md border-4`}
+                onClick={() => navigate(roleToRouteMap[config.role])}
+                className={`${config.bgColor} ${config.borderColor} p-6 rounded-xl shadow-md border-4 hover:shadow-lg transition-all transform hover:scale-105 active:scale-95`}
               >
                 <div className="flex items-center space-x-4">
                   <div className={`p-3 rounded-lg bg-gradient-to-br ${config.color} text-white shadow-lg`}>

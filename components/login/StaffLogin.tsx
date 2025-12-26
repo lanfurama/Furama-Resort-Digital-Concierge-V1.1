@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { UserRole } from '../../types';
 import { authenticateStaff } from '../../services/authService';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 interface StaffLoginProps {
   role: UserRole;
@@ -10,6 +11,7 @@ interface StaffLoginProps {
 }
 
 export const StaffLogin: React.FC<StaffLoginProps> = ({ role, onLoginSuccess, setLanguage }) => {
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
@@ -72,6 +74,15 @@ export const StaffLogin: React.FC<StaffLoginProps> = ({ role, onLoginSuccess, se
     <div className="min-h-screen bg-stone-100 flex flex-col justify-center items-center p-6 relative overflow-hidden">
       {/* Background Accent */}
       <div className="absolute top-0 left-0 w-full h-1/2 bg-emerald-900 rounded-b-[3rem] z-0"></div>
+      
+      {/* Back Button */}
+      <button
+        onClick={() => navigate('/fu25ad/login')}
+        className="absolute top-6 left-6 z-20 text-gray-400 hover:text-gray-600 transition flex items-center gap-2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md hover:shadow-lg"
+      >
+        <ArrowLeft size={20} />
+        <span className="text-sm font-semibold">Back to Role Selection</span>
+      </button>
       
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 z-10 relative">
         <div className="text-center mb-8">
