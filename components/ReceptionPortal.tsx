@@ -1662,8 +1662,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
 
     // Handle creating new ride
     const handleCreateRide = async () => {
-        if (!newRideData.guestName || !newRideData.pickup || !newRideData.destination) {
-            alert('Please fill in all required fields (Guest Name, Pickup, Destination)');
+        if (!newRideData.roomNumber || !newRideData.pickup || !newRideData.destination) {
+            alert('Please fill in all required fields (Room Number, Pickup, Destination)');
             return;
         }
 
@@ -1700,7 +1700,14 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
             // Only send room number if it's not empty, otherwise send null to avoid backend duplicate check
             const roomNumber = (newRideData.roomNumber && newRideData.roomNumber.trim() !== '') ? newRideData.roomNumber : null;
             
-            await requestRide(guestName, roomNumber || '', newRideData.pickup, newRideData.destination, newRideData.guestCount || 1, newRideData.notes || undefined);
+            await requestRide(
+                guestName,
+                newRideData.roomNumber,
+                newRideData.pickup,
+                newRideData.destination,
+                newRideData.guestCount || 1,
+                newRideData.notes || undefined
+            );
             
             // Refresh rides list
             const refreshedRides = await getRides();
@@ -3529,10 +3536,30 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
 
                                 {/* Form */}
                                 <div className="p-4 space-y-3 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-300 scrollbar-track-gray-100 flex-1">
+                                    
+                                    {/* Room Number */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                            Room Number <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={newRideData.roomNumber}
+                                            onChange={(e) =>
+                                                setNewRideData(prev => ({ ...prev, roomNumber: e.target.value }))
+                                            }
+                                            placeholder="Eg: D03, B12, Villa 05"
+                                            className="w-full px-3 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg
+                                                    focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                            required
+                                        />
+                                    </div>
+
+                                    
                                     {/* Guest Name */}
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-1">
-                                            Guest Name <span className="text-red-500">*</span>
+                                            Guest Name <span className="text-gray-400">(Optional)</span>
                                         </label>
                                         <input
                                             type="text"
@@ -3666,7 +3693,12 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                     </button>
                                     <button
                                         onClick={handleCreateRide}
-                                        disabled={isCreatingRide || !newRideData.guestName || !newRideData.pickup || !newRideData.destination}
+                                        disabled={
+                                            isCreatingRide ||
+                                            !newRideData.roomNumber ||
+                                            !newRideData.pickup ||
+                                            !newRideData.destination
+                                        }
                                         className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                     >
                                         {isCreatingRide ? (
