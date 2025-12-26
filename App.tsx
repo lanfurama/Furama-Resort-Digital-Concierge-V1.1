@@ -22,6 +22,7 @@ import StaffLoginPage from './pages/StaffLoginPage';
 import DriverLoginPage from './pages/DriverLoginPage';
 import ReceptionLoginPage from './pages/ReceptionLoginPage';
 import SupervisorLoginPage from './pages/SupervisorLoginPage';
+import CollectionLoginPage from './pages/CollectionLoginPage';
 import { getPromotions, getActiveGuestOrders, getActiveRideForUser } from './services/dataService';
 import { BuggyStatus } from './types';
 import { User as UserIcon, LogOut, MessageSquare, Car, Percent, ShoppingCart, Home } from 'lucide-react';
@@ -128,10 +129,32 @@ const AppContent: React.FC = () => {
   }, [user?.language]); // Only depend on language string, not entire user object
 
   const handleLogout = () => {
+    // Lưu role trước khi xóa user để redirect đúng trang
+    const savedUser = localStorage.getItem('furama_user');
+    let userRole: UserRole | null = null;
+    
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        userRole = parsedUser.role;
+      } catch (error) {
+        console.error('Failed to parse user from localStorage:', error);
+      }
+    }
+    
     setUser(null);
     setLanguage('English'); // Reset to default
     localStorage.removeItem('furama_user');
-    navigate('/');
+    
+    // Redirect về collection login cho các role: reception, staff, driver, supervisor
+    if (userRole === UserRole.RECEPTION || 
+        userRole === UserRole.STAFF || 
+        userRole === UserRole.DRIVER || 
+        userRole === UserRole.SUPERVISOR) {
+      navigate('/fu25ad/login');
+    } else {
+      navigate('/');
+    }
   };
 
   const handleServiceSelect = (serviceId: string) => {
@@ -558,6 +581,7 @@ const AppContent: React.FC = () => {
       <Route path="/driver/login" element={<DriverLoginPage />} />
       <Route path="/reception/login" element={<ReceptionLoginPage />} />
       <Route path="/supervisor/login" element={<SupervisorLoginPage />} />
+      <Route path="/fu25ad/login" element={<CollectionLoginPage />} />
       
       {/* Protected Routes */}
       <Route 

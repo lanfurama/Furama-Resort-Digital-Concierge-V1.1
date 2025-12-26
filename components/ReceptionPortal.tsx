@@ -90,6 +90,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     // Merge Options Modal State
     const [showMergeModal, setShowMergeModal] = useState(false);
     
+    // Manual Assign Modal State
+    const [showManualAssignModal, setShowManualAssignModal] = useState(false);
+    const [selectedRideForAssign, setSelectedRideForAssign] = useState<RideRequest | null>(null);
+    
     // Manual ride merging functions
     const canCombineRides = (ride1: RideRequest, ride2: RideRequest): boolean => {
         const totalGuests = (ride1.guestCount || 1) + (ride2.guestCount || 1);
@@ -723,13 +727,17 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
     }, [rides]);
 
     // Auto-assign logic: Automatically assign rides that have been waiting too long
+    // DISABLED: Auto-assign feature is turned off by default
     useEffect(() => {
-        // Only run if auto-assign is enabled
+        // Always return early - auto-assign is disabled
+        // This ensures no interval is set and no auto-assignment happens
         if (!fleetConfig.autoAssignEnabled) {
-            console.log('[Auto-Assign] Auto-assign is disabled');
+            // Auto-assign is disabled, do nothing
             return;
         }
 
+        // This code should never execute since autoAssignEnabled is always false
+        // But keeping it here for safety in case the feature is re-enabled in the future
         console.log('[Auto-Assign] Auto-assign is enabled, checking every 5 seconds...');
 
         const checkAndAutoAssign = async () => {
@@ -2091,9 +2099,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                         <span className="text-sm font-medium text-gray-700">Enable Auto-Assign</span>
                                         <input 
                                             type="checkbox" 
-                                            checked={fleetConfig.autoAssignEnabled}
-                                            onChange={(e) => setFleetConfig({...fleetConfig, autoAssignEnabled: e.target.checked})}
-                                            className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 cursor-pointer"
+                                            checked={false}
+                                            disabled={true}
+                                            onChange={() => {}}
+                                            className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 cursor-not-allowed opacity-50"
                                         />
                                     </div>
                                     <button 
@@ -2391,32 +2400,22 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                     })()}
                                     
                                     <div className="flex items-center gap-2">
-                                        {/* Toggle Switch */}
+                                        {/* Toggle Switch - Disabled */}
                                         <button
-                                            onClick={() => setFleetConfig({...fleetConfig, autoAssignEnabled: !fleetConfig.autoAssignEnabled})}
-                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 ${
-                                                fleetConfig.autoAssignEnabled ? 'bg-emerald-600' : 'bg-gray-300'
-                                            }`}
-                                            title={fleetConfig.autoAssignEnabled ? 'Disable Auto Assign' : 'Enable Auto Assign'}
+                                            disabled={true}
+                                            onClick={() => {}}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 bg-gray-300 cursor-not-allowed opacity-50`}
+                                            title="Auto Assign is disabled"
                                         >
                                             <span
-                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                                    fleetConfig.autoAssignEnabled ? 'translate-x-5' : 'translate-x-1'
-                                                }`}
+                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-1`}
                                             />
                                         </button>
                                         
                                         {/* Auto Assign Info */}
-                                        {fleetConfig.autoAssignEnabled && (
-                                            <span className="text-sm bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-semibold">
-                                                Auto: {fleetConfig.maxWaitTimeBeforeAutoAssign}s
-                                            </span>
-                                        )}
-                                        {!fleetConfig.autoAssignEnabled && (
-                                            <span className="text-xs text-gray-500 font-medium">
-                                                Auto: Off
-                                            </span>
-                                        )}
+                                        <span className="text-xs text-gray-500 font-medium">
+                                            Auto: Off
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -2452,7 +2451,14 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                             const style = styles[urgencyLevel];
                                             
                                             return (
-                                                <div key={ride.id} className={`${style.bg} ${style.border} p-2 rounded-lg border transition-all duration-200`}>
+                                                <div 
+                                                    key={ride.id} 
+                                                    onClick={() => {
+                                                        setSelectedRideForAssign(ride);
+                                                        setShowManualAssignModal(true);
+                                                    }}
+                                                    className={`${style.bg} ${style.border} p-2 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-md hover:border-emerald-400`}
+                                                >
                                                     {/* Header Row: Room + Guest + Pax + Wait Time */}
                                                     <div className="flex items-center justify-between gap-2">
                                                         <div className="flex items-center gap-1.5 min-w-0">
@@ -2480,6 +2486,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                                                             Note: {ride.notes}
                                                         </div>
                                                     )}
+                                                    
+                                                    {/* Click hint */}
+                                                    <div className="text-[9px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
+                                                        <span>Click to assign driver</span>
+                                                    </div>
                                                 </div>
                                             );
                                         });
@@ -4505,6 +4516,128 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({ onLogout, user, embed
                     )}
                 </div>
             </div>
+            
+            {/* Manual Assign Driver Modal */}
+            {showManualAssignModal && selectedRideForAssign && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowManualAssignModal(false)}>
+                    <div className="backdrop-blur-xl bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border-2 border-gray-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 p-5 flex justify-between items-center z-10">
+                            <div>
+                                <h3 className="font-bold text-lg text-gray-900">Assign Driver</h3>
+                                <p className="text-sm text-gray-600 mt-1">
+                                    {selectedRideForAssign.guestName} • {selectedRideForAssign.pickup} → {selectedRideForAssign.destination}
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => setShowManualAssignModal(false)} 
+                                className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        <div className="p-5">
+                            {(() => {
+                                const onlineDrivers = users.filter(u => u.role === UserRole.DRIVER).filter(driver => {
+                                    const driverIdStr = driver.id ? String(driver.id) : '';
+                                    const hasActiveRide = rides.some(r => {
+                                        const rideDriverId = r.driverId ? String(r.driverId) : '';
+                                        return rideDriverId === driverIdStr && 
+                                            (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
+                                    });
+                                    if (hasActiveRide) return true;
+                                    if (driver.updatedAt) {
+                                        const timeSinceUpdate = Date.now() - driver.updatedAt;
+                                        if (timeSinceUpdate < 30000) return true;
+                                    }
+                                    return false;
+                                });
+                                
+                                const handleAssignDriver = async (driver: User) => {
+                                    try {
+                                        await updateRideStatus(selectedRideForAssign.id, BuggyStatus.ARRIVING, driver.id, 5);
+                                        const refreshedRides = await getRides();
+                                        setRides(refreshedRides);
+                                        setShowManualAssignModal(false);
+                                        setSelectedRideForAssign(null);
+                                        alert(`Successfully assigned driver ${driver.lastName} to Room ${selectedRideForAssign.roomNumber}`);
+                                    } catch (error) {
+                                        console.error('Failed to assign driver:', error);
+                                        alert('Failed to assign driver. Please try again.');
+                                    }
+                                };
+                                
+                                const getDriverStatus = (driver: User) => {
+                                    const driverIdStr = driver.id ? String(driver.id) : '';
+                                    const activeRide = rides.find(r => {
+                                        const rideDriverId = r.driverId ? String(r.driverId) : '';
+                                        return rideDriverId === driverIdStr && 
+                                            (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
+                                    });
+                                    if (activeRide) {
+                                        return { status: 'busy', text: `On Trip: Room ${activeRide.roomNumber}`, color: 'bg-orange-100 text-orange-700' };
+                                    }
+                                    return { status: 'available', text: 'Available', color: 'bg-emerald-100 text-emerald-700' };
+                                };
+                                
+                                return (
+                                    <div className="space-y-4">
+                                        {/* Online Drivers */}
+                                        {onlineDrivers.length > 0 ? (
+                                            <div>
+                                                <h4 className="font-bold text-sm text-gray-700 mb-3 flex items-center gap-2">
+                                                    <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                                                    Online Drivers ({onlineDrivers.length})
+                                                </h4>
+                                                <div className="grid grid-cols-1 gap-2">
+                                                    {onlineDrivers.map((driver) => {
+                                                        const driverStatus = getDriverStatus(driver);
+                                                        return (
+                                                            <button
+                                                                key={driver.id}
+                                                                onClick={() => handleAssignDriver(driver)}
+                                                                disabled={driverStatus.status === 'busy'}
+                                                                className={`p-4 rounded-lg border-2 transition-all text-left ${
+                                                                    driverStatus.status === 'busy'
+                                                                        ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
+                                                                        : 'border-emerald-200 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100 cursor-pointer'
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="font-bold text-gray-900">{driver.lastName}</span>
+                                                                            <span className={`text-xs px-2 py-0.5 rounded font-semibold ${driverStatus.color}`}>
+                                                                                {driverStatus.text}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                    {driverStatus.status === 'available' && (
+                                                                        <div className="ml-3 flex-shrink-0">
+                                                                            <span className="text-emerald-600 font-semibold text-sm">Assign →</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-8 text-gray-500">
+                                                <p className="font-semibold">No online drivers available</p>
+                                                <p className="text-sm mt-1">Please wait for drivers to come online.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                </div>
+            )}
             
         </div>
     );
