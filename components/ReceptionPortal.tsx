@@ -38,7 +38,9 @@ import {
   requestRide,
   updateRide,
   cancelRide,
+  setDriverOnlineFor10Hours,
 } from "../services/dataService";
+import { authenticateStaff } from "../services/authService";
 import { parseAdminInput, parseRideRequestWithContext } from "../services/geminiService";
 import {
   User,
@@ -146,7 +148,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   // Voice Input State
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const [aiIsProcessing, setAiIsProcessing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [voiceResult, setVoiceResult] = useState<{
+    status: "success" | "error" | null;
+    message: string;
+  }>({ status: null, message: "" });
   const recognitionRef = useRef<any>(null);
   // Merge Options Modal State
   const [showMergeModal, setShowMergeModal] = useState(false);
@@ -160,6 +166,63 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   const [showDetailRequestModal, setShowDetailRequestModal] = useState(false);
   const [selectedRideForDetail, setSelectedRideForDetail] =
     useState<RideRequest | null>(null);
+
+  // Admin Auth Modal State (for setting driver online)
+  const [showAdminAuthModal, setShowAdminAuthModal] = useState(false);
+  const [selectedDriverForOnline, setSelectedDriverForOnline] = useState<User | null>(null);
+  const [adminUsername, setAdminUsername] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminAuthError, setAdminAuthError] = useState("");
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
+  // Handle admin authentication and set driver online
+  const handleAdminAuth = async () => {
+    if (!selectedDriverForOnline || !adminUsername || !adminPassword) {
+      return;
+    }
+
+    setIsAuthenticating(true);
+    setAdminAuthError("");
+
+    try {
+      // Authenticate admin
+      const adminUser = await authenticateStaff(adminUsername, adminPassword);
+
+      if (!adminUser) {
+        setAdminAuthError("Invalid admin credentials. Please try again.");
+        setIsAuthenticating(false);
+        return;
+      }
+
+      // Check if user is admin
+      if (adminUser.role !== UserRole.ADMIN) {
+        setAdminAuthError("Access denied. Only admin users can set drivers online.");
+        setIsAuthenticating(false);
+        return;
+      }
+
+      // Set driver online for 10 hours
+      if (selectedDriverForOnline.id) {
+        await setDriverOnlineFor10Hours(selectedDriverForOnline.id);
+        
+        // Refresh users list
+        const refreshedUsers = await getUsers().catch(() => getUsersSync());
+        setUsers(refreshedUsers);
+
+        // Close modal
+        setShowAdminAuthModal(false);
+        setSelectedDriverForOnline(null);
+        setAdminUsername("");
+        setAdminPassword("");
+        setAdminAuthError("");
+      }
+    } catch (error: any) {
+      console.error("Admin auth error:", error);
+      setAdminAuthError(error.message || "Authentication failed. Please try again.");
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
 
   // Manual ride merging functions
   const canCombineRides = (ride1: RideRequest, ride2: RideRequest): boolean => {
@@ -222,42 +285,228 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     }
   };
 
-  const processTranscript = async (text: string) => {
+  // Smart voice parsing without AI - using keyword matching
+  const parseVoiceTranscript = (text: string) => {
+    const lowerText = text.toLowerCase();
+    const result: {
+      roomNumber?: string;
+      guestName?: string;
+      pickup?: string;
+      destination?: string;
+      guestCount?: number;
+      notes?: string;
+    } = {};
+
+    // Extract room number (patterns: "room 101", "phòng 101", "101", "D03", "villa D5")
+    const roomPatterns = [
+      /(?:room|phòng|rồm)\s*([A-Z]?\d+[A-Z]?)/i,
+      /(?:villa|biệt thự)\s*([A-Z]\d+)/i,
+      /\b([A-Z]?\d{2,3}[A-Z]?)\b/,
+      /\b([DP]\d{1,2})\b/i,
+    ];
+    for (const pattern of roomPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        result.roomNumber = match[1];
+        break;
+      }
+    }
+
+    // Extract guest name (after keywords: "guest", "khách", "name", "tên")
+    const namePatterns = [
+      /(?:guest|khách|name|tên)\s+(?:is|là|:)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
+      /(?:tên|name)\s+(?:khách|guest)?\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
+    ];
+    for (const pattern of namePatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        result.guestName = match[1].trim();
+        break;
+      }
+    }
+
+    // Extract guest count (patterns: "3 guests", "3 người", "3 khách", "3 people")
+    const countPatterns = [
+      /\b(\d+)\s*(?:guests?|người|khách|people|pax)\b/i,
+      /\b(\d+)\s*(?:persons?|người)\b/i,
+    ];
+    for (const pattern of countPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        result.guestCount = parseInt(match[1]);
+        if (result.guestCount > 7) result.guestCount = 7;
+        if (result.guestCount < 1) result.guestCount = 1;
+        break;
+      }
+    }
+
+    // Extract notes (keywords: luggage, hành lý, baby seat, urgent, gấp)
+    const notesKeywords = {
+      luggage: ["luggage", "hành lý", "bag", "túi", "valise"],
+      babySeat: ["baby seat", "ghế trẻ em", "trẻ em"],
+      urgent: ["urgent", "gấp", "nhanh", "asap"],
+      wheelchair: ["wheelchair", "xe lăn"],
+    };
+    const foundNotes: string[] = [];
+    for (const [key, keywords] of Object.entries(notesKeywords)) {
+      if (keywords.some((kw) => lowerText.includes(kw))) {
+        foundNotes.push(key === "luggage" ? "Has luggage" : key === "babySeat" ? "Needs baby seat" : key === "urgent" ? "Urgent" : "Needs wheelchair");
+      }
+    }
+    if (foundNotes.length > 0) {
+      result.notes = foundNotes.join(", ");
+    }
+
+    // Find locations using keyword matching
+    const findLocation = (searchText: string): string | null => {
+      const lowerSearch = searchText.toLowerCase();
+      
+      // Direct match
+      for (const loc of locations) {
+        if (lowerSearch.includes(loc.name.toLowerCase()) || loc.name.toLowerCase().includes(lowerSearch)) {
+          return loc.name;
+        }
+      }
+
+      // Keyword matching
+      const keywordMap: Record<string, string[]> = {
+        pool: ["pool", "hồ bơi", "bể bơi"],
+        restaurant: ["restaurant", "nhà hàng", "restaurant"],
+        villa: ["villa", "biệt thự", "villas"],
+        lobby: ["lobby", "sảnh", "reception", "lễ tân"],
+        beach: ["beach", "bãi biển", "biển"],
+        gym: ["gym", "phòng gym", "phòng tập"],
+      };
+
+      for (const [category, keywords] of Object.entries(keywordMap)) {
+        if (keywords.some((kw) => lowerSearch.includes(kw))) {
+          // Find first matching location by type or name
+          if (category === "pool") {
+            const pool = locations.find((l) => l.type === "FACILITY" && l.name.toLowerCase().includes("pool"));
+            if (pool) return pool.name;
+          } else if (category === "restaurant") {
+            const restaurant = locations.find((l) => l.type === "RESTAURANT");
+            if (restaurant) return restaurant.name;
+          } else if (category === "villa") {
+            const villa = locations.find((l) => l.type === "VILLA" || /^[DP]\d/.test(l.name));
+            if (villa) return villa.name;
+          } else if (category === "lobby") {
+            const lobby = locations.find((l) => l.name.toLowerCase().includes("reception") || l.name.toLowerCase().includes("lobby"));
+            if (lobby) return lobby.name;
+          } else {
+            const match = locations.find((l) => l.name.toLowerCase().includes(category));
+            if (match) return match.name;
+          }
+        }
+      }
+
+      return null;
+    };
+
+    // Extract pickup and destination
+    // Patterns: "from X to Y", "từ X đến Y", "pickup X destination Y", "đón X đi Y"
+    const routePatterns = [
+      /(?:from|từ|pickup|đón)\s+(.+?)\s+(?:to|đến|destination|đi|go to)\s+(.+)/i,
+      /(?:pickup|đón)\s+(.+?)\s+(?:destination|điểm đến|đi)\s+(.+)/i,
+      /(.+?)\s+(?:to|đến|đi)\s+(.+)/i,
+    ];
+
+    let foundPickup: string | null = null;
+    let foundDestination: string | null = null;
+
+    for (const pattern of routePatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        const pickupText = match[1].trim();
+        const destText = match[2].trim();
+        
+        foundPickup = findLocation(pickupText);
+        foundDestination = findLocation(destText);
+        
+        if (foundPickup && foundDestination) break;
+      }
+    }
+
+    // If not found in patterns, try to find locations anywhere in text
+    if (!foundPickup || !foundDestination) {
+      for (const loc of locations) {
+        const locLower = loc.name.toLowerCase();
+        if (lowerText.includes(locLower)) {
+          if (!foundPickup) {
+            foundPickup = loc.name;
+          } else if (!foundDestination && loc.name !== foundPickup) {
+            foundDestination = loc.name;
+            break;
+          }
+        }
+      }
+    }
+
+    // If pickup not found but room number exists, use room as pickup
+    if (!foundPickup && result.roomNumber) {
+      foundPickup = result.roomNumber;
+    }
+
+    if (foundPickup) result.pickup = foundPickup;
+    if (foundDestination) result.destination = foundDestination;
+
+    return result;
+  };
+
+  const processTranscript = (text: string) => {
     if (!text.trim()) {
+      setVoiceResult({ status: "error", message: "No speech detected. Please try again." });
       return;
     }
-    setAiIsProcessing(true);
-    try {
-      // Get drivers list for context (optional, for future enhancements)
-      const allDrivers = users.filter((u) => u.role === "DRIVER");
-      
-      // Use enhanced parsing with full context from database
-      const parsedData = await parseRideRequestWithContext(
-        text,
-        locations,
-        allDrivers,
-      );
-      
-      if (parsedData && parsedData.pickup && parsedData.destination) {
-        setNewRideData((prev) => ({
-          ...prev,
-          roomNumber: parsedData.roomNumber || prev.roomNumber,
-          pickup: parsedData.pickup || parsedData.roomNumber || prev.pickup,
-          destination: parsedData.destination || prev.destination,
-          guestName: parsedData.guestName || prev.guestName,
-          guestCount: parsedData.guestCount || prev.guestCount || 1,
-          notes: parsedData.notes || prev.notes,
-        }));
-      } else {
-        alert("Could not understand the request. Please try again with clearer information about pickup and destination locations.");
+
+    setIsProcessing(true);
+    setVoiceResult({ status: null, message: "" });
+
+    // Small delay to show processing state
+    setTimeout(() => {
+      try {
+        const parsedData = parseVoiceTranscript(text);
+
+        if (parsedData.pickup && parsedData.destination) {
+          setNewRideData((prev) => ({
+            ...prev,
+            roomNumber: parsedData.roomNumber || prev.roomNumber,
+            pickup: parsedData.pickup || prev.pickup,
+            destination: parsedData.destination || prev.destination,
+            guestName: parsedData.guestName || prev.guestName,
+            guestCount: parsedData.guestCount || prev.guestCount || 1,
+            notes: parsedData.notes || prev.notes,
+          }));
+
+          setVoiceResult({
+            status: "success",
+            message: "Ride information extracted successfully! Please review and click Create Ride.",
+          });
+        } else {
+          const missing = [];
+          if (!parsedData.pickup) missing.push("pickup location");
+          if (!parsedData.destination) missing.push("destination");
+          
+          setVoiceResult({
+            status: "error",
+            message: `Could not find ${missing.join(" and ")}. Please mention locations clearly (e.g., "from room 101 to pool" or "đón phòng 101 đi hồ bơi").`,
+          });
+        }
+      } catch (error) {
+        console.error("Voice parsing error:", error);
+        setVoiceResult({
+          status: "error",
+          message: "Error processing voice command. Please try again or fill the form manually.",
+        });
+      } finally {
+        setIsProcessing(false);
+        // Keep transcript visible for a few seconds
+        setTimeout(() => {
+          setTranscript("");
+          setVoiceResult({ status: null, message: "" });
+        }, 5000);
       }
-    } catch (error) {
-      console.error("AI parsing error:", error);
-      alert("An error occurred while processing the voice command. Please try again.");
-    } finally {
-      setAiIsProcessing(false);
-      setTranscript("");
-    }
+    }, 500);
   };
   const calculateOptimalMergeRoute = (
     ride1: RideRequest,
@@ -3163,6 +3412,21 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                         {style.text}
                                       </span>
                                     )}
+                                    {driverStatus === "OFFLINE" && (
+                                      <button
+                                        onClick={() => {
+                                          setSelectedDriverForOnline(driver);
+                                          setShowAdminAuthModal(true);
+                                          setAdminUsername("");
+                                          setAdminPassword("");
+                                          setAdminAuthError("");
+                                        }}
+                                        className="text-[9px] px-2 py-0.5 rounded font-medium bg-emerald-500 hover:bg-emerald-600 text-white transition-colors"
+                                        title="Set driver online (Admin required)"
+                                      >
+                                        Set Online
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
 
@@ -4529,17 +4793,38 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       ? "Listening..."
                       : "Press the button and speak to create a ride"}
                   </p>
-                  {(transcript || aiIsProcessing) && (
-                    <div className="mt-4 w-full p-3 bg-white rounded-lg border text-center">
+                  {(transcript || isProcessing || voiceResult.status) && (
+                    <div className="mt-4 w-full space-y-2">
                       {transcript && (
-                        <p className="font-mono text-gray-800 text-xs md:text-sm break-words">
-                          "{transcript}"
-                        </p>
+                        <div className="p-3 bg-white rounded-lg border text-center">
+                          <p className="font-mono text-gray-800 text-xs md:text-sm break-words">
+                            "{transcript}"
+                          </p>
+                        </div>
                       )}
-                      {aiIsProcessing && (
-                        <p className="text-blue-600 font-medium animate-pulse text-sm md:text-base">
-                          AI is processing...
-                        </p>
+                      {isProcessing && (
+                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 text-center">
+                          <p className="text-blue-600 font-medium animate-pulse text-sm md:text-base flex items-center justify-center gap-2">
+                            <Loader2 size={16} className="animate-spin" />
+                            Processing voice command...
+                          </p>
+                        </div>
+                      )}
+                      {voiceResult.status === "success" && (
+                        <div className="p-3 bg-green-50 rounded-lg border border-green-200 text-center">
+                          <p className="text-green-800 font-medium text-sm md:text-base flex items-center justify-center gap-2">
+                            <CheckCircle size={16} />
+                            {voiceResult.message}
+                          </p>
+                        </div>
+                      )}
+                      {voiceResult.status === "error" && (
+                        <div className="p-3 bg-red-50 rounded-lg border border-red-200 text-center">
+                          <p className="text-red-800 font-medium text-sm md:text-base flex items-center justify-center gap-2">
+                            <AlertCircle size={16} />
+                            {voiceResult.message}
+                          </p>
+                        </div>
                       )}
                     </div>
                   )}
@@ -4613,6 +4898,42 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                           setDestinationSearchQuery("");
                         }}
                         className="w-full p-2.5 md:p-2 border rounded-md cursor-pointer bg-white text-gray-900 placeholder:text-gray-400 text-sm md:text-base"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                        Guest Count
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="7"
+                        value={newRideData.guestCount || 1}
+                        placeholder="Number of guests (1-7)"
+                        onChange={(e) =>
+                          setNewRideData((p) => ({
+                            ...p,
+                            guestCount: parseInt(e.target.value) || 1,
+                          }))
+                        }
+                        className="w-full p-2.5 md:p-2 border rounded-md bg-white text-gray-900 placeholder:text-gray-400 text-sm md:text-base"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                        Notes
+                      </label>
+                      <textarea
+                        value={newRideData.notes}
+                        placeholder="Special requests, luggage info, etc."
+                        onChange={(e) =>
+                          setNewRideData((p) => ({
+                            ...p,
+                            notes: e.target.value,
+                          }))
+                        }
+                        rows={2}
+                        className="w-full p-2.5 md:p-2 border rounded-md bg-white text-gray-900 placeholder:text-gray-400 text-sm md:text-base resize-none"
                       />
                     </div>
                   </div>
@@ -5965,6 +6286,118 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   </div>
                 );
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Auth Modal for Setting Driver Online */}
+      {showAdminAuthModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col">
+            <div className="p-5 border-b flex justify-between items-center">
+              <h3 className="font-bold text-lg text-gray-900">
+                Admin Authentication Required
+              </h3>
+              <button
+                onClick={() => {
+                  setShowAdminAuthModal(false);
+                  setSelectedDriverForOnline(null);
+                  setAdminUsername("");
+                  setAdminPassword("");
+                  setAdminAuthError("");
+                }}
+                className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800">
+                  <strong>Setting driver online:</strong> {selectedDriverForOnline?.lastName || "Unknown"}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Admin credentials required to set driver online status.
+                </p>
+              </div>
+
+              {adminAuthError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-sm text-red-800">{adminAuthError}</p>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Admin Username
+                  </label>
+                  <input
+                    type="text"
+                    value={adminUsername}
+                    onChange={(e) => {
+                      setAdminUsername(e.target.value);
+                      setAdminAuthError("");
+                    }}
+                    placeholder="Enter admin username"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    disabled={isAuthenticating}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Admin Password
+                  </label>
+                  <input
+                    type="password"
+                    value={adminPassword}
+                    onChange={(e) => {
+                      setAdminPassword(e.target.value);
+                      setAdminAuthError("");
+                    }}
+                    placeholder="Enter admin password"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    disabled={isAuthenticating}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !isAuthenticating) {
+                        handleAdminAuth();
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t bg-gray-50 flex justify-end gap-3 rounded-b-2xl">
+              <button
+                onClick={() => {
+                  setShowAdminAuthModal(false);
+                  setSelectedDriverForOnline(null);
+                  setAdminUsername("");
+                  setAdminPassword("");
+                  setAdminAuthError("");
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium text-sm"
+                disabled={isAuthenticating}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAdminAuth}
+                disabled={isAuthenticating || !adminUsername || !adminPassword}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+              >
+                {isAuthenticating ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Authenticating...
+                  </>
+                ) : (
+                  "Authenticate & Set Online"
+                )}
+              </button>
             </div>
           </div>
         </div>
