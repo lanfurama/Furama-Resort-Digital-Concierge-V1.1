@@ -1,37 +1,43 @@
-
 export enum AppView {
-  LOGIN_TYPE_SELECTION = 'LOGIN_TYPE_SELECTION', // Choose between Guest or Staff/Admin
-  ROLE_SELECTION = 'ROLE_SELECTION', // Staff role selection page
-  LOGIN = 'LOGIN',
-  HOME = 'HOME',
-  BUGGY = 'BUGGY',
-  SERVICES = 'SERVICES',
-  CHAT = 'CHAT',
-  LIVE_CONCIERGE = 'LIVE_CONCIERGE',
-  ACCOUNT = 'ACCOUNT', // New View
-  ACTIVE_ORDERS = 'ACTIVE_ORDERS', // New View for Cart
+  LOGIN_TYPE_SELECTION = "LOGIN_TYPE_SELECTION", // Choose between Guest or Staff/Admin
+  ROLE_SELECTION = "ROLE_SELECTION", // Staff role selection page
+  LOGIN = "LOGIN",
+  HOME = "HOME",
+  BUGGY = "BUGGY",
+  SERVICES = "SERVICES",
+  CHAT = "CHAT",
+  LIVE_CONCIERGE = "LIVE_CONCIERGE",
+  ACCOUNT = "ACCOUNT", // New View
+  ACTIVE_ORDERS = "ACTIVE_ORDERS", // New View for Cart
   // Service Sub-views
-  DINING_ORDER = 'DINING_ORDER',
-  SPA_BOOKING = 'SPA_BOOKING',
-  POOL_ORDER = 'POOL_ORDER',
-  BUTLER_REQUEST = 'BUTLER_REQUEST',
-  EVENTS = 'EVENTS',
+  DINING_ORDER = "DINING_ORDER",
+  SPA_BOOKING = "SPA_BOOKING",
+  POOL_ORDER = "POOL_ORDER",
+  BUTLER_REQUEST = "BUTLER_REQUEST",
+  EVENTS = "EVENTS",
   // New Portals
-  ADMIN_DASHBOARD = 'ADMIN_DASHBOARD',
-  DRIVER_DASHBOARD = 'DRIVER_DASHBOARD',
-  STAFF_DASHBOARD = 'STAFF_DASHBOARD'
+  ADMIN_DASHBOARD = "ADMIN_DASHBOARD",
+  DRIVER_DASHBOARD = "DRIVER_DASHBOARD",
+  STAFF_DASHBOARD = "STAFF_DASHBOARD",
 }
 
 export enum UserRole {
-  GUEST = 'GUEST',
-  ADMIN = 'ADMIN',
-  DRIVER = 'DRIVER',
-  STAFF = 'STAFF',
-  SUPERVISOR = 'SUPERVISOR',
-  RECEPTION = 'RECEPTION'
+  GUEST = "GUEST",
+  ADMIN = "ADMIN",
+  DRIVER = "DRIVER",
+  STAFF = "STAFF",
+  SUPERVISOR = "SUPERVISOR",
+  RECEPTION = "RECEPTION",
 }
 
-export type Department = 'All' | 'Buggy' | 'Dining' | 'Spa' | 'Pool' | 'Butler' | 'FrontDesk';
+export type Department =
+  | "All"
+  | "Buggy"
+  | "Dining"
+  | "Spa"
+  | "Pool"
+  | "Butler"
+  | "FrontDesk";
 
 export interface User {
   id?: string;
@@ -66,14 +72,14 @@ export interface Room {
   id: string;
   number: string;
   typeId: string; // Links to RoomType
-  status?: 'Available' | 'Occupied' | 'Maintenance';
+  status?: "Available" | "Occupied" | "Maintenance";
 }
 
 // Translation Helper Interface
 export interface ContentTranslation {
-    [langCode: string]: {
-        [field: string]: string;
-    }
+  [langCode: string]: {
+    [field: string]: string;
+  };
 }
 
 export interface MenuItem {
@@ -109,17 +115,32 @@ export interface Promotion {
 export interface KnowledgeItem {
   id: string;
   question: string; // The topic or question, e.g., "Check-out time"
-  answer: string;   // The fact, e.g., "12:00 PM"
+  answer: string; // The fact, e.g., "12:00 PM"
   sourceFile?: string; // Name of uploaded PDF/File
 }
 
 export enum BuggyStatus {
-  IDLE = 'IDLE',
-  SEARCHING = 'SEARCHING', // Waiting for driver
-  ASSIGNED = 'ASSIGNED',   // Driver accepted
-  ARRIVING = 'ARRIVING',
-  ON_TRIP = 'ON_TRIP',
-  COMPLETED = 'COMPLETED'
+  IDLE = "IDLE",
+  SEARCHING = "SEARCHING", // Waiting for driver
+  ASSIGNED = "ASSIGNED", // Driver accepted
+  ARRIVING = "ARRIVING",
+  ON_TRIP = "ON_TRIP",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED",
+}
+
+export interface RouteSegment {
+  from: string;
+  to: string;
+  fromLat?: number;
+  fromLng?: number;
+  toLat?: number;
+  toLng?: number;
+  onBoard: Array<{
+    name: string;
+    roomNumber: string;
+    count: number;
+  }>;
 }
 
 export interface RideRequest {
@@ -132,18 +153,27 @@ export interface RideRequest {
   timestamp: number;
   driverId?: string;
   eta?: number;
-  rating?: number;   // 1-5
+  rating?: number; // 1-5
   feedback?: string;
   pickedUpAt?: number;
   completedAt?: number;
   confirmedAt?: number; // Timestamp when driver accepted the ride
   guestCount?: number; // Number of guests (1-7, default 1)
   notes?: string; // General notes: luggage info, lost items, special instructions
+  isMerged?: boolean;
+  segments?: RouteSegment[];
 }
 
 export interface ServiceRequest {
   id: string;
-  type: 'DINING' | 'SPA' | 'POOL' | 'BUTLER' | 'HOUSEKEEPING' | 'BUGGY' | 'EXTEND_STAY';
+  type:
+    | "DINING"
+    | "SPA"
+    | "POOL"
+    | "BUTLER"
+    | "HOUSEKEEPING"
+    | "BUGGY"
+    | "EXTEND_STAY";
   status: string;
   details: string;
   items?: MenuItem[]; // Stored items to support dynamic translation display
@@ -154,7 +184,7 @@ export interface ServiceRequest {
   pickedUpAt?: number; // Timestamp when buggy picked up guest (for BUGGY type)
   arrivingAt?: number; // Timestamp when buggy arriving (for BUGGY type)
   completedAt?: number; // Timestamp when service completed
-  rating?: number;   // 1-5 Stars
+  rating?: number; // 1-5 Stars
   feedback?: string; // User comment
   newCheckOutDate?: string; // For EXTEND_STAY type: requested new check-out date
   guestCount?: number; // Number of guests (for BUGGY type)
@@ -162,14 +192,14 @@ export interface ServiceRequest {
 }
 
 export interface HotelReview {
-    id: string;
-    roomNumber: string;
-    guestName: string;
-    // rating: number; // Deprecated in favor of detailed categories
-    categoryRatings: { category: string; rating: number }[]; // Detailed ratings
-    averageRating: number; // Calculated average
-    comment: string;
-    timestamp: number;
+  id: string;
+  roomNumber: string;
+  guestName: string;
+  // rating: number; // Deprecated in favor of detailed categories
+  categoryRatings: { category: string; rating: number }[]; // Detailed ratings
+  averageRating: number; // Calculated average
+  comment: string;
+  timestamp: number;
 }
 
 export interface Location {
@@ -177,22 +207,22 @@ export interface Location {
   lat: number;
   lng: number;
   name: string;
-  type?: 'VILLA' | 'FACILITY' | 'RESTAURANT';
+  type?: "VILLA" | "FACILITY" | "RESTAURANT";
 }
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'model' | 'staff'; // Added staff role
+  role: "user" | "model" | "staff"; // Added staff role
   text: string;
-  groundingUrls?: Array<{ uri: string; title: string; type?: 'WEB' | 'MAP' }>;
+  groundingUrls?: Array<{ uri: string; title: string; type?: "WEB" | "MAP" }>;
 }
 
 export interface AppNotification {
-    id: string;
-    recipientId: string; // roomNumber for Guest, userId for Staff
-    title: string;
-    message: string;
-    type: 'INFO' | 'SUCCESS' | 'WARNING';
-    timestamp: number;
-    isRead: boolean;
+  id: string;
+  recipientId: string; // roomNumber for Guest, userId for Staff
+  title: string;
+  message: string;
+  type: "INFO" | "SUCCESS" | "WARNING";
+  timestamp: number;
+  isRead: boolean;
 }

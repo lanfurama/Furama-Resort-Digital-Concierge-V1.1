@@ -18,10 +18,195 @@ import { ContentTranslation } from "../types";
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 if (!apiKey) {
   console.error("VITE_GEMINI_API_KEY is not set. Please check your .env file.");
+  console.error("AI features will not work without a valid API key.");
 }
-const ai = new GoogleGenAI({ apiKey });
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // --- Admin AI Helpers ---
+
+// Enhanced function to parse ride requests with full context from database
+export const parseRideRequestWithContext = async (
+  input: string,
+  locations: Array<{ id?: string; name: string; type?: string; lat?: number; lng?: number }>,
+  drivers?: Array<{ id?: string; lastName: string; roomNumber: string; currentLat?: number; currentLng?: number; updatedAt?: number }>,
+) => {
+  const model = "gemini-2.5-flash";
+
+  const schema: Schema = {
+    type: Type.OBJECT,
+    properties: {
+      roomNumber: {
+        type: Type.STRING,
+        description: "The guest's room number, e.g., '101' or 'Villa D03'",
+      },
+      pickup: {
+        type: Type.STRING,
+        description:
+          "The pickup location name. Must match exactly one of the valid location names provided in context.",
+      },
+      destination: {
+        type: Type.STRING,
+        description: "The destination location name. Must match exactly one of the valid location names provided in context.",
+      },
+      guestName: { type: Type.STRING, description: "The name of the guest." },
+      guestCount: {
+        type: Type.NUMBER,
+        description: "The number of guests, default to 1 if not mentioned.",
+      },
+      notes: {
+        type: Type.STRING,
+        description:
+          "Any special notes or requests, like 'has luggage', 'needs baby seat', 'urgent', or 'has many bags'.",
+      },
+    },
+    required: ["pickup", "destination"],
+  };
+
+  // Build detailed location context
+  const locationContext = locations.map((loc, index) => {
+    let info = `${index + 1}. "${loc.name}"`;
+    if (loc.type) info += ` (Type: ${loc.type})`;
+    return info;
+  }).join("\n");
+
+  // Build driver context if available
+  let driverContext = "";
+  if (drivers && drivers.length > 0) {
+    const onlineDrivers = drivers.filter(d => d.currentLat && d.currentLng);
+    driverContext = `\n\nAvailable Drivers (${onlineDrivers.length} online):\n${onlineDrivers.map((d, idx) => 
+      `${idx + 1}. ${d.lastName} (ID: ${d.id}, Status: Online)`
+    ).join("\n")}`;
+  }
+
+  const prompt = `You are an intelligent assistant for Furama Resort & Villas Da Nang. Extract ride request information from this Vietnamese or English text: "${input}"
+
+VALID LOCATIONS (you MUST match locations exactly to these names):
+${locationContext}
+
+${driverContext ? driverContext : ""}
+
+INSTRUCTIONS:
+1. Room Number: Extract room number if mentioned (e.g., "101", "D03", "Villa D5")
+2. Pickup Location: 
+   - If not specified, use the room number as pickup location
+   - Match location names EXACTLY from the valid locations list above
+   - Use smart matching for common terms:
+     * "pool" or "hồ bơi" → match "Lagoon Pool" or "Ocean Pool" based on context
+     * "restaurant" or "nhà hàng" → match restaurant names (ACC, Cafe Indochine, Don Cipriani's, etc.)
+     * "villa" or "biệt thự" → match villa areas (D1-D7, Villas, etc.)
+     * "lobby" or "sảnh" → match reception/lobby areas
+     * "beach" or "bãi biển" → match beach access points
+   - If multiple matches possible, choose the most common/popular one
+3. Destination Location: Same rules as pickup, but must be different from pickup
+4. Guest Name: Extract if mentioned
+5. Guest Count: Default to 1 if not specified
+6. Notes: Extract special requests (luggage, baby seat, urgent, etc.)
+
+Return JSON with exact location names matching the valid locations list.`;
+
+  if (!ai) {
+    console.error("Gemini AI is not initialized. Please check VITE_GEMINI_API_KEY in .env file.");
+    return null;
+  }
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: schema,
+      },
+    });
+
+    const parsed = JSON.parse(response.text || "{}");
+    
+    // Validate and fix location names if needed
+    const locationNames = locations.map(loc => loc.name);
+    if (parsed.pickup && !locationNames.includes(parsed.pickup)) {
+      // Try to find closest match
+      const closestPickup = findClosestLocation(parsed.pickup, locations);
+      if (closestPickup) parsed.pickup = closestPickup.name;
+    }
+    if (parsed.destination && !locationNames.includes(parsed.destination)) {
+      // Try to find closest match
+      const closestDest = findClosestLocation(parsed.destination, locations);
+      if (closestDest) parsed.destination = closestDest.name;
+    }
+
+    return parsed;
+  } catch (e) {
+    console.error("AI Parse Error (Ride Request)", e);
+    return null;
+  }
+};
+
+// Helper function to find closest location match
+function findClosestLocation(
+  searchTerm: string,
+  locations: Array<{ id?: string; name: string; type?: string }>
+): { id?: string; name: string; type?: string } | null {
+  const lowerSearch = searchTerm.toLowerCase().trim();
+  
+  // Exact match (case insensitive)
+  let match = locations.find(loc => loc.name.toLowerCase() === lowerSearch);
+  if (match) return match;
+  
+  // Contains match (search term contains location name or vice versa)
+  match = locations.find(loc => {
+    const lowerLoc = loc.name.toLowerCase();
+    return lowerLoc.includes(lowerSearch) || lowerSearch.includes(lowerLoc);
+  });
+  if (match) return match;
+  
+  // Fuzzy matching for common terms - check location types first
+  const typeMatch = lowerSearch.match(/(pool|hồ bơi|restaurant|nhà hàng|villa|biệt thự|lobby|sảnh|beach|bãi biển)/i);
+  if (typeMatch) {
+    const term = typeMatch[1].toLowerCase();
+    
+    // Pool matches
+    if (term === "pool" || term === "hồ bơi") {
+      const poolLocs = locations.filter(loc => 
+        loc.type === "FACILITY" && loc.name.toLowerCase().includes("pool")
+      );
+      if (poolLocs.length > 0) return poolLocs[0]; // Return first pool
+    }
+    
+    // Restaurant matches
+    if (term === "restaurant" || term === "nhà hàng") {
+      const restaurantLocs = locations.filter(loc => loc.type === "RESTAURANT");
+      if (restaurantLocs.length > 0) return restaurantLocs[0]; // Return first restaurant
+    }
+    
+    // Villa matches
+    if (term === "villa" || term === "biệt thự") {
+      const villaLocs = locations.filter(loc => 
+        loc.type === "VILLA" || /^[D\d]/.test(loc.name)
+      );
+      if (villaLocs.length > 0) return villaLocs[0];
+    }
+    
+    // Lobby/Reception matches
+    if (term === "lobby" || term === "sảnh") {
+      match = locations.find(loc => 
+        loc.name.toLowerCase().includes("reception") || 
+        loc.name.toLowerCase().includes("lobby")
+      );
+      if (match) return match;
+    }
+  }
+  
+  // Partial word match (e.g., "lagoon" matches "Lagoon Pool")
+  match = locations.find(loc => {
+    const words = lowerSearch.split(/\s+/);
+    return words.some(word => 
+      word.length > 2 && loc.name.toLowerCase().includes(word)
+    );
+  });
+  if (match) return match;
+  
+  return null;
+}
 
 // Parses natural language input into structured JSON for Admin forms
 export const parseAdminInput = async (
@@ -36,7 +221,7 @@ export const parseAdminInput = async (
     | "RIDE_REQUEST",
   context?: string,
 ) => {
-  const model = "gemini-1.5-flash";
+  const model = "gemini-2.5-flash";
 
   let schema: Schema;
 
@@ -118,11 +303,11 @@ export const parseAdminInput = async (
         pickup: {
           type: Type.STRING,
           description:
-            "The pickup location. If not specified, assume it's the guest's room.",
+            "The pickup location name. Must match exactly one of the valid location names provided in context. If not specified, assume it's the guest's room number.",
         },
         destination: {
           type: Type.STRING,
-          description: "The destination location.",
+          description: "The destination location name. Must match exactly one of the valid location names provided in context.",
         },
         guestName: { type: Type.STRING, description: "The name of the guest." },
         guestCount: {
@@ -132,7 +317,7 @@ export const parseAdminInput = async (
         notes: {
           type: Type.STRING,
           description:
-            "Any special notes or requests, like 'has luggage' or 'needs baby seat'.",
+            "Any special notes or requests, like 'has luggage', 'needs baby seat', 'urgent', or 'has many bags'.",
         },
       },
       required: ["pickup", "destination"],
@@ -151,12 +336,21 @@ export const parseAdminInput = async (
   }
 
   const prompt = `Extract the following information from this text: "${input}".
-                  ${context ? `Use this list of valid locations for context: ${context}.` : ""}
-                  For Ride Requests, if pickup is not mentioned, use the room number as the pickup location. Default guestCount to 1 if not specified.
+                  ${context ? `Use this context: ${context}.` : ""}
+                  For Ride Requests: 
+                    - If pickup is not mentioned, use the room number as the pickup location.
+                    - Default guestCount to 1 if not specified.
+                    - Match location names exactly to the provided valid locations list. Use fuzzy matching for common variations (e.g., "pool" should match "Lagoon Pool" or "Ocean Pool", "restaurant" should match restaurant names).
+                    - For locations, be smart about synonyms: "pool" = any pool location, "restaurant" = any restaurant, "villa" = villa areas, "lobby" = reception/lobby areas, "beach" = beach access points.
                   For locations, if coordinates aren't provided, estimate them based on typical Da Nang beach resort coordinates near 16.04, 108.25.
                   For events, assume current year is 2024 if not specified.
                   For Menu Items, strictly categorize as 'Dining' or 'Spa' based on context.
                   For Room Inventory, match Room Type names closely.`;
+
+  if (!ai) {
+    console.error("Gemini AI is not initialized. Please check VITE_GEMINI_API_KEY in .env file.");
+    return null;
+  }
 
   try {
     const response = await ai.models.generateContent({
@@ -199,6 +393,12 @@ export const createChatSession = async () => {
     const promos = promosList
       .map((p) => `Promo: ${p.title} - ${p.description} (${p.discount})`)
       .join("\n");
+
+    if (!ai) {
+      throw new Error(
+        "Gemini API key is not configured. Please set VITE_GEMINI_API_KEY in your environment variables.",
+      );
+    }
 
     return await ai.chats.create({
       model: "gemini-2.5-flash",
@@ -247,6 +447,11 @@ export const translateText = async (
 ): Promise<string> => {
   if (!text || !targetLanguage || targetLanguage === "Original") return text;
 
+  if (!ai) {
+    console.error("Gemini AI is not initialized. Returning original text.");
+    return text;
+  }
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -267,6 +472,11 @@ export const translateText = async (
 export const generateTranslations = async (
   content: Record<string, string>,
 ): Promise<ContentTranslation> => {
+  if (!ai) {
+    console.error("Gemini AI is not initialized. Returning empty translations.");
+    return {};
+  }
+
   try {
     const languages = [
       "Vietnamese",
@@ -304,6 +514,11 @@ export const queryResortInfo = async (
   const latitude = userLocation?.lat ?? RESORT_CENTER.lat;
   const longitude = userLocation?.lng ?? RESORT_CENTER.lng;
 
+  if (!ai) {
+    console.error("Gemini AI is not initialized. Cannot query maps.");
+    return null;
+  }
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -329,6 +544,11 @@ export const queryResortInfo = async (
 
 // --- TTS (Gemini 2.5 Flash TTS) ---
 export const speakText = async (text: string): Promise<AudioBuffer | null> => {
+  if (!ai) {
+    console.error("Gemini AI is not initialized. Cannot generate speech.");
+    return null;
+  }
+
   try {
     console.log(
       "TTS: Calling Gemini API with text:",
@@ -412,6 +632,11 @@ export const connectLiveSession = async (
   onClose: () => void,
   onError: (err: any) => void,
 ) => {
+  if (!ai) {
+    throw new Error(
+      "Gemini API key is not configured. Please set VITE_GEMINI_API_KEY in your environment variables.",
+    );
+  }
   return ai.live.connect({
     model: "gemini-2.5-flash-native-audio-preview-09-2025",
     callbacks: {
