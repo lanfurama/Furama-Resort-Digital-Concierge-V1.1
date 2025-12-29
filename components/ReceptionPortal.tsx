@@ -41,7 +41,10 @@ import {
   setDriverOnlineFor10Hours,
 } from "../services/dataService";
 import { authenticateStaff } from "../services/authService";
-import { parseAdminInput, parseRideRequestWithContext } from "../services/geminiService";
+import {
+  parseAdminInput,
+  parseRideRequestWithContext,
+} from "../services/geminiService";
 import {
   User,
   UserRole,
@@ -138,7 +141,9 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   });
   const [pickupSearchQuery, setPickupSearchQuery] = useState("");
   const [destinationSearchQuery, setDestinationSearchQuery] = useState("");
-  const [locationFilterType, setLocationFilterType] = useState<"ALL" | "RESTAURANT" | "FACILITY">("ALL");
+  const [locationFilterType, setLocationFilterType] = useState<
+    "ALL" | "RESTAURANT" | "FACILITY"
+  >("ALL");
   const [locationModal, setLocationModal] = useState<{
     isOpen: boolean;
     type: "pickup" | "destination" | null;
@@ -154,6 +159,17 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     message: string;
   }>({ status: null, message: "" });
   const recognitionRef = useRef<any>(null);
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const silenceCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSpeechTimeRef = useRef<number>(0);
+  const currentTranscriptRef = useRef<string>("");
+  const [audioLevel, setAudioLevel] = useState(0); // For animation (0-100)
+  const audioLevelIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Voice Auto-Confirm State (in form, not separate modal)
+  const [isAutoConfirming, setIsAutoConfirming] = useState(false);
+  const [countdown, setCountdown] = useState(5);
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
   // Merge Options Modal State
   const [showMergeModal, setShowMergeModal] = useState(false);
 
@@ -169,7 +185,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
   // Admin Auth Modal State (for setting driver online)
   const [showAdminAuthModal, setShowAdminAuthModal] = useState(false);
-  const [selectedDriverForOnline, setSelectedDriverForOnline] = useState<User | null>(null);
+  const [selectedDriverForOnline, setSelectedDriverForOnline] =
+    useState<User | null>(null);
   const [adminUsername, setAdminUsername] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [adminAuthError, setAdminAuthError] = useState("");
@@ -196,7 +213,9 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
       // Check if user is admin
       if (adminUser.role !== UserRole.ADMIN) {
-        setAdminAuthError("Access denied. Only admin users can set drivers online.");
+        setAdminAuthError(
+          "Access denied. Only admin users can set drivers online.",
+        );
         setIsAuthenticating(false);
         return;
       }
@@ -204,7 +223,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       // Set driver online for 10 hours
       if (selectedDriverForOnline.id) {
         await setDriverOnlineFor10Hours(selectedDriverForOnline.id);
-        
+
         // Refresh users list
         const refreshedUsers = await getUsers().catch(() => getUsersSync());
         setUsers(refreshedUsers);
@@ -218,11 +237,39 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       }
     } catch (error: any) {
       console.error("Admin auth error:", error);
-      setAdminAuthError(error.message || "Authentication failed. Please try again.");
+      setAdminAuthError(
+        error.message || "Authentication failed. Please try again.",
+      );
     } finally {
       setIsAuthenticating(false);
     }
   };
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+      }
+      if (silenceCheckIntervalRef.current) {
+        clearInterval(silenceCheckIntervalRef.current);
+      }
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+      }
+      if (audioLevelIntervalRef.current) {
+        clearInterval(audioLevelIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Cleanup countdown timer when auto-confirm stops
+  useEffect(() => {
+    if (!isAutoConfirming && countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+  }, [isAutoConfirming]);
 
   // Manual ride merging functions
   const canCombineRides = (ride1: RideRequest, ride2: RideRequest): boolean => {
@@ -234,12 +281,39 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     );
   };
 
+  // Helper function to stop recording and process transcript
+  const stopRecordingAndProcess = useCallback(() => {
+    if (recognitionRef.current && isListening) {
+      recognitionRef.current.stop();
+    }
+    setIsListening(false);
+    setAudioLevel(0);
+    
+    // Clear all timers
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    if (silenceCheckIntervalRef.current) {
+      clearInterval(silenceCheckIntervalRef.current);
+      silenceCheckIntervalRef.current = null;
+    }
+    if (audioLevelIntervalRef.current) {
+      clearInterval(audioLevelIntervalRef.current);
+      audioLevelIntervalRef.current = null;
+    }
+    
+    // Process transcript and show confirmation modal using ref to get latest value
+    const currentTranscript = currentTranscriptRef.current;
+    if (currentTranscript.trim()) {
+      processTranscript(currentTranscript);
+    }
+  }, [isListening]);
+
   // Voice recognition logic
   const handleToggleListening = () => {
     if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-      processTranscript(transcript);
+      stopRecordingAndProcess();
     } else {
       const SpeechRecognition =
         window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -256,29 +330,120 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       recognitionRef.current.onstart = () => {
         setIsListening(true);
         setTranscript("");
+        currentTranscriptRef.current = "";
+        lastSpeechTimeRef.current = Date.now();
+        setAudioLevel(30); // Start with low level
+        
+        // Clear any existing timers
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+        if (silenceCheckIntervalRef.current) {
+          clearInterval(silenceCheckIntervalRef.current);
+          silenceCheckIntervalRef.current = null;
+        }
+        
+        // Start silence check interval - check every 500ms if 3 seconds of silence passed
+        silenceCheckIntervalRef.current = setInterval(() => {
+          // Check if recognition is still active
+          if (recognitionRef.current) {
+            const timeSinceLastSpeech = Date.now() - lastSpeechTimeRef.current;
+            if (timeSinceLastSpeech >= 3000) {
+              // 3 seconds of silence detected
+              console.log("3 seconds of silence detected, stopping recording...");
+              stopRecordingAndProcess();
+            }
+          }
+        }, 500);
+        
+        // Start audio level animation interval
+        if (audioLevelIntervalRef.current) {
+          clearInterval(audioLevelIntervalRef.current);
+        }
+        audioLevelIntervalRef.current = setInterval(() => {
+          // Gradually decrease audio level when no new speech
+          setAudioLevel(prev => {
+            if (prev > 20) {
+              return Math.max(20, prev - 2);
+            }
+            return prev;
+          });
+        }, 100);
       };
 
       recognitionRef.current.onresult = (event: any) => {
-        let interimTranscript = "";
-        let finalTranscript = "";
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
+        // Build complete transcript from all results
+        // This approach avoids duplicates by reconstructing the full transcript each time
+        let fullTranscript = "";
+        let hasSpeech = false;
+        
+        for (let i = 0; i < event.results.length; ++i) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            fullTranscript += result[0].transcript + " ";
+            hasSpeech = true;
           } else {
-            interimTranscript += event.results[i][0].transcript;
+            // Only show the last interim result (most recent)
+            if (i === event.results.length - 1) {
+              fullTranscript += result[0].transcript;
+              hasSpeech = true;
+            }
           }
         }
-        setTranscript(transcript + finalTranscript + interimTranscript);
+        
+        // Update transcript with the complete version (no duplicates)
+        const trimmedTranscript = fullTranscript.trim();
+        if (trimmedTranscript) {
+          currentTranscriptRef.current = trimmedTranscript;
+          setTranscript(trimmedTranscript);
+          
+          // Update audio level for animation when speech is detected
+          if (hasSpeech) {
+            setAudioLevel(60 + Math.random() * 40); // Random between 60-100
+          }
+          
+          // Reset silence timer whenever we get speech input
+          lastSpeechTimeRef.current = Date.now();
+        } else {
+          // No speech detected, lower audio level gradually
+          setAudioLevel(prev => Math.max(20, prev - 2));
+        }
       };
 
       recognitionRef.current.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error);
         setIsListening(false);
+        setAudioLevel(0);
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+        if (silenceCheckIntervalRef.current) {
+          clearInterval(silenceCheckIntervalRef.current);
+          silenceCheckIntervalRef.current = null;
+        }
+        if (audioLevelIntervalRef.current) {
+          clearInterval(audioLevelIntervalRef.current);
+          audioLevelIntervalRef.current = null;
+        }
       };
 
       recognitionRef.current.onend = () => {
         setIsListening(false);
+        setAudioLevel(0);
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+        if (silenceCheckIntervalRef.current) {
+          clearInterval(silenceCheckIntervalRef.current);
+          silenceCheckIntervalRef.current = null;
+        }
+        if (audioLevelIntervalRef.current) {
+          clearInterval(audioLevelIntervalRef.current);
+          audioLevelIntervalRef.current = null;
+        }
       };
 
       recognitionRef.current.start();
@@ -350,7 +515,15 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     const foundNotes: string[] = [];
     for (const [key, keywords] of Object.entries(notesKeywords)) {
       if (keywords.some((kw) => lowerText.includes(kw))) {
-        foundNotes.push(key === "luggage" ? "Has luggage" : key === "babySeat" ? "Needs baby seat" : key === "urgent" ? "Urgent" : "Needs wheelchair");
+        foundNotes.push(
+          key === "luggage"
+            ? "Has luggage"
+            : key === "babySeat"
+              ? "Needs baby seat"
+              : key === "urgent"
+                ? "Urgent"
+                : "Needs wheelchair",
+        );
       }
     }
     if (foundNotes.length > 0) {
@@ -360,10 +533,13 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     // Find locations using keyword matching
     const findLocation = (searchText: string): string | null => {
       const lowerSearch = searchText.toLowerCase();
-      
+
       // Direct match
       for (const loc of locations) {
-        if (lowerSearch.includes(loc.name.toLowerCase()) || loc.name.toLowerCase().includes(lowerSearch)) {
+        if (
+          lowerSearch.includes(loc.name.toLowerCase()) ||
+          loc.name.toLowerCase().includes(lowerSearch)
+        ) {
           return loc.name;
         }
       }
@@ -382,19 +558,30 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         if (keywords.some((kw) => lowerSearch.includes(kw))) {
           // Find first matching location by type or name
           if (category === "pool") {
-            const pool = locations.find((l) => l.type === "FACILITY" && l.name.toLowerCase().includes("pool"));
+            const pool = locations.find(
+              (l) =>
+                l.type === "FACILITY" && l.name.toLowerCase().includes("pool"),
+            );
             if (pool) return pool.name;
           } else if (category === "restaurant") {
             const restaurant = locations.find((l) => l.type === "RESTAURANT");
             if (restaurant) return restaurant.name;
           } else if (category === "villa") {
-            const villa = locations.find((l) => l.type === "VILLA" || /^[DP]\d/.test(l.name));
+            const villa = locations.find(
+              (l) => l.type === "VILLA" || /^[DP]\d/.test(l.name),
+            );
             if (villa) return villa.name;
           } else if (category === "lobby") {
-            const lobby = locations.find((l) => l.name.toLowerCase().includes("reception") || l.name.toLowerCase().includes("lobby"));
+            const lobby = locations.find(
+              (l) =>
+                l.name.toLowerCase().includes("reception") ||
+                l.name.toLowerCase().includes("lobby"),
+            );
             if (lobby) return lobby.name;
           } else {
-            const match = locations.find((l) => l.name.toLowerCase().includes(category));
+            const match = locations.find((l) =>
+              l.name.toLowerCase().includes(category),
+            );
             if (match) return match.name;
           }
         }
@@ -419,10 +606,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       if (match) {
         const pickupText = match[1].trim();
         const destText = match[2].trim();
-        
+
         foundPickup = findLocation(pickupText);
         foundDestination = findLocation(destText);
-        
+
         if (foundPickup && foundDestination) break;
       }
     }
@@ -455,7 +642,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
   const processTranscript = (text: string) => {
     if (!text.trim()) {
-      setVoiceResult({ status: "error", message: "No speech detected. Please try again." });
+      setVoiceResult({
+        status: "error",
+        message: "No speech detected. Please try again.",
+      });
       return;
     }
 
@@ -468,6 +658,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         const parsedData = parseVoiceTranscript(text);
 
         if (parsedData.pickup && parsedData.destination) {
+          // Auto-fill form data
           setNewRideData((prev) => ({
             ...prev,
             roomNumber: parsedData.roomNumber || prev.roomNumber,
@@ -478,15 +669,42 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
             notes: parsedData.notes || prev.notes,
           }));
 
+          // Show success message and start auto-confirm countdown
           setVoiceResult({
             status: "success",
-            message: "Ride information extracted successfully! Please review and click Create Ride.",
+            message: "Thông tin đã được điền tự động. Tự động tạo ride sau 5 giây...",
           });
+          
+          setIsAutoConfirming(true);
+          setCountdown(5);
+          
+          // Clear existing countdown timer
+          if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
+          }
+          
+          // Start countdown timer
+          countdownTimerRef.current = setInterval(() => {
+            setCountdown((prev) => {
+              if (prev <= 1) {
+                if (countdownTimerRef.current) {
+                  clearInterval(countdownTimerRef.current);
+                  countdownTimerRef.current = null;
+                }
+                // Auto-create ride
+                setIsAutoConfirming(false);
+                handleCreateRide();
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
         } else {
           const missing = [];
           if (!parsedData.pickup) missing.push("pickup location");
           if (!parsedData.destination) missing.push("destination");
-          
+
           setVoiceResult({
             status: "error",
             message: `Could not find ${missing.join(" and ")}. Please mention locations clearly (e.g., "from room 101 to pool" or "đón phòng 101 đi hồ bơi").`,
@@ -496,15 +714,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         console.error("Voice parsing error:", error);
         setVoiceResult({
           status: "error",
-          message: "Error processing voice command. Please try again or fill the form manually.",
+          message:
+            "Error processing voice command. Please try again or fill the form manually.",
         });
       } finally {
         setIsProcessing(false);
-        // Keep transcript visible for a few seconds
-        setTimeout(() => {
-          setTranscript("");
-          setVoiceResult({ status: null, message: "" });
-        }, 5000);
       }
     }, 500);
   };
@@ -2149,6 +2363,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
       // Close modal and reset form
       setShowCreateRideModal(false);
+      setIsAutoConfirming(false);
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
       setNewRideData({
         roomNumber: "",
         pickup: "",
@@ -2159,6 +2378,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       });
       setPickupSearchQuery("");
       setDestinationSearchQuery("");
+      setTranscript("");
+      setVoiceResult({ status: null, message: "" });
     } catch (error: any) {
       console.error("Failed to create ride:", error);
       // Check if error is about duplicate
@@ -4782,11 +5003,49 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                     type="button"
                     onClick={handleToggleListening}
                     className={`relative w-24 h-24 md:w-32 md:h-32 rounded-full transition-all duration-300 flex items-center justify-center ${isListening ? "bg-red-500 text-white shadow-2xl shadow-red-500/50" : "bg-blue-500 text-white hover:bg-blue-600 shadow-2xl shadow-blue-500/50"}`}
+                    style={
+                      isListening && audioLevel > 0
+                        ? {
+                            transform: `scale(${1 + (audioLevel / 100) * 0.15})`,
+                            boxShadow: `0 0 ${20 + audioLevel * 0.5}px rgba(239, 68, 68, ${0.4 + (audioLevel / 100) * 0.3})`,
+                          }
+                        : {}
+                    }
                   >
                     {isListening && (
-                      <div className="absolute inset-0 rounded-full bg-red-400 animate-ping-slow"></div>
+                      <>
+                        <div className="absolute inset-0 rounded-full bg-red-400 animate-ping-slow"></div>
+                        {/* Animated rings based on audio level */}
+                        <div
+                          className="absolute inset-0 rounded-full border-2 border-red-300 opacity-75"
+                          style={{
+                            transform: `scale(${1 + (audioLevel / 100) * 0.2})`,
+                            animation: "pulse 1s ease-in-out infinite",
+                          }}
+                        ></div>
+                        <div
+                          className="absolute inset-0 rounded-full border-2 border-red-200 opacity-50"
+                          style={{
+                            transform: `scale(${1 + (audioLevel / 100) * 0.3})`,
+                            animation: "pulse 1.2s ease-in-out infinite",
+                            animationDelay: "0.2s",
+                          }}
+                        ></div>
+                      </>
                     )}
-                    <Mic size={48} className="md:w-16 md:h-16" />
+                    <Mic 
+                      size={48} 
+                      className={`md:w-16 md:h-16 transition-transform duration-100 ${
+                        isListening && audioLevel > 50 ? "animate-bounce" : ""
+                      }`}
+                      style={
+                        isListening && audioLevel > 50
+                          ? {
+                              transform: `scale(${1 + (audioLevel / 100) * 0.1})`,
+                            }
+                          : {}
+                      }
+                    />
                   </button>
                   <p className="mt-4 md:mt-6 text-gray-600 font-medium text-center text-sm md:text-base px-4">
                     {isListening
@@ -4826,6 +5085,36 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                           </p>
                         </div>
                       )}
+                    </div>
+                  )}
+                  
+                  {/* Auto-confirm countdown */}
+                  {isAutoConfirming && (
+                    <div className="mt-4 w-full p-4 bg-gradient-to-r from-blue-50 to-emerald-50 rounded-lg border-2 border-emerald-300">
+                      <div className="text-center">
+                        <p className="text-sm text-gray-700 mb-2 font-medium">
+                          Tự động tạo ride sau:
+                        </p>
+                        <div className="text-5xl font-bold text-emerald-600 mb-2 animate-pulse">
+                          {countdown}
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          {countdown > 1 ? "giây" : "giây - Đang tạo ride..."}
+                        </p>
+                        <button
+                          onClick={() => {
+                            setIsAutoConfirming(false);
+                            if (countdownTimerRef.current) {
+                              clearInterval(countdownTimerRef.current);
+                              countdownTimerRef.current = null;
+                            }
+                            setCountdown(5);
+                          }}
+                          className="mt-3 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium text-sm transition"
+                        >
+                          Hủy tự động
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -4893,7 +5182,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                         placeholder="Click to select destination"
                         readOnly
                         onClick={() => {
-                          setLocationModal({ isOpen: true, type: "destination" });
+                          setLocationModal({
+                            isOpen: true,
+                            type: "destination",
+                          });
                           setLocationFilterType("ALL");
                           setDestinationSearchQuery("");
                         }}
@@ -6316,7 +6608,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
             <div className="p-6 space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-800">
-                  <strong>Setting driver online:</strong> {selectedDriverForOnline?.lastName || "Unknown"}
+                  <strong>Setting driver online:</strong>{" "}
+                  {selectedDriverForOnline?.lastName || "Unknown"}
                 </p>
                 <p className="text-xs text-blue-600 mt-1">
                   Admin credentials required to set driver online status.
