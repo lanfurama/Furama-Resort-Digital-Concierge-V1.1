@@ -698,21 +698,56 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         // Helper to extract room number from text
         const extractRoomNumber = (text: string): string | null => {
           if (!text) return null;
+          const trimmed = text.trim();
+          
+          // Pattern 1: Room/Villa keywords followed by room number
           const roomPatterns = [
-            /(?:room|phòng|rồm)\s*([A-Z]?\d+[A-Z]?)/i,
+            /(?:room|phòng|rồm)\s*([A-Z]{1,3}\d{0,3}[A-Z]?|\d{2,3}[A-Z]?)/i,
             /(?:villa|biệt thự)\s*([A-Z]\d+)/i,
-            /\b([A-Z]?\d{2,3}[A-Z]?)\b/,
-            /\b([DP]\d{1,2})\b/i,
           ];
           for (const pattern of roomPatterns) {
             const match = text.match(pattern);
-            if (match) return match[1];
+            if (match) return match[1].trim();
           }
-          // Check if the text itself is a room number pattern
-          if (/^[A-Z]?\d{2,3}[A-Z]?$|^[DP]\d{1,2}$/i.test(text.trim())) {
-            return text.trim();
+          
+          // Pattern 2: Direct room number formats
+          // ACC, D11, A101, 101, D03, etc.
+          const directPatterns = [
+            /^([A-Z]{2,3})$/i,  // ACC, ABC (2-3 letters)
+            /^([A-Z]\d{1,3})$/i,  // D11, A101 (letter + 1-3 digits)
+            /^([A-Z]?\d{2,3}[A-Z]?)$/i,  // 101, 101A, A101
+            /^([DP]\d{1,2})$/i,  // D11, P03
+          ];
+          for (const pattern of directPatterns) {
+            if (pattern.test(trimmed)) {
+              return trimmed.toUpperCase();
+            }
           }
+          
+          // Pattern 3: Room number in text (word boundary)
+          const inTextPatterns = [
+            /\b([A-Z]{2,3})\b/i,  // ACC, ABC
+            /\b([A-Z]\d{1,3})\b/i,  // D11, A101
+            /\b([A-Z]?\d{2,3}[A-Z]?)\b/,  // 101, 101A
+            /\b([DP]\d{1,2})\b/i,  // D11, P03
+          ];
+          for (const pattern of inTextPatterns) {
+            const match = text.match(pattern);
+            if (match) return match[1].trim().toUpperCase();
+          }
+          
           return null;
+        };
+        
+        // Helper to check if text looks like a room number
+        const looksLikeRoomNumber = (text: string): boolean => {
+          if (!text) return false;
+          const trimmed = text.trim().toUpperCase();
+          // Check various room number patterns
+          return /^[A-Z]{2,3}$/.test(trimmed) ||  // ACC, ABC
+                 /^[A-Z]\d{1,3}$/.test(trimmed) ||  // D11, A101
+                 /^[A-Z]?\d{2,3}[A-Z]?$/.test(trimmed) ||  // 101, 101A
+                 /^[DP]\d{1,2}$/.test(trimmed);  // D11, P03
         };
 
         // Helper to check if a string is a known location name
@@ -729,20 +764,29 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         let roomNumber = parsedData.roomNumber;
         // If no room number, try to extract from pickup
         if (!roomNumber && parsedData.pickup) {
+          // First try to extract room number from pickup text
           roomNumber = extractRoomNumber(parsedData.pickup) || null;
-          // If pickup is not a known location and looks like a room number, use it as roomNumber
+          
+          // If pickup itself looks like a room number and is not a known location, use it directly
           if (!roomNumber && !isLocationName(parsedData.pickup)) {
+            if (looksLikeRoomNumber(parsedData.pickup)) {
+              roomNumber = parsedData.pickup.trim().toUpperCase();
+            }
+          }
+          
+          // If pickup is a known location that contains a room number, extract it
+          if (!roomNumber && isLocationName(parsedData.pickup)) {
             const extracted = extractRoomNumber(parsedData.pickup);
             if (extracted) {
               roomNumber = extracted;
-            } else if (/^[A-Z]?\d{2,3}[A-Z]?$|^[DP]\d{1,2}$/i.test(parsedData.pickup.trim())) {
-              roomNumber = parsedData.pickup.trim();
             }
           }
         }
         // If still no room number, try from previous data
         if (!roomNumber) {
-          roomNumber = extractRoomNumber(newRideData.pickup) || newRideData.roomNumber || null;
+          roomNumber = extractRoomNumber(newRideData.pickup) || 
+                      (looksLikeRoomNumber(newRideData.pickup) ? newRideData.pickup.trim().toUpperCase() : null) ||
+                      (newRideData.roomNumber && newRideData.roomNumber.trim() ? newRideData.roomNumber : null);
         }
 
         setNewRideData((prev) => ({
@@ -812,30 +856,92 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           // Helper to extract room number from text
           const extractRoomNumber = (text: string): string | null => {
             if (!text) return null;
+            const trimmed = text.trim();
+            
+            // Pattern 1: Room/Villa keywords followed by room number
             const roomPatterns = [
-              /(?:room|phòng|rồm)\s*([A-Z]?\d+[A-Z]?)/i,
+              /(?:room|phòng|rồm)\s*([A-Z]{1,3}\d{0,3}[A-Z]?|\d{2,3}[A-Z]?)/i,
               /(?:villa|biệt thự)\s*([A-Z]\d+)/i,
-              /\b([A-Z]?\d{2,3}[A-Z]?)\b/,
-              /\b([DP]\d{1,2})\b/i,
             ];
             for (const pattern of roomPatterns) {
               const match = text.match(pattern);
-              if (match) return match[1];
+              if (match) return match[1].trim();
             }
-            if (/^[A-Z]?\d{2,3}[A-Z]?$|^[DP]\d{1,2}$/i.test(text.trim())) {
-              return text.trim();
+            
+            // Pattern 2: Direct room number formats
+            const directPatterns = [
+              /^([A-Z]{2,3})$/i,  // ACC, ABC
+              /^([A-Z]\d{1,3})$/i,  // D11, A101
+              /^([A-Z]?\d{2,3}[A-Z]?)$/i,  // 101, 101A
+              /^([DP]\d{1,2})$/i,  // D11, P03
+            ];
+            for (const pattern of directPatterns) {
+              if (pattern.test(trimmed)) {
+                return trimmed.toUpperCase();
+              }
             }
+            
+            // Pattern 3: Room number in text
+            const inTextPatterns = [
+              /\b([A-Z]{2,3})\b/i,  // ACC, ABC
+              /\b([A-Z]\d{1,3})\b/i,  // D11, A101
+              /\b([A-Z]?\d{2,3}[A-Z]?)\b/,  // 101, 101A
+              /\b([DP]\d{1,2})\b/i,  // D11, P03
+            ];
+            for (const pattern of inTextPatterns) {
+              const match = text.match(pattern);
+              if (match) return match[1].trim().toUpperCase();
+            }
+            
             return null;
+          };
+          
+          // Helper to check if text looks like a room number
+          const looksLikeRoomNumber = (text: string): boolean => {
+            if (!text) return false;
+            const trimmed = text.trim().toUpperCase();
+            return /^[A-Z]{2,3}$/.test(trimmed) ||  // ACC, ABC
+                   /^[A-Z]\d{1,3}$/.test(trimmed) ||  // D11, A101
+                   /^[A-Z]?\d{2,3}[A-Z]?$/.test(trimmed) ||  // 101, 101A
+                   /^[DP]\d{1,2}$/.test(trimmed);  // D11, P03
+          };
+          
+          // Helper to check if a string is a known location name
+          const isLocationName = (text: string): boolean => {
+            if (!text) return false;
+            return locations.some(loc => 
+              loc.name.toLowerCase() === text.toLowerCase() ||
+              loc.name.toLowerCase().includes(text.toLowerCase()) ||
+              text.toLowerCase().includes(loc.name.toLowerCase())
+            );
           };
 
           let roomNumber = fallbackData.roomNumber;
           // If no room number, try to extract from pickup
           if (!roomNumber && fallbackData.pickup) {
+            // First try to extract room number from pickup text
             roomNumber = extractRoomNumber(fallbackData.pickup) || null;
+            
+            // If pickup itself looks like a room number and is not a known location, use it directly
+            if (!roomNumber && !isLocationName(fallbackData.pickup)) {
+              if (looksLikeRoomNumber(fallbackData.pickup)) {
+                roomNumber = fallbackData.pickup.trim().toUpperCase();
+              }
+            }
+            
+            // If pickup is a known location that contains a room number, extract it
+            if (!roomNumber && isLocationName(fallbackData.pickup)) {
+              const extracted = extractRoomNumber(fallbackData.pickup);
+              if (extracted) {
+                roomNumber = extracted;
+              }
+            }
           }
           // If still no room number, try from previous data
           if (!roomNumber) {
-            roomNumber = extractRoomNumber(newRideData.pickup) || newRideData.roomNumber || null;
+            roomNumber = extractRoomNumber(newRideData.pickup) || 
+                        (looksLikeRoomNumber(newRideData.pickup) ? newRideData.pickup.trim().toUpperCase() : null) ||
+                        (newRideData.roomNumber && newRideData.roomNumber.trim() ? newRideData.roomNumber : null);
           }
 
           setNewRideData((prev) => ({
@@ -898,30 +1004,92 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           // Helper to extract room number from text
           const extractRoomNumber = (text: string): string | null => {
             if (!text) return null;
+            const trimmed = text.trim();
+            
+            // Pattern 1: Room/Villa keywords followed by room number
             const roomPatterns = [
-              /(?:room|phòng|rồm)\s*([A-Z]?\d+[A-Z]?)/i,
+              /(?:room|phòng|rồm)\s*([A-Z]{1,3}\d{0,3}[A-Z]?|\d{2,3}[A-Z]?)/i,
               /(?:villa|biệt thự)\s*([A-Z]\d+)/i,
-              /\b([A-Z]?\d{2,3}[A-Z]?)\b/,
-              /\b([DP]\d{1,2})\b/i,
             ];
             for (const pattern of roomPatterns) {
               const match = text.match(pattern);
-              if (match) return match[1];
+              if (match) return match[1].trim();
             }
-            if (/^[A-Z]?\d{2,3}[A-Z]?$|^[DP]\d{1,2}$/i.test(text.trim())) {
-              return text.trim();
+            
+            // Pattern 2: Direct room number formats
+            const directPatterns = [
+              /^([A-Z]{2,3})$/i,  // ACC, ABC
+              /^([A-Z]\d{1,3})$/i,  // D11, A101
+              /^([A-Z]?\d{2,3}[A-Z]?)$/i,  // 101, 101A
+              /^([DP]\d{1,2})$/i,  // D11, P03
+            ];
+            for (const pattern of directPatterns) {
+              if (pattern.test(trimmed)) {
+                return trimmed.toUpperCase();
+              }
             }
+            
+            // Pattern 3: Room number in text
+            const inTextPatterns = [
+              /\b([A-Z]{2,3})\b/i,  // ACC, ABC
+              /\b([A-Z]\d{1,3})\b/i,  // D11, A101
+              /\b([A-Z]?\d{2,3}[A-Z]?)\b/,  // 101, 101A
+              /\b([DP]\d{1,2})\b/i,  // D11, P03
+            ];
+            for (const pattern of inTextPatterns) {
+              const match = text.match(pattern);
+              if (match) return match[1].trim().toUpperCase();
+            }
+            
             return null;
+          };
+          
+          // Helper to check if text looks like a room number
+          const looksLikeRoomNumber = (text: string): boolean => {
+            if (!text) return false;
+            const trimmed = text.trim().toUpperCase();
+            return /^[A-Z]{2,3}$/.test(trimmed) ||  // ACC, ABC
+                   /^[A-Z]\d{1,3}$/.test(trimmed) ||  // D11, A101
+                   /^[A-Z]?\d{2,3}[A-Z]?$/.test(trimmed) ||  // 101, 101A
+                   /^[DP]\d{1,2}$/.test(trimmed);  // D11, P03
+          };
+          
+          // Helper to check if a string is a known location name
+          const isLocationName = (text: string): boolean => {
+            if (!text) return false;
+            return locations.some(loc => 
+              loc.name.toLowerCase() === text.toLowerCase() ||
+              loc.name.toLowerCase().includes(text.toLowerCase()) ||
+              text.toLowerCase().includes(loc.name.toLowerCase())
+            );
           };
 
           let roomNumber = fallbackData.roomNumber;
           // If no room number, try to extract from pickup
           if (!roomNumber && fallbackData.pickup) {
+            // First try to extract room number from pickup text
             roomNumber = extractRoomNumber(fallbackData.pickup) || null;
+            
+            // If pickup itself looks like a room number and is not a known location, use it directly
+            if (!roomNumber && !isLocationName(fallbackData.pickup)) {
+              if (looksLikeRoomNumber(fallbackData.pickup)) {
+                roomNumber = fallbackData.pickup.trim().toUpperCase();
+              }
+            }
+            
+            // If pickup is a known location that contains a room number, extract it
+            if (!roomNumber && isLocationName(fallbackData.pickup)) {
+              const extracted = extractRoomNumber(fallbackData.pickup);
+              if (extracted) {
+                roomNumber = extracted;
+              }
+            }
           }
           // If still no room number, try from previous data
           if (!roomNumber) {
-            roomNumber = extractRoomNumber(newRideData.pickup) || newRideData.roomNumber || null;
+            roomNumber = extractRoomNumber(newRideData.pickup) || 
+                        (looksLikeRoomNumber(newRideData.pickup) ? newRideData.pickup.trim().toUpperCase() : null) ||
+                        (newRideData.roomNumber && newRideData.roomNumber.trim() ? newRideData.roomNumber : null);
           }
 
           setNewRideData((prev) => ({
