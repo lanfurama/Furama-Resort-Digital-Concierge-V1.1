@@ -316,7 +316,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       stopRecordingAndProcess();
     } else {
       const SpeechRecognition =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (!SpeechRecognition) {
         alert("Speech recognition is not supported in this browser.");
         return;
@@ -344,14 +344,14 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           silenceCheckIntervalRef.current = null;
         }
         
-        // Start silence check interval - check every 500ms if 3 seconds of silence passed
+        // Start silence check interval - check every 500ms if 5 seconds of silence passed
         silenceCheckIntervalRef.current = setInterval(() => {
           // Check if recognition is still active
           if (recognitionRef.current) {
             const timeSinceLastSpeech = Date.now() - lastSpeechTimeRef.current;
-            if (timeSinceLastSpeech >= 3000) {
-              // 3 seconds of silence detected
-              console.log("3 seconds of silence detected, stopping recording...");
+            if (timeSinceLastSpeech >= 5000) {
+              // 5 seconds of silence detected (increased from 3s for better UX)
+              console.log("5 seconds of silence detected, stopping recording...");
               stopRecordingAndProcess();
             }
           }
@@ -640,11 +640,37 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     return result;
   };
 
-  const processTranscript = (text: string) => {
+  // Normalize transcript text - remove filler words and clean up
+  const normalizeTranscript = (text: string): string => {
+    // Remove common filler words in Vietnamese and English
+    const fillerWords = [
+      "um", "uh", "er", "ah", "à", "ừ", "ờ", "hmm", "hm",
+      "you know", "like", "actually", "basically", "so", "well",
+      "thì", "là", "và", "của", "để", "mà", "với", "cho"
+    ];
+    
+    let normalized = text.trim();
+    
+    // Remove excessive spaces
+    normalized = normalized.replace(/\s+/g, " ");
+    
+    // Remove filler words (case insensitive)
+    fillerWords.forEach(word => {
+      const regex = new RegExp(`\\b${word}\\b`, "gi");
+      normalized = normalized.replace(regex, " ").trim();
+    });
+    
+    // Clean up multiple spaces again
+    normalized = normalized.replace(/\s+/g, " ").trim();
+    
+    return normalized;
+  };
+
+  const processTranscript = async (text: string) => {
     if (!text.trim()) {
       setVoiceResult({
         status: "error",
-        message: "No speech detected. Please try again.",
+        message: "Không phát hiện giọng nói. Vui lòng thử lại.",
       });
       return;
     }
@@ -652,27 +678,90 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     setIsProcessing(true);
     setVoiceResult({ status: null, message: "" });
 
-    // Small delay to show processing state
-    setTimeout(() => {
-      try {
-        const parsedData = parseVoiceTranscript(text);
+    try {
+      // Normalize transcript first
+      const normalizedText = normalizeTranscript(text);
+      
+      if (!normalizedText || normalizedText.length < 5) {
+        setVoiceResult({
+          status: "error",
+          message: "Câu nói quá ngắn hoặc không rõ ràng. Vui lòng thử lại.",
+        });
+        setIsProcessing(false);
+        return;
+      }
 
-        if (parsedData.pickup && parsedData.destination) {
-          // Auto-fill form data
-          setNewRideData((prev) => ({
-            ...prev,
-            roomNumber: parsedData.roomNumber || prev.roomNumber,
-            pickup: parsedData.pickup || prev.pickup,
-            destination: parsedData.destination || prev.destination,
-            guestName: parsedData.guestName || prev.guestName,
-            guestCount: parsedData.guestCount || prev.guestCount || 1,
-            notes: parsedData.notes || prev.notes,
-          }));
+      // Use AI parsing instead of simple keyword matching
+      const parsedData = await parseRideRequestWithContext(normalizedText, locations);
 
+      if (parsedData && (parsedData.pickup || parsedData.destination)) {
+        // Helper to extract room number from text
+        const extractRoomNumber = (text: string): string | null => {
+          if (!text) return null;
+          const roomPatterns = [
+            /(?:room|phòng|rồm)\s*([A-Z]?\d+[A-Z]?)/i,
+            /(?:villa|biệt thự)\s*([A-Z]\d+)/i,
+            /\b([A-Z]?\d{2,3}[A-Z]?)\b/,
+            /\b([DP]\d{1,2})\b/i,
+          ];
+          for (const pattern of roomPatterns) {
+            const match = text.match(pattern);
+            if (match) return match[1];
+          }
+          // Check if the text itself is a room number pattern
+          if (/^[A-Z]?\d{2,3}[A-Z]?$|^[DP]\d{1,2}$/i.test(text.trim())) {
+            return text.trim();
+          }
+          return null;
+        };
+
+        // Helper to check if a string is a known location name
+        const isLocationName = (text: string): boolean => {
+          if (!text) return false;
+          return locations.some(loc => 
+            loc.name.toLowerCase() === text.toLowerCase() ||
+            loc.name.toLowerCase().includes(text.toLowerCase()) ||
+            text.toLowerCase().includes(loc.name.toLowerCase())
+          );
+        };
+
+        // Auto-fill form data
+        let roomNumber = parsedData.roomNumber;
+        // If no room number, try to extract from pickup
+        if (!roomNumber && parsedData.pickup) {
+          roomNumber = extractRoomNumber(parsedData.pickup) || null;
+          // If pickup is not a known location and looks like a room number, use it as roomNumber
+          if (!roomNumber && !isLocationName(parsedData.pickup)) {
+            const extracted = extractRoomNumber(parsedData.pickup);
+            if (extracted) {
+              roomNumber = extracted;
+            } else if (/^[A-Z]?\d{2,3}[A-Z]?$|^[DP]\d{1,2}$/i.test(parsedData.pickup.trim())) {
+              roomNumber = parsedData.pickup.trim();
+            }
+          }
+        }
+        // If still no room number, try from previous data
+        if (!roomNumber) {
+          roomNumber = extractRoomNumber(newRideData.pickup) || newRideData.roomNumber || null;
+        }
+
+        setNewRideData((prev) => ({
+          ...prev,
+          roomNumber: roomNumber || (prev.roomNumber && prev.roomNumber.trim() ? prev.roomNumber : ""),
+          pickup: parsedData.pickup || prev.pickup,
+          destination: parsedData.destination || prev.destination,
+          guestName: parsedData.guestName || prev.guestName,
+          guestCount: parsedData.guestCount || prev.guestCount || 1,
+          notes: parsedData.notes || prev.notes,
+        }));
+
+        // Check if we have minimum required fields - use the extracted roomNumber
+        const finalRoomNumber = roomNumber || newRideData.roomNumber;
+        if (parsedData.pickup && parsedData.destination && finalRoomNumber) {
           // Show success message and start auto-confirm countdown
           setVoiceResult({
             status: "success",
-            message: "Thông tin đã được điền tự động. Tự động tạo ride sau 5 giây...",
+            message: "✅ Đã nhận diện thành công! Tự động tạo ride sau 5 giây...",
           });
           
           setIsAutoConfirming(true);
@@ -692,9 +781,97 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   clearInterval(countdownTimerRef.current);
                   countdownTimerRef.current = null;
                 }
-                // Auto-create ride
+                // Auto-create ride - add small delay to ensure state is updated
                 setIsAutoConfirming(false);
-                handleCreateRide();
+                setTimeout(() => {
+                  handleCreateRide();
+                }, 100);
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        } else {
+          // Partial data - show what was found
+          const found = [];
+          if (parsedData.pickup) found.push("điểm đón");
+          if (parsedData.destination) found.push("điểm đến");
+          if (parsedData.roomNumber) found.push("số phòng");
+          if (parsedData.guestName) found.push("tên khách");
+          
+          setVoiceResult({
+            status: "success",
+            message: `✅ Đã nhận diện: ${found.join(", ")}. Vui lòng bổ sung thông tin còn thiếu.`,
+          });
+        }
+      } else {
+        // Fallback to simple parsing if AI fails
+        const fallbackData = parseVoiceTranscript(normalizedText);
+        
+        if (fallbackData.pickup && fallbackData.destination) {
+          // Helper to extract room number from text
+          const extractRoomNumber = (text: string): string | null => {
+            if (!text) return null;
+            const roomPatterns = [
+              /(?:room|phòng|rồm)\s*([A-Z]?\d+[A-Z]?)/i,
+              /(?:villa|biệt thự)\s*([A-Z]\d+)/i,
+              /\b([A-Z]?\d{2,3}[A-Z]?)\b/,
+              /\b([DP]\d{1,2})\b/i,
+            ];
+            for (const pattern of roomPatterns) {
+              const match = text.match(pattern);
+              if (match) return match[1];
+            }
+            if (/^[A-Z]?\d{2,3}[A-Z]?$|^[DP]\d{1,2}$/i.test(text.trim())) {
+              return text.trim();
+            }
+            return null;
+          };
+
+          let roomNumber = fallbackData.roomNumber;
+          // If no room number, try to extract from pickup
+          if (!roomNumber && fallbackData.pickup) {
+            roomNumber = extractRoomNumber(fallbackData.pickup) || null;
+          }
+          // If still no room number, try from previous data
+          if (!roomNumber) {
+            roomNumber = extractRoomNumber(newRideData.pickup) || newRideData.roomNumber || null;
+          }
+
+          setNewRideData((prev) => ({
+            ...prev,
+            roomNumber: roomNumber || (prev.roomNumber && prev.roomNumber.trim() ? prev.roomNumber : ""),
+            pickup: fallbackData.pickup || prev.pickup,
+            destination: fallbackData.destination || prev.destination,
+            guestName: fallbackData.guestName || prev.guestName,
+            guestCount: fallbackData.guestCount || prev.guestCount || 1,
+            notes: fallbackData.notes || prev.notes,
+          }));
+
+          setVoiceResult({
+            status: "success",
+            message: "✅ Đã nhận diện thành công! Tự động tạo ride sau 5 giây...",
+          });
+          
+          setIsAutoConfirming(true);
+          setCountdown(5);
+          
+          if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
+          }
+          
+          countdownTimerRef.current = setInterval(() => {
+            setCountdown((prev) => {
+              if (prev <= 1) {
+                if (countdownTimerRef.current) {
+                  clearInterval(countdownTimerRef.current);
+                  countdownTimerRef.current = null;
+                }
+                setIsAutoConfirming(false);
+                setTimeout(() => {
+                  handleCreateRide();
+                }, 100);
                 return 0;
               }
               return prev - 1;
@@ -702,25 +879,105 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           }, 1000);
         } else {
           const missing = [];
-          if (!parsedData.pickup) missing.push("pickup location");
-          if (!parsedData.destination) missing.push("destination");
+          if (!fallbackData.pickup && !parsedData?.pickup) missing.push("điểm đón");
+          if (!fallbackData.destination && !parsedData?.destination) missing.push("điểm đến");
 
           setVoiceResult({
             status: "error",
-            message: `Could not find ${missing.join(" and ")}. Please mention locations clearly (e.g., "from room 101 to pool" or "đón phòng 101 đi hồ bơi").`,
+            message: `Không tìm thấy ${missing.join(" và ")}. Vui lòng nói rõ ràng hơn, ví dụ: "đón phòng 101 đi hồ bơi" hoặc "from room 101 to pool".`,
           });
         }
-      } catch (error) {
-        console.error("Voice parsing error:", error);
+      }
+    } catch (error) {
+      console.error("Voice parsing error:", error);
+      
+      // Try fallback parsing
+      try {
+        const fallbackData = parseVoiceTranscript(text);
+        if (fallbackData.pickup && fallbackData.destination) {
+          // Helper to extract room number from text
+          const extractRoomNumber = (text: string): string | null => {
+            if (!text) return null;
+            const roomPatterns = [
+              /(?:room|phòng|rồm)\s*([A-Z]?\d+[A-Z]?)/i,
+              /(?:villa|biệt thự)\s*([A-Z]\d+)/i,
+              /\b([A-Z]?\d{2,3}[A-Z]?)\b/,
+              /\b([DP]\d{1,2})\b/i,
+            ];
+            for (const pattern of roomPatterns) {
+              const match = text.match(pattern);
+              if (match) return match[1];
+            }
+            if (/^[A-Z]?\d{2,3}[A-Z]?$|^[DP]\d{1,2}$/i.test(text.trim())) {
+              return text.trim();
+            }
+            return null;
+          };
+
+          let roomNumber = fallbackData.roomNumber;
+          // If no room number, try to extract from pickup
+          if (!roomNumber && fallbackData.pickup) {
+            roomNumber = extractRoomNumber(fallbackData.pickup) || null;
+          }
+          // If still no room number, try from previous data
+          if (!roomNumber) {
+            roomNumber = extractRoomNumber(newRideData.pickup) || newRideData.roomNumber || null;
+          }
+
+          setNewRideData((prev) => ({
+            ...prev,
+            roomNumber: roomNumber || (prev.roomNumber && prev.roomNumber.trim() ? prev.roomNumber : ""),
+            pickup: fallbackData.pickup || prev.pickup,
+            destination: fallbackData.destination || prev.destination,
+            guestName: fallbackData.guestName || prev.guestName,
+            guestCount: fallbackData.guestCount || prev.guestCount || 1,
+            notes: fallbackData.notes || prev.notes,
+          }));
+
+          setVoiceResult({
+            status: "success",
+            message: "✅ Đã nhận diện thành công! Tự động tạo ride sau 5 giây...",
+          });
+          
+          setIsAutoConfirming(true);
+          setCountdown(5);
+          
+          if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
+          }
+          
+          countdownTimerRef.current = setInterval(() => {
+            setCountdown((prev) => {
+              if (prev <= 1) {
+                if (countdownTimerRef.current) {
+                  clearInterval(countdownTimerRef.current);
+                  countdownTimerRef.current = null;
+                }
+                setIsAutoConfirming(false);
+                setTimeout(() => {
+                  handleCreateRide();
+                }, 100);
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        } else {
+          setVoiceResult({
+            status: "error",
+            message: "Không thể xử lý yêu cầu. Vui lòng thử lại hoặc điền form thủ công.",
+          });
+        }
+      } catch (fallbackError) {
         setVoiceResult({
           status: "error",
-          message:
-            "Error processing voice command. Please try again or fill the form manually.",
+          message: "Lỗi xử lý giọng nói. Vui lòng thử lại hoặc điền form thủ công.",
         });
-      } finally {
-        setIsProcessing(false);
       }
-    }, 500);
+    } finally {
+      setIsProcessing(false);
+    }
   };
   const calculateOptimalMergeRoute = (
     ride1: RideRequest,
@@ -3260,15 +3517,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       )
                     </h3>
                     <div className="flex items-center gap-1.5 md:gap-2 w-full sm:w-auto">
-                      <button
-                        onClick={() => setShowCreateRideModal(true)}
-                        className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 md:py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] md:text-xs font-semibold rounded transition-colors min-h-[36px] md:min-h-0 touch-manipulation flex-1 sm:flex-initial"
-                        title="Create New Ride"
-                      >
-                        <Car size={12} className="md:w-[14px] md:h-[14px]" />
-                        <span>New Ride</span>
-                      </button>
-
                       {/* Merge Options Button */}
                       {(() => {
                         const pendingRides = rides.filter(
@@ -4991,7 +5239,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           {showCreateRideModal && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 md:p-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
-                <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 p-3 md:p-5 flex justify-between items-center z-10 rounded-t-2xl">
+                <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 p-2 md:p-3 flex justify-between items-center z-10 rounded-t-2xl">
                   <h3 className="font-bold text-base md:text-lg text-gray-900">
                     Create New Ride
                   </h3>
@@ -5216,7 +5464,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                         className="w-full p-3 md:p-2.5 border rounded-md bg-white text-gray-900 placeholder:text-gray-400 text-base md:text-sm min-h-[44px] md:min-h-0"
                       />
                     </div>
-                    <div className="md:col-span-2">
+                    <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
                         Notes
                       </label>
@@ -6699,6 +6947,21 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Floating New Ride Button - Centered with Text */}
+      {viewMode === "BUGGY" && !showCreateRideModal && (
+        <button
+          onClick={() => setShowCreateRideModal(true)}
+          className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-full border-4 border-emerald-400 flex items-center justify-center gap-2 px-6 py-4 md:px-5 md:py-3 transition-all z-50 touch-manipulation hover:scale-105 active:scale-95 min-h-[56px] md:min-h-[48px]"
+          style={{
+            boxShadow: "0 15px 40px -5px rgba(16, 185, 129, 0.7), 0 0 20px rgba(16, 185, 129, 0.4)",
+          }}
+          title="Create New Ride"
+        >
+          <Car size={24} className="md:w-5 md:h-5" strokeWidth={2.5} />
+          <span className="text-base md:text-sm font-semibold">New Ride</span>
+        </button>
       )}
     </div>
   );
