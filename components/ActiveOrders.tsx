@@ -64,10 +64,10 @@ const ActiveOrders: React.FC<ActiveOrdersProps> = ({ user, onBack }) => {
             .then(setActiveOrders)
             .catch(console.error)
             .finally(() => setIsLoading(false));
-        // Poll for updates every 5 seconds
+        // Poll for updates every 8 seconds
         const interval = setInterval(() => {
             getActiveGuestOrders(user.roomNumber).then(setActiveOrders).catch(console.error);
-        }, 5000);
+        }, 8000);
         return () => clearInterval(interval);
     }, [user.roomNumber]);
 

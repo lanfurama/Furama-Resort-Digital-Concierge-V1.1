@@ -354,17 +354,17 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       const scheduleNext = () => {
           if (!isMountedRef.current) return;
           
-          // Use longer intervals to reduce flickering:
-          // - SEARCHING: 5s (less frequent updates, status rarely changes)
-          // - ASSIGNED/ARRIVING: 3s (more frequent, driver is moving)
-          // - ON_TRIP: 3s (more frequent, trip in progress)
-          // - No ride: 10s (slow polling when idle)
-          let pollingInterval = 10000; // Default: no ride
+          // Use longer intervals to reduce API calls:
+          // - SEARCHING: 8s (less frequent updates, status rarely changes)
+          // - ASSIGNED/ARRIVING: 5s (more frequent, driver is moving)
+          // - ON_TRIP: 5s (more frequent, trip in progress)
+          // - No ride: 15s (slow polling when idle)
+          let pollingInterval = 15000; // Default: no ride
           if (activeRideRef.current) {
               if (activeRideRef.current.status === BuggyStatus.SEARCHING) {
-                  pollingInterval = 5000; // 5s for SEARCHING to reduce flickering
+                  pollingInterval = 8000; // 8s for SEARCHING to reduce API calls
               } else {
-                  pollingInterval = 3000; // 3s for ASSIGNED/ARRIVING/ON_TRIP
+                  pollingInterval = 5000; // 5s for ASSIGNED/ARRIVING/ON_TRIP
               }
           }
           

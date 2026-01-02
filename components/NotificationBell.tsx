@@ -35,7 +35,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, variant = '
         };
         
         fetch();
-        const interval = setInterval(fetch, 2000); // Poll every 2 seconds
+        const interval = setInterval(fetch, 5000); // Poll every 5 seconds to reduce API calls
         return () => clearInterval(interval);
     }, [userId]);
 

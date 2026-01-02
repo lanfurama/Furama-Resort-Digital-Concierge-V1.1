@@ -112,7 +112,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
         };
 
         fetch();
-        const interval = setInterval(fetch, 3000); // Poll every 3 seconds
+        const interval = setInterval(fetch, 5000); // Poll every 5 seconds to reduce API calls
         return () => clearInterval(interval);
     }, [roomNumber, serviceType]);
 
@@ -140,7 +140,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
             };
 
             fetchUnread();
-            const interval = setInterval(fetchUnread, 3000); // Poll every 3 seconds
+            const interval = setInterval(fetchUnread, 5000); // Poll every 5 seconds to reduce API calls
             return () => clearInterval(interval);
         } else {
             setUnreadCount(0); // Reset when chat is open

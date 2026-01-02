@@ -481,7 +481,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         // Initial load
         loadRides();
 
-        const interval = setInterval(loadRides, 2000); // Poll every 2 seconds
+        const interval = setInterval(loadRides, 5000); // Poll every 5 seconds to reduce API calls
         return () => clearInterval(interval);
     }, [soundEnabled]);
 

@@ -23,10 +23,11 @@ import DriverLoginPage from './pages/DriverLoginPage';
 import ReceptionLoginPage from './pages/ReceptionLoginPage';
 import SupervisorLoginPage from './pages/SupervisorLoginPage';
 import CollectionLoginPage from './pages/CollectionLoginPage';
-import { getPromotions, getActiveGuestOrders, getActiveRideForUser } from './services/dataService';
+import { getPromotions, getActiveGuestOrders } from './services/dataService';
 import { BuggyStatus } from './types';
 import { User as UserIcon, LogOut, MessageSquare, Car, Percent, ShoppingCart, Home } from 'lucide-react';
 import { LanguageProvider, useTranslation } from './contexts/LanguageContext';
+import { BuggyStatusProvider, useBuggyStatus } from './contexts/BuggyStatusContext';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ 
@@ -181,8 +182,6 @@ const AppContent: React.FC = () => {
   // Helper for Nav Bar Active State
   const isActive = (v: AppView) => view === v;
   const [activeOrderCount, setActiveOrderCount] = useState(0);
-  const [buggyWaitTime, setBuggyWaitTime] = useState<number>(0);
-  const [buggyStatus, setBuggyStatus] = useState<BuggyStatus | null>(null);
   
   // Load active order count
   useEffect(() => {
@@ -190,52 +189,14 @@ const AppContent: React.FC = () => {
       // Initial load
       getActiveGuestOrders(user.roomNumber).then(orders => setActiveOrderCount(orders.length)).catch(console.error);
       
-      // Poll every 10 seconds
+      // Poll every 15 seconds to reduce API calls
       const interval = setInterval(() => {
         getActiveGuestOrders(user.roomNumber).then(orders => setActiveOrderCount(orders.length)).catch(console.error);
-      }, 10000);
+      }, 15000);
       
       return () => clearInterval(interval);
     } else {
       setActiveOrderCount(0);
-    }
-  }, [user?.roomNumber]); // Only depend on roomNumber, not entire user object
-
-  // Track buggy wait time and status for badge notification
-  useEffect(() => {
-    if (user && user.role === UserRole.GUEST && user.roomNumber) {
-      const checkBuggyStatus = async () => {
-        try {
-          const activeRide = await getActiveRideForUser(user.roomNumber);
-          if (activeRide) {
-            setBuggyStatus(activeRide.status);
-            if (activeRide.status === BuggyStatus.SEARCHING) {
-              const now = Date.now();
-              const elapsed = Math.max(0, Math.floor((now - activeRide.timestamp) / 1000));
-              setBuggyWaitTime(elapsed);
-            } else {
-              setBuggyWaitTime(0);
-            }
-          } else {
-            setBuggyStatus(null);
-            setBuggyWaitTime(0);
-          }
-        } catch (error) {
-          console.error('Failed to check buggy status:', error);
-          setBuggyStatus(null);
-          setBuggyWaitTime(0);
-        }
-      };
-      
-      // Initial check
-      checkBuggyStatus();
-      
-      // Poll every 3 seconds
-      const interval = setInterval(checkBuggyStatus, 3000);
-      return () => clearInterval(interval);
-    } else {
-      setBuggyStatus(null);
-      setBuggyWaitTime(0);
     }
   }, [user?.roomNumber]); // Only depend on roomNumber, not entire user object
 
@@ -319,8 +280,11 @@ const AppContent: React.FC = () => {
     return <GuestHome user={user} />;
   };
 
-  // Guest Home Component
-  const GuestHome: React.FC<{ user: User }> = ({ user }) => (
+  // Guest Home Component - uses buggy status context
+  const GuestHome: React.FC<{ user: User }> = ({ user }) => {
+    const { buggyStatus, buggyWaitTime } = useBuggyStatus();
+    
+    return (
     <div className="flex flex-col h-screen bg-gray-50 max-w-md mx-auto shadow-2xl overflow-hidden relative">
       {/* Header */}
       <div 
@@ -466,21 +430,11 @@ const AppContent: React.FC = () => {
           icon={Home} 
           label={t('home')} 
         />
-        <NavButton 
+        <BuggyNavButton 
           active={view === AppView.BUGGY} 
           onClick={() => setView(AppView.BUGGY)} 
           icon={Car} 
           label={t('buggy')}
-          urgentBadge={buggyWaitTime >= 600}
-          statusLabel={
-            buggyStatus === BuggyStatus.SEARCHING 
-              ? t('finding_driver') 
-              : (buggyStatus === BuggyStatus.ASSIGNED || buggyStatus === BuggyStatus.ARRIVING)
-                ? t('driver_arriving')
-                : buggyStatus === BuggyStatus.ON_TRIP
-                  ? t('en_route')
-                  : undefined
-          }
         />
         <NavButton 
           active={view === AppView.CHAT} 
@@ -504,7 +458,76 @@ const AppContent: React.FC = () => {
         />
       </div>
     </div>
-  );
+    );
+  };
+
+  // BuggyNavButton Component - uses buggy status context, only re-renders when buggy status changes
+  const BuggyNavButton: React.FC<{ 
+    active: boolean; 
+    onClick: () => void; 
+    icon: React.ElementType; 
+    label: string;
+  }> = ({ active, onClick, icon: Icon, label }) => {
+    const { buggyStatus, buggyWaitTime } = useBuggyStatus();
+    const urgentBadge = buggyWaitTime >= 600;
+    const statusLabel = 
+      buggyStatus === BuggyStatus.SEARCHING 
+        ? t('finding_driver') 
+        : (buggyStatus === BuggyStatus.ASSIGNED || buggyStatus === BuggyStatus.ARRIVING)
+          ? t('driver_arriving')
+          : buggyStatus === BuggyStatus.ON_TRIP
+            ? t('en_route')
+            : undefined;
+    
+    return (
+      <button 
+        onClick={onClick}
+        className={`group flex flex-col items-center justify-center w-full h-full relative transition-all duration-300 ${
+          active ? 'text-emerald-600' : 'text-gray-400'
+        }`}
+      >
+        <div className="mb-1 relative">
+          <div className={`p-2 rounded-xl transition-all duration-300 ${
+            active 
+              ? 'bg-gradient-to-br from-emerald-50 to-teal-50' 
+              : 'group-hover:bg-gray-50'
+          }`}>
+            <Icon 
+              size={22} 
+              strokeWidth={active ? 2.5 : 2} 
+              className={`transition-all duration-300 ${
+                active ? 'text-emerald-600' : 'text-gray-500 group-hover:text-gray-600'
+              }`}
+            />
+          </div>
+          {urgentBadge ? (
+            <span className="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-red-500 to-pink-600 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-lg animate-pulse">
+              !
+            </span>
+          ) : null}
+          {active && (
+            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-emerald-600 rounded-full"></div>
+          )}
+        </div>
+        <div className="flex flex-col items-center transition-all duration-300">
+          <span className={`text-[10px] font-semibold transition-all duration-300 ${
+            active 
+              ? 'text-emerald-600' 
+              : urgentBadge 
+                ? 'text-red-600 font-bold' 
+                : 'text-gray-500 group-hover:text-gray-600'
+          }`}>
+            {label}
+          </span>
+          {statusLabel && !active && (
+            <span className="text-[9px] font-bold text-orange-600 mt-0.5 animate-pulse">
+              {statusLabel}
+            </span>
+          )}
+        </div>
+      </button>
+    );
+  };
 
   // NavButton Component
   const NavButton: React.FC<{ 
@@ -652,8 +675,39 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <LanguageProvider>
-      <AppContent />
+      <AppContentWithProviders />
     </LanguageProvider>
+  );
+};
+
+// Wrapper component to provide buggy status context
+const AppContentWithProviders: React.FC = () => {
+  const [user, setUser] = useState<User | null>(null);
+  const [view, setView] = useState<AppView>(AppView.HOME);
+  
+  // Load user from localStorage
+  useEffect(() => {
+    const savedUser = localStorage.getItem('furama_user');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (error) {
+        console.error('Failed to restore user from localStorage:', error);
+        localStorage.removeItem('furama_user');
+      }
+    }
+  }, []);
+  
+  // Use ref to track view for BuggyStatusProvider without causing re-renders
+  const viewRef = useRef<AppView>(view);
+  useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
+  
+  return (
+    <BuggyStatusProvider user={user} currentView={viewRef.current}>
+      <AppContent />
+    </BuggyStatusProvider>
   );
 };
 

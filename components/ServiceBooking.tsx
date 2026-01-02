@@ -13,7 +13,7 @@ interface ServiceBookingProps {
     onBack: () => void;
 }
 
-const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) => {
+const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, onBack }) => {
     const { t, language } = useTranslation();
     const [cart, setCart] = useState<MenuItem[]>([]);
     const [isOrderPlaced, setIsOrderPlaced] = useState(false);
@@ -500,7 +500,9 @@ const ServiceBooking: React.FC<ServiceBookingProps> = ({ type, user, onBack }) =
             />
         </div>
     );
-};
+});
+
+ServiceBooking.displayName = 'ServiceBooking';
 
 export default ServiceBooking;
 

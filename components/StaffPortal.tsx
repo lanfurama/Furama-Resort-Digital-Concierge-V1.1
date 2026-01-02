@@ -65,7 +65,7 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
             } catch (error) {
                 console.error('Failed to refresh requests:', error);
             }
-        }, 2000); // Poll every 2 seconds instead of 1 second
+        }, 5000); // Poll every 5 seconds to reduce API calls
         return () => clearInterval(interval);
     }, []);
 
