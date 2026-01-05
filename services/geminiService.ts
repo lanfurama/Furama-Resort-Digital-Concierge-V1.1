@@ -80,27 +80,51 @@ export const parseRideRequestWithContext = async (
 
   const prompt = `You are an intelligent assistant for Furama Resort & Villas Da Nang. Extract ride request information from this Vietnamese or English text: "${input}"
 
-VALID LOCATIONS (you MUST match locations exactly to these names):
+VALID LOCATIONS (you MUST match locations exactly to these names - case-sensitive matching):
 ${locationContext}
 
 ${driverContext ? driverContext : ""}
 
-INSTRUCTIONS:
-1. Room Number: Extract room number if mentioned (e.g., "101", "D03", "Villa D5")
-2. Pickup Location: 
-   - If not specified, use the room number as pickup location
+CRITICAL EXTRACTION RULES (follow these precisely for >95% accuracy):
+
+1. ROOM NUMBER EXTRACTION (>95% accuracy required):
+   - Extract room number if mentioned in ANY format:
+     * "Room 101", "Phòng 101", "R101" → "101"
+     * "Villa D03", "Biệt thự D5", "Villa D11" → "D03", "D5", "D11"
+     * "D03", "D11", "P03" → "D03", "D11", "P03"
+     * "ACC", "ABC" (2-3 letters) → "ACC", "ABC"
+     * "101", "2001", "101A" → "101", "2001", "101A"
+   - Common patterns: [Letter][Digits] (D11, A101), [Digits] (101, 2001), [2-3 Letters] (ACC)
+   - If room number is in pickup text, extract it separately
+   - Room numbers are typically: 2-4 digits, or 1 letter + 1-3 digits, or 2-3 letters
+
+2. PICKUP LOCATION MATCHING (>90% accuracy required):
    - Match location names EXACTLY from the valid locations list above
-   - Use smart matching for common terms:
-     * "pool" or "hồ bơi" → match "Lagoon Pool" or "Ocean Pool" based on context
-     * "restaurant" or "nhà hàng" → match restaurant names (ACC, Cafe Indochine, Don Cipriani's, etc.)
-     * "villa" or "biệt thự" → match villa areas (D1-D7, Villas, etc.)
-     * "lobby" or "sảnh" → match reception/lobby areas
-     * "beach" or "bãi biển" → match beach access points
-   - If multiple matches possible, choose the most common/popular one
-3. Destination Location: Same rules as pickup, but must be different from pickup
-4. Guest Name: Extract if mentioned
-5. Guest Count: Default to 1 if not specified
-6. Notes: Extract special requests (luggage, baby seat, urgent, etc.)
+   - If pickup is NOT specified, use the extracted room number as pickup location
+   - Smart matching for common terms (use EXACT names from list):
+     * "pool" or "hồ bơi" → prefer "Lagoon Pool" or "Ocean Pool" (check context for which one)
+     * "restaurant" or "nhà hàng" → match to specific restaurant: "ACC", "Cafe Indochine", "Don Cipriani's", etc.
+     * "villa" or "biệt thự" → match villa areas: "D1", "D2", "D3", "D4", "D5", "D6", "D7", "Villas"
+     * "lobby" or "sảnh" or "reception" → match "Reception" or "Main Lobby"
+     * "beach" or "bãi biển" → match "Beach Access" or "Beach"
+   - If multiple matches possible, choose the MOST COMMON/POPULAR one from the list
+   - IMPORTANT: Return the EXACT name as it appears in the valid locations list (case-sensitive)
+
+3. DESTINATION LOCATION MATCHING (>90% accuracy required):
+   - Same rules as pickup location
+   - MUST be different from pickup location
+   - Match EXACTLY from valid locations list
+
+4. GUEST NAME: Extract if mentioned (optional)
+
+5. GUEST COUNT: Default to 1 if not specified
+
+6. NOTES: Extract special requests (luggage, baby seat, urgent, many bags, etc.)
+
+VALIDATION:
+- Room number format: Must match patterns [A-Z]{1,3}\\d{0,3}[A-Z]? or \\d{2,4}[A-Z]? or [A-Z]\\d{1,3}
+- Location names: Must be EXACT matches from the valid locations list
+- Pickup and destination: Must be different
 
 Return JSON with exact location names matching the valid locations list.`;
 
@@ -121,17 +145,69 @@ Return JSON with exact location names matching the valid locations list.`;
 
     const parsed = JSON.parse(response.text || "{}");
     
-    // Validate and fix location names if needed
+    // Post-processing validation and correction for >90% location accuracy
     const locationNames = locations.map(loc => loc.name);
-    if (parsed.pickup && !locationNames.includes(parsed.pickup)) {
-      // Try to find closest match
-      const closestPickup = findClosestLocation(parsed.pickup, locations);
-      if (closestPickup) parsed.pickup = closestPickup.name;
+    
+    // Validate and fix pickup location
+    if (parsed.pickup) {
+      if (!locationNames.includes(parsed.pickup)) {
+        // Try to find closest match with improved algorithm
+        const closestPickup = findClosestLocation(parsed.pickup, locations);
+        if (closestPickup) {
+          console.log(`[AI Parse] Fixed pickup: "${parsed.pickup}" → "${closestPickup.name}"`);
+          parsed.pickup = closestPickup.name;
+        } else {
+          console.warn(`[AI Parse] Could not match pickup location: "${parsed.pickup}"`);
+        }
+      }
     }
-    if (parsed.destination && !locationNames.includes(parsed.destination)) {
-      // Try to find closest match
-      const closestDest = findClosestLocation(parsed.destination, locations);
-      if (closestDest) parsed.destination = closestDest.name;
+    
+    // Validate and fix destination location
+    if (parsed.destination) {
+      if (!locationNames.includes(parsed.destination)) {
+        const closestDest = findClosestLocation(parsed.destination, locations);
+        if (closestDest) {
+          console.log(`[AI Parse] Fixed destination: "${parsed.destination}" → "${closestDest.name}"`);
+          parsed.destination = closestDest.name;
+        } else {
+          console.warn(`[AI Parse] Could not match destination location: "${parsed.destination}"`);
+        }
+      }
+    }
+    
+    // Post-processing validation for room number (>95% accuracy)
+    if (parsed.roomNumber) {
+      // Use enhanced extraction function to validate/improve room number
+      const extracted = extractRoomNumber(parsed.roomNumber);
+      if (extracted && extracted !== parsed.roomNumber) {
+        console.log(`[AI Parse] Improved room number: "${parsed.roomNumber}" → "${extracted}"`);
+        parsed.roomNumber = extracted;
+      } else if (!extracted) {
+        // Try to extract from pickup if room number seems invalid
+        if (parsed.pickup) {
+          const fromPickup = extractRoomNumber(parsed.pickup);
+          if (fromPickup) {
+            console.log(`[AI Parse] Extracted room number from pickup: "${fromPickup}"`);
+            parsed.roomNumber = fromPickup;
+          }
+        }
+      }
+    } else if (parsed.pickup) {
+      // Try to extract room number from pickup if not provided
+      const extracted = extractRoomNumber(parsed.pickup);
+      if (extracted) {
+        console.log(`[AI Parse] Extracted room number from pickup: "${extracted}"`);
+        parsed.roomNumber = extracted;
+      }
+    }
+    
+    // Ensure pickup and destination are different
+    if (parsed.pickup && parsed.destination && parsed.pickup === parsed.destination) {
+      console.warn(`[AI Parse] Pickup and destination are the same: "${parsed.pickup}"`);
+      // If pickup is a room number, keep it; otherwise try to use room number as pickup
+      if (parsed.roomNumber && !locationNames.includes(parsed.roomNumber)) {
+        parsed.pickup = parsed.roomNumber;
+      }
     }
 
     return parsed;
@@ -141,41 +217,175 @@ Return JSON with exact location names matching the valid locations list.`;
   }
 };
 
-// Helper function to find closest location match
+// Levenshtein distance for fuzzy string matching
+function levenshteinDistance(str1: string, str2: string): number {
+  const matrix: number[][] = [];
+  const len1 = str1.length;
+  const len2 = str2.length;
+
+  if (len1 === 0) return len2;
+  if (len2 === 0) return len1;
+
+  for (let i = 0; i <= len2; i++) {
+    matrix[i] = [i];
+  }
+
+  for (let j = 0; j <= len1; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= len2; i++) {
+    for (let j = 1; j <= len1; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+
+  return matrix[len2][len1];
+}
+
+// Calculate similarity score (0-1, higher is better)
+function similarityScore(str1: string, str2: string): number {
+  const maxLen = Math.max(str1.length, str2.length);
+  if (maxLen === 0) return 1;
+  const distance = levenshteinDistance(str1.toLowerCase(), str2.toLowerCase());
+  return 1 - distance / maxLen;
+}
+
+// Enhanced room number extraction with high accuracy (>95%)
+export function extractRoomNumber(text: string): string | null {
+  if (!text) return null;
+  const trimmed = text.trim();
+  
+  // Pattern 1: Room/Villa keywords followed by room number (most common)
+  const roomPatterns = [
+    /(?:room|phòng|rồm|r)\s*:?\s*([A-Z]{1,3}\d{0,3}[A-Z]?|\d{2,4}[A-Z]?)/i,
+    /(?:villa|biệt thự|v)\s*:?\s*([A-Z]\d{1,3})/i,
+    /(?:số|number|no\.?|#)\s*:?\s*([A-Z]{1,3}\d{0,3}[A-Z]?|\d{2,4}[A-Z]?)/i,
+  ];
+  
+  for (const pattern of roomPatterns) {
+    const match = trimmed.match(pattern);
+    if (match && match[1]) {
+      const extracted = match[1].trim().toUpperCase();
+      // Validate extracted room number format
+      if (/^[A-Z]{1,3}\d{0,3}[A-Z]?$|^\d{2,4}[A-Z]?$|^[A-Z]\d{1,3}$/.test(extracted)) {
+        return extracted;
+      }
+    }
+  }
+  
+  // Pattern 2: Direct room number formats (standalone)
+  const directPatterns = [
+    /^([A-Z]{2,3})$/i,  // ACC, ABC (2-3 letters)
+    /^([A-Z]\d{1,3})$/i,  // D11, A101, D03 (letter + 1-3 digits)
+    /^([A-Z]?\d{2,4}[A-Z]?)$/i,  // 101, 101A, A101, 2001
+    /^([DP]\d{1,2})$/i,  // D11, P03
+  ];
+  
+  for (const pattern of directPatterns) {
+    if (pattern.test(trimmed)) {
+      return trimmed.toUpperCase();
+    }
+  }
+  
+  // Pattern 3: Room number in text (word boundary - more precise)
+  const inTextPatterns = [
+    /\b([A-Z]{2,3})\b/i,  // ACC, ABC
+    /\b([A-Z]\d{1,3})\b/i,  // D11, A101, D03
+    /\b([A-Z]?\d{2,4}[A-Z]?)\b/i,  // 101, 101A, 2001
+    /\b([DP]\d{1,2})\b/i,  // D11, P03
+  ];
+  
+  for (const pattern of inTextPatterns) {
+    const match = trimmed.match(pattern);
+    if (match && match[1]) {
+      const extracted = match[1].trim().toUpperCase();
+      // Additional validation: exclude common words that might match
+      const excludeWords = ['ACC', 'THE', 'AND', 'FOR', 'ARE', 'BUT', 'NOT', 'YOU', 'ALL', 'CAN', 'HER', 'WAS', 'ONE', 'OUR', 'OUT', 'DAY', 'GET', 'HAS', 'HIM', 'HIS', 'HOW', 'ITS', 'MAY', 'NEW', 'NOW', 'OLD', 'SEE', 'TWO', 'WAY', 'WHO', 'BOY', 'DID', 'ITS', 'LET', 'PUT', 'SAY', 'SHE', 'TOO', 'USE'];
+      if (!excludeWords.includes(extracted) && extracted.length >= 2) {
+        return extracted;
+      }
+    }
+  }
+  
+  return null;
+}
+
+// Helper function to find closest location match with improved accuracy (>90%)
 function findClosestLocation(
   searchTerm: string,
   locations: Array<{ id?: string; name: string; type?: string }>
 ): { id?: string; name: string; type?: string } | null {
+  if (!searchTerm || !locations || locations.length === 0) return null;
+  
   const lowerSearch = searchTerm.toLowerCase().trim();
   
-  // Exact match (case insensitive)
+  // 1. Exact match (case insensitive) - highest priority
   let match = locations.find(loc => loc.name.toLowerCase() === lowerSearch);
   if (match) return match;
   
-  // Contains match (search term contains location name or vice versa)
+  // 2. Exact match with normalized spaces
+  match = locations.find(loc => 
+    loc.name.toLowerCase().replace(/\s+/g, ' ') === lowerSearch.replace(/\s+/g, ' ')
+  );
+  if (match) return match;
+  
+  // 3. Contains match (search term contains location name or vice versa)
   match = locations.find(loc => {
     const lowerLoc = loc.name.toLowerCase();
     return lowerLoc.includes(lowerSearch) || lowerSearch.includes(lowerLoc);
   });
   if (match) return match;
   
-  // Fuzzy matching for common terms - check location types first
-  const typeMatch = lowerSearch.match(/(pool|hồ bơi|restaurant|nhà hàng|villa|biệt thự|lobby|sảnh|beach|bãi biển)/i);
+  // 4. Fuzzy matching with Levenshtein distance (similarity > 0.7)
+  const matchesWithScore = locations.map(loc => ({
+    location: loc,
+    score: similarityScore(lowerSearch, loc.name.toLowerCase())
+  })).filter(m => m.score > 0.7).sort((a, b) => b.score - a.score);
+  
+  if (matchesWithScore.length > 0 && matchesWithScore[0].score > 0.7) {
+    return matchesWithScore[0].location;
+  }
+  
+  // 5. Smart matching for common terms - check location types
+  const typeMatch = lowerSearch.match(/(pool|hồ bơi|restaurant|nhà hàng|villa|biệt thự|lobby|sảnh|beach|bãi biển|reception|spa)/i);
   if (typeMatch) {
     const term = typeMatch[1].toLowerCase();
     
-    // Pool matches
+    // Pool matches - prefer more specific matches
     if (term === "pool" || term === "hồ bơi") {
+      // Try to match specific pool names first
+      const specificPool = locations.find(loc => 
+        loc.type === "FACILITY" && 
+        (loc.name.toLowerCase().includes("lagoon pool") || loc.name.toLowerCase().includes("ocean pool"))
+      );
+      if (specificPool) return specificPool;
+      
       const poolLocs = locations.filter(loc => 
         loc.type === "FACILITY" && loc.name.toLowerCase().includes("pool")
       );
-      if (poolLocs.length > 0) return poolLocs[0]; // Return first pool
+      if (poolLocs.length > 0) return poolLocs[0];
     }
     
-    // Restaurant matches
+    // Restaurant matches - prefer main restaurants
     if (term === "restaurant" || term === "nhà hàng") {
       const restaurantLocs = locations.filter(loc => loc.type === "RESTAURANT");
-      if (restaurantLocs.length > 0) return restaurantLocs[0]; // Return first restaurant
+      // Prefer ACC, Cafe Indochine, Don Cipriani's (common restaurants)
+      const preferred = restaurantLocs.find(loc => 
+        loc.name.toLowerCase().includes("acc") || 
+        loc.name.toLowerCase().includes("indochine") ||
+        loc.name.toLowerCase().includes("cipriani")
+      );
+      if (preferred) return preferred;
+      if (restaurantLocs.length > 0) return restaurantLocs[0];
     }
     
     // Villa matches
@@ -187,23 +397,52 @@ function findClosestLocation(
     }
     
     // Lobby/Reception matches
-    if (term === "lobby" || term === "sảnh") {
+    if (term === "lobby" || term === "sảnh" || term === "reception") {
       match = locations.find(loc => 
         loc.name.toLowerCase().includes("reception") || 
-        loc.name.toLowerCase().includes("lobby")
+        loc.name.toLowerCase().includes("lobby") ||
+        loc.name.toLowerCase().includes("main entrance")
+      );
+      if (match) return match;
+    }
+    
+    // Beach matches
+    if (term === "beach" || term === "bãi biển") {
+      match = locations.find(loc => 
+        loc.name.toLowerCase().includes("beach") || 
+        loc.name.toLowerCase().includes("bãi biển")
+      );
+      if (match) return match;
+    }
+    
+    // Spa matches
+    if (term === "spa") {
+      match = locations.find(loc => 
+        loc.name.toLowerCase().includes("spa")
       );
       if (match) return match;
     }
   }
   
-  // Partial word match (e.g., "lagoon" matches "Lagoon Pool")
+  // 6. Partial word match with minimum word length (e.g., "lagoon" matches "Lagoon Pool")
   match = locations.find(loc => {
-    const words = lowerSearch.split(/\s+/);
+    const words = lowerSearch.split(/\s+/).filter(w => w.length > 2);
+    const locWords = loc.name.toLowerCase().split(/\s+/);
     return words.some(word => 
-      word.length > 2 && loc.name.toLowerCase().includes(word)
+      locWords.some(locWord => locWord.includes(word) || word.includes(locWord))
     );
   });
   if (match) return match;
+  
+  // 7. Character-based similarity (fallback)
+  const charSimilarity = locations.map(loc => ({
+    location: loc,
+    score: similarityScore(lowerSearch, loc.name.toLowerCase())
+  })).sort((a, b) => b.score - a.score);
+  
+  if (charSimilarity.length > 0 && charSimilarity[0].score > 0.5) {
+    return charSimilarity[0].location;
+  }
   
   return null;
 }

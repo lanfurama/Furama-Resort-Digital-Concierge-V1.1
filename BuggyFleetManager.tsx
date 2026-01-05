@@ -1,10 +1,18 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { getRides, getDrivers, updateRideStatus, updateDriverStatus, getLocations, getSystemConfig, updateSystemConfig } from '../services/dataService';
+import { getRides, getDriversWithLocations, updateRideStatus, getLocations, getSystemConfig, updateSystemConfig, getUsers } from '../services/dataService';
 import { optimizeBuggyFleet } from '../services/geminiService';
-import { RideRequest, Driver, BuggyStatus } from '../types';
-import { Car, Clock, MapPin, CheckCircle, RefreshCw, Zap, User, Settings, Save, Map, List, Navigation, AlertTriangle, X, Check } from 'lucide-react';
+import { RideRequest, BuggyStatus, User, UserRole } from '../types';
+import { Car, Clock, MapPin, CheckCircle, RefreshCw, Zap, User as UserIcon, Settings, Save, Map, List, Navigation, AlertTriangle, X, Check, Filter, ZoomIn, ZoomOut } from 'lucide-react';
 import { RESORT_CENTER } from '../constants';
+
+// Driver type extends User with additional fields
+interface Driver extends User {
+    status: 'AVAILABLE' | 'BUSY' | 'OFFLINE';
+    currentLocation: string;
+    name: string;
+    currentRideId?: string;
+}
 
 const BuggyFleetManager: React.FC = () => {
     const [rides, setRides] = useState<RideRequest[]>([]);
@@ -16,11 +24,14 @@ const BuggyFleetManager: React.FC = () => {
     const [pendingAssignment, setPendingAssignment] = useState<{rideId: string, driverId: string} | null>(null);
 
     // View Mode for Drivers Column
-    const [driverViewMode, setDriverViewMode] = useState<'LIST' | 'MAP'>('LIST');
+    const [driverViewMode, setDriverViewMode] = useState<'LIST' | 'MAP'>('MAP');
     
     // Config State
     const [config, setConfig] = useState(getSystemConfig());
     const [showSettings, setShowSettings] = useState(false);
+    
+    // Map Filter State
+    const [driverFilter, setDriverFilter] = useState<'ALL' | 'AVAILABLE' | 'BUSY'>('ALL');
 
     // Map State
     const mapRef = useRef<HTMLDivElement>(null);
@@ -33,11 +44,63 @@ const BuggyFleetManager: React.FC = () => {
     // Locations for Map Mapping
     const locations = getLocations();
 
-    const refreshData = () => {
-        const currentRides = getRides();
-        const currentDrivers = getDrivers();
+    const refreshData = async () => {
+        const currentRides = await getRides();
+        const driversWithLocations = await getDriversWithLocations();
+        const allRides = await getRides();
+        
+        // Transform User[] to Driver[] with status and location info
+        const transformedDrivers: Driver[] = driversWithLocations.map(user => {
+            // Determine driver status based on active rides
+            const activeRide = allRides.find(r => 
+                r.driverId === user.id && 
+                (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP)
+            );
+            
+            // Determine if driver is online (updated within last 10 hours)
+            const isOnline = user.updatedAt && (Date.now() - user.updatedAt) < (10 * 60 * 60 * 1000);
+            
+            // Get location string
+            let locationStr = "Unknown Location";
+            if (activeRide) {
+                locationStr = activeRide.destination;
+            } else if (user.currentLat !== undefined && user.currentLng !== undefined) {
+                // Find nearest location to driver's GPS coordinates
+                let nearestLocation = locations[0];
+                let minDistance = Infinity;
+                
+                locations.forEach(loc => {
+                    const dist = Math.sqrt(
+                        Math.pow(user.currentLat! - loc.lat, 2) + Math.pow(user.currentLng! - loc.lng, 2)
+                    );
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        nearestLocation = loc;
+                    }
+                });
+                
+                // If within ~100 meters of a known location, show location name
+                if (minDistance < 0.001) {
+                    locationStr = `Near ${nearestLocation.name}`;
+                } else {
+                    locationStr = `GPS: ${user.currentLat.toFixed(6)}, ${user.currentLng.toFixed(6)}`;
+                }
+            } else if (locations.length > 0) {
+                const driverLocation = locations[parseInt(user.id || '0') % locations.length];
+                locationStr = driverLocation?.name || "Unknown Location";
+            }
+            
+            return {
+                ...user,
+                status: activeRide ? 'BUSY' : (isOnline ? 'AVAILABLE' : 'OFFLINE'),
+                currentLocation: locationStr,
+                name: user.lastName || `Driver ${user.id}`,
+                currentRideId: activeRide?.id
+            } as Driver;
+        });
+        
         setRides(currentRides);
-        setDrivers(currentDrivers);
+        setDrivers(transformedDrivers);
 
         // --- ADMIN SIDE AUTO-ASSIGN CHECKER ---
         if (config.autoAssignEnabled) {
@@ -58,7 +121,7 @@ const BuggyFleetManager: React.FC = () => {
 
     useEffect(() => {
         refreshData();
-        const interval = setInterval(refreshData, 3000); // Live poll
+        const interval = setInterval(refreshData, 3000); // Live poll every 3 seconds
         return () => clearInterval(interval);
     }, [config]); 
 
@@ -149,9 +212,16 @@ const BuggyFleetManager: React.FC = () => {
         if (mapInstance && driverViewMode === 'MAP' && (window as any).google && !mapError) {
             markers.forEach(m => m.setMap(null));
             const newMarkers: any[] = [];
+            
+            // Filter drivers based on filter state
+            const filteredDrivers = drivers.filter(d => {
+                if (d.status === 'OFFLINE') return false;
+                if (driverFilter === 'ALL') return true;
+                return d.status === driverFilter;
+            });
 
-            drivers.filter(d => d.status !== 'OFFLINE').forEach(driver => {
-                const coords = resolveDriverCoordinates(driver.currentLocation);
+            filteredDrivers.forEach(driver => {
+                const coords = resolveDriverCoordinates(driver);
                 let infoContent = '';
                 const activeRide = driver.currentRideId ? activeRides.find(r => r.id === driver.currentRideId) : null;
                 
@@ -176,14 +246,25 @@ const BuggyFleetManager: React.FC = () => {
                         const diffMins = Math.floor((Date.now() - lastRide.completedAt) / 60000);
                         timeSinceStr = diffMins === 0 ? "Just now" : `${diffMins} mins ago`;
                     }
+                    
+                    // Location info
+                    let locationInfo = driver.currentLocation;
+                    let gpsInfo = "";
+                    if (driver.currentLat !== undefined && driver.currentLng !== undefined) {
+                        gpsInfo = `<br/><strong>GPS:</strong> ${driver.currentLat.toFixed(6)}, ${driver.currentLng.toFixed(6)}`;
+                        if (driver.locationUpdatedAt) {
+                            const locationAge = Math.floor((Date.now() - driver.locationUpdatedAt) / 60000);
+                            gpsInfo += ` <span style="color: ${locationAge > 5 ? '#ef4444' : '#10b981'}; font-size: 10px;">(${locationAge}m ago)</span>`;
+                        }
+                    }
 
                     infoContent = `
-                        <div style="color: #1f2937; padding: 4px; max-width: 200px;">
+                        <div style="color: #1f2937; padding: 6px; max-width: 220px;">
                             <strong style="font-size: 14px; color: #059669;">${driver.name} (Available)</strong>
                             <hr style="margin: 4px 0; border: 0; border-top: 1px solid #eee;"/>
                             <div style="font-size: 11px; color: #6b7280;">
                                 <strong>Idle:</strong> ${timeSinceStr}<br/>
-                                <strong>Loc:</strong> ${driver.currentLocation}
+                                <strong>Location:</strong> ${locationInfo}${gpsInfo}
                             </div>
                         </div>
                     `;
@@ -223,16 +304,29 @@ const BuggyFleetManager: React.FC = () => {
                 newMarkers.push(marker);
             });
             setMarkers(newMarkers);
+            
+            // Auto-fit bounds to show all drivers
+            if (newMarkers.length > 0 && mapInstance) {
+                const bounds = new (window as any).google.maps.LatLngBounds();
+                filteredDrivers.forEach(driver => {
+                    const coords = resolveDriverCoordinates(driver);
+                    bounds.extend(coords);
+                });
+                mapInstance.fitBounds(bounds);
+                // Ensure minimum zoom level
+                if (mapInstance.getZoom() && mapInstance.getZoom() > 18) {
+                    mapInstance.setZoom(18);
+                }
+            }
         }
-    }, [drivers, mapInstance, driverViewMode, mapError, activeRides, completedRides]);
+    }, [drivers, mapInstance, driverViewMode, mapError, activeRides, completedRides, driverFilter]);
 
     // ... (Keep handleAssign, handleAutoAssign, handleSaveConfig, resolveDriverCoordinates unchanged)
-    const handleAssign = (rideId: string, driverId: string) => {
-        updateRideStatus(rideId, BuggyStatus.ASSIGNED, driverId, 5); 
-        updateDriverStatus(driverId, 'BUSY', undefined, rideId);
+    const handleAssign = async (rideId: string, driverId: string) => {
+        await updateRideStatus(rideId, BuggyStatus.ASSIGNED, driverId, 5); 
         setSelectedRide(null);
         setPendingAssignment(null); // Clear pending state
-        refreshData();
+        await refreshData();
     };
 
     const handleAutoAssign = async (targetRides = pendingRides, targetDrivers = availableDrivers) => {
@@ -253,13 +347,33 @@ const BuggyFleetManager: React.FC = () => {
         setShowSettings(false);
     };
 
-    const resolveDriverCoordinates = (locationName: string) => {
-        if (locationName.startsWith("GPS:")) {
-            const parts = locationName.replace("GPS:", "").split(",");
-            if (parts.length === 2) return { lat: parseFloat(parts[0]), lng: parseFloat(parts[1]) };
+    const resolveDriverCoordinates = (driver: Driver) => {
+        // Priority 1: Use GPS coordinates from database if available
+        if (driver.currentLat !== undefined && driver.currentLng !== undefined) {
+            return { lat: driver.currentLat, lng: driver.currentLng };
         }
-        const loc = locations.find(l => locationName.includes(l.name) || l.name.includes(locationName));
+        
+        // Priority 2: Parse GPS from location string
+        if (driver.currentLocation.startsWith("GPS:")) {
+            const parts = driver.currentLocation.replace("GPS:", "").split(",");
+            if (parts.length === 2) {
+                const lat = parseFloat(parts[0].trim());
+                const lng = parseFloat(parts[1].trim());
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    return { lat, lng };
+                }
+            }
+        }
+        
+        // Priority 3: Find location by name
+        const loc = locations.find(l => 
+            driver.currentLocation.includes(l.name) || 
+            l.name.includes(driver.currentLocation) ||
+            driver.currentLocation.includes(`Near ${l.name}`)
+        );
         if (loc) return { lat: loc.lat, lng: loc.lng };
+        
+        // Fallback: Resort center with small random offset
         return { 
             lat: RESORT_CENTER.lat + (Math.random() * 0.001 - 0.0005), 
             lng: RESORT_CENTER.lng + (Math.random() * 0.001 - 0.0005) 
@@ -439,12 +553,35 @@ const BuggyFleetManager: React.FC = () => {
 
                 {/* Column 2: Driver Fleet (With Map Toggle) */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
-                    {/* ... (Keep header same) ... */}
                     <div className="p-2 bg-blue-50 border-b border-blue-100 font-bold text-blue-800 flex justify-between items-center">
-                        <span className="pl-2">Driver Fleet ({drivers.length})</span>
-                        <div className="flex bg-white rounded-lg p-0.5 border border-blue-100">
-                             <button onClick={() => setDriverViewMode('LIST')} className={`p-1.5 rounded ${driverViewMode === 'LIST' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><List size={14}/></button>
-                             <button onClick={() => setDriverViewMode('MAP')} className={`p-1.5 rounded ${driverViewMode === 'MAP' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><Map size={14}/></button>
+                        <span className="pl-2">Driver Fleet ({drivers.filter(d => d.status !== 'OFFLINE').length} online)</span>
+                        <div className="flex items-center gap-2">
+                            {driverViewMode === 'MAP' && (
+                                <div className="flex bg-white rounded-lg p-0.5 border border-blue-100 mr-1">
+                                    <button 
+                                        onClick={() => setDriverFilter('ALL')} 
+                                        className={`px-2 py-1 text-[10px] rounded ${driverFilter === 'ALL' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >
+                                        All
+                                    </button>
+                                    <button 
+                                        onClick={() => setDriverFilter('AVAILABLE')} 
+                                        className={`px-2 py-1 text-[10px] rounded ${driverFilter === 'AVAILABLE' ? 'bg-emerald-100 text-emerald-700 font-bold' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >
+                                        Available
+                                    </button>
+                                    <button 
+                                        onClick={() => setDriverFilter('BUSY')} 
+                                        className={`px-2 py-1 text-[10px] rounded ${driverFilter === 'BUSY' ? 'bg-orange-100 text-orange-700 font-bold' : 'text-slate-400 hover:text-slate-600'}`}
+                                    >
+                                        Busy
+                                    </button>
+                                </div>
+                            )}
+                            <div className="flex bg-white rounded-lg p-0.5 border border-blue-100">
+                                <button onClick={() => setDriverViewMode('LIST')} className={`p-1.5 rounded ${driverViewMode === 'LIST' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><List size={14}/></button>
+                                <button onClick={() => setDriverViewMode('MAP')} className={`p-1.5 rounded ${driverViewMode === 'MAP' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><Map size={14}/></button>
+                            </div>
                         </div>
                     </div>
                     
@@ -490,26 +627,76 @@ const BuggyFleetManager: React.FC = () => {
                             {mapError ? (
                                 <>
                                     <img src="https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Map-768x552.jpg" alt="Map" className="absolute inset-0 w-full h-full object-cover opacity-80"/>
-                                    {drivers.filter(d => d.status !== 'OFFLINE').map(driver => {
-                                        const coords = resolveDriverCoordinates(driver.currentLocation);
-                                        const pos = getPos(coords.lat, coords.lng);
-                                        const isBusy = driver.status === 'BUSY';
-                                        return (
-                                            <div key={driver.id} className="absolute transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group cursor-pointer hover:z-50" style={{ top: pos.top, left: pos.left }}>
-                                                <div className="bg-white/90 backdrop-blur-sm text-[9px] font-bold px-1.5 py-0.5 rounded shadow mb-1 whitespace-nowrap z-20 text-black">{driver.name.split(' ')[0]}</div>
-                                                <div className={`p-1.5 rounded-full shadow-lg border-2 border-white transition-transform duration-300 relative z-10 ${isBusy ? 'bg-orange-500' : 'bg-emerald-600'} ${!isBusy ? 'animate-bounce' : ''}`}>
-                                                    <Car size={14} className="text-white"/>
+                                    {drivers
+                                        .filter(d => {
+                                            if (d.status === 'OFFLINE') return false;
+                                            if (driverFilter === 'ALL') return true;
+                                            return d.status === driverFilter;
+                                        })
+                                        .map(driver => {
+                                            const coords = resolveDriverCoordinates(driver);
+                                            const pos = getPos(coords.lat, coords.lng);
+                                            const isBusy = driver.status === 'BUSY';
+                                            return (
+                                                <div key={driver.id} className="absolute transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group cursor-pointer hover:z-50" style={{ top: pos.top, left: pos.left }}>
+                                                    <div className="bg-white/90 backdrop-blur-sm text-[9px] font-bold px-1.5 py-0.5 rounded shadow mb-1 whitespace-nowrap z-20 text-black">{driver.name.split(' ')[0]}</div>
+                                                    <div className={`p-1.5 rounded-full shadow-lg border-2 border-white transition-transform duration-300 relative z-10 ${isBusy ? 'bg-orange-500' : 'bg-emerald-600'} ${!isBusy ? 'animate-bounce' : ''}`}>
+                                                        <Car size={14} className="text-white"/>
+                                                    </div>
+                                                    {driver.currentLat !== undefined && driver.currentLng !== undefined && (
+                                                        <div className="mt-1 bg-white/90 backdrop-blur-sm text-[8px] px-1 py-0.5 rounded shadow text-gray-600">
+                                                            GPS
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })}
                                 </>
                             ) : ( <div ref={mapRef} className="w-full h-full" /> )}
                             <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur p-2 rounded text-[10px] shadow border border-gray-200 z-10">
                                 <div className="flex items-center mb-1 text-gray-800"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-1.5"></div> Available Driver</div>
                                 <div className="flex items-center text-gray-800"><div className="w-2.5 h-2.5 rounded-full bg-orange-500 mr-1.5"></div> Busy / On Trip</div>
                                 {mapError && <div className="mt-1 text-red-500 font-bold text-[9px] flex items-center"><AlertTriangle size={8} className="mr-1"/> Static View (Map Error)</div>}
+                                {!mapError && (
+                                    <div className="mt-1 text-emerald-600 font-bold text-[9px] flex items-center">
+                                        <MapPin size={8} className="mr-1"/> Real-time GPS Tracking
+                                    </div>
+                                )}
                             </div>
+                            {!mapError && mapInstance && (
+                                <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
+                                    <button 
+                                        onClick={() => mapInstance.setZoom(mapInstance.getZoom()! + 1)}
+                                        className="bg-white/90 backdrop-blur p-1.5 rounded shadow border border-gray-200 hover:bg-white transition"
+                                        title="Zoom In"
+                                    >
+                                        <ZoomIn size={14} className="text-gray-700"/>
+                                    </button>
+                                    <button 
+                                        onClick={() => mapInstance.setZoom(mapInstance.getZoom()! - 1)}
+                                        className="bg-white/90 backdrop-blur p-1.5 rounded shadow border border-gray-200 hover:bg-white transition"
+                                        title="Zoom Out"
+                                    >
+                                        <ZoomOut size={14} className="text-gray-700"/>
+                                    </button>
+                                    <button 
+                                        onClick={() => {
+                                            if (mapInstance) {
+                                                const bounds = new (window as any).google.maps.LatLngBounds();
+                                                drivers.filter(d => d.status !== 'OFFLINE').forEach(driver => {
+                                                    const coords = resolveDriverCoordinates(driver);
+                                                    bounds.extend(coords);
+                                                });
+                                                mapInstance.fitBounds(bounds);
+                                            }
+                                        }}
+                                        className="bg-white/90 backdrop-blur p-1.5 rounded shadow border border-gray-200 hover:bg-white transition"
+                                        title="Fit All Drivers"
+                                    >
+                                        <Navigation size={14} className="text-gray-700"/>
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

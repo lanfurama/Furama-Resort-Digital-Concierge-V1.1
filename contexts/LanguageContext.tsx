@@ -143,6 +143,40 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     'sort_name_az': 'Name A-Z',
     'sort_price_low_high': 'Price: Low to High',
     'sort_price_high_low': 'Price: High to Low',
+    
+    // Error Messages - Microphone
+    'error_mic_permission_denied': 'Microphone permission denied. Please allow microphone access in your browser settings.',
+    'error_mic_not_found': 'No microphone found. Please connect a microphone and try again.',
+    'error_mic_in_use': 'Microphone is already in use by another application. Please close other applications and try again.',
+    'error_mic_constraints': 'Microphone constraints could not be satisfied. Please check your microphone settings.',
+    'error_mic_security': 'Microphone access blocked due to security restrictions. Please use HTTPS or localhost.',
+    'error_mic_not_supported': 'getUserMedia is not supported in this browser. Please use a modern browser.',
+    'error_mic_access_failed': 'Failed to access microphone. Please try again.',
+    
+    // Error Messages - Speech Recognition
+    'error_speech_api_not_supported': 'Web Speech API is not supported in this browser. Please use Chrome, Edge, or Safari (latest version).',
+    'error_speech_https_required': 'Web Speech API requires HTTPS connection. Please use HTTPS or localhost.',
+    'error_speech_no_speech': 'No speech detected. Please speak clearly into the microphone.',
+    'error_speech_audio_capture': 'No microphone found or microphone is not accessible. Please check your microphone settings.',
+    'error_speech_not_allowed': 'Microphone permission denied. Please allow microphone access in your browser settings.',
+    'error_speech_network': 'Network error occurred. Please check your internet connection and try again.',
+    'error_speech_aborted': 'Speech recognition was aborted.',
+    'error_speech_service_not_allowed': 'Speech recognition service is not allowed. Please check your browser settings.',
+    'error_speech_grammar': 'Speech recognition grammar error.',
+    'error_speech_language_not_supported': 'Language is not supported. Please try a different language.',
+    'error_speech_unknown': 'Speech recognition error occurred. Please try again.',
+    
+    // Error Messages - Network & API
+    'error_network': 'Network error occurred. Please check your connection and try again.',
+    'error_api_auth': 'AI API authentication error. Please check your API key configuration.',
+    'error_api_unknown': 'An error occurred. Please try again.',
+    
+    // Error Messages - General
+    'error_unknown': 'An unexpected error occurred. Please try again.',
+    'error_user_id_not_found': 'User ID not found. Please log in again.',
+    'error_update_profile_failed': 'Failed to update profile. Please try again.',
+    'error_update_language_failed': 'Failed to update language. Please check your connection and try again.',
+    'error_audio_context_not_supported': 'AudioContext is not supported in this browser.',
   },
   Vietnamese: {
     'welcome_back': 'Chào mừng quay lại,',
@@ -256,6 +290,40 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     'sort_name_az': 'Tên A-Z',
     'sort_price_low_high': 'Giá: Thấp đến Cao',
     'sort_price_high_low': 'Giá: Cao đến Thấp',
+    
+    // Error Messages - Microphone
+    'error_mic_permission_denied': 'Quyền truy cập microphone bị từ chối. Vui lòng cho phép truy cập microphone trong cài đặt trình duyệt.',
+    'error_mic_not_found': 'Không tìm thấy microphone. Vui lòng kết nối microphone và thử lại.',
+    'error_mic_in_use': 'Microphone đang được sử dụng bởi ứng dụng khác. Vui lòng đóng các ứng dụng khác và thử lại.',
+    'error_mic_constraints': 'Không thể đáp ứng yêu cầu microphone. Vui lòng kiểm tra cài đặt microphone.',
+    'error_mic_security': 'Truy cập microphone bị chặn do hạn chế bảo mật. Vui lòng sử dụng HTTPS hoặc localhost.',
+    'error_mic_not_supported': 'getUserMedia không được hỗ trợ trong trình duyệt này. Vui lòng sử dụng trình duyệt hiện đại.',
+    'error_mic_access_failed': 'Không thể truy cập microphone. Vui lòng thử lại.',
+    
+    // Error Messages - Speech Recognition
+    'error_speech_api_not_supported': 'Web Speech API không được hỗ trợ trong trình duyệt này. Vui lòng sử dụng Chrome, Edge hoặc Safari (phiên bản mới nhất).',
+    'error_speech_https_required': 'Web Speech API yêu cầu kết nối HTTPS. Vui lòng sử dụng HTTPS hoặc localhost.',
+    'error_speech_no_speech': 'Không phát hiện giọng nói. Vui lòng nói rõ ràng vào microphone.',
+    'error_speech_audio_capture': 'Không tìm thấy microphone hoặc microphone không thể truy cập. Vui lòng kiểm tra cài đặt microphone.',
+    'error_speech_not_allowed': 'Quyền truy cập microphone bị từ chối. Vui lòng cho phép truy cập microphone trong cài đặt trình duyệt.',
+    'error_speech_network': 'Lỗi mạng xảy ra. Vui lòng kiểm tra kết nối internet và thử lại.',
+    'error_speech_aborted': 'Nhận dạng giọng nói đã bị hủy.',
+    'error_speech_service_not_allowed': 'Dịch vụ nhận dạng giọng nói không được phép. Vui lòng kiểm tra cài đặt trình duyệt.',
+    'error_speech_grammar': 'Lỗi ngữ pháp nhận dạng giọng nói.',
+    'error_speech_language_not_supported': 'Ngôn ngữ không được hỗ trợ. Vui lòng thử ngôn ngữ khác.',
+    'error_speech_unknown': 'Lỗi nhận dạng giọng nói xảy ra. Vui lòng thử lại.',
+    
+    // Error Messages - Network & API
+    'error_network': 'Lỗi mạng xảy ra. Vui lòng kiểm tra kết nối và thử lại.',
+    'error_api_auth': 'Lỗi xác thực AI API. Vui lòng kiểm tra cấu hình API key.',
+    'error_api_unknown': 'Đã xảy ra lỗi. Vui lòng thử lại.',
+    
+    // Error Messages - General
+    'error_unknown': 'Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.',
+    'error_user_id_not_found': 'Không tìm thấy ID người dùng. Vui lòng đăng nhập lại.',
+    'error_update_profile_failed': 'Cập nhật hồ sơ thất bại. Vui lòng thử lại.',
+    'error_update_language_failed': 'Cập nhật ngôn ngữ thất bại. Vui lòng kiểm tra kết nối và thử lại.',
+    'error_audio_context_not_supported': 'AudioContext không được hỗ trợ trong trình duyệt này.',
   },
   Korean: {
     'welcome_back': '환영합니다,',
@@ -369,6 +437,40 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     'sort_name_az': '이름 A-Z',
     'sort_price_low_high': '가격: 낮은 순',
     'sort_price_high_low': '가격: 높은 순',
+    
+    // Error Messages - Microphone
+    'error_mic_permission_denied': '마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크 액세스를 허용해 주세요.',
+    'error_mic_not_found': '마이크를 찾을 수 없습니다. 마이크를 연결하고 다시 시도해 주세요.',
+    'error_mic_in_use': '마이크가 다른 애플리케이션에서 사용 중입니다. 다른 애플리케이션을 닫고 다시 시도해 주세요.',
+    'error_mic_constraints': '마이크 제약 조건을 충족할 수 없습니다. 마이크 설정을 확인해 주세요.',
+    'error_mic_security': '보안 제한으로 인해 마이크 액세스가 차단되었습니다. HTTPS 또는 localhost를 사용해 주세요.',
+    'error_mic_not_supported': '이 브라우저에서 getUserMedia를 지원하지 않습니다. 최신 브라우저를 사용해 주세요.',
+    'error_mic_access_failed': '마이크에 액세스하지 못했습니다. 다시 시도해 주세요.',
+    
+    // Error Messages - Speech Recognition
+    'error_speech_api_not_supported': '이 브라우저에서 Web Speech API를 지원하지 않습니다. Chrome, Edge 또는 Safari(최신 버전)를 사용해 주세요.',
+    'error_speech_https_required': 'Web Speech API는 HTTPS 연결이 필요합니다. HTTPS 또는 localhost를 사용해 주세요.',
+    'error_speech_no_speech': '음성이 감지되지 않았습니다. 마이크에 명확하게 말씀해 주세요.',
+    'error_speech_audio_capture': '마이크를 찾을 수 없거나 액세스할 수 없습니다. 마이크 설정을 확인해 주세요.',
+    'error_speech_not_allowed': '마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크 액세스를 허용해 주세요.',
+    'error_speech_network': '네트워크 오류가 발생했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.',
+    'error_speech_aborted': '음성 인식이 중단되었습니다.',
+    'error_speech_service_not_allowed': '음성 인식 서비스가 허용되지 않습니다. 브라우저 설정을 확인해 주세요.',
+    'error_speech_grammar': '음성 인식 문법 오류가 발생했습니다.',
+    'error_speech_language_not_supported': '언어가 지원되지 않습니다. 다른 언어를 시도해 주세요.',
+    'error_speech_unknown': '음성 인식 오류가 발생했습니다. 다시 시도해 주세요.',
+    
+    // Error Messages - Network & API
+    'error_network': '네트워크 오류가 발생했습니다. 연결을 확인하고 다시 시도해 주세요.',
+    'error_api_auth': 'AI API 인증 오류가 발생했습니다. API 키 구성을 확인해 주세요.',
+    'error_api_unknown': '오류가 발생했습니다. 다시 시도해 주세요.',
+    
+    // Error Messages - General
+    'error_unknown': '예기치 않은 오류가 발생했습니다. 다시 시도해 주세요.',
+    'error_user_id_not_found': '사용자 ID를 찾을 수 없습니다. 다시 로그인해 주세요.',
+    'error_update_profile_failed': '프로필 업데이트에 실패했습니다. 다시 시도해 주세요.',
+    'error_update_language_failed': '언어 업데이트에 실패했습니다. 연결을 확인하고 다시 시도해 주세요.',
+    'error_audio_context_not_supported': '이 브라우저에서 AudioContext를 지원하지 않습니다.',
   },
   Japanese: {
     'welcome_back': 'おかえりなさいませ、',
@@ -482,6 +584,40 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     'sort_name_az': '名前 A-Z',
     'sort_price_low_high': '価格: 安い順',
     'sort_price_high_low': '価格: 高い順',
+    
+    // Error Messages - Microphone
+    'error_mic_permission_denied': 'マイクの権限が拒否されました。ブラウザの設定でマイクへのアクセスを許可してください。',
+    'error_mic_not_found': 'マイクが見つかりません。マイクを接続して再度お試しください。',
+    'error_mic_in_use': 'マイクは他のアプリケーションで使用中です。他のアプリケーションを閉じて再度お試しください。',
+    'error_mic_constraints': 'マイクの制約を満たせませんでした。マイクの設定を確認してください。',
+    'error_mic_security': 'セキュリティ制限によりマイクへのアクセスがブロックされました。HTTPSまたはlocalhostを使用してください。',
+    'error_mic_not_supported': 'このブラウザではgetUserMediaがサポートされていません。最新のブラウザをご使用ください。',
+    'error_mic_access_failed': 'マイクにアクセスできませんでした。再度お試しください。',
+    
+    // Error Messages - Speech Recognition
+    'error_speech_api_not_supported': 'このブラウザではWeb Speech APIがサポートされていません。Chrome、Edge、またはSafari（最新版）をご使用ください。',
+    'error_speech_https_required': 'Web Speech APIにはHTTPS接続が必要です。HTTPSまたはlocalhostを使用してください。',
+    'error_speech_no_speech': '音声が検出されませんでした。マイクにはっきりと話してください。',
+    'error_speech_audio_capture': 'マイクが見つからないか、アクセスできません。マイクの設定を確認してください。',
+    'error_speech_not_allowed': 'マイクの権限が拒否されました。ブラウザの設定でマイクへのアクセスを許可してください。',
+    'error_speech_network': 'ネットワークエラーが発生しました。インターネット接続を確認して再度お試しください。',
+    'error_speech_aborted': '音声認識が中止されました。',
+    'error_speech_service_not_allowed': '音声認識サービスが許可されていません。ブラウザの設定を確認してください。',
+    'error_speech_grammar': '音声認識の文法エラーが発生しました。',
+    'error_speech_language_not_supported': '言語がサポートされていません。別の言語をお試しください。',
+    'error_speech_unknown': '音声認識エラーが発生しました。再度お試しください。',
+    
+    // Error Messages - Network & API
+    'error_network': 'ネットワークエラーが発生しました。接続を確認して再度お試しください。',
+    'error_api_auth': 'AI API認証エラーが発生しました。APIキーの設定を確認してください。',
+    'error_api_unknown': 'エラーが発生しました。再度お試しください。',
+    
+    // Error Messages - General
+    'error_unknown': '予期しないエラーが発生しました。再度お試しください。',
+    'error_user_id_not_found': 'ユーザーIDが見つかりません。再度ログインしてください。',
+    'error_update_profile_failed': 'プロフィールの更新に失敗しました。再度お試しください。',
+    'error_update_language_failed': '言語の更新に失敗しました。接続を確認して再度お試しください。',
+    'error_audio_context_not_supported': 'このブラウザではAudioContextがサポートされていません。',
   },
   Chinese: {
     'welcome_back': '欢迎回来，',
@@ -595,6 +731,40 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     'sort_name_az': '名称 A-Z',
     'sort_price_low_high': '价格: 低到高',
     'sort_price_high_low': '价格: 高到低',
+    
+    // Error Messages - Microphone
+    'error_mic_permission_denied': '麦克风权限被拒绝。请在浏览器设置中允许麦克风访问。',
+    'error_mic_not_found': '未找到麦克风。请连接麦克风后重试。',
+    'error_mic_in_use': '麦克风正被其他应用程序使用。请关闭其他应用程序后重试。',
+    'error_mic_constraints': '无法满足麦克风约束条件。请检查麦克风设置。',
+    'error_mic_security': '由于安全限制，麦克风访问被阻止。请使用HTTPS或localhost。',
+    'error_mic_not_supported': '此浏览器不支持getUserMedia。请使用现代浏览器。',
+    'error_mic_access_failed': '无法访问麦克风。请重试。',
+    
+    // Error Messages - Speech Recognition
+    'error_speech_api_not_supported': '此浏览器不支持Web Speech API。请使用Chrome、Edge或Safari（最新版本）。',
+    'error_speech_https_required': 'Web Speech API需要HTTPS连接。请使用HTTPS或localhost。',
+    'error_speech_no_speech': '未检测到语音。请对着麦克风清晰说话。',
+    'error_speech_audio_capture': '未找到麦克风或麦克风无法访问。请检查麦克风设置。',
+    'error_speech_not_allowed': '麦克风权限被拒绝。请在浏览器设置中允许麦克风访问。',
+    'error_speech_network': '发生网络错误。请检查互联网连接后重试。',
+    'error_speech_aborted': '语音识别已中止。',
+    'error_speech_service_not_allowed': '不允许语音识别服务。请检查浏览器设置。',
+    'error_speech_grammar': '语音识别语法错误。',
+    'error_speech_language_not_supported': '不支持该语言。请尝试其他语言。',
+    'error_speech_unknown': '发生语音识别错误。请重试。',
+    
+    // Error Messages - Network & API
+    'error_network': '发生网络错误。请检查连接后重试。',
+    'error_api_auth': 'AI API身份验证错误。请检查API密钥配置。',
+    'error_api_unknown': '发生错误。请重试。',
+    
+    // Error Messages - General
+    'error_unknown': '发生意外错误。请重试。',
+    'error_user_id_not_found': '未找到用户ID。请重新登录。',
+    'error_update_profile_failed': '更新个人资料失败。请重试。',
+    'error_update_language_failed': '更新语言失败。请检查连接后重试。',
+    'error_audio_context_not_supported': '此浏览器不支持AudioContext。',
   },
   Russian: {
     'welcome_back': 'С возвращением,',
@@ -708,6 +878,40 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     'sort_name_az': 'Имя A-Z',
     'sort_price_low_high': 'Цена: от низкой к высокой',
     'sort_price_high_low': 'Цена: от высокой к низкой',
+    
+    // Error Messages - Microphone
+    'error_mic_permission_denied': 'Доступ к микрофону запрещен. Пожалуйста, разрешите доступ к микрофону в настройках браузера.',
+    'error_mic_not_found': 'Микрофон не найден. Пожалуйста, подключите микрофон и попробуйте снова.',
+    'error_mic_in_use': 'Микрофон уже используется другим приложением. Пожалуйста, закройте другие приложения и попробуйте снова.',
+    'error_mic_constraints': 'Не удалось выполнить требования к микрофону. Пожалуйста, проверьте настройки микрофона.',
+    'error_mic_security': 'Доступ к микрофону заблокирован из-за ограничений безопасности. Пожалуйста, используйте HTTPS или localhost.',
+    'error_mic_not_supported': 'getUserMedia не поддерживается в этом браузере. Пожалуйста, используйте современный браузер.',
+    'error_mic_access_failed': 'Не удалось получить доступ к микрофону. Пожалуйста, попробуйте снова.',
+    
+    // Error Messages - Speech Recognition
+    'error_speech_api_not_supported': 'Web Speech API не поддерживается в этом браузере. Пожалуйста, используйте Chrome, Edge или Safari (последняя версия).',
+    'error_speech_https_required': 'Web Speech API требует HTTPS-соединения. Пожалуйста, используйте HTTPS или localhost.',
+    'error_speech_no_speech': 'Речь не обнаружена. Пожалуйста, говорите четко в микрофон.',
+    'error_speech_audio_capture': 'Микрофон не найден или недоступен. Пожалуйста, проверьте настройки микрофона.',
+    'error_speech_not_allowed': 'Доступ к микрофону запрещен. Пожалуйста, разрешите доступ к микрофону в настройках браузера.',
+    'error_speech_network': 'Произошла сетевая ошибка. Пожалуйста, проверьте подключение к интернету и попробуйте снова.',
+    'error_speech_aborted': 'Распознавание речи было прервано.',
+    'error_speech_service_not_allowed': 'Служба распознавания речи не разрешена. Пожалуйста, проверьте настройки браузера.',
+    'error_speech_grammar': 'Ошибка грамматики распознавания речи.',
+    'error_speech_language_not_supported': 'Язык не поддерживается. Пожалуйста, попробуйте другой язык.',
+    'error_speech_unknown': 'Произошла ошибка распознавания речи. Пожалуйста, попробуйте снова.',
+    
+    // Error Messages - Network & API
+    'error_network': 'Произошла сетевая ошибка. Пожалуйста, проверьте подключение и попробуйте снова.',
+    'error_api_auth': 'Ошибка аутентификации AI API. Пожалуйста, проверьте конфигурацию API-ключа.',
+    'error_api_unknown': 'Произошла ошибка. Пожалуйста, попробуйте снова.',
+    
+    // Error Messages - General
+    'error_unknown': 'Произошла непредвиденная ошибка. Пожалуйста, попробуйте снова.',
+    'error_user_id_not_found': 'ID пользователя не найден. Пожалуйста, войдите снова.',
+    'error_update_profile_failed': 'Не удалось обновить профиль. Пожалуйста, попробуйте снова.',
+    'error_update_language_failed': 'Не удалось обновить язык. Пожалуйста, проверьте подключение и попробуйте снова.',
+    'error_audio_context_not_supported': 'AudioContext не поддерживается в этом браузере.',
   },
   French: {
     'welcome_back': 'Bon retour,',
@@ -820,6 +1024,40 @@ const TRANSLATIONS: Record<string, Record<string, string>> = {
     'sort_name_az': 'Nom A-Z',
     'sort_price_low_high': 'Prix: du plus bas au plus élevé',
     'sort_price_high_low': 'Prix: du plus élevé au plus bas',
+    
+    // Error Messages - Microphone
+    'error_mic_permission_denied': 'Permission du microphone refusée. Veuillez autoriser l\'accès au microphone dans les paramètres de votre navigateur.',
+    'error_mic_not_found': 'Aucun microphone trouvé. Veuillez connecter un microphone et réessayer.',
+    'error_mic_in_use': 'Le microphone est déjà utilisé par une autre application. Veuillez fermer les autres applications et réessayer.',
+    'error_mic_constraints': 'Les contraintes du microphone n\'ont pas pu être satisfaites. Veuillez vérifier les paramètres de votre microphone.',
+    'error_mic_security': 'L\'accès au microphone est bloqué en raison de restrictions de sécurité. Veuillez utiliser HTTPS ou localhost.',
+    'error_mic_not_supported': 'getUserMedia n\'est pas pris en charge dans ce navigateur. Veuillez utiliser un navigateur moderne.',
+    'error_mic_access_failed': 'Échec de l\'accès au microphone. Veuillez réessayer.',
+    
+    // Error Messages - Speech Recognition
+    'error_speech_api_not_supported': 'L\'API Web Speech n\'est pas prise en charge dans ce navigateur. Veuillez utiliser Chrome, Edge ou Safari (dernière version).',
+    'error_speech_https_required': 'L\'API Web Speech nécessite une connexion HTTPS. Veuillez utiliser HTTPS ou localhost.',
+    'error_speech_no_speech': 'Aucune parole détectée. Veuillez parler clairement dans le microphone.',
+    'error_speech_audio_capture': 'Aucun microphone trouvé ou microphone inaccessible. Veuillez vérifier les paramètres de votre microphone.',
+    'error_speech_not_allowed': 'Permission du microphone refusée. Veuillez autoriser l\'accès au microphone dans les paramètres de votre navigateur.',
+    'error_speech_network': 'Une erreur réseau s\'est produite. Veuillez vérifier votre connexion Internet et réessayer.',
+    'error_speech_aborted': 'La reconnaissance vocale a été interrompue.',
+    'error_speech_service_not_allowed': 'Le service de reconnaissance vocale n\'est pas autorisé. Veuillez vérifier les paramètres de votre navigateur.',
+    'error_speech_grammar': 'Erreur de grammaire de reconnaissance vocale.',
+    'error_speech_language_not_supported': 'La langue n\'est pas prise en charge. Veuillez essayer une autre langue.',
+    'error_speech_unknown': 'Une erreur de reconnaissance vocale s\'est produite. Veuillez réessayer.',
+    
+    // Error Messages - Network & API
+    'error_network': 'Une erreur réseau s\'est produite. Veuillez vérifier votre connexion et réessayer.',
+    'error_api_auth': 'Erreur d\'authentification de l\'API IA. Veuillez vérifier la configuration de votre clé API.',
+    'error_api_unknown': 'Une erreur s\'est produite. Veuillez réessayer.',
+    
+    // Error Messages - General
+    'error_unknown': 'Une erreur inattendue s\'est produite. Veuillez réessayer.',
+    'error_user_id_not_found': 'ID utilisateur introuvable. Veuillez vous reconnecter.',
+    'error_update_profile_failed': 'Échec de la mise à jour du profil. Veuillez réessayer.',
+    'error_update_language_failed': 'Échec de la mise à jour de la langue. Veuillez vérifier votre connexion et réessayer.',
+    'error_audio_context_not_supported': 'AudioContext n\'est pas pris en charge dans ce navigateur.',
   }
 };
 

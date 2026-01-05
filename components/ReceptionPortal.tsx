@@ -44,7 +44,13 @@ import { authenticateStaff } from "../services/authService";
 import {
   parseAdminInput,
   parseRideRequestWithContext,
+  extractRoomNumber,
 } from "../services/geminiService";
+import { useVoiceRecording } from "../hooks/useVoiceRecording";
+import {
+  processTranscript,
+  ParsedVoiceData,
+} from "../services/voiceParsingService";
 import {
   User,
   UserRole,
@@ -56,6 +62,7 @@ import {
 } from "../types";
 import { apiClient } from "../services/apiClient";
 import BuggyNotificationBell from "./BuggyNotificationBell";
+import { useTranslation } from "../contexts/LanguageContext";
 
 interface ReceptionPortalProps {
   onLogout: () => void;
@@ -68,6 +75,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   user,
   embedded = false,
 }) => {
+  const { t } = useTranslation();
   const [rides, setRides] = useState<RideRequest[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -150,21 +158,31 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   }>({ isOpen: false, type: null });
   const [isCreatingRide, setIsCreatingRide] = useState(false);
 
-  // Voice Input State
-  const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState("");
+  // Voice Input State - using custom hook
   const [isProcessing, setIsProcessing] = useState(false);
   const [voiceResult, setVoiceResult] = useState<{
     status: "success" | "error" | null;
     message: string;
   }>({ status: null, message: "" });
-  const recognitionRef = useRef<any>(null);
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const silenceCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastSpeechTimeRef = useRef<number>(0);
-  const currentTranscriptRef = useRef<string>("");
-  const [audioLevel, setAudioLevel] = useState(0); // For animation (0-100)
-  const audioLevelIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Use voice recording hook
+  const {
+    isListening,
+    transcript,
+    audioLevel,
+    silenceCountdown,
+    silenceRemainingTime,
+    handleToggleListening,
+    stopRecording,
+  } = useVoiceRecording({
+    language: "vi-VN",
+    onTranscriptReady: async (finalTranscript: string) => {
+      // Process transcript when recording stops
+      await handleProcessTranscript(finalTranscript);
+    },
+    silenceTimeout: 5000,
+    t, // Pass translation function for multilingual error messages
+  });
   
   // Voice Auto-Confirm State (in form, not separate modal)
   const [isAutoConfirming, setIsAutoConfirming] = useState(false);
@@ -245,20 +263,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     }
   };
 
-  // Cleanup timers on unmount
+  // Cleanup countdown timer on unmount
   useEffect(() => {
     return () => {
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-      }
-      if (silenceCheckIntervalRef.current) {
-        clearInterval(silenceCheckIntervalRef.current);
-      }
       if (countdownTimerRef.current) {
         clearInterval(countdownTimerRef.current);
-      }
-      if (audioLevelIntervalRef.current) {
-        clearInterval(audioLevelIntervalRef.current);
       }
     };
   }, []);
@@ -281,527 +290,27 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     );
   };
 
-  // Helper function to stop recording and process transcript
-  const stopRecordingAndProcess = useCallback(() => {
-    if (recognitionRef.current && isListening) {
-      recognitionRef.current.stop();
-    }
-    setIsListening(false);
-    setAudioLevel(0);
-    
-    // Clear all timers
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
-    }
-    if (silenceCheckIntervalRef.current) {
-      clearInterval(silenceCheckIntervalRef.current);
-      silenceCheckIntervalRef.current = null;
-    }
-    if (audioLevelIntervalRef.current) {
-      clearInterval(audioLevelIntervalRef.current);
-      audioLevelIntervalRef.current = null;
-    }
-    
-    // Process transcript and show confirmation modal using ref to get latest value
-    const currentTranscript = currentTranscriptRef.current;
-    if (currentTranscript.trim()) {
-      processTranscript(currentTranscript);
-    }
-  }, [isListening]);
-
-  // Voice recognition logic
-  const handleToggleListening = () => {
-    if (isListening) {
-      stopRecordingAndProcess();
-    } else {
-      const SpeechRecognition =
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        alert("Speech recognition is not supported in this browser.");
-        return;
-      }
-
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.lang = "vi-VN"; // Set to Vietnamese
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.continuous = true;
-
-      recognitionRef.current.onstart = () => {
-        setIsListening(true);
-        setTranscript("");
-        currentTranscriptRef.current = "";
-        lastSpeechTimeRef.current = Date.now();
-        setAudioLevel(30); // Start with low level
-        
-        // Clear any existing timers
-        if (silenceTimerRef.current) {
-          clearTimeout(silenceTimerRef.current);
-          silenceTimerRef.current = null;
-        }
-        if (silenceCheckIntervalRef.current) {
-          clearInterval(silenceCheckIntervalRef.current);
-          silenceCheckIntervalRef.current = null;
-        }
-        
-        // Start silence check interval - check every 500ms if 5 seconds of silence passed
-        silenceCheckIntervalRef.current = setInterval(() => {
-          // Check if recognition is still active
-          if (recognitionRef.current) {
-            const timeSinceLastSpeech = Date.now() - lastSpeechTimeRef.current;
-            if (timeSinceLastSpeech >= 5000) {
-              // 5 seconds of silence detected (increased from 3s for better UX)
-              console.log("5 seconds of silence detected, stopping recording...");
-              stopRecordingAndProcess();
-            }
-          }
-        }, 500);
-        
-        // Start audio level animation interval
-        if (audioLevelIntervalRef.current) {
-          clearInterval(audioLevelIntervalRef.current);
-        }
-        audioLevelIntervalRef.current = setInterval(() => {
-          // Gradually decrease audio level when no new speech
-          setAudioLevel(prev => {
-            if (prev > 20) {
-              return Math.max(20, prev - 2);
-            }
-            return prev;
-          });
-        }, 100);
-      };
-
-      recognitionRef.current.onresult = (event: any) => {
-        // Build complete transcript from all results
-        // This approach avoids duplicates by reconstructing the full transcript each time
-        let fullTranscript = "";
-        let hasSpeech = false;
-        
-        for (let i = 0; i < event.results.length; ++i) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            fullTranscript += result[0].transcript + " ";
-            hasSpeech = true;
-          } else {
-            // Only show the last interim result (most recent)
-            if (i === event.results.length - 1) {
-              fullTranscript += result[0].transcript;
-              hasSpeech = true;
-            }
-          }
-        }
-        
-        // Update transcript with the complete version (no duplicates)
-        const trimmedTranscript = fullTranscript.trim();
-        if (trimmedTranscript) {
-          currentTranscriptRef.current = trimmedTranscript;
-          setTranscript(trimmedTranscript);
-          
-          // Update audio level for animation when speech is detected
-          if (hasSpeech) {
-            setAudioLevel(60 + Math.random() * 40); // Random between 60-100
-          }
-          
-          // Reset silence timer whenever we get speech input
-          lastSpeechTimeRef.current = Date.now();
-        } else {
-          // No speech detected, lower audio level gradually
-          setAudioLevel(prev => Math.max(20, prev - 2));
-        }
-      };
-
-      recognitionRef.current.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
-        setIsListening(false);
-        setAudioLevel(0);
-        if (silenceTimerRef.current) {
-          clearTimeout(silenceTimerRef.current);
-          silenceTimerRef.current = null;
-        }
-        if (silenceCheckIntervalRef.current) {
-          clearInterval(silenceCheckIntervalRef.current);
-          silenceCheckIntervalRef.current = null;
-        }
-        if (audioLevelIntervalRef.current) {
-          clearInterval(audioLevelIntervalRef.current);
-          audioLevelIntervalRef.current = null;
-        }
-      };
-
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-        setAudioLevel(0);
-        if (silenceTimerRef.current) {
-          clearTimeout(silenceTimerRef.current);
-          silenceTimerRef.current = null;
-        }
-        if (silenceCheckIntervalRef.current) {
-          clearInterval(silenceCheckIntervalRef.current);
-          silenceCheckIntervalRef.current = null;
-        }
-        if (audioLevelIntervalRef.current) {
-          clearInterval(audioLevelIntervalRef.current);
-          audioLevelIntervalRef.current = null;
-        }
-      };
-
-      recognitionRef.current.start();
-    }
-  };
-
-  // Smart voice parsing without AI - using keyword matching
-  const parseVoiceTranscript = (text: string) => {
-    const lowerText = text.toLowerCase();
-    const result: {
-      roomNumber?: string;
-      guestName?: string;
-      pickup?: string;
-      destination?: string;
-      guestCount?: number;
-      notes?: string;
-    } = {};
-
-    // Extract room number (patterns: "room 101", "phòng 101", "101", "D03", "villa D5")
-    const roomPatterns = [
-      /(?:room|phòng|rồm)\s*([A-Z]?\d+[A-Z]?)/i,
-      /(?:villa|biệt thự)\s*([A-Z]\d+)/i,
-      /\b([A-Z]?\d{2,3}[A-Z]?)\b/,
-      /\b([DP]\d{1,2})\b/i,
-    ];
-    for (const pattern of roomPatterns) {
-      const match = text.match(pattern);
-      if (match) {
-        result.roomNumber = match[1];
-        break;
-      }
-    }
-
-    // Extract guest name (after keywords: "guest", "khách", "name", "tên")
-    const namePatterns = [
-      /(?:guest|khách|name|tên)\s+(?:is|là|:)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
-      /(?:tên|name)\s+(?:khách|guest)?\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
-    ];
-    for (const pattern of namePatterns) {
-      const match = text.match(pattern);
-      if (match) {
-        result.guestName = match[1].trim();
-        break;
-      }
-    }
-
-    // Extract guest count (patterns: "3 guests", "3 người", "3 khách", "3 people")
-    const countPatterns = [
-      /\b(\d+)\s*(?:guests?|người|khách|people|pax)\b/i,
-      /\b(\d+)\s*(?:persons?|người)\b/i,
-    ];
-    for (const pattern of countPatterns) {
-      const match = text.match(pattern);
-      if (match) {
-        result.guestCount = parseInt(match[1]);
-        if (result.guestCount > 7) result.guestCount = 7;
-        if (result.guestCount < 1) result.guestCount = 1;
-        break;
-      }
-    }
-
-    // Extract notes (keywords: luggage, hành lý, baby seat, urgent, gấp)
-    const notesKeywords = {
-      luggage: ["luggage", "hành lý", "bag", "túi", "valise"],
-      babySeat: ["baby seat", "ghế trẻ em", "trẻ em"],
-      urgent: ["urgent", "gấp", "nhanh", "asap"],
-      wheelchair: ["wheelchair", "xe lăn"],
-    };
-    const foundNotes: string[] = [];
-    for (const [key, keywords] of Object.entries(notesKeywords)) {
-      if (keywords.some((kw) => lowerText.includes(kw))) {
-        foundNotes.push(
-          key === "luggage"
-            ? "Has luggage"
-            : key === "babySeat"
-              ? "Needs baby seat"
-              : key === "urgent"
-                ? "Urgent"
-                : "Needs wheelchair",
-        );
-      }
-    }
-    if (foundNotes.length > 0) {
-      result.notes = foundNotes.join(", ");
-    }
-
-    // Find locations using keyword matching
-    const findLocation = (searchText: string): string | null => {
-      const lowerSearch = searchText.toLowerCase();
-
-      // Direct match
-      for (const loc of locations) {
-        if (
-          lowerSearch.includes(loc.name.toLowerCase()) ||
-          loc.name.toLowerCase().includes(lowerSearch)
-        ) {
-          return loc.name;
-        }
-      }
-
-      // Keyword matching
-      const keywordMap: Record<string, string[]> = {
-        pool: ["pool", "hồ bơi", "bể bơi"],
-        restaurant: ["restaurant", "nhà hàng", "restaurant"],
-        villa: ["villa", "biệt thự", "villas"],
-        lobby: ["lobby", "sảnh", "reception", "lễ tân"],
-        beach: ["beach", "bãi biển", "biển"],
-        gym: ["gym", "phòng gym", "phòng tập"],
-      };
-
-      for (const [category, keywords] of Object.entries(keywordMap)) {
-        if (keywords.some((kw) => lowerSearch.includes(kw))) {
-          // Find first matching location by type or name
-          if (category === "pool") {
-            const pool = locations.find(
-              (l) =>
-                l.type === "FACILITY" && l.name.toLowerCase().includes("pool"),
-            );
-            if (pool) return pool.name;
-          } else if (category === "restaurant") {
-            const restaurant = locations.find((l) => l.type === "RESTAURANT");
-            if (restaurant) return restaurant.name;
-          } else if (category === "villa") {
-            const villa = locations.find(
-              (l) => l.type === "VILLA" || /^[DP]\d/.test(l.name),
-            );
-            if (villa) return villa.name;
-          } else if (category === "lobby") {
-            const lobby = locations.find(
-              (l) =>
-                l.name.toLowerCase().includes("reception") ||
-                l.name.toLowerCase().includes("lobby"),
-            );
-            if (lobby) return lobby.name;
-          } else {
-            const match = locations.find((l) =>
-              l.name.toLowerCase().includes(category),
-            );
-            if (match) return match.name;
-          }
-        }
-      }
-
-      return null;
-    };
-
-    // Extract pickup and destination
-    // Patterns: "from X to Y", "từ X đến Y", "pickup X destination Y", "đón X đi Y"
-    const routePatterns = [
-      /(?:from|từ|pickup|đón)\s+(.+?)\s+(?:to|đến|destination|đi|go to)\s+(.+)/i,
-      /(?:pickup|đón)\s+(.+?)\s+(?:destination|điểm đến|đi)\s+(.+)/i,
-      /(.+?)\s+(?:to|đến|đi)\s+(.+)/i,
-    ];
-
-    let foundPickup: string | null = null;
-    let foundDestination: string | null = null;
-
-    for (const pattern of routePatterns) {
-      const match = text.match(pattern);
-      if (match) {
-        const pickupText = match[1].trim();
-        const destText = match[2].trim();
-
-        foundPickup = findLocation(pickupText);
-        foundDestination = findLocation(destText);
-
-        if (foundPickup && foundDestination) break;
-      }
-    }
-
-    // If not found in patterns, try to find locations anywhere in text
-    if (!foundPickup || !foundDestination) {
-      for (const loc of locations) {
-        const locLower = loc.name.toLowerCase();
-        if (lowerText.includes(locLower)) {
-          if (!foundPickup) {
-            foundPickup = loc.name;
-          } else if (!foundDestination && loc.name !== foundPickup) {
-            foundDestination = loc.name;
-            break;
-          }
-        }
-      }
-    }
-
-    // If pickup not found but room number exists, use room as pickup
-    if (!foundPickup && result.roomNumber) {
-      foundPickup = result.roomNumber;
-    }
-
-    if (foundPickup) result.pickup = foundPickup;
-    if (foundDestination) result.destination = foundDestination;
-
-    return result;
-  };
-
-  // Normalize transcript text - remove filler words and clean up
-  const normalizeTranscript = (text: string): string => {
-    // Remove common filler words in Vietnamese and English
-    const fillerWords = [
-      "um", "uh", "er", "ah", "à", "ừ", "ờ", "hmm", "hm",
-      "you know", "like", "actually", "basically", "so", "well",
-      "thì", "là", "và", "của", "để", "mà", "với", "cho"
-    ];
-    
-    let normalized = text.trim();
-    
-    // Remove excessive spaces
-    normalized = normalized.replace(/\s+/g, " ");
-    
-    // Remove filler words (case insensitive)
-    fillerWords.forEach(word => {
-      const regex = new RegExp(`\\b${word}\\b`, "gi");
-      normalized = normalized.replace(regex, " ").trim();
-    });
-    
-    // Clean up multiple spaces again
-    normalized = normalized.replace(/\s+/g, " ").trim();
-    
-    return normalized;
-  };
-
-  const processTranscript = async (text: string) => {
-    if (!text.trim()) {
-      setVoiceResult({
-        status: "error",
-        message: "Không phát hiện giọng nói. Vui lòng thử lại.",
-      });
-      return;
-    }
-
+  // Handle processing transcript using voice parsing service
+  const handleProcessTranscript = async (text: string) => {
     setIsProcessing(true);
     setVoiceResult({ status: null, message: "" });
 
-    try {
-      // Normalize transcript first
-      const normalizedText = normalizeTranscript(text);
-      
-      if (!normalizedText || normalizedText.length < 5) {
-        setVoiceResult({
-          status: "error",
-          message: "Câu nói quá ngắn hoặc không rõ ràng. Vui lòng thử lại.",
-        });
-        setIsProcessing(false);
-        return;
-      }
-
-      // Use AI parsing instead of simple keyword matching
-      const parsedData = await parseRideRequestWithContext(normalizedText, locations);
-
-      if (parsedData && (parsedData.pickup || parsedData.destination)) {
-        // Helper to extract room number from text
-        const extractRoomNumber = (text: string): string | null => {
-          if (!text) return null;
-          const trimmed = text.trim();
-          
-          // Pattern 1: Room/Villa keywords followed by room number
-          const roomPatterns = [
-            /(?:room|phòng|rồm)\s*([A-Z]{1,3}\d{0,3}[A-Z]?|\d{2,3}[A-Z]?)/i,
-            /(?:villa|biệt thự)\s*([A-Z]\d+)/i,
-          ];
-          for (const pattern of roomPatterns) {
-            const match = text.match(pattern);
-            if (match) return match[1].trim();
-          }
-          
-          // Pattern 2: Direct room number formats
-          // ACC, D11, A101, 101, D03, etc.
-          const directPatterns = [
-            /^([A-Z]{2,3})$/i,  // ACC, ABC (2-3 letters)
-            /^([A-Z]\d{1,3})$/i,  // D11, A101 (letter + 1-3 digits)
-            /^([A-Z]?\d{2,3}[A-Z]?)$/i,  // 101, 101A, A101
-            /^([DP]\d{1,2})$/i,  // D11, P03
-          ];
-          for (const pattern of directPatterns) {
-            if (pattern.test(trimmed)) {
-              return trimmed.toUpperCase();
-            }
-          }
-          
-          // Pattern 3: Room number in text (word boundary)
-          const inTextPatterns = [
-            /\b([A-Z]{2,3})\b/i,  // ACC, ABC
-            /\b([A-Z]\d{1,3})\b/i,  // D11, A101
-            /\b([A-Z]?\d{2,3}[A-Z]?)\b/,  // 101, 101A
-            /\b([DP]\d{1,2})\b/i,  // D11, P03
-          ];
-          for (const pattern of inTextPatterns) {
-            const match = text.match(pattern);
-            if (match) return match[1].trim().toUpperCase();
-          }
-          
-          return null;
-        };
-        
-        // Helper to check if text looks like a room number
-        const looksLikeRoomNumber = (text: string): boolean => {
-          if (!text) return false;
-          const trimmed = text.trim().toUpperCase();
-          // Check various room number patterns
-          return /^[A-Z]{2,3}$/.test(trimmed) ||  // ACC, ABC
-                 /^[A-Z]\d{1,3}$/.test(trimmed) ||  // D11, A101
-                 /^[A-Z]?\d{2,3}[A-Z]?$/.test(trimmed) ||  // 101, 101A
-                 /^[DP]\d{1,2}$/.test(trimmed);  // D11, P03
-        };
-
-        // Helper to check if a string is a known location name
-        const isLocationName = (text: string): boolean => {
-          if (!text) return false;
-          return locations.some(loc => 
-            loc.name.toLowerCase() === text.toLowerCase() ||
-            loc.name.toLowerCase().includes(text.toLowerCase()) ||
-            text.toLowerCase().includes(loc.name.toLowerCase())
-          );
-        };
-
-        // Auto-fill form data
-        let roomNumber = parsedData.roomNumber;
-        // If no room number, try to extract from pickup
-        if (!roomNumber && parsedData.pickup) {
-          // First try to extract room number from pickup text
-          roomNumber = extractRoomNumber(parsedData.pickup) || null;
-          
-          // If pickup itself looks like a room number and is not a known location, use it directly
-          if (!roomNumber && !isLocationName(parsedData.pickup)) {
-            if (looksLikeRoomNumber(parsedData.pickup)) {
-              roomNumber = parsedData.pickup.trim().toUpperCase();
-            }
-          }
-          
-          // If pickup is a known location that contains a room number, extract it
-          if (!roomNumber && isLocationName(parsedData.pickup)) {
-            const extracted = extractRoomNumber(parsedData.pickup);
-            if (extracted) {
-              roomNumber = extracted;
-            }
-          }
-        }
-        // If still no room number, try from previous data
-        if (!roomNumber) {
-          roomNumber = extractRoomNumber(newRideData.pickup) || 
-                      (looksLikeRoomNumber(newRideData.pickup) ? newRideData.pickup.trim().toUpperCase() : null) ||
-                      (newRideData.roomNumber && newRideData.roomNumber.trim() ? newRideData.roomNumber : null);
-        }
-
+    await processTranscript(
+      text,
+      locations,
+      {
+        onSuccess: (data: ParsedVoiceData) => {
+          // Update form data
         setNewRideData((prev) => ({
           ...prev,
-          roomNumber: roomNumber || (prev.roomNumber && prev.roomNumber.trim() ? prev.roomNumber : ""),
-          pickup: parsedData.pickup || prev.pickup,
-          destination: parsedData.destination || prev.destination,
-          guestName: parsedData.guestName || prev.guestName,
-          guestCount: parsedData.guestCount || prev.guestCount || 1,
-          notes: parsedData.notes || prev.notes,
-        }));
+            roomNumber: data.roomNumber || (prev.roomNumber && prev.roomNumber.trim() ? prev.roomNumber : ""),
+            pickup: data.pickup || prev.pickup,
+            destination: data.destination || prev.destination,
+            guestName: data.guestName || prev.guestName,
+            guestCount: data.guestCount || prev.guestCount || 1,
+            notes: data.notes || prev.notes,
+          }));
 
-        // Check if we have minimum required fields - use the extracted roomNumber
-        const finalRoomNumber = roomNumber || newRideData.roomNumber;
-        if (parsedData.pickup && parsedData.destination && finalRoomNumber) {
           // Show success message and start auto-confirm countdown
           setVoiceResult({
             status: "success",
@@ -835,317 +344,35 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               return prev - 1;
             });
           }, 1000);
-        } else {
-          // Partial data - show what was found
-          const found = [];
-          if (parsedData.pickup) found.push("điểm đón");
-          if (parsedData.destination) found.push("điểm đến");
-          if (parsedData.roomNumber) found.push("số phòng");
-          if (parsedData.guestName) found.push("tên khách");
-          
+        },
+        onError: (message: string) => {
           setVoiceResult({
-            status: "success",
-            message: `✅ Đã nhận diện: ${found.join(", ")}. Vui lòng bổ sung thông tin còn thiếu.`,
+            status: "error",
+            message,
           });
-        }
-      } else {
-        // Fallback to simple parsing if AI fails
-        const fallbackData = parseVoiceTranscript(normalizedText);
-        
-        if (fallbackData.pickup && fallbackData.destination) {
-          // Helper to extract room number from text
-          const extractRoomNumber = (text: string): string | null => {
-            if (!text) return null;
-            const trimmed = text.trim();
-            
-            // Pattern 1: Room/Villa keywords followed by room number
-            const roomPatterns = [
-              /(?:room|phòng|rồm)\s*([A-Z]{1,3}\d{0,3}[A-Z]?|\d{2,3}[A-Z]?)/i,
-              /(?:villa|biệt thự)\s*([A-Z]\d+)/i,
-            ];
-            for (const pattern of roomPatterns) {
-              const match = text.match(pattern);
-              if (match) return match[1].trim();
-            }
-            
-            // Pattern 2: Direct room number formats
-            const directPatterns = [
-              /^([A-Z]{2,3})$/i,  // ACC, ABC
-              /^([A-Z]\d{1,3})$/i,  // D11, A101
-              /^([A-Z]?\d{2,3}[A-Z]?)$/i,  // 101, 101A
-              /^([DP]\d{1,2})$/i,  // D11, P03
-            ];
-            for (const pattern of directPatterns) {
-              if (pattern.test(trimmed)) {
-                return trimmed.toUpperCase();
-              }
-            }
-            
-            // Pattern 3: Room number in text
-            const inTextPatterns = [
-              /\b([A-Z]{2,3})\b/i,  // ACC, ABC
-              /\b([A-Z]\d{1,3})\b/i,  // D11, A101
-              /\b([A-Z]?\d{2,3}[A-Z]?)\b/,  // 101, 101A
-              /\b([DP]\d{1,2})\b/i,  // D11, P03
-            ];
-            for (const pattern of inTextPatterns) {
-              const match = text.match(pattern);
-              if (match) return match[1].trim().toUpperCase();
-            }
-            
-            return null;
-          };
-          
-          // Helper to check if text looks like a room number
-          const looksLikeRoomNumber = (text: string): boolean => {
-            if (!text) return false;
-            const trimmed = text.trim().toUpperCase();
-            return /^[A-Z]{2,3}$/.test(trimmed) ||  // ACC, ABC
-                   /^[A-Z]\d{1,3}$/.test(trimmed) ||  // D11, A101
-                   /^[A-Z]?\d{2,3}[A-Z]?$/.test(trimmed) ||  // 101, 101A
-                   /^[DP]\d{1,2}$/.test(trimmed);  // D11, P03
-          };
-          
-          // Helper to check if a string is a known location name
-          const isLocationName = (text: string): boolean => {
-            if (!text) return false;
-            return locations.some(loc => 
-              loc.name.toLowerCase() === text.toLowerCase() ||
-              loc.name.toLowerCase().includes(text.toLowerCase()) ||
-              text.toLowerCase().includes(loc.name.toLowerCase())
-            );
-          };
-
-          let roomNumber = fallbackData.roomNumber;
-          // If no room number, try to extract from pickup
-          if (!roomNumber && fallbackData.pickup) {
-            // First try to extract room number from pickup text
-            roomNumber = extractRoomNumber(fallbackData.pickup) || null;
-            
-            // If pickup itself looks like a room number and is not a known location, use it directly
-            if (!roomNumber && !isLocationName(fallbackData.pickup)) {
-              if (looksLikeRoomNumber(fallbackData.pickup)) {
-                roomNumber = fallbackData.pickup.trim().toUpperCase();
-              }
-            }
-            
-            // If pickup is a known location that contains a room number, extract it
-            if (!roomNumber && isLocationName(fallbackData.pickup)) {
-              const extracted = extractRoomNumber(fallbackData.pickup);
-              if (extracted) {
-                roomNumber = extracted;
-              }
-            }
-          }
-          // If still no room number, try from previous data
-          if (!roomNumber) {
-            roomNumber = extractRoomNumber(newRideData.pickup) || 
-                        (looksLikeRoomNumber(newRideData.pickup) ? newRideData.pickup.trim().toUpperCase() : null) ||
-                        (newRideData.roomNumber && newRideData.roomNumber.trim() ? newRideData.roomNumber : null);
-          }
-
+        },
+        onPartialSuccess: (data: ParsedVoiceData, foundFields: string[]) => {
+          // Update form data with partial results
           setNewRideData((prev) => ({
             ...prev,
-            roomNumber: roomNumber || (prev.roomNumber && prev.roomNumber.trim() ? prev.roomNumber : ""),
-            pickup: fallbackData.pickup || prev.pickup,
-            destination: fallbackData.destination || prev.destination,
-            guestName: fallbackData.guestName || prev.guestName,
-            guestCount: fallbackData.guestCount || prev.guestCount || 1,
-            notes: fallbackData.notes || prev.notes,
+            roomNumber: data.roomNumber || (prev.roomNumber && prev.roomNumber.trim() ? prev.roomNumber : ""),
+            pickup: data.pickup || prev.pickup,
+            destination: data.destination || prev.destination,
+            guestName: data.guestName || prev.guestName,
+            guestCount: data.guestCount || prev.guestCount || 1,
+            notes: data.notes || prev.notes,
           }));
 
           setVoiceResult({
             status: "success",
-            message: "✅ Đã nhận diện thành công! Tự động tạo ride sau 5 giây...",
+            message: `✅ Đã nhận diện: ${foundFields.join(", ")}. Vui lòng bổ sung thông tin còn thiếu.`,
           });
-          
-          setIsAutoConfirming(true);
-          setCountdown(5);
-          
-          if (countdownTimerRef.current) {
-            clearInterval(countdownTimerRef.current);
-            countdownTimerRef.current = null;
-          }
-          
-          countdownTimerRef.current = setInterval(() => {
-            setCountdown((prev) => {
-              if (prev <= 1) {
-                if (countdownTimerRef.current) {
-                  clearInterval(countdownTimerRef.current);
-                  countdownTimerRef.current = null;
-                }
-                setIsAutoConfirming(false);
-                setTimeout(() => {
-                  handleCreateRide();
-                }, 100);
-                return 0;
-              }
-              return prev - 1;
-            });
-          }, 1000);
-        } else {
-          const missing = [];
-          if (!fallbackData.pickup && !parsedData?.pickup) missing.push("điểm đón");
-          if (!fallbackData.destination && !parsedData?.destination) missing.push("điểm đến");
+        },
+      },
+      newRideData
+    );
 
-          setVoiceResult({
-            status: "error",
-            message: `Không tìm thấy ${missing.join(" và ")}. Vui lòng nói rõ ràng hơn, ví dụ: "đón phòng 101 đi hồ bơi" hoặc "from room 101 to pool".`,
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Voice parsing error:", error);
-      
-      // Try fallback parsing
-      try {
-        const fallbackData = parseVoiceTranscript(text);
-        if (fallbackData.pickup && fallbackData.destination) {
-          // Helper to extract room number from text
-          const extractRoomNumber = (text: string): string | null => {
-            if (!text) return null;
-            const trimmed = text.trim();
-            
-            // Pattern 1: Room/Villa keywords followed by room number
-            const roomPatterns = [
-              /(?:room|phòng|rồm)\s*([A-Z]{1,3}\d{0,3}[A-Z]?|\d{2,3}[A-Z]?)/i,
-              /(?:villa|biệt thự)\s*([A-Z]\d+)/i,
-            ];
-            for (const pattern of roomPatterns) {
-              const match = text.match(pattern);
-              if (match) return match[1].trim();
-            }
-            
-            // Pattern 2: Direct room number formats
-            const directPatterns = [
-              /^([A-Z]{2,3})$/i,  // ACC, ABC
-              /^([A-Z]\d{1,3})$/i,  // D11, A101
-              /^([A-Z]?\d{2,3}[A-Z]?)$/i,  // 101, 101A
-              /^([DP]\d{1,2})$/i,  // D11, P03
-            ];
-            for (const pattern of directPatterns) {
-              if (pattern.test(trimmed)) {
-                return trimmed.toUpperCase();
-              }
-            }
-            
-            // Pattern 3: Room number in text
-            const inTextPatterns = [
-              /\b([A-Z]{2,3})\b/i,  // ACC, ABC
-              /\b([A-Z]\d{1,3})\b/i,  // D11, A101
-              /\b([A-Z]?\d{2,3}[A-Z]?)\b/,  // 101, 101A
-              /\b([DP]\d{1,2})\b/i,  // D11, P03
-            ];
-            for (const pattern of inTextPatterns) {
-              const match = text.match(pattern);
-              if (match) return match[1].trim().toUpperCase();
-            }
-            
-            return null;
-          };
-          
-          // Helper to check if text looks like a room number
-          const looksLikeRoomNumber = (text: string): boolean => {
-            if (!text) return false;
-            const trimmed = text.trim().toUpperCase();
-            return /^[A-Z]{2,3}$/.test(trimmed) ||  // ACC, ABC
-                   /^[A-Z]\d{1,3}$/.test(trimmed) ||  // D11, A101
-                   /^[A-Z]?\d{2,3}[A-Z]?$/.test(trimmed) ||  // 101, 101A
-                   /^[DP]\d{1,2}$/.test(trimmed);  // D11, P03
-          };
-          
-          // Helper to check if a string is a known location name
-          const isLocationName = (text: string): boolean => {
-            if (!text) return false;
-            return locations.some(loc => 
-              loc.name.toLowerCase() === text.toLowerCase() ||
-              loc.name.toLowerCase().includes(text.toLowerCase()) ||
-              text.toLowerCase().includes(loc.name.toLowerCase())
-            );
-          };
-
-          let roomNumber = fallbackData.roomNumber;
-          // If no room number, try to extract from pickup
-          if (!roomNumber && fallbackData.pickup) {
-            // First try to extract room number from pickup text
-            roomNumber = extractRoomNumber(fallbackData.pickup) || null;
-            
-            // If pickup itself looks like a room number and is not a known location, use it directly
-            if (!roomNumber && !isLocationName(fallbackData.pickup)) {
-              if (looksLikeRoomNumber(fallbackData.pickup)) {
-                roomNumber = fallbackData.pickup.trim().toUpperCase();
-              }
-            }
-            
-            // If pickup is a known location that contains a room number, extract it
-            if (!roomNumber && isLocationName(fallbackData.pickup)) {
-              const extracted = extractRoomNumber(fallbackData.pickup);
-              if (extracted) {
-                roomNumber = extracted;
-              }
-            }
-          }
-          // If still no room number, try from previous data
-          if (!roomNumber) {
-            roomNumber = extractRoomNumber(newRideData.pickup) || 
-                        (looksLikeRoomNumber(newRideData.pickup) ? newRideData.pickup.trim().toUpperCase() : null) ||
-                        (newRideData.roomNumber && newRideData.roomNumber.trim() ? newRideData.roomNumber : null);
-          }
-
-          setNewRideData((prev) => ({
-            ...prev,
-            roomNumber: roomNumber || (prev.roomNumber && prev.roomNumber.trim() ? prev.roomNumber : ""),
-            pickup: fallbackData.pickup || prev.pickup,
-            destination: fallbackData.destination || prev.destination,
-            guestName: fallbackData.guestName || prev.guestName,
-            guestCount: fallbackData.guestCount || prev.guestCount || 1,
-            notes: fallbackData.notes || prev.notes,
-          }));
-
-          setVoiceResult({
-            status: "success",
-            message: "✅ Đã nhận diện thành công! Tự động tạo ride sau 5 giây...",
-          });
-          
-          setIsAutoConfirming(true);
-          setCountdown(5);
-          
-          if (countdownTimerRef.current) {
-            clearInterval(countdownTimerRef.current);
-            countdownTimerRef.current = null;
-          }
-          
-          countdownTimerRef.current = setInterval(() => {
-            setCountdown((prev) => {
-              if (prev <= 1) {
-                if (countdownTimerRef.current) {
-                  clearInterval(countdownTimerRef.current);
-                  countdownTimerRef.current = null;
-                }
-                setIsAutoConfirming(false);
-                setTimeout(() => {
-                  handleCreateRide();
-                }, 100);
-                return 0;
-              }
-              return prev - 1;
-            });
-          }, 1000);
-        } else {
-          setVoiceResult({
-            status: "error",
-            message: "Không thể xử lý yêu cầu. Vui lòng thử lại hoặc điền form thủ công.",
-          });
-        }
-      } catch (fallbackError) {
-        setVoiceResult({
-          status: "error",
-          message: "Lỗi xử lý giọng nói. Vui lòng thử lại hoặc điền form thủ công.",
-        });
-      }
-    } finally {
       setIsProcessing(false);
-    }
   };
   const calculateOptimalMergeRoute = (
     ride1: RideRequest,
@@ -2736,11 +1963,29 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     }
 
     // Check for duplicate pending ride (any status except COMPLETED)
-    // Only check by guest name (not room number)
+    // Check by Room Number and Route (pickup → destination), and also by guest name
     const duplicateRide = rides.find((r) => {
       if (r.status === BuggyStatus.COMPLETED) return false;
 
-      // Only check by guest name
+      // First check: Room Number and Route (pickup → destination)
+      const sameRoomNumber = 
+        newRideData.roomNumber &&
+        r.roomNumber &&
+        r.roomNumber.toLowerCase() === newRideData.roomNumber.toLowerCase();
+      
+      const sameRoute = 
+        newRideData.pickup &&
+        newRideData.destination &&
+        r.pickup &&
+        r.destination &&
+        r.pickup.toLowerCase() === newRideData.pickup.toLowerCase() &&
+        r.destination.toLowerCase() === newRideData.destination.toLowerCase();
+
+      if (sameRoomNumber && sameRoute) {
+        return true; // Duplicate: same room number and same route
+      }
+
+      // Second check: Guest name (as fallback)
       if (newRideData.guestName && newRideData.guestName.trim() !== "") {
         if (
           r.guestName &&
@@ -3024,11 +2269,15 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                     onClick={async () => {
                       try {
                         const [refreshedRides, refreshedUsers] =
-                          await Promise.all([getRides(), getUsers()]);
+                          await Promise.all([
+                            getRides().catch(() => getRidesSync()),
+                            getUsers().catch(() => getUsersSync()),
+                          ]);
                         setRides(refreshedRides);
                         setUsers(refreshedUsers);
                       } catch (error) {
                         console.error("Failed to refresh data:", error);
+                        // Fallback to sync functions if Promise.all itself fails
                         setRides(getRidesSync());
                         setUsers(getUsersSync());
                       }
@@ -4306,31 +3555,27 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                               driverStatus = "BUSY";
                             }
                           } else {
+                            // Check if driver has recent heartbeat (updated_at within last 30 seconds)
+                            // This is the PRIMARY way to determine if driver is online
                             if (driver.updatedAt) {
                               const timeSinceUpdate =
                                 Date.now() - driver.updatedAt;
                               if (timeSinceUpdate < 30000) {
+                                // 30 seconds
                                 driverStatus = "AVAILABLE";
+                              } else {
+                                // Driver has been offline for more than 30 seconds
+                                driverStatus = "OFFLINE";
                               }
+                            } else {
+                              // No updatedAt timestamp means driver is offline
+                              driverStatus = "OFFLINE";
                             }
 
-                            if (driverStatus === "OFFLINE") {
-                              const recentCompleted = rides.filter((r) => {
-                                const rideDriverId = r.driverId
-                                  ? String(r.driverId)
-                                  : "";
-                                return (
-                                  rideDriverId === driverIdStr &&
-                                  r.status === BuggyStatus.COMPLETED &&
-                                  r.completedAt &&
-                                  Date.now() - r.completedAt < 3600000
-                                );
-                              });
-                              driverStatus =
-                                recentCompleted.length > 0
-                                  ? "AVAILABLE"
-                                  : "OFFLINE";
-                            }
+                            // Note: We removed the fallback to completed rides because:
+                            // 1. A driver who just logged out should be OFFLINE immediately
+                            // 2. Heartbeat (updatedAt) is the most reliable indicator of online status
+                            // 3. Completed rides can be old and don't indicate current online status
                           }
 
                           // Don't show offline drivers
@@ -5473,6 +4718,43 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       ? "Listening..."
                       : "Press the button and speak to create a ride"}
                   </p>
+                  {/* Silence countdown indicator */}
+                  {isListening && silenceCountdown !== null && silenceRemainingTime !== null && (
+                    <div className="mt-3 w-full max-w-xs mx-auto animate-in fade-in slide-in-from-bottom-2">
+                      <div className="bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-orange-400 rounded-xl p-4 shadow-lg">
+                        <div className="flex items-center justify-center gap-2 mb-3">
+                          <AlertCircle size={20} className="text-orange-600 animate-pulse" />
+                          <p className="text-orange-800 font-semibold text-sm md:text-base">
+                            Im lặng phát hiện - Dừng ghi âm sau:
+                          </p>
+                        </div>
+                        <div className="mt-2 flex items-center justify-center mb-3">
+                          <div className="text-5xl md:text-6xl font-bold text-orange-600 animate-pulse drop-shadow-sm">
+                            {silenceCountdown}
+                          </div>
+                          <span className="text-3xl md:text-4xl font-semibold text-orange-600 ml-1">
+                            s
+                          </span>
+                        </div>
+                        {/* Enhanced Progress bar with accurate time-based calculation */}
+                        <div className="mt-3 w-full bg-orange-200 rounded-full h-3 overflow-hidden shadow-inner">
+                          <div
+                            className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 h-3 rounded-full transition-all duration-100 ease-linear relative overflow-hidden"
+                            style={{
+                              width: `${Math.max(0, Math.min(100, (silenceRemainingTime / 5000) * 100))}%`,
+                            }}
+                          >
+                            {/* Animated shimmer effect */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+                          </div>
+                        </div>
+                        {/* Time remaining text */}
+                        <p className="mt-2 text-center text-xs text-orange-700 font-medium">
+                          {(silenceRemainingTime / 1000).toFixed(1)} giây còn lại
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   {(transcript || isProcessing || voiceResult.status) && (
                     <div className="mt-4 w-full space-y-2">
                       {transcript && (

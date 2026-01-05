@@ -215,7 +215,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
 
     const handleSaveProfile = async () => {
         if (!user.id) {
-            alert('User ID not found');
+            alert(t('error_user_id_not_found') || 'User ID not found');
             return;
         }
 
@@ -268,7 +268,8 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
             alert('Profile updated successfully!');
         } catch (error: any) {
             console.error('Failed to save profile:', error);
-            alert(`Failed to update profile: ${error.message || 'Please try again'}`);
+            const baseMessage = t('error_update_profile_failed') || 'Failed to update profile.';
+            alert(`${baseMessage} ${error.message ? `(${error.message})` : ''}`);
         } finally {
             setIsSavingProfile(false);
         }
@@ -299,7 +300,8 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
             // Revert selectedLang on error
             setSelectedLang(selectedLang);
             
-            alert(`Failed to update language: ${error.message || 'Unknown error'}\n\nPlease check:\n1. Database has 'language' column\n2. Backend server is running\n3. Check browser console for details`);
+            const baseMessage = t('error_update_language_failed') || 'Failed to update language.';
+            alert(`${baseMessage} ${error.message ? `(${error.message})` : ''}\n\nPlease check:\n1. Database has 'language' column\n2. Backend server is running\n3. Check browser console for details`);
         } finally {
             setIsLangSaving(false);
             console.log('=== handleLanguageChange END ===');

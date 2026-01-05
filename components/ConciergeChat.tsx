@@ -314,6 +314,18 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
 
   const startLiveSession = async () => {
     try {
+        // Check if getUserMedia is available
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('getUserMedia is not supported in this browser');
+        }
+
+        // Check network connectivity
+        if (!navigator.onLine) {
+            alert(t('error_network') || 'No internet connection. Please check your network and try again.');
+            setMode('TEXT');
+            return;
+        }
+
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 16000});
         
@@ -347,6 +359,14 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
                                     data: base64Data
                                 }
                             });
+                        }).catch(err => {
+                            console.error("Error sending audio input:", err);
+                            // Check if it's a network error
+                            if (err?.message?.includes('network') || err?.message?.includes('fetch') || !navigator.onLine) {
+                                alert(t('error_network') || 'Network error occurred. Please check your connection and try again.');
+                                setMode('TEXT');
+                                setIsLiveConnected(false);
+                            }
                         });
                     }
                 };
@@ -381,11 +401,42 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
                 }
             },
             () => { setIsLiveConnected(false); },
-            (err) => { console.error("Live Error", err); setIsLiveConnected(false); }
+            (err) => { 
+                console.error("Live Error", err);
+                setIsLiveConnected(false);
+                
+                // Check error type and show appropriate message
+                const errorMessage = err?.message || String(err);
+                if (errorMessage.includes('network') || errorMessage.includes('fetch') || !navigator.onLine) {
+                    alert(t('error_network') || 'Network error occurred. Please check your connection and try again.');
+                } else if (errorMessage.includes('API key') || errorMessage.includes('401') || errorMessage.includes('403')) {
+                    alert(t('error_api_auth') || 'AI API authentication error. Please check your API key configuration.');
+                } else {
+                    alert(t('error_api_unknown') || 'An error occurred with the live session. Please try again.');
+                }
+                setMode('TEXT');
+            }
         );
 
-    } catch (err) {
+    } catch (err: any) {
         console.error("Failed to start live session", err);
+        
+        // Handle different error types with translation
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            alert(t('error_mic_permission_denied') || 'Microphone permission denied. Please allow microphone access in your browser settings.');
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+            alert(t('error_mic_not_found') || 'No microphone found. Please connect a microphone and try again.');
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+            alert(t('error_mic_in_use') || 'Microphone is already in use by another application. Please close other applications and try again.');
+        } else if (err.name === 'SecurityError') {
+            alert(t('error_mic_security') || 'Microphone access blocked due to security restrictions. Please use HTTPS or localhost.');
+        } else if (err.message?.includes('getUserMedia is not supported')) {
+            alert(t('error_mic_not_supported') || 'getUserMedia is not supported in this browser. Please use a modern browser.');
+        } else {
+            const baseMessage = t('error_api_unknown') || 'Failed to start live session.';
+            alert(`${baseMessage} ${err.message ? `(${err.message})` : ''}`);
+        }
+        
         setMode('TEXT');
     }
   };
