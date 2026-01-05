@@ -10,6 +10,7 @@ import {
   CheckCircle,
   MapPin,
   AlertCircle,
+  AlertTriangle,
   Info,
   X,
   Map,
@@ -25,6 +26,9 @@ import {
   Search,
   Bell,
   Mic,
+  Navigation,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import {
   getRides,
@@ -63,6 +67,7 @@ import {
 import { apiClient } from "../services/apiClient";
 import BuggyNotificationBell from "./BuggyNotificationBell";
 import { useTranslation } from "../contexts/LanguageContext";
+import { RESORT_CENTER } from "../constants";
 
 interface ReceptionPortalProps {
   onLogout: () => void;
@@ -93,6 +98,13 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
   // Driver View Mode State
   const [driverViewMode, setDriverViewMode] = useState<"LIST" | "MAP">("LIST");
+
+  // Map State for Driver Fleet
+  const mapRef = useRef<HTMLDivElement>(null);
+  const [mapInstance, setMapInstance] = useState<any>(null);
+  const [markers, setMarkers] = useState<any[]>([]);
+  const [mapError, setMapError] = useState(typeof process === 'undefined' || !process.env?.API_KEY);
+  const [driverFilter, setDriverFilter] = useState<'ALL' | 'AVAILABLE' | 'BUSY'>('ALL');
 
   // AI Assignment Modal State
   const [showAIAssignment, setShowAIAssignment] = useState(false);
@@ -821,6 +833,214 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rides]);
 
+  // --- GOOGLE MAPS INTEGRATION FOR DRIVER FLEET ---
+  useEffect(() => {
+    if (driverViewMode === "MAP" && !mapInstance && !mapError) {
+      // Define global error handler for Auth Failure (Invalid Key)
+      (window as any).gm_authFailure = () => {
+        console.error("Google Maps Authentication Error (gm_authFailure). Falling back to static map.");
+        setMapError(true);
+        setMapInstance(null); // Clear invalid instance
+      };
+
+      // Check if script already exists
+      if ((window as any).google && (window as any).google.maps) {
+        initMap();
+        return;
+      }
+
+      // Load Google Maps Script
+      if (!document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]')) {
+        const script = document.createElement("script");
+        const apiKey = (typeof process !== 'undefined' && process.env?.API_KEY) || "";
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async&callback=initGoogleMapReception&v=weekly`;
+        script.async = true;
+        script.defer = true;
+
+        script.onerror = () => {
+          console.error("Failed to load Google Maps script (Network Error).");
+          setMapError(true);
+        };
+
+        (window as any).initGoogleMapReception = () => {
+          initMap();
+        };
+
+        document.head.appendChild(script);
+      }
+    }
+  }, [driverViewMode, mapError]);
+
+  const initMap = () => {
+    if (!mapRef.current || !(window as any).google || mapError) return;
+
+    try {
+      const map = new (window as any).google.maps.Map(mapRef.current, {
+        center: { lat: RESORT_CENTER.lat, lng: RESORT_CENTER.lng },
+        zoom: 17,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        styles: [
+          {
+            featureType: "poi",
+            elementType: "labels",
+            stylers: [{ visibility: "off" }],
+          },
+        ],
+      });
+      setMapInstance(map);
+    } catch (e) {
+      console.error("Error initializing map constructor", e);
+      setMapError(true);
+    }
+  };
+
+  // Update Markers on Map
+  useEffect(() => {
+    if (mapInstance && driverViewMode === "MAP" && (window as any).google && !mapError) {
+      markers.forEach((m) => m.setMap(null));
+      const newMarkers: any[] = [];
+
+      // Get driver users and determine their status
+      const driverUsers = users.filter((u) => u.role === UserRole.DRIVER);
+      const activeRides = rides.filter(
+        (r) =>
+          r.status === BuggyStatus.ASSIGNED ||
+          r.status === BuggyStatus.ARRIVING ||
+          r.status === BuggyStatus.ON_TRIP,
+      );
+      const completedRides = rides.filter((r) => r.status === BuggyStatus.COMPLETED);
+
+      // Filter drivers based on filter state and online status
+      const filteredDrivers = driverUsers.filter((driver) => {
+        const driverIdStr = driver.id ? String(driver.id) : "";
+        const hasActiveRide = activeRides.some((r) => {
+          const rideDriverId = r.driverId ? String(r.driverId) : "";
+          return rideDriverId === driverIdStr;
+        });
+
+        // Check if driver is online (updated within last 30 seconds)
+        const isOnline = driver.updatedAt && Date.now() - driver.updatedAt < 30000;
+        if (!isOnline && !hasActiveRide) return false; // Don't show offline drivers
+
+        // Apply filter
+        if (driverFilter === "ALL") return true;
+        if (driverFilter === "AVAILABLE" && !hasActiveRide) return true;
+        if (driverFilter === "BUSY" && hasActiveRide) return true;
+        return false;
+      });
+
+      filteredDrivers.forEach((driver) => {
+        const coords = resolveDriverCoordinates(driver);
+        const driverIdStr = driver.id ? String(driver.id) : "";
+        const activeRide = activeRides.find((r) => {
+          const rideDriverId = r.driverId ? String(r.driverId) : "";
+          return rideDriverId === driverIdStr;
+        });
+
+        let infoContent = "";
+        if (activeRide) {
+          infoContent = `
+            <div style="color: #1f2937; padding: 4px; max-width: 200px;">
+              <strong style="font-size: 14px; color: #d97706;">${driver.lastName || "Unknown"} (Busy)</strong>
+              <hr style="margin: 4px 0; border: 0; border-top: 1px solid #eee;"/>
+              <div style="font-size: 12px;">
+                <strong>Trip:</strong> Room ${activeRide.roomNumber}<br/>
+                <span style="color: #6b7280;">${activeRide.pickup} &rarr; ${activeRide.destination}</span>
+              </div>
+            </div>
+          `;
+        } else {
+          const lastRide = completedRides
+            .filter((r) => {
+              const rideDriverId = r.driverId ? String(r.driverId) : "";
+              return rideDriverId === driverIdStr;
+            })
+            .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0))[0];
+
+          let timeSinceStr = "No recent trips";
+          if (lastRide && lastRide.completedAt) {
+            const diffMins = Math.floor((Date.now() - lastRide.completedAt) / 60000);
+            timeSinceStr = diffMins === 0 ? "Just now" : `${diffMins} mins ago`;
+          }
+
+          const locationName = getDriverLocation(driver);
+          let gpsInfo = "";
+          if (driver.currentLat !== undefined && driver.currentLng !== undefined) {
+            gpsInfo = `<br/><strong>GPS:</strong> ${driver.currentLat.toFixed(6)}, ${driver.currentLng.toFixed(6)}`;
+            if (driver.locationUpdatedAt) {
+              const locationAge = Math.floor((Date.now() - driver.locationUpdatedAt) / 60000);
+              gpsInfo += ` <span style="color: ${locationAge > 5 ? "#ef4444" : "#10b981"}; font-size: 10px;">(${locationAge}m ago)</span>`;
+            }
+          }
+
+          infoContent = `
+            <div style="color: #1f2937; padding: 6px; max-width: 220px;">
+              <strong style="font-size: 14px; color: #059669;">${driver.lastName || "Unknown"} (Available)</strong>
+              <hr style="margin: 4px 0; border: 0; border-top: 1px solid #eee;"/>
+              <div style="font-size: 11px; color: #6b7280;">
+                <strong>Idle:</strong> ${timeSinceStr}<br/>
+                <strong>Location:</strong> ${locationName}${gpsInfo}
+              </div>
+            </div>
+          `;
+        }
+
+        const hasActiveRide = !!activeRide;
+        const color = hasActiveRide ? "#f97316" : "#10b981";
+        const svgIcon = {
+          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+              <path fill="${color}" stroke="white" stroke-width="2" d="M20,0 C28.28,0 35,6.72 35,15 C35,25 20,40 20,40 C20,40 5,25 5,15 C5,6.72 11.72,0 20,0 Z"></path>
+              <circle cx="20" cy="15" r="10" fill="white" />
+              <path transform="translate(12, 9) scale(0.7)" fill="${color}" d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2a2 2 0 0 0 4 0h3a2 2 0 0 0 4 0h3zm-3-6l1.3 2.5c.1.2.1.5.1.8v.7H6v-.7c0-.3 0-.6.2-.8L7.5 11h8.5z" />
+            </svg>
+          `)}`,
+          scaledSize: new (window as any).google.maps.Size(40, 40),
+          anchor: new (window as any).google.maps.Point(20, 40),
+          labelOrigin: new (window as any).google.maps.Point(20, -10),
+        };
+
+        const marker = new (window as any).google.maps.Marker({
+          position: coords,
+          map: mapInstance,
+          icon: svgIcon,
+          animation: (window as any).google.maps.Animation.DROP,
+          label: {
+            text: driver.lastName || "Driver",
+            color: "#374151",
+            fontWeight: "bold",
+            fontSize: "12px",
+            className: "bg-white px-1 rounded shadow-sm",
+          },
+        });
+
+        const infoWindow = new (window as any).google.maps.InfoWindow({ content: infoContent });
+        marker.addListener("click", () => infoWindow.open(mapInstance, marker));
+        marker.addListener("mouseover", () => infoWindow.open(mapInstance, marker));
+        newMarkers.push(marker);
+      });
+
+      setMarkers(newMarkers);
+
+      // Auto-fit bounds to show all drivers
+      if (newMarkers.length > 0 && mapInstance) {
+        const bounds = new (window as any).google.maps.LatLngBounds();
+        filteredDrivers.forEach((driver) => {
+          const coords = resolveDriverCoordinates(driver);
+          bounds.extend(coords);
+        });
+        mapInstance.fitBounds(bounds);
+        // Ensure minimum zoom level
+        if (mapInstance.getZoom() && mapInstance.getZoom() > 18) {
+          mapInstance.setZoom(18);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users, rides, mapInstance, driverViewMode, mapError, driverFilter]);
+
   // Auto-assign logic: Automatically assign rides that have been waiting too long
   // DISABLED: Auto-assign feature is turned off by default
   useEffect(() => {
@@ -1061,16 +1281,35 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   const resolveDriverCoordinates = (
     driver: User,
   ): { lat: number; lng: number } => {
-    const locationName = getDriverLocation(driver);
-    const coords = resolveLocationCoordinates(locationName);
+    // Priority 1: Use GPS coordinates from database if available
+    if (driver.currentLat !== undefined && driver.currentLng !== undefined) {
+      return { lat: driver.currentLat, lng: driver.currentLng };
+    }
 
+    // Priority 2: Parse GPS from location string
+    const locationName = getDriverLocation(driver);
+    if (locationName.startsWith("GPS:")) {
+      const parts = locationName.replace("GPS:", "").split(",");
+      if (parts.length === 2) {
+        const lat = parseFloat(parts[0].trim());
+        const lng = parseFloat(parts[1].trim());
+        if (!isNaN(lat) && !isNaN(lng)) {
+          return { lat, lng };
+        }
+      }
+    }
+
+    // Priority 3: Find location by name
+    const coords = resolveLocationCoordinates(locationName);
     if (coords) {
       return coords;
     }
 
-    // Fallback to resort center if location not found
-    const RESORT_CENTER = { lat: 16.04, lng: 108.248 };
-    return RESORT_CENTER;
+    // Fallback: Resort center with small random offset
+    return {
+      lat: RESORT_CENTER.lat + (Math.random() * 0.001 - 0.0005),
+      lng: RESORT_CENTER.lng + (Math.random() * 0.001 - 0.0005),
+    };
   };
 
   // Helper: Get position on map (percentage)
@@ -3106,32 +3345,86 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   <div className="flex justify-between items-center mb-2 md:mb-3 gap-2">
                     <h3 className="font-bold text-xs md:text-sm text-gray-800">
                       Driver Fleet (
-                      {users.filter((u) => u.role === UserRole.DRIVER).length})
+                      {users
+                        .filter((u) => u.role === UserRole.DRIVER)
+                        .filter((driver) => {
+                          const driverIdStr = driver.id ? String(driver.id) : "";
+                          const hasActiveRide = rides.some((r) => {
+                            const rideDriverId = r.driverId
+                              ? String(r.driverId)
+                              : "";
+                            return (
+                              rideDriverId === driverIdStr &&
+                              (r.status === BuggyStatus.ASSIGNED ||
+                                r.status === BuggyStatus.ARRIVING ||
+                                r.status === BuggyStatus.ON_TRIP)
+                            );
+                          });
+                          const isOnline =
+                            driver.updatedAt && Date.now() - driver.updatedAt < 30000;
+                          return isOnline || hasActiveRide;
+                        }).length}{" "}
+                      online)
                     </h3>
-                    <div className="flex gap-0.5 flex-shrink-0">
-                      <button
-                        onClick={() => setDriverViewMode("LIST")}
-                        className={`p-1.5 md:p-1 rounded transition min-h-[36px] md:min-h-0 touch-manipulation ${
-                          driverViewMode === "LIST"
-                            ? "text-blue-600 bg-blue-50"
-                            : "text-gray-400 hover:text-gray-600"
-                        }`}
-                        title="List View"
-                      >
-                        <List size={14} className="md:w-[14px] md:h-[14px]" />
-                      </button>
-                      <button
-                        onClick={() => setDriverViewMode("MAP")}
-                        className={`p-1.5 md:p-1 rounded transition min-h-[36px] md:min-h-0 touch-manipulation ${
-                          driverViewMode === "MAP"
-                            ? "text-blue-600 bg-blue-50"
-                            : "text-gray-400 hover:text-gray-600"
-                        } disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-gray-400`}
-                        title="Map View"
-                        disabled={true}
-                      >
-                        <Map size={14} className="md:w-[14px] md:h-[14px]" />
-                      </button>
+                    <div className="flex items-center gap-2">
+                      {driverViewMode === "MAP" && (
+                        <div className="flex bg-white rounded-lg p-0.5 border border-blue-100 mr-1">
+                          <button
+                            onClick={() => setDriverFilter("ALL")}
+                            className={`px-2 py-1 text-[10px] rounded ${
+                              driverFilter === "ALL"
+                                ? "bg-blue-100 text-blue-700 font-bold"
+                                : "text-slate-400 hover:text-slate-600"
+                            }`}
+                          >
+                            All
+                          </button>
+                          <button
+                            onClick={() => setDriverFilter("AVAILABLE")}
+                            className={`px-2 py-1 text-[10px] rounded ${
+                              driverFilter === "AVAILABLE"
+                                ? "bg-emerald-100 text-emerald-700 font-bold"
+                                : "text-slate-400 hover:text-slate-600"
+                            }`}
+                          >
+                            Available
+                          </button>
+                          <button
+                            onClick={() => setDriverFilter("BUSY")}
+                            className={`px-2 py-1 text-[10px] rounded ${
+                              driverFilter === "BUSY"
+                                ? "bg-orange-100 text-orange-700 font-bold"
+                                : "text-slate-400 hover:text-slate-600"
+                            }`}
+                          >
+                            Busy
+                          </button>
+                        </div>
+                      )}
+                      <div className="flex gap-0.5 flex-shrink-0">
+                        <button
+                          onClick={() => setDriverViewMode("LIST")}
+                          className={`p-1.5 md:p-1 rounded transition min-h-[36px] md:min-h-0 touch-manipulation ${
+                            driverViewMode === "LIST"
+                              ? "text-blue-600 bg-blue-50"
+                              : "text-gray-400 hover:text-gray-600"
+                          }`}
+                          title="List View"
+                        >
+                          <List size={14} className="md:w-[14px] md:h-[14px]" />
+                        </button>
+                        <button
+                          onClick={() => setDriverViewMode("MAP")}
+                          className={`p-1.5 md:p-1 rounded transition min-h-[36px] md:min-h-0 touch-manipulation ${
+                            driverViewMode === "MAP"
+                              ? "text-blue-600 bg-blue-50"
+                              : "text-gray-400 hover:text-gray-600"
+                          }`}
+                          title="Map View"
+                        >
+                          <Map size={14} className="md:w-[14px] md:h-[14px]" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                   {driverViewMode === "LIST" ? (
@@ -3425,356 +3718,100 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       })()}
                     </div>
                   ) : (
-                    // MAP VIEW - CSS Only Design
-                    <div className="relative bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 overflow-hidden h-[400px] rounded-md border border-gray-200">
-                      {/* Map Background with CSS Grid Pattern */}
-                      <div
-                        className="absolute inset-0"
-                        style={{
-                          backgroundImage: `
-                                            linear-gradient(to right, rgba(16, 185, 129, 0.1) 1px, transparent 1px),
-                                            linear-gradient(to bottom, rgba(16, 185, 129, 0.1) 1px, transparent 1px)
-                                        `,
-                          backgroundSize: "40px 40px",
-                        }}
-                      ></div>
-
-                      {/* Simulated Areas using CSS */}
-                      <div className="absolute inset-0">
-                        {/* Main Lobby */}
-                        <div className="absolute top-[35%] left-[40%] w-32 h-24 bg-emerald-400/40 rounded-lg border-2 border-emerald-600/50 flex items-center justify-center">
-                          <span className="text-[10px] font-bold text-emerald-900">
-                            Lobby
-                          </span>
+                    // MAP VIEW - Google Maps
+                    <div className="flex-1 relative bg-emerald-50 overflow-hidden min-h-[400px] rounded-md border border-gray-200">
+                      {mapError ? (
+                        <>
+                          <img
+                            src="https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Map-768x552.jpg"
+                            alt="Map"
+                            className="absolute inset-0 w-full h-full object-cover opacity-80"
+                          />
+                        </>
+                      ) : (
+                        <div ref={mapRef} className="w-full h-full" />
+                      )}
+                      <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur p-2 rounded text-[10px] shadow border border-gray-200 z-10">
+                        <div className="flex items-center mb-1 text-gray-800">
+                          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-1.5"></div>{" "}
+                          Available Driver
                         </div>
-
-                        {/* Pool Area */}
-                        <div className="absolute bottom-[20%] left-[15%] w-24 h-20 bg-cyan-400/40 rounded-full border-2 border-cyan-600/50 flex items-center justify-center">
-                          <span className="text-[9px] font-bold text-cyan-900">
-                            Pool
-                          </span>
+                        <div className="flex items-center text-gray-800">
+                          <div className="w-2.5 h-2.5 rounded-full bg-orange-500 mr-1.5"></div>{" "}
+                          Busy / On Trip
                         </div>
-
-                        {/* Restaurant */}
-                        <div className="absolute bottom-[25%] right-[20%] w-28 h-20 bg-amber-400/40 rounded-lg border-2 border-amber-600/50 flex items-center justify-center">
-                          <span className="text-[9px] font-bold text-amber-900">
-                            Restaurant
-                          </span>
-                        </div>
-
-                        {/* Spa */}
-                        <div className="absolute top-[30%] right-[15%] w-20 h-20 bg-pink-400/40 rounded-full border-2 border-pink-600/50 flex items-center justify-center">
-                          <span className="text-[9px] font-bold text-pink-900">
-                            Spa
-                          </span>
-                        </div>
-
-                        {/* Villas Area */}
-                        <div className="absolute top-[20%] left-[5%] w-24 h-20 bg-lime-400/40 rounded-lg border-2 border-lime-600/50 flex items-center justify-center">
-                          <span className="text-[9px] font-bold text-lime-900">
-                            Villas
-                          </span>
-                        </div>
-
-                        {/* Parking */}
-                        <div className="absolute top-[10%] left-[20%] w-28 h-16 bg-gray-400/40 rounded border-2 border-gray-600/50 flex items-center justify-center">
-                          <span className="text-[9px] font-bold text-gray-900">
-                            Parking
-                          </span>
-                        </div>
-
-                        {/* Roads - Horizontal */}
-                        <div className="absolute top-[50%] left-0 right-0 h-2 bg-emerald-700/20"></div>
-                        {/* Roads - Vertical */}
-                        <div className="absolute left-[50%] top-0 bottom-0 w-2 bg-emerald-700/20"></div>
-                      </div>
-
-                      {/* Map Title */}
-                      <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-10">
-                        <div className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-lg shadow-sm border border-gray-200">
-                          <div className="text-xs font-bold text-emerald-900">
-                            Furama Resort
+                        {mapError && (
+                          <div className="mt-1 text-red-500 font-bold text-[9px] flex items-center">
+                            <AlertTriangle size={8} className="mr-1" /> Static View
+                            (Map Error)
                           </div>
-                          <div className="text-[9px] text-emerald-700">
-                            Driver Locations
+                        )}
+                        {!mapError && (
+                          <div className="mt-1 text-emerald-600 font-bold text-[9px] flex items-center">
+                            <MapPin size={8} className="mr-1" /> Real-time GPS Tracking
                           </div>
-                        </div>
+                        )}
                       </div>
-
-                      {/* Driver Points */}
-                      {(() => {
-                        const driverUsers = users.filter(
-                          (u) => u.role === UserRole.DRIVER,
-                        );
-
-                        return driverUsers.map((driver, index) => {
-                          const driverIdStr = driver.id
-                            ? String(driver.id)
-                            : "";
-                          const driverRides = rides.filter((r) => {
-                            const rideDriverId = r.driverId
-                              ? String(r.driverId)
-                              : "";
-                            return (
-                              rideDriverId === driverIdStr &&
-                              (r.status === BuggyStatus.ASSIGNED ||
-                                r.status === BuggyStatus.ARRIVING ||
-                                r.status === BuggyStatus.ON_TRIP)
-                            );
-                          });
-                          const currentRide = driverRides[0];
-                          const hasActiveRide =
-                            currentRide &&
-                            (currentRide.status === BuggyStatus.ASSIGNED ||
-                              currentRide.status === BuggyStatus.ARRIVING ||
-                              currentRide.status === BuggyStatus.ON_TRIP);
-
-                          // Determine driver status
-                          let driverStatus:
-                            | "AVAILABLE"
-                            | "BUSY"
-                            | "NEAR_COMPLETION"
-                            | "OFFLINE" = "OFFLINE";
-                          let isNearCompletion = false;
-
-                          if (hasActiveRide) {
-                            if (currentRide.status === BuggyStatus.ON_TRIP) {
-                              const tripDuration = currentRide.pickedUpAt
-                                ? Math.floor(
-                                    (Date.now() - currentRide.pickedUpAt) /
-                                      1000,
-                                  )
-                                : 0;
-                              if (tripDuration > 180) {
-                                driverStatus = "NEAR_COMPLETION";
-                                isNearCompletion = true;
-                              } else {
-                                driverStatus = "BUSY";
-                              }
-                            } else {
-                              driverStatus = "BUSY";
+                      {!mapError && mapInstance && (
+                        <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
+                          <button
+                            onClick={() =>
+                              mapInstance.setZoom(mapInstance.getZoom()! + 1)
                             }
-                          } else {
-                            // Check if driver has recent heartbeat (updated_at within last 30 seconds)
-                            // This is the PRIMARY way to determine if driver is online
-                            if (driver.updatedAt) {
-                              const timeSinceUpdate =
-                                Date.now() - driver.updatedAt;
-                              if (timeSinceUpdate < 30000) {
-                                // 30 seconds
-                                driverStatus = "AVAILABLE";
-                              } else {
-                                // Driver has been offline for more than 30 seconds
-                                driverStatus = "OFFLINE";
-                              }
-                            } else {
-                              // No updatedAt timestamp means driver is offline
-                              driverStatus = "OFFLINE";
+                            className="bg-white/90 backdrop-blur p-1.5 rounded shadow border border-gray-200 hover:bg-white transition"
+                            title="Zoom In"
+                          >
+                            <ZoomIn size={14} className="text-gray-700" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              mapInstance.setZoom(mapInstance.getZoom()! - 1)
                             }
-
-                            // Note: We removed the fallback to completed rides because:
-                            // 1. A driver who just logged out should be OFFLINE immediately
-                            // 2. Heartbeat (updatedAt) is the most reliable indicator of online status
-                            // 3. Completed rides can be old and don't indicate current online status
-                          }
-
-                          // Don't show offline drivers
-                          if (driverStatus === "OFFLINE") return null;
-
-                          // Calculate position based on driver index (simulated positions)
-                          // Distribute drivers across the map
-                          const totalDrivers = driverUsers.filter((d) => {
-                            const dIdStr = d.id ? String(d.id) : "";
-                            const dRides = rides.filter((r) => {
-                              const rideDriverId = r.driverId
-                                ? String(r.driverId)
-                                : "";
-                              return (
-                                rideDriverId === dIdStr &&
-                                (r.status === BuggyStatus.ASSIGNED ||
-                                  r.status === BuggyStatus.ARRIVING ||
-                                  r.status === BuggyStatus.ON_TRIP)
-                              );
-                            });
-                            const hasActive =
-                              dRides[0] &&
-                              (dRides[0].status === BuggyStatus.ASSIGNED ||
-                                dRides[0].status === BuggyStatus.ARRIVING ||
-                                dRides[0].status === BuggyStatus.ON_TRIP);
-
-                            if (hasActive) return true;
-                            if (d.updatedAt && Date.now() - d.updatedAt < 30000)
-                              return true;
-                            const recent = rides.filter((r) => {
-                              const rideDriverId = r.driverId
-                                ? String(r.driverId)
-                                : "";
-                              return (
-                                rideDriverId === dIdStr &&
-                                r.status === BuggyStatus.COMPLETED &&
-                                r.completedAt &&
-                                Date.now() - r.completedAt < 3600000
-                              );
-                            });
-                            return recent.length > 0;
-                          }).length;
-
-                          const driverIndex =
-                            driverUsers.slice(0, index + 1).filter((d) => {
-                              const dIdStr = d.id ? String(d.id) : "";
-                              const dRides = rides.filter((r) => {
-                                const rideDriverId = r.driverId
-                                  ? String(r.driverId)
-                                  : "";
-                                return (
-                                  rideDriverId === dIdStr &&
-                                  (r.status === BuggyStatus.ASSIGNED ||
-                                    r.status === BuggyStatus.ARRIVING ||
-                                    r.status === BuggyStatus.ON_TRIP)
+                            className="bg-white/90 backdrop-blur p-1.5 rounded shadow border border-gray-200 hover:bg-white transition"
+                            title="Zoom Out"
+                          >
+                            <ZoomOut size={14} className="text-gray-700" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (mapInstance) {
+                                const driverUsers = users.filter(
+                                  (u) => u.role === UserRole.DRIVER,
                                 );
-                              });
-                              const hasActive =
-                                dRides[0] &&
-                                (dRides[0].status === BuggyStatus.ASSIGNED ||
-                                  dRides[0].status === BuggyStatus.ARRIVING ||
-                                  dRides[0].status === BuggyStatus.ON_TRIP);
-
-                              if (hasActive) return true;
-                              if (
-                                d.updatedAt &&
-                                Date.now() - d.updatedAt < 30000
-                              )
-                                return true;
-                              const recent = rides.filter((r) => {
-                                const rideDriverId = r.driverId
-                                  ? String(r.driverId)
-                                  : "";
-                                return (
-                                  rideDriverId === dIdStr &&
-                                  r.status === BuggyStatus.COMPLETED &&
-                                  r.completedAt &&
-                                  Date.now() - r.completedAt < 3600000
-                                );
-                              });
-                              return recent.length > 0;
-                            }).length - 1;
-
-                          // Simulated positions - distribute across map
-                          const positions = [
-                            { top: "25%", left: "30%" },
-                            { top: "45%", left: "25%" },
-                            { top: "65%", left: "35%" },
-                            { top: "35%", left: "60%" },
-                            { top: "55%", left: "65%" },
-                            { top: "25%", left: "70%" },
-                            { top: "70%", left: "20%" },
-                            { top: "50%", left: "75%" },
-                          ];
-
-                          const position = positions[
-                            driverIndex % positions.length
-                          ] || {
-                            top: `${20 + ((driverIndex * 15) % 60)}%`,
-                            left: `${15 + ((driverIndex * 20) % 70)}%`,
-                          };
-
-                          const driverDisplayName =
-                            driver.lastName || "Unknown";
-
-                          // Determine point color and style
-                          let pointColor = "";
-                          let pointBg = "";
-                          let pointBorder = "";
-                          let pulseClass = "";
-
-                          if (driverStatus === "AVAILABLE") {
-                            pointColor = "bg-green-500";
-                            pointBg = "bg-green-100";
-                            pointBorder = "border-green-600";
-                            pulseClass = "animate-pulse";
-                          } else if (driverStatus === "NEAR_COMPLETION") {
-                            pointColor = "bg-blue-500";
-                            pointBg = "bg-blue-100";
-                            pointBorder = "border-blue-600";
-                            pulseClass = "animate-pulse";
-                          } else {
-                            pointColor = "bg-orange-500";
-                            pointBg = "bg-orange-100";
-                            pointBorder = "border-orange-600";
-                          }
-
-                          return (
-                            <div
-                              key={driver.id}
-                              className="absolute transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group cursor-pointer hover:z-50 transition-all duration-200"
-                              style={{ top: position.top, left: position.left }}
-                            >
-                              {/* Driver Name Label */}
-                              <div
-                                className={`${pointBg} ${pointBorder} border-2 text-[9px] font-bold px-2 py-0.5 rounded-lg shadow-md mb-1.5 whitespace-nowrap z-20 ${
-                                  driverStatus === "AVAILABLE"
-                                    ? "text-green-900"
-                                    : driverStatus === "NEAR_COMPLETION"
-                                      ? "text-blue-900"
-                                      : "text-orange-900"
-                                } opacity-0 group-hover:opacity-100 transition-opacity`}
-                              >
-                                {driverDisplayName.split(" ")[0]}
-                                {isNearCompletion && " ⚡"}
-                              </div>
-
-                              {/* Driver Point */}
-                              <div className="relative">
-                                {/* Pulse Ring for Available/Near Completion */}
-                                {(driverStatus === "AVAILABLE" ||
-                                  driverStatus === "NEAR_COMPLETION") && (
-                                  <div
-                                    className={`absolute inset-0 ${pointColor} rounded-full ${pulseClass} opacity-75`}
-                                    style={{ transform: "scale(1.5)" }}
-                                  ></div>
-                                )}
-
-                                {/* Main Point */}
-                                <div
-                                  className={`relative ${pointColor} w-4 h-4 rounded-full border-2 border-white shadow-lg ${pointColor === "bg-green-500" ? "ring-2 ring-green-300" : pointColor === "bg-blue-500" ? "ring-2 ring-blue-300" : ""} transition-transform group-hover:scale-125`}
-                                >
-                                  {/* Inner dot */}
-                                  <div className="absolute inset-0.5 bg-white rounded-full opacity-50"></div>
-                                </div>
-
-                                {/* Status Indicator */}
-                                {driverStatus === "AVAILABLE" && (
-                                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full border border-white"></div>
-                                )}
-                                {isNearCompletion && (
-                                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-400 rounded-full border border-white animate-ping"></div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()}
-
-                      {/* Legend */}
-                      <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1.5 rounded-lg shadow-sm border border-gray-200 z-10">
-                        <div className="text-[9px] font-bold text-gray-700 mb-1">
-                          Legend:
+                                const bounds = new (window as any).google.maps.LatLngBounds();
+                                driverUsers.forEach((driver) => {
+                                  const driverIdStr = driver.id
+                                    ? String(driver.id)
+                                    : "";
+                                  const hasActiveRide = rides.some((r) => {
+                                    const rideDriverId = r.driverId
+                                      ? String(r.driverId)
+                                      : "";
+                                    return (
+                                      rideDriverId === driverIdStr &&
+                                      (r.status === BuggyStatus.ASSIGNED ||
+                                        r.status === BuggyStatus.ARRIVING ||
+                                        r.status === BuggyStatus.ON_TRIP)
+                                    );
+                                  });
+                                  const isOnline =
+                                    driver.updatedAt &&
+                                    Date.now() - driver.updatedAt < 30000;
+                                  if (isOnline || hasActiveRide) {
+                                    const coords = resolveDriverCoordinates(driver);
+                                    bounds.extend(coords);
+                                  }
+                                });
+                                mapInstance.fitBounds(bounds);
+                              }
+                            }}
+                            className="bg-white/90 backdrop-blur p-1.5 rounded shadow border border-gray-200 hover:bg-white transition"
+                            title="Fit All Drivers"
+                          >
+                            <Navigation size={14} className="text-gray-700" />
+                          </button>
                         </div>
-                        <div className="flex items-center gap-2 text-[8px]">
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 bg-green-500 rounded-full border border-white"></div>
-                            <span className="text-gray-600">Available</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 bg-blue-500 rounded-full border border-white"></div>
-                            <span className="text-gray-600">Near Done</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 bg-orange-500 rounded-full border border-white"></div>
-                            <span className="text-gray-600">Busy</span>
-                          </div>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
