@@ -8,13 +8,19 @@ async function apiRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  
-  console.log('API Request:', {
-    method: options.method || 'GET',
-    url,
-    body: options.body ? JSON.parse(options.body as string) : undefined
-  });
-  
+
+  // Check if this is a room lookup endpoint (we'll suppress 404 logs for these)
+  const isRoomLookup = endpoint.includes('/users/room/');
+
+  // Disabled verbose logging to reduce console noise
+  // if (!isRoomLookup) {
+  //   console.log('API Request:', {
+  //     method: options.method || 'GET',
+  //     url,
+  //     body: options.body ? JSON.parse(options.body as string) : undefined
+  //   });
+  // }
+
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -23,16 +29,25 @@ async function apiRequest<T>(
     },
   });
 
-  console.log('API Response:', {
-    status: response.status,
-    statusText: response.statusText,
-    ok: response.ok,
-    url: response.url
-  });
+  // Only log response if not a 404 on room lookup
+  const is404OnRoomLookup = response.status === 404 && isRoomLookup;
+  // Disabled verbose logging
+  // if (!is404OnRoomLookup) {
+  //   console.log('API Response:', {
+  //     status: response.status,
+  //     statusText: response.statusText,
+  //     ok: response.ok,
+  //     url: response.url
+  //   });
+  // }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: 'Network error' }));
-    console.error('API Error:', errorData);
+
+    // Only log actual errors (not 404 on room lookup which is expected)
+    if (!is404OnRoomLookup) {
+      console.error('API Error:', errorData);
+    }
     // Prioritize message field, then error field, then default message
     const errorMessage = errorData.message || errorData.error || `HTTP error! status: ${response.status}`;
     const error = new Error(errorMessage);
@@ -43,23 +58,23 @@ async function apiRequest<T>(
   // Handle empty response (common for DELETE requests with 204 No Content)
   const contentType = response.headers.get('content-type');
   const contentLength = response.headers.get('content-length');
-  
+
   // If response is empty or no content-type, return null/undefined
   if (response.status === 204 || contentLength === '0' || !contentType?.includes('application/json')) {
-    console.log('API Response: Empty body (204 No Content or no JSON)');
+    // console.log('API Response: Empty body (204 No Content or no JSON)');
     return null as T;
   }
 
   // Try to parse JSON, but handle empty body gracefully
   const text = await response.text();
   if (!text || text.trim() === '') {
-    console.log('API Response: Empty text body');
+    // console.log('API Response: Empty text body');
     return null as T;
   }
 
   try {
     const data = JSON.parse(text);
-    console.log('API Response Data:', data);
+    // console.log('API Response Data:', data);
     return data;
   } catch (parseError) {
     console.warn('API Response: Failed to parse JSON, returning null', parseError);
@@ -69,7 +84,7 @@ async function apiRequest<T>(
 
 export const apiClient = {
   get: <T>(endpoint: string) => apiRequest<T>(endpoint, { method: 'GET' }),
-  
+
   post: <T>(endpoint: string, data?: any, options?: { method?: string }) => {
     const method = options?.method || 'POST';
     return apiRequest<T>(endpoint, {
@@ -77,13 +92,13 @@ export const apiClient = {
       body: method !== 'DELETE' && data ? JSON.stringify(data) : undefined,
     });
   },
-  
-  put: <T>(endpoint: string, data?: any) => 
+
+  put: <T>(endpoint: string, data?: any) =>
     apiRequest<T>(endpoint, {
       method: 'PUT',
       body: data ? JSON.stringify(data) : undefined,
     }),
-  
+
   delete: <T>(endpoint: string) => apiRequest<T>(endpoint, { method: 'DELETE' }),
 };
 

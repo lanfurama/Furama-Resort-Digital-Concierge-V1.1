@@ -26,19 +26,19 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
     showActive = false
 }) => {
     const [showDropdown, setShowDropdown] = useState(false);
-    const [notification, setNotification] = useState<{message: string, type: 'success' | 'info' | 'warning'} | null>(null);
+    const [notification, setNotification] = useState<{ message: string, type: 'success' | 'info' | 'warning' } | null>(null);
     const prevRidesRef = useRef<RideRequest[]>([]);
     const notificationBellRef = useRef<HTMLDivElement>(null);
 
     // Helper: Play notification sound
     const playNotificationSound = useCallback(() => {
         if (!soundEnabled) return;
-        
+
         try {
             const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
-            
+
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
             oscillator.frequency.value = 800;
@@ -57,19 +57,19 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
     // Track changes in rides and show notifications
     useEffect(() => {
         const prevRides = prevRidesRef.current;
-        
+
         if (prevRides.length > 0) {
             // Find new requests (SEARCHING)
-            const newRequests = rides.filter(newRide => 
+            const newRequests = rides.filter(newRide =>
                 newRide.status === BuggyStatus.SEARCHING &&
                 !prevRides.some(prevRide => prevRide.id === newRide.id)
             );
-            
+
             // Find status changes
             rides.forEach(newRide => {
                 const prevRide = prevRides.find(pr => pr.id === newRide.id);
                 if (!prevRide) return;
-                
+
                 // Driver accepted booking (SEARCHING -> ASSIGNED)
                 if (prevRide.status === BuggyStatus.SEARCHING && newRide.status === BuggyStatus.ASSIGNED) {
                     const driver = users.find(u => u.id === newRide.driverId);
@@ -81,9 +81,9 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                     });
                     playNotificationSound();
                 }
-                
+
                 // Driver arrived/picked up (ASSIGNED -> ARRIVING or ON_TRIP)
-                if (prevRide.status === BuggyStatus.ASSIGNED && 
+                if (prevRide.status === BuggyStatus.ASSIGNED &&
                     (newRide.status === BuggyStatus.ARRIVING || newRide.status === BuggyStatus.ON_TRIP)) {
                     const driver = users.find(u => u.id === newRide.driverId);
                     const driverName = driver ? driver.lastName : 'Driver';
@@ -95,7 +95,7 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                     });
                     playNotificationSound();
                 }
-                
+
                 // Completed (any status -> COMPLETED)
                 if (prevRide.status !== BuggyStatus.COMPLETED && newRide.status === BuggyStatus.COMPLETED) {
                     const driver = users.find(u => u.id === newRide.driverId);
@@ -108,7 +108,7 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                     playNotificationSound();
                 }
             });
-            
+
             // Notify new requests
             if (newRequests.length > 0) {
                 if (newRequests.length === 1) {
@@ -126,7 +126,7 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                 playNotificationSound();
             }
         }
-        
+
         // Update previous rides state
         prevRidesRef.current = rides;
     }, [rides, users, playNotificationSound]);
@@ -150,32 +150,32 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
     const getTotalActivitiesCount = () => {
         const allActivities = getAllActivities();
         const count = allActivities.length;
-        console.log('BuggyNotificationBell: Total activities count:', count);
+        // console.log('BuggyNotificationBell: Total activities count:', count);
         return count;
     };
 
     // Get all activities for dropdown
     const getAllActivities = () => {
-        console.log('BuggyNotificationBell: getAllActivities called');
-        console.log('BuggyNotificationBell: rides:', rides);
-        console.log('BuggyNotificationBell: showCompleted:', showCompleted, 'showAssigned:', showAssigned, 'showActive:', showActive);
-        
+        // console.log('BuggyNotificationBell: getAllActivities called');
+        // console.log('BuggyNotificationBell: rides:', rides);
+        // console.log('BuggyNotificationBell: showCompleted:', showCompleted, 'showAssigned:', showAssigned, 'showActive:', showActive);
+
         const pendingRides = rides.filter(r => r.status === BuggyStatus.SEARCHING);
-        console.log('BuggyNotificationBell: pendingRides (SEARCHING):', pendingRides.length);
-        
+        // console.log('BuggyNotificationBell: pendingRides (SEARCHING):', pendingRides.length);
+
         const activities: Array<{ ride: RideRequest; activityType: 'PENDING' | 'ASSIGNED' | 'ACTIVE' | 'COMPLETED' }> = [
             ...pendingRides.map(r => ({ ride: r, activityType: 'PENDING' as const }))
         ];
 
         if (showAssigned) {
             const assignedRides = rides.filter(r => r.status === BuggyStatus.ASSIGNED);
-            console.log('BuggyNotificationBell: assignedRides (ASSIGNED):', assignedRides.length);
+            // console.log('BuggyNotificationBell: assignedRides (ASSIGNED):', assignedRides.length);
             activities.push(...assignedRides.map(r => ({ ride: r, activityType: 'ASSIGNED' as const })));
         }
 
         if (showActive) {
             const activeRides = rides.filter(r => r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP);
-            console.log('BuggyNotificationBell: activeRides (ARRIVING/ON_TRIP):', activeRides.length);
+            // console.log('BuggyNotificationBell: activeRides (ARRIVING/ON_TRIP):', activeRides.length);
             activities.push(...activeRides.map(r => ({ ride: r, activityType: 'ACTIVE' as const })));
         }
 
@@ -195,11 +195,11 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                     return timeB - timeA;
                 })
                 .slice(0, 10); // Show last 10 completed (increased from 5)
-            console.log('BuggyNotificationBell: completedRides:', completedRides.length);
+            // console.log('BuggyNotificationBell: completedRides:', completedRides.length);
             activities.push(...completedRides.map(r => ({ ride: r, activityType: 'COMPLETED' as const })));
         }
-        
-        console.log('BuggyNotificationBell: Total activities after filtering:', activities.length);
+
+        // console.log('BuggyNotificationBell: Total activities after filtering:', activities.length);
 
         return activities.sort((a, b) => {
             const timeA = a.activityType === 'COMPLETED' ? (a.ride.completedAt || 0) : a.ride.timestamp;
@@ -212,11 +212,10 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
         <>
             {/* Toast Notification */}
             {notification && (
-                <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-5 ${
-                    notification.type === 'success' ? 'bg-emerald-500' :
-                    notification.type === 'info' ? 'bg-blue-500' :
-                    'bg-amber-500'
-                } text-white px-6 py-3 rounded-lg shadow-2xl flex items-center gap-2 max-w-sm`}>
+                <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-5 ${notification.type === 'success' ? 'bg-emerald-500' :
+                        notification.type === 'info' ? 'bg-blue-500' :
+                            'bg-amber-500'
+                    } text-white px-6 py-3 rounded-lg shadow-2xl flex items-center gap-2 max-w-sm`}>
                     <CheckCircle size={20} />
                     <span className="font-semibold">{notification.message}</span>
                 </div>
@@ -236,7 +235,7 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                         </span>
                     )}
                 </button>
-                
+
                 {/* Notification Dropdown */}
                 {showDropdown && (
                     <>
@@ -254,28 +253,27 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                                             e.stopPropagation();
                                             onSoundToggle(!soundEnabled);
                                         }}
-                                        className={`p-1.5 rounded-lg transition-all ${
-                                            soundEnabled 
-                                                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' 
+                                        className={`p-1.5 rounded-lg transition-all ${soundEnabled
+                                                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                                                 : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                                        }`}
+                                            }`}
                                         title={soundEnabled ? 'Sound enabled - Click to disable' : 'Sound disabled - Click to enable'}
                                     >
                                         <Bell size={16} className={soundEnabled ? '' : 'opacity-50'} />
                                     </button>
-                                    <button 
-                                        onClick={() => setShowDropdown(false)} 
+                                    <button
+                                        onClick={() => setShowDropdown(false)}
                                         className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
                                     >
-                                        <X size={18} strokeWidth={2.5}/>
+                                        <X size={18} strokeWidth={2.5} />
                                     </button>
                                 </div>
                             </div>
-                            
+
                             <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                                 {(() => {
                                     const allActivities = getAllActivities();
-                                    
+
                                     if (allActivities.length === 0) {
                                         return (
                                             <div className="p-12 text-center">
@@ -284,13 +282,13 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                                             </div>
                                         );
                                     }
-                                    
+
                                     return (
                                         <div className="divide-y divide-gray-100">
                                             {allActivities.map(({ ride, activityType }) => {
                                                 const driver = users.find(u => u.id === ride.driverId);
                                                 const driverName = driver ? driver.lastName : 'Unknown';
-                                                
+
                                                 const getActivityBadge = () => {
                                                     switch (activityType) {
                                                         case 'PENDING':
@@ -305,14 +303,14 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                                                             return { label: 'BUGGY', bg: 'bg-gray-50', border: 'border-gray-100', text: 'text-gray-800' };
                                                     }
                                                 };
-                                                
+
                                                 const badge = getActivityBadge();
                                                 const displayTime = activityType === 'COMPLETED' && ride.completedAt
-                                                    ? new Date(ride.completedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
-                                                    : new Date(ride.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                                                
+                                                    ? new Date(ride.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                                    : new Date(ride.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
                                                 return (
-                                                    <div 
+                                                    <div
                                                         key={ride.id}
                                                         className="p-4 hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50/30 transition-all cursor-pointer"
                                                         onClick={() => {

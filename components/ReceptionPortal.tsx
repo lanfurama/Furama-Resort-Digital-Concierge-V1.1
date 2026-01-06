@@ -13,7 +13,7 @@ import {
   AlertTriangle,
   Info,
   X,
-  Map,
+  Map as MapIcon,
   Star,
   Loader2,
   Brain,
@@ -79,6 +79,32 @@ import { apiClient } from "../services/apiClient";
 import BuggyNotificationBell from "./BuggyNotificationBell";
 import { useTranslation } from "../contexts/LanguageContext";
 import { RESORT_CENTER } from "../constants";
+
+// Import extracted utilities
+import {
+  resolveLocationCoordinates as resolveLocationCoordinatesUtil,
+  calculateDistance as calculateDistanceUtil,
+  getMapPosition as getMapPositionUtil,
+} from "./ReceptionPortal/utils/locationUtils";
+import {
+  getPendingRequestsCount as getPendingRequestsCountUtil,
+  getActiveRidesCount as getActiveRidesCountUtil,
+  getCompletedRidesTodayCount as getCompletedRidesTodayCountUtil,
+  getTotalDriversCount as getTotalDriversCountUtil,
+  getOnlineDriversCount as getOnlineDriversCountUtil,
+  getOfflineDriversCount as getOfflineDriversCountUtil,
+  getPendingServiceRequestsCount as getPendingServiceRequestsCountUtil,
+  getConfirmedServiceRequestsCount as getConfirmedServiceRequestsCountUtil,
+  getDepartmentForServiceType as getDepartmentForServiceTypeUtil,
+} from "./ReceptionPortal/utils/rideHelpers";
+import {
+  getDriverLocation as getDriverLocationUtil,
+  resolveDriverCoordinates as resolveDriverCoordinatesUtil,
+} from "./ReceptionPortal/utils/driverUtils";
+import {
+  canCombineRides as canCombineRidesUtil,
+  calculateOptimalMergeRoute as calculateOptimalMergeRouteUtil,
+} from "./ReceptionPortal/utils/mergeRideUtils";
 
 interface ReceptionPortalProps {
   onLogout: () => void;
@@ -154,7 +180,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
   // Current time state for countdown
   const [currentTime, setCurrentTime] = useState(Date.now());
-  
+
   // Auto-assign countdown state (updates every second)
   const [autoAssignCountdown, setAutoAssignCountdown] = useState<number | null>(null);
 
@@ -205,7 +231,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     status: "success" | "error" | null;
     message: string;
   }>({ status: null, message: "" });
-  
+
   // Use voice recording hook
   const {
     isListening,
@@ -224,7 +250,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     silenceTimeout: 5000,
     t, // Pass translation function for multilingual error messages
   });
-  
+
   // Voice Auto-Confirm State (in form, not separate modal)
   const [isAutoConfirming, setIsAutoConfirming] = useState(false);
   const [countdown, setCountdown] = useState(5);
@@ -236,7 +262,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   const [showManualAssignModal, setShowManualAssignModal] = useState(false);
   const [selectedRideForAssign, setSelectedRideForAssign] =
     useState<RideRequest | null>(null);
-
 
   // Detail Request Modal State
   const [showDetailRequestModal, setShowDetailRequestModal] = useState(false);
@@ -317,28 +342,28 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   // Load reports when REPORTS viewMode is active
   useEffect(() => {
     if (viewMode !== 'REPORTS') return;
-    
+
     const loadReports = async () => {
       setIsLoadingReports(true);
       try {
         const params: any = {};
-        
+
         if (reportPeriod === 'custom') {
           if (reportStartDate) params.startDate = reportStartDate;
           if (reportEndDate) params.endDate = reportEndDate;
         } else {
           params.period = reportPeriod;
         }
-        
+
         if (reportDriverId) {
           params.driverId = reportDriverId;
         }
-        
+
         const [ridesData, statsData] = await Promise.all([
           getHistoricalRideReports(params),
           getReportStatistics(params)
         ]);
-        
+
         setReportRides(ridesData);
         setReportStats(statsData);
       } catch (error) {
@@ -347,25 +372,25 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         setIsLoadingReports(false);
       }
     };
-    
+
     loadReports();
   }, [viewMode, reportPeriod, reportStartDate, reportEndDate, reportDriverId]);
 
   // Load driver performance stats when PERFORMANCE viewMode is active
   useEffect(() => {
     if (viewMode !== 'PERFORMANCE') return;
-    
+
     const loadPerformanceStats = async () => {
       setIsLoadingPerformance(true);
       try {
         const params: any = {
           period: performancePeriod,
         };
-        
+
         if (performanceDriverId) {
           params.driverId = performanceDriverId;
         }
-        
+
         const stats = await getDriverPerformanceStats(params);
         setDriverPerformanceStats(stats);
       } catch (error) {
@@ -374,7 +399,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         setIsLoadingPerformance(false);
       }
     };
-    
+
     loadPerformanceStats();
   }, [viewMode, performancePeriod, performanceDriverId]);
 
@@ -388,12 +413,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
   // Manual ride merging functions
   const canCombineRides = (ride1: RideRequest, ride2: RideRequest): boolean => {
-    const totalGuests = (ride1.guestCount || 1) + (ride2.guestCount || 1);
-    return (
-      totalGuests <= 7 &&
-      ride1.status === BuggyStatus.SEARCHING &&
-      ride2.status === BuggyStatus.SEARCHING
-    );
+    return canCombineRidesUtil(ride1, ride2);
   };
 
   // Handle processing transcript using voice parsing service
@@ -407,8 +427,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       {
         onSuccess: (data: ParsedVoiceData) => {
           // Update form data
-        setNewRideData((prev) => ({
-          ...prev,
+          setNewRideData((prev) => ({
+            ...prev,
             roomNumber: data.roomNumber || (prev.roomNumber && prev.roomNumber.trim() ? prev.roomNumber : ""),
             pickup: data.pickup || prev.pickup,
             destination: data.destination || prev.destination,
@@ -422,16 +442,16 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
             status: "success",
             message: "✅ Đã nhận diện thành công! Tự động tạo ride sau 5 giây...",
           });
-          
+
           setIsAutoConfirming(true);
           setCountdown(5);
-          
+
           // Clear existing countdown timer
           if (countdownTimerRef.current) {
             clearInterval(countdownTimerRef.current);
             countdownTimerRef.current = null;
           }
-          
+
           // Start countdown timer
           countdownTimerRef.current = setInterval(() => {
             setCountdown((prev) => {
@@ -478,7 +498,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       newRideData
     );
 
-      setIsProcessing(false);
+    setIsProcessing(false);
   };
   const calculateOptimalMergeRoute = (
     ride1: RideRequest,
@@ -490,213 +510,12 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     segments: RouteSegment[];
     isChainTrip: boolean;
   } => {
-    // Helper function to resolve coordinates for a location
-    const getLocationCoords = (locationName: string) => {
-      const coords = resolveLocationCoordinates(locationName);
-      return coords
-        ? { lat: coords.lat, lng: coords.lng }
-        : { lat: undefined, lng: undefined };
-    };
-
-    // Same route - keep as is
-    if (
-      ride1.pickup === ride2.pickup &&
-      ride1.destination === ride2.destination
-    ) {
-      const pickupCoords = getLocationCoords(ride1.pickup);
-      const destCoords = getLocationCoords(ride1.destination);
-      return {
-        pickup: ride1.pickup,
-        destination: ride1.destination,
-        routePath: [ride1.pickup, ride1.destination],
-        segments: [
-          {
-            from: ride1.pickup,
-            to: ride1.destination,
-            fromLat: pickupCoords.lat,
-            fromLng: pickupCoords.lng,
-            toLat: destCoords.lat,
-            toLng: destCoords.lng,
-            onBoard: [
-              {
-                name: ride1.guestName || "Guest",
-                roomNumber: ride1.roomNumber,
-                count: ride1.guestCount || 1,
-              },
-              {
-                name: ride2.guestName || "Guest",
-                roomNumber: ride2.roomNumber,
-                count: ride2.guestCount || 1,
-              },
-            ],
-          },
-        ],
-        isChainTrip: false,
-      };
-    }
-
-    // Chain trip possibilities can be simplified by the generic algorithm below
-    // But we can keep these simple checks for performance
-    if (ride1.destination === ride2.pickup) {
-      // ... (existing chain trip logic can be refactored, but let's keep it for now)
-    }
-
-    // Generic route optimization
-    const pickup1Coords = getLocationCoords(ride1.pickup);
-    const dest1Coords = getLocationCoords(ride1.destination);
-    const pickup2Coords = getLocationCoords(ride2.pickup);
-    const dest2Coords = getLocationCoords(ride2.destination);
-
-    // If we don't have coordinates for all points, fallback to simple logic
-    if (
-      !pickup1Coords?.lat ||
-      !dest1Coords?.lat ||
-      !pickup2Coords?.lat ||
-      !dest2Coords?.lat
-    ) {
-      // Fallback to time-based simple chain
-      const baseRide = ride1.timestamp <= ride2.timestamp ? ride1 : ride2;
-      const otherRide = ride1.timestamp <= ride2.timestamp ? ride2 : ride1;
-      return {
-        pickup: baseRide.pickup,
-        destination: otherRide.destination,
-        routePath: [
-          baseRide.pickup,
-          baseRide.destination,
-          otherRide.pickup,
-          otherRide.destination,
-        ],
-        segments: [
-          {
-            from: baseRide.pickup,
-            to: baseRide.destination,
-            onBoard: [
-              {
-                name: baseRide.guestName,
-                roomNumber: baseRide.roomNumber,
-                count: baseRide.guestCount || 1,
-              },
-            ],
-          },
-          {
-            from: otherRide.pickup,
-            to: otherRide.destination,
-            onBoard: [
-              {
-                name: otherRide.guestName,
-                roomNumber: otherRide.roomNumber,
-                count: otherRide.guestCount || 1,
-              },
-            ],
-          },
-        ],
-        isChainTrip: false,
-      };
-    }
-
-    // Calculate distances
-    const getDistance = (from: string, to: string): number => {
-      const fromCoords = getLocationCoords(from);
-      const toCoords = getLocationCoords(to);
-      if (!fromCoords?.lat || !toCoords?.lat) return Infinity;
-      return calculateDistance(
-        { lat: fromCoords.lat, lng: fromCoords.lng },
-        { lat: toCoords.lat, lng: toCoords.lng },
-      );
-    };
-
-    const allPoints = Array.from(
-      new Set([
-        ride1.pickup,
-        ride1.destination,
-        ride2.pickup,
-        ride2.destination,
-      ]),
+    return calculateOptimalMergeRouteUtil(
+      ride1,
+      ride2,
+      resolveLocationCoordinates,
+      calculateDistance
     );
-
-    // This is a traveling salesman problem, which is NP-hard.
-    // For 4-5 points, a brute-force permutation approach is acceptable.
-    const permutations = (arr: string[]): string[][] => {
-      if (arr.length === 0) return [[]];
-      const first = arr[0];
-      const rest = arr.slice(1);
-      const permsWithoutFirst = permutations(rest);
-      const allPermutations: string[][] = [];
-      permsWithoutFirst.forEach((perm) => {
-        for (let i = 0; i <= perm.length; i++) {
-          const permWithFirst = [...perm.slice(0, i), first, ...perm.slice(i)];
-          allPermutations.push(permWithFirst);
-        }
-      });
-      return allPermutations;
-    };
-
-    const possibleRoutes = permutations(allPoints);
-
-    let bestRoute: string[] = [];
-    let minDistance = Infinity;
-
-    possibleRoutes.forEach((route) => {
-      // A valid route must respect pickup->destination order for both rides
-      if (
-        route.indexOf(ride1.pickup) > route.indexOf(ride1.destination) ||
-        route.indexOf(ride2.pickup) > route.indexOf(ride2.destination)
-      ) {
-        return;
-      }
-
-      let currentDistance = 0;
-      for (let i = 0; i < route.length - 1; i++) {
-        currentDistance += getDistance(route[i], route[i + 1]);
-      }
-
-      if (currentDistance < minDistance) {
-        minDistance = currentDistance;
-        bestRoute = route;
-      }
-    });
-
-    const segments: RouteSegment[] = [];
-    if (bestRoute.length > 1) {
-      let guest1OnBoard = false;
-      let guest2OnBoard = false;
-      for (let i = 0; i < bestRoute.length - 1; i++) {
-        const from = bestRoute[i];
-        const to = bestRoute[i + 1];
-
-        if (from === ride1.pickup) guest1OnBoard = true;
-        if (from === ride2.pickup) guest2OnBoard = true;
-
-        const onBoard: RouteSegment["onBoard"] = [];
-        if (guest1OnBoard)
-          onBoard.push({
-            name: ride1.guestName,
-            roomNumber: ride1.roomNumber,
-            count: ride1.guestCount || 1,
-          });
-        if (guest2OnBoard)
-          onBoard.push({
-            name: ride2.guestName,
-            roomNumber: ride2.roomNumber,
-            count: ride2.guestCount || 1,
-          });
-
-        segments.push({ from, to, onBoard });
-
-        if (to === ride1.destination) guest1OnBoard = false;
-        if (to === ride2.destination) guest2OnBoard = false;
-      }
-    }
-
-    return {
-      pickup: bestRoute[0] || ride1.pickup,
-      destination: bestRoute[bestRoute.length - 1] || ride1.destination,
-      routePath: bestRoute,
-      segments,
-      isChainTrip:
-        ride1.destination === ride2.pickup ||
-        ride2.destination === ride1.pickup,
-    };
   };
 
   const handleMergeRides = async (ride1Id: string, ride2Id: string) => {
@@ -928,8 +747,18 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
       const roomNumbers = [...new Set(activeRides.map((r) => r.roomNumber))];
 
+      // Filter out merged ride room numbers (contain '+') and only keep valid room numbers
+      const validRoomNumbers = roomNumbers.filter((roomNum) => {
+        const roomNumStr = String(roomNum);
+        // Skip if room number contains '+' (merged rides)
+        if (roomNumStr.includes('+')) return false;
+        // Skip if room number is not a valid number
+        if (isNaN(Number(roomNumStr))) return false;
+        return true;
+      });
+
       // Load guest info for rooms that we don't have in cache
-      const roomsToLoad = roomNumbers.filter(
+      const roomsToLoad = validRoomNumbers.filter(
         (roomNum) => !guestInfoCache[roomNum],
       );
 
@@ -950,11 +779,14 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               },
             };
           }
-        } catch (error) {
-          console.error(
-            `Failed to load guest info for room ${roomNumber}:`,
-            error,
-          );
+        } catch (error: any) {
+          // Silently skip 404 errors (room has no guest) - this is expected
+          if (error?.message !== 'User not found') {
+            console.error(
+              `Failed to load guest info for room ${roomNumber}:`,
+              error,
+            );
+          }
         }
         return null;
       });
@@ -1269,51 +1101,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   const resolveLocationCoordinates = (
     locationName: string,
   ): { lat: number; lng: number } | null => {
-    if (!locationName || locationName === "Unknown Location") return null;
-
-    // Check if it's a GPS coordinate format
-    if (locationName.startsWith("GPS:")) {
-      const parts = locationName.replace("GPS:", "").split(",");
-      if (parts.length === 2) {
-        const lat = parseFloat(parts[0]);
-        const lng = parseFloat(parts[1]);
-        if (!isNaN(lat) && !isNaN(lng)) {
-          return { lat, lng };
-        }
-      }
-    }
-
-    // Try exact match first
-    let loc = locations.find(
-      (l) => locationName.toLowerCase().trim() === l.name.toLowerCase().trim(),
-    );
-
-    // Try partial match if exact match fails
-    if (!loc) {
-      loc = locations.find(
-        (l) =>
-          locationName.toLowerCase().includes(l.name.toLowerCase()) ||
-          l.name.toLowerCase().includes(locationName.toLowerCase()),
-      );
-    }
-
-    // Try matching room numbers (e.g., "Room 101" might match a villa location)
-    if (!loc && locationName.toLowerCase().includes("room")) {
-      const roomMatch = locationName.match(/\d+/);
-      if (roomMatch) {
-        // Try to find a location that might correspond to this room
-        // This is a fallback - ideally room numbers should map to specific locations
-        loc = locations.find(
-          (l) => l.name.toLowerCase().includes("villa") || l.type === "VILLA",
-        );
-      }
-    }
-
-    if (loc) {
-      return { lat: loc.lat, lng: loc.lng };
-    }
-
-    return null;
+    return resolveLocationCoordinatesUtil(locationName, locations);
   };
 
   // Helper: Calculate distance between two coordinates using Haversine formula (in meters)
@@ -1321,142 +1109,25 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     coord1: { lat: number; lng: number },
     coord2: { lat: number; lng: number },
   ): number => {
-    const R = 6371000; // Earth radius in meters
-    const dLat = ((coord2.lat - coord1.lat) * Math.PI) / 180;
-    const dLng = ((coord2.lng - coord1.lng) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((coord1.lat * Math.PI) / 180) *
-        Math.cos((coord2.lat * Math.PI) / 180) *
-        Math.sin(dLng / 2) *
-        Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in meters
+    return calculateDistanceUtil(coord1, coord2);
   };
 
   // Helper: Get driver's current or expected location
   const getDriverLocation = (driver: User): string => {
-    const driverIdStr = driver.id ? String(driver.id) : "";
-
-    // Check if driver has an active ride
-    const driverActiveRides = rides.filter((r) => {
-      const rideDriverId = r.driverId ? String(r.driverId) : "";
-      return (
-        rideDriverId === driverIdStr &&
-        (r.status === BuggyStatus.ASSIGNED ||
-          r.status === BuggyStatus.ARRIVING ||
-          r.status === BuggyStatus.ON_TRIP)
-      );
-    });
-
-    if (driverActiveRides.length > 0) {
-      // Driver is busy - use destination of current ride (where they'll be)
-      return driverActiveRides[0].destination;
-    }
-
-    // Driver is available - check if we have GPS coordinates from database
-    if (driver.currentLat !== undefined && driver.currentLng !== undefined) {
-      // Find nearest location to driver's GPS coordinates
-      let nearestLocation = locations[0];
-      let minDistance = Infinity;
-
-      locations.forEach((loc) => {
-        const dist = Math.sqrt(
-          Math.pow(driver.currentLat! - loc.lat, 2) +
-            Math.pow(driver.currentLng! - loc.lng, 2),
-        );
-        if (dist < minDistance) {
-          minDistance = dist;
-          nearestLocation = loc;
-        }
-      });
-
-      // If within ~100 meters of a known location, show location name
-      if (minDistance < 0.001) {
-        return `Near ${nearestLocation.name}`;
-      } else {
-        // Show GPS coordinates if not near any known location
-        return `GPS: ${driver.currentLat.toFixed(6)}, ${driver.currentLng.toFixed(6)}`;
-      }
-    }
-
-    // Fallback: try to get their location from locations array (old method)
-    if (locations.length > 0) {
-      const driverLocation =
-        locations[parseInt(driver.id || "0") % locations.length];
-      return driverLocation?.name || "Unknown Location";
-    }
-
-    return "Unknown Location";
+    return getDriverLocationUtil(driver, rides, locations);
   };
 
   // Helper: Get online drivers count
+  // Helper: Get online drivers count
   const getOnlineDriversCount = (): number => {
-    const driverUsers = users.filter((u) => u.role === UserRole.DRIVER);
-    return driverUsers.filter((driver) => {
-      const driverIdStr = driver.id ? String(driver.id) : "";
-      const hasActiveRide = rides.some((r) => {
-        const rideDriverId = r.driverId ? String(r.driverId) : "";
-        return (
-          rideDriverId === driverIdStr &&
-          (r.status === BuggyStatus.ASSIGNED ||
-            r.status === BuggyStatus.ARRIVING ||
-            r.status === BuggyStatus.ON_TRIP)
-        );
-      });
-      if (hasActiveRide) return true; // Busy drivers are considered online
-
-      // Check if driver has recent heartbeat (updated_at within last 30 seconds)
-      // This is the PRIMARY way to determine if driver is online
-      // When driver logs out, updatedAt is set to 3 minutes ago, so they will be offline
-      if (driver.updatedAt) {
-        const timeSinceUpdate = Date.now() - driver.updatedAt;
-        if (timeSinceUpdate < 30000) {
-          // 30 seconds
-          return true; // Driver is online (heartbeat active)
-        }
-        // If updatedAt is more than 30 seconds ago, driver is offline
-        return false;
-      }
-
-      // No updatedAt means driver is offline
-      return false;
-    }).length;
+    return getOnlineDriversCountUtil(users, rides);
   };
 
   // Helper: Resolve driver coordinates for map view
   const resolveDriverCoordinates = (
     driver: User,
   ): { lat: number; lng: number } => {
-    // Priority 1: Use GPS coordinates from database if available
-    if (driver.currentLat !== undefined && driver.currentLng !== undefined) {
-      return { lat: driver.currentLat, lng: driver.currentLng };
-    }
-
-    // Priority 2: Parse GPS from location string
-    const locationName = getDriverLocation(driver);
-    if (locationName.startsWith("GPS:")) {
-      const parts = locationName.replace("GPS:", "").split(",");
-      if (parts.length === 2) {
-        const lat = parseFloat(parts[0].trim());
-        const lng = parseFloat(parts[1].trim());
-        if (!isNaN(lat) && !isNaN(lng)) {
-          return { lat, lng };
-        }
-      }
-    }
-
-    // Priority 3: Find location by name
-    const coords = resolveLocationCoordinates(locationName);
-    if (coords) {
-      return coords;
-    }
-
-    // Fallback: Resort center with small random offset
-    return {
-      lat: RESORT_CENTER.lat + (Math.random() * 0.001 - 0.0005),
-      lng: RESORT_CENTER.lng + (Math.random() * 0.001 - 0.0005),
-    };
+    return resolveDriverCoordinatesUtil(driver, rides, locations, resolveLocationCoordinates);
   };
 
   // Helper: Get position on map (percentage)
@@ -1467,96 +1138,46 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       minLng: 108.246,
       maxLng: 108.25,
     };
-    const clampedLat = Math.max(
-      mapBounds.minLat,
-      Math.min(mapBounds.maxLat, lat),
-    );
-    const clampedLng = Math.max(
-      mapBounds.minLng,
-      Math.min(mapBounds.maxLng, lng),
-    );
-    const y =
-      ((mapBounds.maxLat - clampedLat) /
-        (mapBounds.maxLat - mapBounds.minLat)) *
-      100;
-    const x =
-      ((clampedLng - mapBounds.minLng) /
-        (mapBounds.maxLng - mapBounds.minLng)) *
-      100;
-    return {
-      top: `${Math.max(5, Math.min(95, y))}%`,
-      left: `${Math.max(5, Math.min(95, x))}%`,
-    };
+    return getMapPositionUtil(lat, lng, mapBounds);
   };
 
   // Helper: Get pending requests count
   const getPendingRequestsCount = (): number => {
-    return rides.filter((r) => r.status === BuggyStatus.SEARCHING).length;
+    return getPendingRequestsCountUtil(rides);
   };
 
   // Helper: Get offline drivers count
   const getOfflineDriversCount = (): number => {
-    const totalDrivers = users.filter((u) => u.role === UserRole.DRIVER).length;
-    return totalDrivers - getOnlineDriversCount();
+    return getOfflineDriversCountUtil(users, rides);
   };
 
   // Helper: Get active rides count (ASSIGNED, ARRIVING, ON_TRIP)
   const getActiveRidesCount = (): number => {
-    return rides.filter(
-      (r) =>
-        r.status === BuggyStatus.ASSIGNED ||
-        r.status === BuggyStatus.ARRIVING ||
-        r.status === BuggyStatus.ON_TRIP,
-    ).length;
+    return getActiveRidesCountUtil(rides);
   };
 
   // Helper: Get completed rides count today
   const getCompletedRidesTodayCount = (): number => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return rides.filter((r) => {
-      if (r.status !== BuggyStatus.COMPLETED) return false;
-      if (!r.completedAt) return false;
-      const completedDate = new Date(r.completedAt);
-      completedDate.setHours(0, 0, 0, 0);
-      return completedDate.getTime() === today.getTime();
-    }).length;
+    return getCompletedRidesTodayCountUtil(rides);
   };
 
   // Helper: Get total drivers count
   const getTotalDriversCount = (): number => {
-    return users.filter((u) => u.role === UserRole.DRIVER).length;
+    return getTotalDriversCountUtil(users);
   };
 
   // Service Request Helpers
   const getPendingServiceRequestsCount = (): number => {
-    return serviceRequests.filter(
-      (sr) => sr.status === "PENDING" && sr.type !== "BUGGY",
-    ).length;
+    return getPendingServiceRequestsCountUtil(serviceRequests);
   };
 
   const getConfirmedServiceRequestsCount = (): number => {
-    return serviceRequests.filter(
-      (sr) => sr.status === "CONFIRMED" && sr.type !== "BUGGY",
-    ).length;
+    return getConfirmedServiceRequestsCountUtil(serviceRequests);
   };
 
   // Helper: Map service type to staff department
   const getDepartmentForServiceType = (serviceType: string): string => {
-    switch (serviceType) {
-      case "DINING":
-        return "Dining";
-      case "SPA":
-        return "Spa";
-      case "POOL":
-        return "Pool";
-      case "BUTLER":
-        return "Butler";
-      case "HOUSEKEEPING":
-        return "Housekeeping";
-      default:
-        return "All";
-    }
+    return getDepartmentForServiceTypeUtil(serviceType);
   };
 
   // Helper: Get staff for a service type (by department)
@@ -1589,11 +1210,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     // This is a simplified approach - in a real system, you'd track staff assignments
     const estimatedActiveCount = Math.floor(
       activeRequests.length /
-        Math.max(
-          1,
-          getAvailableStaffForService(activeRequests[0]?.type || "DINING")
-            .length,
-        ),
+      Math.max(
+        1,
+        getAvailableStaffForService(activeRequests[0]?.type || "DINING")
+          .length,
+      ),
     );
     return estimatedActiveCount >= 3 ? "BUSY" : "AVAILABLE";
   };
@@ -1638,7 +1259,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     const rideDate = new Date(ride.timestamp).toISOString().split('T')[0];
     const currentTime = new Date().toTimeString().substring(0, 8); // HH:MM:SS format
     const isScheduledAvailable = await checkDriverAvailability(driverIdStr, rideDate, currentTime);
-    
+
     // If driver is not available according to schedule, return very high cost
     if (!isScheduledAvailable) {
       return 10000000; // Very high cost to prevent assignment
@@ -2172,7 +1793,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       // Group assignments by driver
       for (const assignment of assignments) {
         const ride = assignment.rides[0];
-        
+
         // Skip if ride already assigned
         if (assignedRides.has(ride.id)) {
           continue;
@@ -2236,7 +1857,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
           // Check if driver is busy
           const isBusy = driverActiveRides.length > 0;
-          
+
           if (isBusy) {
             // Driver is busy - only allow chain trips (cost is very negative)
             if (assignment.cost > -5000) {
@@ -2262,7 +1883,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         if (ridesToAssign.length > 0) {
           // Use the best cost (first assignment's cost)
           const bestCost = driverRideAssignments.find(a => ridesToAssign.includes(a.rides[0]))?.cost || 0;
-          
+
           finalAssignments.push({
             driver,
             rides: ridesToAssign,
@@ -2407,12 +2028,12 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       if (r.status === BuggyStatus.COMPLETED) return false;
 
       // First check: Room Number and Route (pickup → destination)
-      const sameRoomNumber = 
+      const sameRoomNumber =
         newRideData.roomNumber &&
         r.roomNumber &&
         r.roomNumber.toLowerCase() === newRideData.roomNumber.toLowerCase();
-      
-      const sameRoute = 
+
+      const sameRoute =
         newRideData.pickup &&
         newRideData.destination &&
         r.pickup &&
@@ -2566,11 +2187,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         <header className="bg-emerald-900 text-white py-2 md:py-3 px-3 md:px-4 flex justify-between items-center shadow-lg sticky top-0 z-20">
           <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
             <div
-              className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                viewMode === "BUGGY" ? "bg-emerald-700" : 
+              className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${viewMode === "BUGGY" ? "bg-emerald-700" :
                 viewMode === "REPORTS" ? "bg-purple-600" :
-                viewMode === "PERFORMANCE" ? "bg-indigo-600" : "bg-emerald-700"
-              }`}
+                  viewMode === "PERFORMANCE" ? "bg-indigo-600" : "bg-emerald-700"
+                }`}
             >
               {viewMode === "BUGGY" ? (
                 <Car size={20} className="md:w-6 md:h-6 text-white" />
@@ -2638,33 +2258,30 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           <div className="flex items-center gap-2 mb-4 px-2 md:px-4">
             <button
               onClick={() => setViewMode("BUGGY")}
-              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm transition-all min-h-[44px] touch-manipulation ${
-                viewMode === "BUGGY"
-                  ? "bg-emerald-600 text-white shadow-md"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm transition-all min-h-[44px] touch-manipulation ${viewMode === "BUGGY"
+                ? "bg-emerald-600 text-white shadow-md"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
             >
               <Car size={16} className="md:w-[18px] md:h-[18px]" />
               <span className="whitespace-nowrap">Buggy Fleet</span>
             </button>
             <button
               onClick={() => setViewMode("REPORTS")}
-              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm transition-all min-h-[44px] touch-manipulation ${
-                viewMode === "REPORTS"
-                  ? "bg-purple-600 text-white shadow-md"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm transition-all min-h-[44px] touch-manipulation ${viewMode === "REPORTS"
+                ? "bg-purple-600 text-white shadow-md"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
             >
               <BarChart3 size={16} className="md:w-[18px] md:h-[18px]" />
               <span className="whitespace-nowrap">Reports</span>
             </button>
             <button
               onClick={() => setViewMode("PERFORMANCE")}
-              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm transition-all min-h-[44px] touch-manipulation ${
-                viewMode === "PERFORMANCE"
-                  ? "bg-indigo-600 text-white shadow-md"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm transition-all min-h-[44px] touch-manipulation ${viewMode === "PERFORMANCE"
+                ? "bg-indigo-600 text-white shadow-md"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
             >
               <TrendingUp size={16} className="md:w-[18px] md:h-[18px]" />
               <span className="whitespace-nowrap">Performance</span>
@@ -2982,7 +2599,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                           type="checkbox"
                           checked={false}
                           disabled={true}
-                          onChange={() => {}}
+                          onChange={() => { }}
                           className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 cursor-not-allowed opacity-50"
                         />
                       </div>
@@ -3038,17 +2655,17 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       </div>
                       {(aiAssignmentData.status === "completed" ||
                         aiAssignmentData.status === "error") && (
-                        <button
-                          onClick={() => {
-                            setShowAIAssignment(false);
-                            setAIAssignmentData(null);
-                          }}
-                          className="text-white/80 hover:text-white transition-colors p-1 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center"
-                          aria-label="Close"
-                        >
-                          <X size={20} className="md:w-6 md:h-6" />
-                        </button>
-                      )}
+                          <button
+                            onClick={() => {
+                              setShowAIAssignment(false);
+                              setAIAssignmentData(null);
+                            }}
+                            className="text-white/80 hover:text-white transition-colors p-1 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center"
+                            aria-label="Close"
+                          >
+                            <X size={20} className="md:w-6 md:h-6" />
+                          </button>
+                        )}
                     </div>
 
                     {/* Content */}
@@ -3107,8 +2724,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                   );
                                   const waitTime = Math.floor(
                                     (Date.now() - assignment.ride.timestamp) /
-                                      1000 /
-                                      60,
+                                    1000 /
+                                    60,
                                   );
 
                                   return (
@@ -3324,18 +2941,18 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                     {/* Footer */}
                     {(aiAssignmentData.status === "completed" ||
                       aiAssignmentData.status === "error") && (
-                      <div className="border-t border-gray-200 p-3 md:p-4 bg-gray-50 flex justify-end">
-                        <button
-                          onClick={() => {
-                            setShowAIAssignment(false);
-                            setAIAssignmentData(null);
-                          }}
-                          className="bg-blue-600 text-white px-5 md:px-6 py-2.5 md:py-2 rounded-lg hover:bg-blue-700 transition font-medium text-sm md:text-base min-h-[44px] md:min-h-0 touch-manipulation"
-                        >
-                          Close
-                        </button>
-                      </div>
-                    )}
+                        <div className="border-t border-gray-200 p-3 md:p-4 bg-gray-50 flex justify-end">
+                          <button
+                            onClick={() => {
+                              setShowAIAssignment(false);
+                              setAIAssignmentData(null);
+                            }}
+                            className="bg-blue-600 text-white px-5 md:px-6 py-2.5 md:py-2 rounded-lg hover:bg-blue-700 transition font-medium text-sm md:text-base min-h-[44px] md:min-h-0 touch-manipulation"
+                          >
+                            Close
+                          </button>
+                        </div>
+                      )}
                   </div>
                 </div>
               )}
@@ -3387,7 +3004,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                         {/* Toggle Switch - Disabled */}
                         <button
                           disabled={true}
-                          onClick={() => {}}
+                          onClick={() => { }}
                           className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 bg-gray-300 cursor-not-allowed opacity-50 touch-manipulation`}
                           title="Auto Assign is disabled"
                         >
@@ -3552,31 +3169,28 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                         <div className="flex bg-white rounded-lg p-0.5 border border-blue-100 mr-1">
                           <button
                             onClick={() => setDriverFilter("ALL")}
-                            className={`px-2 py-1 text-[10px] rounded ${
-                              driverFilter === "ALL"
-                                ? "bg-blue-100 text-blue-700 font-bold"
-                                : "text-slate-400 hover:text-slate-600"
-                            }`}
+                            className={`px-2 py-1 text-[10px] rounded ${driverFilter === "ALL"
+                              ? "bg-blue-100 text-blue-700 font-bold"
+                              : "text-slate-400 hover:text-slate-600"
+                              }`}
                           >
                             All
                           </button>
                           <button
                             onClick={() => setDriverFilter("AVAILABLE")}
-                            className={`px-2 py-1 text-[10px] rounded ${
-                              driverFilter === "AVAILABLE"
-                                ? "bg-emerald-100 text-emerald-700 font-bold"
-                                : "text-slate-400 hover:text-slate-600"
-                            }`}
+                            className={`px-2 py-1 text-[10px] rounded ${driverFilter === "AVAILABLE"
+                              ? "bg-emerald-100 text-emerald-700 font-bold"
+                              : "text-slate-400 hover:text-slate-600"
+                              }`}
                           >
                             Available
                           </button>
                           <button
                             onClick={() => setDriverFilter("BUSY")}
-                            className={`px-2 py-1 text-[10px] rounded ${
-                              driverFilter === "BUSY"
-                                ? "bg-orange-100 text-orange-700 font-bold"
-                                : "text-slate-400 hover:text-slate-600"
-                            }`}
+                            className={`px-2 py-1 text-[10px] rounded ${driverFilter === "BUSY"
+                              ? "bg-orange-100 text-orange-700 font-bold"
+                              : "text-slate-400 hover:text-slate-600"
+                              }`}
                           >
                             Busy
                           </button>
@@ -3585,25 +3199,23 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       <div className="flex gap-0.5 flex-shrink-0">
                         <button
                           onClick={() => setDriverViewMode("LIST")}
-                          className={`p-1.5 md:p-1 rounded transition min-h-[36px] md:min-h-0 touch-manipulation ${
-                            driverViewMode === "LIST"
-                              ? "text-blue-600 bg-blue-50"
-                              : "text-gray-400 hover:text-gray-600"
-                          }`}
+                          className={`p-1.5 md:p-1 rounded transition min-h-[36px] md:min-h-0 touch-manipulation ${driverViewMode === "LIST"
+                            ? "text-blue-600 bg-blue-50"
+                            : "text-gray-400 hover:text-gray-600"
+                            }`}
                           title="List View"
                         >
                           <List size={14} className="md:w-[14px] md:h-[14px]" />
                         </button>
                         <button
                           onClick={() => setDriverViewMode("MAP")}
-                          className={`p-1.5 md:p-1 rounded transition min-h-[36px] md:min-h-0 touch-manipulation ${
-                            driverViewMode === "MAP"
-                              ? "text-blue-600 bg-blue-50"
-                              : "text-gray-400 hover:text-gray-600"
-                          }`}
+                          className={`p-1.5 md:p-1 rounded transition min-h-[36px] md:min-h-0 touch-manipulation ${driverViewMode === "MAP"
+                            ? "text-blue-600 bg-blue-50"
+                            : "text-gray-400 hover:text-gray-600"
+                            }`}
                           title="Map View"
                         >
-                          <Map size={14} className="md:w-[14px] md:h-[14px]" />
+                          <MapIcon size={14} className="md:w-[14px] md:h-[14px]" />
                         </button>
                       </div>
                     </div>
@@ -3801,11 +3413,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                     {driverRides.map((ride, idx) => {
                                       const tripProgress =
                                         ride.status === BuggyStatus.ON_TRIP &&
-                                        ride.pickedUpAt
+                                          ride.pickedUpAt
                                           ? Math.floor(
-                                              (Date.now() - ride.pickedUpAt) /
-                                                60000,
-                                            )
+                                            (Date.now() - ride.pickedUpAt) /
+                                            60000,
+                                          )
                                           : null;
                                       const guestInfo =
                                         guestInfoCache[ride.roomNumber];
@@ -3831,21 +3443,20 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                                   {ride.guestCount || 1} pax
                                                 </span>
                                                 <span
-                                                  className={`text-[8px] md:text-[9px] px-1 py-0.5 rounded font-bold ${
-                                                    ride.status ===
+                                                  className={`text-[8px] md:text-[9px] px-1 py-0.5 rounded font-bold ${ride.status ===
                                                     BuggyStatus.ON_TRIP
-                                                      ? "bg-emerald-100 text-emerald-700"
-                                                      : ride.status ===
-                                                          BuggyStatus.ARRIVING
-                                                        ? "bg-blue-100 text-blue-700"
-                                                        : "bg-amber-100 text-amber-700"
-                                                  }`}
+                                                    ? "bg-emerald-100 text-emerald-700"
+                                                    : ride.status ===
+                                                      BuggyStatus.ARRIVING
+                                                      ? "bg-blue-100 text-blue-700"
+                                                      : "bg-amber-100 text-amber-700"
+                                                    }`}
                                                 >
                                                   {ride.status ===
-                                                  BuggyStatus.ON_TRIP
+                                                    BuggyStatus.ON_TRIP
                                                     ? "ON-TRIP"
                                                     : ride.status ===
-                                                        BuggyStatus.ARRIVING
+                                                      BuggyStatus.ARRIVING
                                                       ? "ARRIVING"
                                                       : "ASSIGNED"}
                                                 </span>
@@ -3865,19 +3476,18 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                             <button
                                               onClick={() =>
                                                 ride.status ===
-                                                BuggyStatus.ON_TRIP
+                                                  BuggyStatus.ON_TRIP
                                                   ? handleEndRide(ride.id)
                                                   : handlePickupGuest(ride.id)
                                               }
-                                              className={`text-[9px] md:text-[10px] px-2 py-1.5 md:py-1 rounded font-medium transition-colors flex-shrink-0 flex items-center gap-1 min-h-[32px] md:min-h-0 touch-manipulation ${
-                                                ride.status ===
+                                              className={`text-[9px] md:text-[10px] px-2 py-1.5 md:py-1 rounded font-medium transition-colors flex-shrink-0 flex items-center gap-1 min-h-[32px] md:min-h-0 touch-manipulation ${ride.status ===
                                                 BuggyStatus.ON_TRIP
-                                                  ? "bg-emerald-500 hover:bg-emerald-600 text-white"
-                                                  : "bg-blue-500 hover:bg-blue-600 text-white"
-                                              }`}
+                                                ? "bg-emerald-500 hover:bg-emerald-600 text-white"
+                                                : "bg-blue-500 hover:bg-blue-600 text-white"
+                                                }`}
                                             >
                                               {ride.status ===
-                                              BuggyStatus.ON_TRIP ? (
+                                                BuggyStatus.ON_TRIP ? (
                                                 <>
                                                   <CheckCircle size={12} />
                                                   <span>Completed</span>
@@ -4115,10 +3725,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       })()}
                       {rides.filter((r) => r.status === BuggyStatus.COMPLETED)
                         .length === 0 && (
-                        <div className="text-center py-3 text-gray-400 text-[10px]">
-                          No completed trips yet.
-                        </div>
-                      )}
+                          <div className="text-center py-3 text-gray-400 text-[10px]">
+                            No completed trips yet.
+                          </div>
+                        )}
                     </div>
                   </div>
                 </div>
@@ -4251,11 +3861,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                       {totalGuests}/7 pax
                                     </span>
                                     <span
-                                      className={`text-xs px-1.5 py-0.5 rounded ${
-                                        isSameRoute
-                                          ? "bg-green-100 text-green-700"
-                                          : "bg-yellow-100 text-yellow-700"
-                                      }`}
+                                      className={`text-xs px-1.5 py-0.5 rounded ${isSameRoute
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-yellow-100 text-yellow-700"
+                                        }`}
                                     >
                                       {isSameRoute
                                         ? "Same"
@@ -4366,7 +3975,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                             // Check ride1
                                             if (
                                               segment.to ===
-                                                ride1.destination &&
+                                              ride1.destination &&
                                               guestStatus[
                                                 ride1.guestName || "Guest1"
                                               ].pickedUp &&
@@ -4389,7 +3998,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                             // Check ride2 - can be dropped at the same location as ride1
                                             if (
                                               segment.to ===
-                                                ride2.destination &&
+                                              ride2.destination &&
                                               guestStatus[
                                                 ride2.guestName || "Guest2"
                                               ].pickedUp &&
@@ -4492,7 +4101,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                               j < allActions.length &&
                                               allActions[j].type === "pickup" &&
                                               allActions[j].location ===
-                                                next.location
+                                              next.location
                                             ) {
                                               allPickupGuests.push(
                                                 ...allActions[j].guests,
@@ -4526,9 +4135,9 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                             while (j < allActions.length) {
                                               if (
                                                 allActions[j].type ===
-                                                  "dropoff" &&
+                                                "dropoff" &&
                                                 allActions[j].location ===
-                                                  next.location
+                                                next.location
                                               ) {
                                                 allDropoffGuests.push(
                                                   ...allActions[j].guests,
@@ -4538,7 +4147,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                                 allActions[j].type === "move" &&
                                                 allActions[j].segment &&
                                                 allActions[j].segment.to ===
-                                                  next.location
+                                                next.location
                                               ) {
                                                 // Skip move actions that lead to the same dropoff location
                                                 j++;
@@ -4563,9 +4172,9 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                             next.type === "move" &&
                                             next.segment &&
                                             next.segment.to ===
-                                              current.location &&
+                                            current.location &&
                                             next.segment.from ===
-                                              current.segment?.from
+                                            current.segment?.from
                                           ) {
                                             // Merge: show move with dropoff info
                                             mergedActions.push({
@@ -4603,9 +4212,9 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                             next.type === "move" &&
                                             next.segment &&
                                             next.segment.to ===
-                                              current.location &&
+                                            current.location &&
                                             next.segment.from ===
-                                              current.segment?.from
+                                            current.segment?.from
                                           ) {
                                             // Merge: show move with pickup info
                                             mergedActions.push({
@@ -4624,16 +4233,16 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                             // Check if this move is redundant (same as previous dropoff/pickup)
                                             const prevAction =
                                               mergedActions[
-                                                mergedActions.length - 1
+                                              mergedActions.length - 1
                                               ];
                                             if (
                                               prevAction &&
                                               ((prevAction.type === "dropoff" &&
                                                 prevAction.location ===
-                                                  current.segment.to) ||
+                                                current.segment.to) ||
                                                 (prevAction.type === "pickup" &&
                                                   prevAction.location ===
-                                                    current.segment.to))
+                                                  current.segment.to))
                                             ) {
                                               // Skip this redundant move action
                                               continue;
@@ -4702,7 +4311,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                                       {/* Route path if exists */}
                                                       {action.segment &&
                                                         action.segment.from !==
-                                                          action.location && (
+                                                        action.location && (
                                                           <div className="flex items-center gap-1.5 text-xs text-gray-500">
                                                             <span className="font-medium">
                                                               {
@@ -4747,54 +4356,54 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
                                                   {action.type ===
                                                     "dropoff" && (
-                                                    <div className="flex flex-col gap-1.5">
-                                                      {/* Route path if exists */}
-                                                      {action.segment &&
-                                                        action.segment.from !==
+                                                      <div className="flex flex-col gap-1.5">
+                                                        {/* Route path if exists */}
+                                                        {action.segment &&
+                                                          action.segment.from !==
                                                           action.location && (
-                                                          <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                                                            <span className="font-medium">
-                                                              {
-                                                                action.segment
-                                                                  .from
-                                                              }
-                                                            </span>
-                                                            <ArrowRight
+                                                            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                                                              <span className="font-medium">
+                                                                {
+                                                                  action.segment
+                                                                    .from
+                                                                }
+                                                              </span>
+                                                              <ArrowRight
+                                                                size={11}
+                                                                className="text-gray-400"
+                                                              />
+                                                              <span className="font-medium">
+                                                                {action.location}
+                                                              </span>
+                                                            </div>
+                                                          )}
+                                                        {/* Action details */}
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                          <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-800 px-2.5 py-1 rounded-md border border-green-200 font-medium text-xs">
+                                                            <CheckCircle
                                                               size={11}
-                                                              className="text-gray-400"
                                                             />
-                                                            <span className="font-medium">
-                                                              {action.location}
-                                                            </span>
-                                                          </div>
-                                                        )}
-                                                      {/* Action details */}
-                                                      <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-800 px-2.5 py-1 rounded-md border border-green-200 font-medium text-xs">
-                                                          <CheckCircle
-                                                            size={11}
-                                                          />
-                                                          Drop off
-                                                        </span>
-                                                        {action.guests.map(
-                                                          (guest, gIdx) => (
-                                                            <span
-                                                              key={gIdx}
-                                                              className="bg-white text-gray-800 px-2 py-0.5 rounded border border-gray-300 font-medium text-xs shadow-sm"
-                                                            >
-                                                              {guest.name}
-                                                            </span>
-                                                          ),
-                                                        )}
-                                                        <span className="text-gray-500 text-xs font-medium">
-                                                          at
-                                                        </span>
-                                                        <span className="bg-white text-gray-900 px-2 py-0.5 rounded border border-gray-300 font-semibold text-xs shadow-sm">
-                                                          {action.location}
-                                                        </span>
+                                                            Drop off
+                                                          </span>
+                                                          {action.guests.map(
+                                                            (guest, gIdx) => (
+                                                              <span
+                                                                key={gIdx}
+                                                                className="bg-white text-gray-800 px-2 py-0.5 rounded border border-gray-300 font-medium text-xs shadow-sm"
+                                                              >
+                                                                {guest.name}
+                                                              </span>
+                                                            ),
+                                                          )}
+                                                          <span className="text-gray-500 text-xs font-medium">
+                                                            at
+                                                          </span>
+                                                          <span className="bg-white text-gray-900 px-2 py-0.5 rounded border border-gray-300 font-semibold text-xs shadow-sm">
+                                                            {action.location}
+                                                          </span>
+                                                        </div>
                                                       </div>
-                                                    </div>
-                                                  )}
+                                                    )}
 
                                                   {action.type === "move" &&
                                                     action.segment && (
@@ -4836,11 +4445,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                     handleMergeRides(ride1.id!, ride2.id!);
                                     setShowMergeModal(false);
                                   }}
-                                  className={`px-3 md:px-3 py-2 md:py-1.5 rounded-md font-medium text-xs transition hover:scale-105 flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${
-                                    isSameRoute
-                                      ? "bg-green-500 text-white hover:bg-green-600"
-                                      : "bg-blue-500 text-white hover:bg-blue-600"
-                                  }`}
+                                  className={`px-3 md:px-3 py-2 md:py-1.5 rounded-md font-medium text-xs transition hover:scale-105 flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${isSameRoute
+                                    ? "bg-green-500 text-white hover:bg-green-600"
+                                    : "bg-blue-500 text-white hover:bg-blue-600"
+                                    }`}
                                 >
                                   Merge
                                 </button>
@@ -4890,9 +4498,9 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                     style={
                       isListening && audioLevel > 0
                         ? {
-                            transform: `scale(${1 + (audioLevel / 100) * 0.15})`,
-                            boxShadow: `0 0 ${20 + audioLevel * 0.5}px rgba(239, 68, 68, ${0.4 + (audioLevel / 100) * 0.3})`,
-                          }
+                          transform: `scale(${1 + (audioLevel / 100) * 0.15})`,
+                          boxShadow: `0 0 ${20 + audioLevel * 0.5}px rgba(239, 68, 68, ${0.4 + (audioLevel / 100) * 0.3})`,
+                        }
                         : {}
                     }
                   >
@@ -4917,16 +4525,15 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                         ></div>
                       </>
                     )}
-                    <Mic 
-                      size={48} 
-                      className={`md:w-16 md:h-16 transition-transform duration-100 ${
-                        isListening && audioLevel > 50 ? "animate-bounce" : ""
-                      }`}
+                    <Mic
+                      size={48}
+                      className={`md:w-16 md:h-16 transition-transform duration-100 ${isListening && audioLevel > 50 ? "animate-bounce" : ""
+                        }`}
                       style={
                         isListening && audioLevel > 50
                           ? {
-                              transform: `scale(${1 + (audioLevel / 100) * 0.1})`,
-                            }
+                            transform: `scale(${1 + (audioLevel / 100) * 0.1})`,
+                          }
                           : {}
                       }
                     />
@@ -5008,7 +4615,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       )}
                     </div>
                   )}
-                  
+
                   {/* Auto-confirm countdown */}
                   {isAutoConfirming && (
                     <div className="mt-4 w-full p-4 bg-gradient-to-r from-blue-50 to-emerald-50 rounded-lg border-2 border-emerald-300">
@@ -5224,31 +4831,28 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     <button
                       onClick={() => setLocationFilterType("ALL")}
-                      className={`px-3 md:px-4 py-2.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition whitespace-nowrap flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${
-                        locationFilterType === "ALL"
-                          ? "bg-emerald-600 text-white"
-                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                      }`}
+                      className={`px-3 md:px-4 py-2.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition whitespace-nowrap flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${locationFilterType === "ALL"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        }`}
                     >
                       All
                     </button>
                     <button
                       onClick={() => setLocationFilterType("RESTAURANT")}
-                      className={`px-3 md:px-4 py-2.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition whitespace-nowrap flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${
-                        locationFilterType === "RESTAURANT"
-                          ? "bg-emerald-600 text-white"
-                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                      }`}
+                      className={`px-3 md:px-4 py-2.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition whitespace-nowrap flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${locationFilterType === "RESTAURANT"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        }`}
                     >
                       Restaurant
                     </button>
                     <button
                       onClick={() => setLocationFilterType("FACILITY")}
-                      className={`px-3 md:px-4 py-2.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition whitespace-nowrap flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${
-                        locationFilterType === "FACILITY"
-                          ? "bg-emerald-600 text-white"
-                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                      }`}
+                      className={`px-3 md:px-4 py-2.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition whitespace-nowrap flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${locationFilterType === "FACILITY"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        }`}
                     >
                       Public Areas
                     </button>
@@ -5402,7 +5006,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
             const lastSegment =
               selectedRideForDetail.segments[
-                selectedRideForDetail.segments.length - 1
+              selectedRideForDetail.segments.length - 1
               ];
             if (lastSegment.onBoard.length > 0) {
               if (!locationActions[lastSegment.to])
@@ -5689,11 +5293,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                 key={driver.id}
                                 onClick={() => handleAssignDriver(driver)}
                                 disabled={driverStatus.status === "busy"}
-                                className={`p-3 md:p-4 rounded-lg border-2 transition-all text-left min-h-[60px] md:min-h-0 touch-manipulation ${
-                                  driverStatus.status === "busy"
-                                    ? "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
-                                    : "border-emerald-200 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100 cursor-pointer"
-                                }`}
+                                className={`p-3 md:p-4 rounded-lg border-2 transition-all text-left min-h-[60px] md:min-h-0 touch-manipulation ${driverStatus.status === "busy"
+                                  ? "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
+                                  : "border-emerald-200 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100 cursor-pointer"
+                                  }`}
                               >
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex-1 min-w-0">
@@ -5764,7 +5367,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   <option value="custom">Custom Range</option>
                 </select>
               </div>
-              
+
               {reportPeriod === 'custom' && (
                 <>
                   <div>
@@ -5787,7 +5390,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   </div>
                 </>
               )}
-              
+
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Driver (Optional)</label>
                 <select
@@ -5806,7 +5409,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                 </select>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <button
                 onClick={async () => {
@@ -5820,7 +5423,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       params.period = reportPeriod;
                     }
                     if (reportDriverId) params.driverId = reportDriverId;
-                    
+
                     const [ridesData, statsData] = await Promise.all([
                       getHistoricalRideReports(params),
                       getReportStatistics(params)
@@ -5838,7 +5441,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                 <RefreshCw size={14} className={isLoadingReports ? 'animate-spin' : ''} />
                 {isLoadingReports ? 'Loading...' : 'Refresh'}
               </button>
-              
+
               {reportRides.length > 0 && (
                 <button
                   onClick={() => {
@@ -5877,7 +5480,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                 <div className="text-sm text-gray-500 mb-1">Avg Response Time</div>
                 <div className="text-2xl font-bold text-purple-600">
-                  {reportStats.avgResponseTime > 0 
+                  {reportStats.avgResponseTime > 0
                     ? `${Math.round(reportStats.avgResponseTime / 1000 / 60)} min`
                     : 'N/A'}
                 </div>
@@ -5891,7 +5494,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               <h3 className="font-semibold text-gray-800">Ride History</h3>
               <span className="text-sm text-gray-500">{reportRides.length} rides</span>
             </div>
-            
+
             {isLoadingReports ? (
               <div className="p-10 text-center">
                 <Loader2 size={32} className="mx-auto mb-4 text-emerald-600 animate-spin" />
@@ -5980,7 +5583,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   <option value="month">This Month</option>
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Driver (Optional)</label>
                 <select
@@ -5999,7 +5602,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                 </select>
               </div>
             </div>
-            
+
             <button
               onClick={async () => {
                 setIsLoadingPerformance(true);
@@ -6030,7 +5633,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               </h3>
               <span className="text-sm text-gray-500">{driverPerformanceStats.length} drivers</span>
             </div>
-            
+
             {isLoadingPerformance ? (
               <div className="p-10 text-center">
                 <Loader2 size={32} className="mx-auto mb-4 text-indigo-600 animate-spin" />
@@ -6058,8 +5661,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   <tbody className="divide-y divide-gray-200">
                     {driverPerformanceStats.map((stats, index) => {
                       const rank = index + 1;
-                      const scoreColor = stats.performance_score >= 80 ? 'text-green-600' : 
-                                       stats.performance_score >= 60 ? 'text-yellow-600' : 'text-red-600';
+                      const scoreColor = stats.performance_score >= 80 ? 'text-green-600' :
+                        stats.performance_score >= 60 ? 'text-yellow-600' : 'text-red-600';
                       return (
                         <tr key={stats.driver_id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-sm">
@@ -6080,19 +5683,19 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
-                            {stats.avg_response_time > 0 
+                            {stats.avg_response_time > 0
                               ? `${Math.round(stats.avg_response_time / 1000 / 60)} min`
                               : '-'}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
-                            {stats.avg_trip_time > 0 
+                            {stats.avg_trip_time > 0
                               ? `${Math.round(stats.avg_trip_time / 1000 / 60)} min`
                               : '-'}
                           </td>
                           <td className="px-4 py-3 text-sm">
                             <div className="flex items-center gap-2">
                               <div className="flex-1 bg-gray-200 rounded-full h-2">
-                                <div 
+                                <div
                                   className={`h-2 rounded-full ${stats.performance_score >= 80 ? 'bg-green-500' : stats.performance_score >= 60 ? 'bg-yellow-500' : 'bg-red-500'}`}
                                   style={{ width: `${Math.min(stats.performance_score, 100)}%` }}
                                 />

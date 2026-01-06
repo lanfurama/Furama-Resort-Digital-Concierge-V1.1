@@ -1219,9 +1219,9 @@ export const getGuestCSVContent = (): string => {
 // --- LOCATIONS ---
 export const getLocations = async (): Promise<Location[]> => {
   try {
-    console.log("Fetching locations from API...");
+    // console.log("Fetching locations from API...");
     const dbLocations = await apiClient.get<any[]>("/locations");
-    console.log("Locations API response:", dbLocations);
+    // console.log("Locations API response:", dbLocations);
 
     const mappedLocations = dbLocations.map((loc) => ({
       id: loc.id.toString(),
@@ -1231,7 +1231,7 @@ export const getLocations = async (): Promise<Location[]> => {
       type: loc.type as "VILLA" | "FACILITY" | "RESTAURANT",
     }));
 
-    console.log("Mapped locations:", mappedLocations);
+    // console.log("Mapped locations:", mappedLocations);
     return mappedLocations;
   } catch (error) {
     console.error("Failed to fetch locations from API:", error);
@@ -2002,7 +2002,7 @@ export const getPromotions = async (): Promise<Promotion[]> => {
     const queryString = queryParams.toString();
     const endpoint = `/promotions${queryString ? `?${queryString}` : ""}`;
     const dbPromotions = await apiClient.get<any[]>(endpoint);
-    console.log("Promotions API response:", dbPromotions);
+    // console.log("Promotions API response:", dbPromotions);
 
     const mapped = dbPromotions.map((promo) => ({
       id: promo.id.toString(),
@@ -2014,7 +2014,7 @@ export const getPromotions = async (): Promise<Promotion[]> => {
       imageUrl: promo.image_url || undefined,
     }));
 
-    console.log("Mapped promotions:", mapped);
+    // console.log("Mapped promotions:", mapped);
     return mapped;
   } catch (error) {
     console.error("Failed to fetch promotions from API:", error);
@@ -2286,9 +2286,9 @@ export const deleteKnowledgeItem = async (id: string): Promise<void> => {
 // --- RIDES (Buggy) ---
 export const getRides = async (): Promise<RideRequest[]> => {
   try {
-    console.log("Fetching rides from API...");
+    // console.log("Fetching rides from API...");
     const dbRides = await apiClient.get<any[]>("/ride-requests");
-    console.log("Rides API response:", dbRides);
+    // console.log("Rides API response:", dbRides);
 
     const mapped = dbRides.map((r) => {
       // Handle timestamp: prefer timestamp (bigint), fallback to created_at, then Date.now()
@@ -2347,7 +2347,7 @@ export const getRides = async (): Promise<RideRequest[]> => {
       };
     });
 
-    console.log("Mapped rides:", mapped);
+    // console.log("Mapped rides:", mapped);
     // Update local cache
     rides = mapped;
     return mapped;
@@ -3996,7 +3996,7 @@ export const getDriverPerformanceStats = async (
     return apiStats;
   } catch (error) {
     console.error('Failed to fetch driver performance stats from API, using fallback:', error);
-    
+
     // Fallback to frontend calculation
     const period = params?.period || "day";
     const allRides = await getRides().catch(() => getRidesSync());
@@ -4193,7 +4193,7 @@ export const getHistoricalRideReports = async (
     if (params.status) queryParams.append('status', params.status);
 
     const dbRides = await apiClient.get<any[]>(`/ride-requests/reports/historical?${queryParams.toString()}`);
-    
+
     // Map to frontend format
     return dbRides.map((r) => {
       let reqTimestamp: number;
