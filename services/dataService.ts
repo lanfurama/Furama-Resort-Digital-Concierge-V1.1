@@ -3963,10 +3963,42 @@ export const getDashboardStats = async () => {
 };
 
 // --- DRIVER PERFORMANCE ANALYTICS ---
+export interface DriverPerformanceStats {
+  driver_id: number;
+  driver_name: string;
+  total_rides: number;
+  avg_rating: number;
+  rating_count: number;
+  avg_response_time: number; // ms
+  avg_trip_time: number; // ms
+  performance_score: number;
+}
+
 export const getDriverPerformanceStats = async (
-  period: "day" | "week" | "month" = "day",
-) => {
+  params?: {
+    period?: "day" | "week" | "month";
+    startDate?: string;
+    endDate?: string;
+    driverId?: string;
+  }
+): Promise<DriverPerformanceStats[]> => {
   try {
+    // Try to get from API first
+    const queryParams = new URLSearchParams();
+    if (params?.period) queryParams.append('period', params.period);
+    if (params?.startDate) queryParams.append('startDate', params.startDate);
+    if (params?.endDate) queryParams.append('endDate', params.endDate);
+    if (params?.driverId) queryParams.append('driverId', params.driverId);
+
+    const apiStats = await apiClient.get<DriverPerformanceStats[]>(
+      `/ride-requests/reports/driver-performance?${queryParams.toString()}`
+    );
+    return apiStats;
+  } catch (error) {
+    console.error('Failed to fetch driver performance stats from API, using fallback:', error);
+    
+    // Fallback to frontend calculation
+    const period = params?.period || "day";
     const allRides = await getRides().catch(() => getRidesSync());
     const allUsers = await getUsers().catch(() => getUsersSync());
     const drivers = allUsers.filter((u) => u.role === UserRole.DRIVER);
@@ -4115,11 +4147,183 @@ export const getDriverPerformanceStats = async (
     // Sort by performance score (descending)
     driverStatsArray.sort((a, b) => b.performanceScore - a.performanceScore);
 
-    return driverStatsArray;
+    // Map to API format
+    return driverStatsArray.map(stats => ({
+      driver_id: parseInt(stats.driverId) || 0,
+      driver_name: stats.driverName,
+      total_rides: stats.totalRides,
+      avg_rating: stats.avgRating,
+      rating_count: stats.ratingCount,
+      avg_response_time: stats.avgResponseTime,
+      avg_trip_time: stats.avgTripTime,
+      performance_score: stats.performanceScore,
+    }));
+  }
+};
+
+// --- HISTORICAL RIDE REPORTS ---
+export interface HistoricalReportParams {
+  startDate?: string; // ISO date string
+  endDate?: string; // ISO date string
+  period?: 'day' | 'week' | 'month';
+  driverId?: string;
+  status?: BuggyStatus;
+}
+
+export interface ReportStatistics {
+  totalRides: number;
+  totalGuests: number;
+  avgRating: number;
+  totalRatings: number;
+  avgResponseTime: number; // ms
+  avgTripTime: number; // ms
+  ridesByStatus: Record<string, number>;
+  ridesByDriver: Array<{ driver_id: number; driver_name: string; ride_count: number }>;
+}
+
+export const getHistoricalRideReports = async (
+  params: HistoricalReportParams
+): Promise<RideRequest[]> => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params.startDate) queryParams.append('startDate', params.startDate);
+    if (params.endDate) queryParams.append('endDate', params.endDate);
+    if (params.period) queryParams.append('period', params.period);
+    if (params.driverId) queryParams.append('driverId', params.driverId);
+    if (params.status) queryParams.append('status', params.status);
+
+    const dbRides = await apiClient.get<any[]>(`/ride-requests/reports/historical?${queryParams.toString()}`);
+    
+    // Map to frontend format
+    return dbRides.map((r) => {
+      let reqTimestamp: number;
+      if (r.timestamp && typeof r.timestamp === "number" && r.timestamp > 0) {
+        reqTimestamp = r.timestamp;
+      } else if (r.created_at) {
+        const createdDate = new Date(r.created_at);
+        reqTimestamp = isNaN(createdDate.getTime()) ? Date.now() : createdDate.getTime();
+      } else {
+        reqTimestamp = Date.now();
+      }
+
+      return {
+        id: r.id.toString(),
+        guestName: r.guest_name || r.guestName || "Guest",
+        roomNumber: r.room_number || r.roomNumber,
+        pickup: r.pickup,
+        destination: r.destination,
+        status: r.status as BuggyStatus,
+        timestamp: reqTimestamp,
+        driverId: r.driver_id ? r.driver_id.toString() : undefined,
+        eta: r.eta || undefined,
+        pickedUpAt: r.pick_timestamp
+          ? new Date(r.pick_timestamp).getTime()
+          : r.picked_up_at
+            ? new Date(r.picked_up_at).getTime()
+            : undefined,
+        completedAt: r.drop_timestamp
+          ? new Date(r.drop_timestamp).getTime()
+          : r.completed_at
+            ? new Date(r.completed_at).getTime()
+            : undefined,
+        confirmedAt: r.assigned_timestamp
+          ? new Date(r.assigned_timestamp).getTime()
+          : r.assigned_at
+            ? new Date(r.assigned_at).getTime()
+            : undefined,
+        rating: r.rating || undefined,
+        feedback: r.feedback || undefined,
+        guestCount: r.guest_count || 1,
+        notes: r.notes || undefined,
+      };
+    });
   } catch (error) {
-    console.error("Failed to get driver performance stats:", error);
+    console.error("Failed to fetch historical ride reports:", error);
     return [];
   }
+};
+
+export const getReportStatistics = async (
+  params: Omit<HistoricalReportParams, 'status'>
+): Promise<ReportStatistics> => {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params.startDate) queryParams.append('startDate', params.startDate);
+    if (params.endDate) queryParams.append('endDate', params.endDate);
+    if (params.period) queryParams.append('period', params.period);
+    if (params.driverId) queryParams.append('driverId', params.driverId);
+
+    const stats = await apiClient.get<ReportStatistics>(`/ride-requests/reports/statistics?${queryParams.toString()}`);
+    return stats;
+  } catch (error) {
+    console.error("Failed to fetch report statistics:", error);
+    return {
+      totalRides: 0,
+      totalGuests: 0,
+      avgRating: 0,
+      totalRatings: 0,
+      avgResponseTime: 0,
+      avgTripTime: 0,
+      ridesByStatus: {},
+      ridesByDriver: [],
+    };
+  }
+};
+
+// Export rides to CSV
+export const exportRidesToCSV = (rides: RideRequest[], filename: string = 'ride-reports.csv'): void => {
+  const headers = [
+    'ID',
+    'Guest Name',
+    'Room Number',
+    'Pickup Location',
+    'Destination',
+    'Status',
+    'Request Time',
+    'Assigned Time',
+    'Pickup Time',
+    'Completed Time',
+    'Driver ID',
+    'Guest Count',
+    'Rating',
+    'Feedback',
+    'Notes'
+  ];
+
+  const rows = rides.map(ride => [
+    ride.id,
+    ride.guestName || '',
+    ride.roomNumber || '',
+    ride.pickup || '',
+    ride.destination || '',
+    ride.status || '',
+    ride.timestamp ? new Date(ride.timestamp).toLocaleString() : '',
+    ride.confirmedAt ? new Date(ride.confirmedAt).toLocaleString() : '',
+    ride.pickedUpAt ? new Date(ride.pickedUpAt).toLocaleString() : '',
+    ride.completedAt ? new Date(ride.completedAt).toLocaleString() : '',
+    ride.driverId || '',
+    (ride.guestCount || 1).toString(),
+    ride.rating ? ride.rating.toString() : '',
+    (ride.feedback || '').replace(/"/g, '""'), // Escape quotes for CSV
+    (ride.notes || '').replace(/"/g, '""'), // Escape quotes for CSV
+  ]);
+
+  // Convert to CSV format
+  const csvContent = [
+    headers.map(h => `"${h}"`).join(','),
+    ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+  ].join('\n');
+
+  // Create blob and download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 };
 
 // --- DRIVER SCHEDULE MANAGEMENT ---

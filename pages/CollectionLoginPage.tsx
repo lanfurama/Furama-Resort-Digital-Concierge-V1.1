@@ -4,7 +4,7 @@ import { StaffLogin } from '../components/login/StaffLogin';
 import { UserRole } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
 import { setDriverOnlineFor10Hours } from '../services/dataService';
-import { Briefcase, Building2, Car, UserCheck, ArrowLeft } from 'lucide-react';
+import { Briefcase, Building2, Car, UserCheck, ArrowLeft, Shield } from 'lucide-react';
 
 const CollectionLoginPage: React.FC = () => {
   const { setLanguage } = useTranslation();
@@ -21,7 +21,7 @@ const CollectionLoginPage: React.FC = () => {
     [UserRole.GUEST]: '/login'
   };
 
-  // Chỉ hiển thị 4 role được yêu cầu
+  // Chỉ hiển thị 5 role được yêu cầu
   const allowedRoles = [
     {
       role: UserRole.RECEPTION,
@@ -62,6 +62,16 @@ const CollectionLoginPage: React.FC = () => {
       bgColor: 'bg-blue-50',
       textColor: 'text-blue-700',
       borderColor: 'border-blue-500'
+    },
+    {
+      role: UserRole.ADMIN,
+      label: 'Admin',
+      icon: Shield,
+      description: 'System Administration',
+      color: 'from-emerald-500 to-teal-600',
+      bgColor: 'bg-emerald-50',
+      textColor: 'text-emerald-700',
+      borderColor: 'border-emerald-500'
     }
   ];
 
@@ -84,6 +94,9 @@ const CollectionLoginPage: React.FC = () => {
     // Redirect based on role
     switch (user.role) {
       case UserRole.SUPERVISOR:
+        window.location.href = '/admin';
+        break;
+      case UserRole.ADMIN:
         window.location.href = '/admin';
         break;
       case UserRole.DRIVER:

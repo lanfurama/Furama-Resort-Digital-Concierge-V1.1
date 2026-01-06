@@ -195,5 +195,293 @@ export const rideRequestModel = {
     const result = await pool.query('DELETE FROM ride_requests WHERE id = $1', [id]);
     return result.rowCount > 0;
   },
+
+  async getHistoricalReports(params: {
+    startDate?: Date;
+    endDate?: Date;
+    period?: 'day' | 'week' | 'month';
+    driverId?: number;
+    status?: RideRequest['status'];
+  }): Promise<RideRequest[]> {
+    let query = 'SELECT * FROM ride_requests WHERE 1=1';
+    const values: any[] = [];
+    let paramCount = 1;
+
+    // Filter by date range
+    if (params.startDate) {
+      query += ` AND (drop_timestamp >= $${paramCount} OR (drop_timestamp IS NULL AND created_at >= $${paramCount}))`;
+      values.push(params.startDate);
+      paramCount++;
+    }
+
+    if (params.endDate) {
+      query += ` AND (drop_timestamp <= $${paramCount} OR (drop_timestamp IS NULL AND created_at <= $${paramCount}))`;
+      values.push(params.endDate);
+      paramCount++;
+    }
+
+    // Filter by period (if no explicit date range provided)
+    if (!params.startDate && !params.endDate && params.period) {
+      const now = new Date();
+      let startDate: Date;
+
+      if (params.period === 'day') {
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0);
+      } else if (params.period === 'week') {
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 7);
+      } else {
+        // month
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        startDate.setHours(0, 0, 0, 0);
+      }
+
+      query += ` AND (drop_timestamp >= $${paramCount} OR (drop_timestamp IS NULL AND created_at >= $${paramCount}))`;
+      values.push(startDate);
+      paramCount++;
+    }
+
+    // Filter by driver
+    if (params.driverId) {
+      query += ` AND driver_id = $${paramCount}`;
+      values.push(params.driverId);
+      paramCount++;
+    }
+
+    // Filter by status (default to COMPLETED for historical reports)
+    if (params.status) {
+      query += ` AND status = $${paramCount}`;
+      values.push(params.status);
+      paramCount++;
+    } else {
+      // Default: only show completed rides for historical reports
+      query += ` AND status = 'COMPLETED'`;
+    }
+
+    query += ' ORDER BY drop_timestamp DESC, created_at DESC';
+
+    const result = await pool.query(query, values);
+    return result.rows;
+  },
+
+  async getReportStatistics(params: {
+    startDate?: Date;
+    endDate?: Date;
+    period?: 'day' | 'week' | 'month';
+    driverId?: number;
+  }): Promise<{
+    totalRides: number;
+    totalGuests: number;
+    avgRating: number;
+    totalRatings: number;
+    avgResponseTime: number; // Average time from SEARCHING to ASSIGNED (ms)
+    avgTripTime: number; // Average time from ON_TRIP to COMPLETED (ms)
+    ridesByStatus: Record<string, number>;
+    ridesByDriver: Array<{ driver_id: number; driver_name: string; ride_count: number }>;
+  }> {
+    // Get rides for statistics
+    const rides = await this.getHistoricalReports({
+      ...params,
+      status: 'COMPLETED'
+    });
+
+    // Calculate statistics
+    const totalRides = rides.length;
+    const totalGuests = rides.reduce((sum, r) => sum + (r.guest_count || 1), 0);
+    
+    const ratedRides = rides.filter(r => r.rating !== null && r.rating !== undefined);
+    const totalRatings = ratedRides.length;
+    const avgRating = totalRatings > 0
+      ? ratedRides.reduce((sum, r) => sum + (r.rating || 0), 0) / totalRatings
+      : 0;
+
+    // Calculate average response time (SEARCHING to ASSIGNED)
+    const ridesWithResponseTime = rides.filter(r => r.assigned_timestamp && r.timestamp);
+    const totalResponseTime = ridesWithResponseTime.reduce((sum, r) => {
+      const responseTime = new Date(r.assigned_timestamp!).getTime() - r.timestamp;
+      return sum + (responseTime > 0 ? responseTime : 0);
+    }, 0);
+    const avgResponseTime = ridesWithResponseTime.length > 0
+      ? totalResponseTime / ridesWithResponseTime.length
+      : 0;
+
+    // Calculate average trip time (ON_TRIP to COMPLETED)
+    const ridesWithTripTime = rides.filter(r => r.drop_timestamp && r.pick_timestamp);
+    const totalTripTime = ridesWithTripTime.reduce((sum, r) => {
+      const tripTime = new Date(r.drop_timestamp!).getTime() - new Date(r.pick_timestamp!).getTime();
+      return sum + (tripTime > 0 ? tripTime : 0);
+    }, 0);
+    const avgTripTime = ridesWithTripTime.length > 0
+      ? totalTripTime / ridesWithTripTime.length
+      : 0;
+
+    // Count rides by status
+    const ridesByStatus: Record<string, number> = {};
+    rides.forEach(r => {
+      ridesByStatus[r.status] = (ridesByStatus[r.status] || 0) + 1;
+    });
+
+    // Count rides by driver
+    const driverMap = new Map<number, { driver_id: number; driver_name: string; ride_count: number }>();
+    rides.forEach(r => {
+      if (r.driver_id) {
+        const existing = driverMap.get(r.driver_id);
+        if (existing) {
+          existing.ride_count++;
+        } else {
+          driverMap.set(r.driver_id, {
+            driver_id: r.driver_id,
+            driver_name: `Driver ${r.driver_id}`, // Will be enriched with actual name in controller
+            ride_count: 1
+          });
+        }
+      }
+    });
+
+    return {
+      totalRides,
+      totalGuests,
+      avgRating,
+      totalRatings,
+      avgResponseTime,
+      avgTripTime,
+      ridesByStatus,
+      ridesByDriver: Array.from(driverMap.values())
+    };
+  },
+
+  async getDriverPerformanceStats(params: {
+    startDate?: Date;
+    endDate?: Date;
+    period?: 'day' | 'week' | 'month';
+    driverId?: number;
+  }): Promise<Array<{
+    driver_id: number;
+    driver_name: string;
+    total_rides: number;
+    avg_rating: number;
+    rating_count: number;
+    avg_response_time: number; // ms
+    avg_trip_time: number; // ms
+    performance_score: number;
+  }>> {
+    // Get completed rides for the period
+    const rides = await this.getHistoricalReports({
+      ...params,
+      status: 'COMPLETED'
+    });
+
+    // Get all drivers
+    const { userModel } = await import('./userModel.js');
+    const allUsers = await userModel.getAll();
+    const drivers = allUsers.filter(u => u.role === 'DRIVER');
+
+    // Create driver stats map
+    const driverStatsMap = new Map<number, {
+      driver_id: number;
+      driver_name: string;
+      total_rides: number;
+      total_rating: number;
+      rating_count: number;
+      total_response_time: number;
+      response_time_count: number;
+      total_trip_time: number;
+      trip_time_count: number;
+    }>();
+
+    // Initialize all drivers
+    drivers.forEach(driver => {
+      driverStatsMap.set(driver.id, {
+        driver_id: driver.id,
+        driver_name: `${driver.firstName || ''} ${driver.lastName || ''}`.trim() || `Driver ${driver.id}`,
+        total_rides: 0,
+        total_rating: 0,
+        rating_count: 0,
+        total_response_time: 0,
+        response_time_count: 0,
+        total_trip_time: 0,
+        trip_time_count: 0,
+      });
+    });
+
+    // Process rides
+    rides.forEach(ride => {
+      if (!ride.driver_id) return;
+      
+      const stats = driverStatsMap.get(ride.driver_id);
+      if (!stats) return;
+
+      stats.total_rides++;
+
+      // Rating
+      if (ride.rating !== null && ride.rating !== undefined) {
+        stats.total_rating += ride.rating;
+        stats.rating_count++;
+      }
+
+      // Response time (SEARCHING to ASSIGNED)
+      if (ride.assigned_timestamp && ride.timestamp) {
+        const responseTime = new Date(ride.assigned_timestamp).getTime() - ride.timestamp;
+        if (responseTime > 0) {
+          stats.total_response_time += responseTime;
+          stats.response_time_count++;
+        }
+      }
+
+      // Trip time (ON_TRIP to COMPLETED)
+      if (ride.drop_timestamp && ride.pick_timestamp) {
+        const tripTime = new Date(ride.drop_timestamp).getTime() - new Date(ride.pick_timestamp).getTime();
+        if (tripTime > 0) {
+          stats.total_trip_time += tripTime;
+          stats.trip_time_count++;
+        }
+      }
+    });
+
+    // Calculate averages and performance scores
+    const driverStatsArray = Array.from(driverStatsMap.values()).map(stats => {
+      const avg_rating = stats.rating_count > 0 ? stats.total_rating / stats.rating_count : 0;
+      const avg_response_time = stats.response_time_count > 0 
+        ? stats.total_response_time / stats.response_time_count 
+        : 0;
+      const avg_trip_time = stats.trip_time_count > 0 
+        ? stats.total_trip_time / stats.trip_time_count 
+        : 0;
+
+      // Calculate performance score (higher is better)
+      // Formula: (rides * 0.4) + (rating * 20 * 0.3) + (response speed * 0.2) + (trip efficiency * 0.1)
+      const normalizedRides = Math.min(stats.total_rides / 50, 1) * 100;
+      const normalizedRating = avg_rating * 20; // 0-5 rating -> 0-100
+      const normalizedResponse = avg_response_time > 0
+        ? Math.max(0, 100 - (avg_response_time / 60000) * 10) // Faster = better, max 10 min
+        : 50; // Default if no data
+      const normalizedTrip = avg_trip_time > 0
+        ? Math.max(0, 100 - (avg_trip_time / 600000) * 5) // Faster = better, max 10 min
+        : 50; // Default if no data
+
+      const performance_score = 
+        normalizedRides * 0.4 +
+        normalizedRating * 0.3 +
+        normalizedResponse * 0.2 +
+        normalizedTrip * 0.1;
+
+      return {
+        driver_id: stats.driver_id,
+        driver_name: stats.driver_name,
+        total_rides: stats.total_rides,
+        avg_rating,
+        rating_count: stats.rating_count,
+        avg_response_time,
+        avg_trip_time,
+        performance_score,
+      };
+    });
+
+    // Sort by performance score (descending)
+    driverStatsArray.sort((a, b) => b.performance_score - a.performance_score);
+
+    return driverStatsArray;
+  },
 };
 

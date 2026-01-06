@@ -29,6 +29,10 @@ import {
   Navigation,
   ZoomIn,
   ZoomOut,
+  BarChart3,
+  Download,
+  TrendingUp,
+  Award,
 } from "lucide-react";
 import {
   getRides,
@@ -44,6 +48,12 @@ import {
   cancelRide,
   setDriverOnlineFor10Hours,
   checkDriverAvailability,
+  getHistoricalRideReports,
+  getReportStatistics,
+  exportRidesToCSV,
+  ReportStatistics,
+  getDriverPerformanceStats,
+  DriverPerformanceStats,
 } from "../services/dataService";
 import { authenticateStaff } from "../services/authService";
 import {
@@ -87,8 +97,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   const [locations, setLocations] = useState<Location[]>([]);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
 
-  // View Mode: Switch between Buggy and Service
-  const [viewMode, setViewMode] = useState<"BUGGY" | "SERVICE">("BUGGY");
+  // View Mode: Switch between Buggy, Reports, and Performance
+  const [viewMode, setViewMode] = useState<"BUGGY" | "REPORTS" | "PERFORMANCE">("BUGGY");
 
   // Fleet Config State
   const [showFleetSettings, setShowFleetSettings] = useState(false);
@@ -153,6 +163,21 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     Record<string, { last_name: string; villa_type?: string | null }>
   >({});
 
+  // Reports State
+  const [reportRides, setReportRides] = useState<RideRequest[]>([]);
+  const [reportStats, setReportStats] = useState<ReportStatistics | null>(null);
+  const [reportPeriod, setReportPeriod] = useState<'day' | 'week' | 'month' | 'custom'>('day');
+  const [reportStartDate, setReportStartDate] = useState<string>('');
+  const [reportEndDate, setReportEndDate] = useState<string>('');
+  const [reportDriverId, setReportDriverId] = useState<string>('');
+  const [isLoadingReports, setIsLoadingReports] = useState(false);
+
+  // Driver Performance Analytics State
+  const [driverPerformanceStats, setDriverPerformanceStats] = useState<DriverPerformanceStats[]>([]);
+  const [performancePeriod, setPerformancePeriod] = useState<'day' | 'week' | 'month'>('week');
+  const [performanceDriverId, setPerformanceDriverId] = useState<string>('');
+  const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
+
   // Create New Ride Modal State
   const [showCreateRideModal, setShowCreateRideModal] = useState(false);
   const [newRideData, setNewRideData] = useState({
@@ -211,6 +236,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   const [showManualAssignModal, setShowManualAssignModal] = useState(false);
   const [selectedRideForAssign, setSelectedRideForAssign] =
     useState<RideRequest | null>(null);
+
 
   // Detail Request Modal State
   const [showDetailRequestModal, setShowDetailRequestModal] = useState(false);
@@ -287,6 +313,70 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       }
     };
   }, []);
+
+  // Load reports when REPORTS viewMode is active
+  useEffect(() => {
+    if (viewMode !== 'REPORTS') return;
+    
+    const loadReports = async () => {
+      setIsLoadingReports(true);
+      try {
+        const params: any = {};
+        
+        if (reportPeriod === 'custom') {
+          if (reportStartDate) params.startDate = reportStartDate;
+          if (reportEndDate) params.endDate = reportEndDate;
+        } else {
+          params.period = reportPeriod;
+        }
+        
+        if (reportDriverId) {
+          params.driverId = reportDriverId;
+        }
+        
+        const [ridesData, statsData] = await Promise.all([
+          getHistoricalRideReports(params),
+          getReportStatistics(params)
+        ]);
+        
+        setReportRides(ridesData);
+        setReportStats(statsData);
+      } catch (error) {
+        console.error('Failed to load reports:', error);
+      } finally {
+        setIsLoadingReports(false);
+      }
+    };
+    
+    loadReports();
+  }, [viewMode, reportPeriod, reportStartDate, reportEndDate, reportDriverId]);
+
+  // Load driver performance stats when PERFORMANCE viewMode is active
+  useEffect(() => {
+    if (viewMode !== 'PERFORMANCE') return;
+    
+    const loadPerformanceStats = async () => {
+      setIsLoadingPerformance(true);
+      try {
+        const params: any = {
+          period: performancePeriod,
+        };
+        
+        if (performanceDriverId) {
+          params.driverId = performanceDriverId;
+        }
+        
+        const stats = await getDriverPerformanceStats(params);
+        setDriverPerformanceStats(stats);
+      } catch (error) {
+        console.error('Failed to load driver performance stats:', error);
+      } finally {
+        setIsLoadingPerformance(false);
+      }
+    };
+    
+    loadPerformanceStats();
+  }, [viewMode, performancePeriod, performanceDriverId]);
 
   // Cleanup countdown timer when auto-confirm stops
   useEffect(() => {
@@ -2069,25 +2159,21 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         await new Promise((resolve) => setTimeout(resolve, 600));
       }
 
-      // Greedy assignment: assign each individual ride to the best available driver
-      // IMPORTANT: Each ride is assigned individually - NO automatic merging during assignment
-      // IMPORTANT: Each driver can only be assigned ONE ride at a time (no multiple assignments)
-      // Rides can only be merged manually by staff using the Merge Options feature
+      // Greedy assignment with bulk assignment support: assign multiple rides to drivers when capacity allows
+      // Group rides by driver to allow bulk assignment (multiple rides per driver)
       const assignedRides = new Set<string>();
-      const assignedDrivers = new Set<string>();
-      const finalAssignments: Array<{
-        driver: User;
+      const driverAssignments = new Map<string, Array<{
         rides: RideRequest[];
         cost: number;
         isChainTrip?: boolean;
         totalGuests: number;
-      }> = [];
+      }>>();
 
+      // Group assignments by driver
       for (const assignment of assignments) {
-        // Each assignment contains exactly 1 ride (no automatic merging)
         const ride = assignment.rides[0];
-
-        // Check if this ride is already assigned
+        
+        // Skip if ride already assigned
         if (assignedRides.has(ride.id)) {
           continue;
         }
@@ -2096,13 +2182,27 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           ? String(assignment.driver.id)
           : "";
 
-        // IMPORTANT: Each driver can only be assigned ONE ride per auto-assign cycle
-        // This prevents automatic merging or multiple assignments to the same driver
-        if (assignedDrivers.has(driverId)) {
-          continue; // Driver already assigned a ride in this cycle
+        // Get or create driver's assignment list
+        if (!driverAssignments.has(driverId)) {
+          driverAssignments.set(driverId, []);
         }
+        driverAssignments.get(driverId)!.push(assignment);
+      }
 
-        // Check if driver can take this ride (if busy, only allow chain trips)
+      // Process each driver's assignments - allow multiple rides per driver
+      const finalAssignments: Array<{
+        driver: User;
+        rides: RideRequest[];
+        cost: number;
+        isChainTrip?: boolean;
+        totalGuests: number;
+      }> = [];
+
+      for (const [driverId, driverRideAssignments] of driverAssignments.entries()) {
+        const driver = allDrivers.find((d) => (d.id ? String(d.id) : "") === driverId);
+        if (!driver) continue;
+
+        // Get driver's active rides
         const driverActiveRides = rides.filter((r) => {
           const rideDriverId = r.driverId ? String(r.driverId) : "";
           return (
@@ -2113,51 +2213,84 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           );
         });
 
-        // Check total capacity: active rides + this single ride
         const activeRidesGuestCount = driverActiveRides.reduce(
           (sum, r) => sum + (r.guestCount || 1),
           0,
         );
-        if (
-          activeRidesGuestCount + assignment.totalGuests >
-          MAX_BUGGY_CAPACITY
-        ) {
-          continue; // Would exceed capacity
-        }
 
-        let isChainTrip = false;
-        if (driverActiveRides.length > 0) {
-          // Driver is busy - only allow if it's a chain trip (cost is very negative)
-          if (assignment.cost > -5000) {
-            continue; // Not a chain trip, skip
+        // Sort assignments by cost (best first)
+        driverRideAssignments.sort((a, b) => a.cost - b.cost);
+
+        // Collect rides that can be assigned to this driver (bulk assignment)
+        const ridesToAssign: RideRequest[] = [];
+        let totalGuestsToAssign = 0;
+        let hasChainTrip = false;
+
+        for (const assignment of driverRideAssignments) {
+          const ride = assignment.rides[0];
+
+          // Skip if ride already assigned
+          if (assignedRides.has(ride.id)) {
+            continue;
           }
-          isChainTrip = true;
+
+          // Check if driver is busy
+          const isBusy = driverActiveRides.length > 0;
+          
+          if (isBusy) {
+            // Driver is busy - only allow chain trips (cost is very negative)
+            if (assignment.cost > -5000) {
+              continue; // Not a chain trip, skip
+            }
+            hasChainTrip = true;
+          }
+
+          // Check capacity: active rides + already selected rides + this ride
+          const newTotalGuests = activeRidesGuestCount + totalGuestsToAssign + assignment.totalGuests;
+          if (newTotalGuests > MAX_BUGGY_CAPACITY) {
+            // Cannot add this ride - would exceed capacity
+            continue;
+          }
+
+          // Add this ride to bulk assignment
+          ridesToAssign.push(ride);
+          totalGuestsToAssign += assignment.totalGuests;
+          assignedRides.add(ride.id);
         }
 
-        // Assign this individual ride to the driver (no merging, no multiple assignments)
-        assignedRides.add(ride.id);
-        assignedDrivers.add(driverId); // Mark driver as assigned to prevent multiple assignments
-        finalAssignments.push({ ...assignment, isChainTrip });
+        // If we have rides to assign, create bulk assignment
+        if (ridesToAssign.length > 0) {
+          // Use the best cost (first assignment's cost)
+          const bestCost = driverRideAssignments.find(a => ridesToAssign.includes(a.rides[0]))?.cost || 0;
+          
+          finalAssignments.push({
+            driver,
+            rides: ridesToAssign,
+            cost: bestCost,
+            isChainTrip: hasChainTrip,
+            totalGuests: totalGuestsToAssign,
+          });
+        }
       }
 
       // Update modal with assignments (only if showing modal)
-      // Each assignment already contains exactly 1 ride (no merging)
-      // Resolve coordinates for pickup and destination locations
-      const displayAssignments = finalAssignments.map((assignment) => {
-        const ride = assignment.rides[0]; // Each group has exactly 1 ride
-        const pickupCoords = resolveLocationCoordinates(ride.pickup);
-        const destinationCoords = resolveLocationCoordinates(ride.destination);
+      // Flatten bulk assignments for display (one entry per ride)
+      const displayAssignments = finalAssignments.flatMap((assignment) => {
+        return assignment.rides.map((ride) => {
+          const pickupCoords = resolveLocationCoordinates(ride.pickup);
+          const destinationCoords = resolveLocationCoordinates(ride.destination);
 
-        return {
-          driver: assignment.driver,
-          ride: ride,
-          cost: assignment.cost,
-          isChainTrip: assignment.isChainTrip,
-          pickupLat: pickupCoords?.lat,
-          pickupLng: pickupCoords?.lng,
-          destinationLat: destinationCoords?.lat,
-          destinationLng: destinationCoords?.lng,
-        };
+          return {
+            driver: assignment.driver,
+            ride: ride,
+            cost: assignment.cost,
+            isChainTrip: assignment.isChainTrip,
+            pickupLat: pickupCoords?.lat,
+            pickupLng: pickupCoords?.lng,
+            destinationLat: destinationCoords?.lat,
+            destinationLng: destinationCoords?.lng,
+          };
+        });
       });
       if (!isAutoTriggered) {
         setAIAssignmentData((prev) =>
@@ -2168,17 +2301,17 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
 
-      // Execute assignments - assign each individual ride to its driver
-      // IMPORTANT: Each ride is assigned individually - NO automatic merging
+      // Execute assignments - assign all rides in each bulk assignment
       let assignmentCount = 0;
       for (const { driver, rides } of finalAssignments) {
-        try {
-          // Each group contains exactly 1 ride (no automatic merging)
-          const ride = rides[0];
-          await updateRideStatus(ride.id, BuggyStatus.ASSIGNED, driver.id, 5); // 5 min ETA
-          assignmentCount++;
-        } catch (error) {
-          console.error(`Failed to assign ride to driver ${driver.id}:`, error);
+        // Assign all rides in this bulk assignment to the driver
+        for (const ride of rides) {
+          try {
+            await updateRideStatus(ride.id, BuggyStatus.ASSIGNED, driver.id, 5); // 5 min ETA
+            assignmentCount++;
+          } catch (error) {
+            console.error(`Failed to assign ride ${ride.id} to driver ${driver.id}:`, error);
+          }
         }
       }
 
@@ -2434,13 +2567,19 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
             <div
               className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                viewMode === "BUGGY" ? "bg-emerald-700" : "bg-blue-600"
+                viewMode === "BUGGY" ? "bg-emerald-700" : 
+                viewMode === "REPORTS" ? "bg-purple-600" :
+                viewMode === "PERFORMANCE" ? "bg-indigo-600" : "bg-emerald-700"
               }`}
             >
               {viewMode === "BUGGY" ? (
                 <Car size={20} className="md:w-6 md:h-6 text-white" />
+              ) : viewMode === "REPORTS" ? (
+                <BarChart3 size={20} className="md:w-6 md:h-6 text-white" />
+              ) : viewMode === "PERFORMANCE" ? (
+                <TrendingUp size={20} className="md:w-6 md:h-6 text-white" />
               ) : (
-                <UtensilsCrossed size={20} className="md:w-6 md:h-6 text-white" />
+                <Car size={20} className="md:w-6 md:h-6 text-white" />
               )}
             </div>
             <div className="min-w-0">
@@ -2509,20 +2648,26 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               <span className="whitespace-nowrap">Buggy Fleet</span>
             </button>
             <button
-              onClick={() => {
-                /* Disabled temporarily */
-              }}
-              disabled
-              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm transition-all opacity-50 cursor-not-allowed min-h-[44px] ${
-                viewMode === "SERVICE"
-                  ? "bg-blue-600 text-white shadow-md"
-                  : "bg-gray-100 text-gray-600"
+              onClick={() => setViewMode("REPORTS")}
+              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm transition-all min-h-[44px] touch-manipulation ${
+                viewMode === "REPORTS"
+                  ? "bg-purple-600 text-white shadow-md"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
-              title="Service Requests feature is temporarily disabled"
             >
-              <UtensilsCrossed size={16} className="md:w-[18px] md:h-[18px]" />
-              <span className="whitespace-nowrap hidden sm:inline">Service Requests</span>
-              <span className="whitespace-nowrap sm:hidden">Service</span>
+              <BarChart3 size={16} className="md:w-[18px] md:h-[18px]" />
+              <span className="whitespace-nowrap">Reports</span>
+            </button>
+            <button
+              onClick={() => setViewMode("PERFORMANCE")}
+              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm transition-all min-h-[44px] touch-manipulation ${
+                viewMode === "PERFORMANCE"
+                  ? "bg-indigo-600 text-white shadow-md"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <TrendingUp size={16} className="md:w-[18px] md:h-[18px]" />
+              <span className="whitespace-nowrap">Performance</span>
             </button>
           </div>
 
@@ -5174,771 +5319,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
             </div>
           )}
 
-          {/* Service Request Management */}
-          {viewMode === "SERVICE" && (
-            <>
-              {/* Service Header */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4 px-4 py-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 bg-blue-600 rounded-md flex items-center justify-center">
-                    <UtensilsCrossed size={20} className="text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-gray-800">
-                      Service Request Management
-                    </h2>
-                    <p className="text-xs text-gray-500">
-                      Manage dining, spa, pool, butler, and housekeeping
-                      requests.
-                    </p>
-                  </div>
-                </div>
-                {/* Status Indicator */}
-                <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-1.5 border border-gray-200 shadow-sm">
-                  <div className="flex items-center gap-1.5">
-                    <div className="flex items-center gap-1">
-                      <AlertCircle size={14} className="text-orange-500" />
-                      <span className="text-xs font-semibold text-gray-700">
-                        {getPendingServiceRequestsCount()}
-                      </span>
-                      <span className="text-sm text-gray-500">Pending</span>
-                    </div>
-                    <div className="w-px h-4 bg-gray-300"></div>
-                    <div className="flex items-center gap-1">
-                      <CheckCircle size={14} className="text-blue-500" />
-                      <span className="text-xs font-semibold text-gray-700">
-                        {getConfirmedServiceRequestsCount()}
-                      </span>
-                      <span className="text-sm text-gray-500">Confirmed</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={async () => {
-                      try {
-                        const refreshedServices = await getServiceRequests();
-                        setServiceRequests(refreshedServices);
-                      } catch (error) {
-                        console.error(
-                          "Failed to refresh service requests:",
-                          error,
-                        );
-                        setServiceRequests([]);
-                      }
-                    }}
-                    className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition"
-                  >
-                    <RefreshCw size={18} />
-                  </button>
-                  <button
-                    onClick={async () => {
-                      await handleServiceAutoAssign();
-                    }}
-                    disabled={(() => {
-                      const hasPendingServices =
-                        getPendingServiceRequestsCount() > 0;
-                      const hasOnlineStaff = getOnlineStaffCount() > 0;
-                      return !hasPendingServices || !hasOnlineStaff;
-                    })()}
-                    className="bg-blue-600 text-white px-3 py-1.5 rounded-md flex items-center gap-1.5 hover:bg-blue-700 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Zap size={16} />
-                    <span>Assign by AI</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Service AI Assignment Modal - Similar to Buggy */}
-              {showServiceAIAssignment && serviceAIAssignmentData && (
-                <div
-                  className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 animate-in fade-in"
-                  onClick={() => {
-                    if (
-                      serviceAIAssignmentData.status === "completed" ||
-                      serviceAIAssignmentData.status === "error"
-                    ) {
-                      setShowServiceAIAssignment(false);
-                      setServiceAIAssignmentData(null);
-                    }
-                  }}
-                >
-                  <div
-                    className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[90vw] max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in slide-in-from-top-5 relative"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {/* Header */}
-                    <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                          <Brain size={24} className="text-white" />
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-lg">
-                            AI Service Assignment Engine
-                          </h3>
-                          <p className="text-xs text-blue-100">
-                            Intelligent staff-service matching
-                          </p>
-                        </div>
-                      </div>
-                      {(serviceAIAssignmentData.status === "completed" ||
-                        serviceAIAssignmentData.status === "error") && (
-                        <button
-                          onClick={() => {
-                            setShowServiceAIAssignment(false);
-                            setServiceAIAssignmentData(null);
-                          }}
-                          className="text-white/80 hover:text-white transition-colors"
-                        >
-                          <X size={24} />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 overflow-y-auto p-6">
-                      {serviceAIAssignmentData.status === "analyzing" && (
-                        <div className="flex flex-col items-center justify-center py-12">
-                          <Loader2
-                            size={48}
-                            className="text-blue-600 animate-spin mb-4"
-                          />
-                          <h4 className="text-xl font-bold text-gray-800 mb-2">
-                            Analyzing Requests...
-                          </h4>
-                          <p className="text-gray-600 text-center max-w-md">
-                            AI is analyzing{" "}
-                            {serviceAIAssignmentData.pendingServices.length}{" "}
-                            pending request(s) and{" "}
-                            {serviceAIAssignmentData.onlineStaff.length}{" "}
-                            available staff member(s)
-                          </p>
-                        </div>
-                      )}
-
-                      {serviceAIAssignmentData.status === "matching" && (
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-3 mb-4">
-                            <Loader2
-                              size={24}
-                              className="text-blue-600 animate-spin"
-                            />
-                            <h4 className="text-lg font-bold text-gray-800">
-                              Matching Staff to Requests...
-                            </h4>
-                          </div>
-                        </div>
-                      )}
-
-                      {serviceAIAssignmentData.status === "completed" &&
-                        serviceAIAssignmentData.assignments.length > 0 && (
-                          <div className="space-y-3">
-                            {serviceAIAssignmentData.assignments.map(
-                              (assignment, idx) => (
-                                <div
-                                  key={`${assignment.staff.id}-${assignment.service.id}`}
-                                  className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg p-4"
-                                >
-                                  <div className="flex items-start gap-4">
-                                    <div className="flex-1 bg-white rounded-lg p-3 border border-blue-200">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                          <Users
-                                            size={16}
-                                            className="text-blue-600"
-                                          />
-                                        </div>
-                                        <div>
-                                          <div className="font-bold text-sm text-gray-800">
-                                            {assignment.staff.lastName}
-                                          </div>
-                                          <div className="text-xs text-gray-500">
-                                            {assignment.staff.department ||
-                                              "Staff"}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center pt-2">
-                                      <ArrowRight
-                                        size={24}
-                                        className="text-blue-600"
-                                      />
-                                    </div>
-                                    <div className="flex-1 bg-white rounded-lg p-3 border border-purple-200">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                                          <UtensilsCrossed
-                                            size={16}
-                                            className="text-purple-600"
-                                          />
-                                        </div>
-                                        <div>
-                                          <div className="font-bold text-sm text-gray-800">
-                                            Room {assignment.service.roomNumber}
-                                          </div>
-                                          <div className="text-xs text-gray-500">
-                                            {assignment.service.type}
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <div className="text-xs text-gray-600">
-                                        {assignment.service.details}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              ),
-                            )}
-                          </div>
-                        )}
-
-                      {serviceAIAssignmentData.status === "error" && (
-                        <div className="flex flex-col items-center justify-center py-12">
-                          <AlertCircle
-                            size={48}
-                            className="text-red-600 mb-4"
-                          />
-                          <h4 className="text-xl font-bold text-gray-800 mb-2">
-                            Assignment Failed
-                          </h4>
-                          <p className="text-gray-600 text-center whitespace-pre-line max-w-md">
-                            {serviceAIAssignmentData.errorMessage}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Footer */}
-                    {(serviceAIAssignmentData.status === "completed" ||
-                      serviceAIAssignmentData.status === "error") && (
-                      <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-end">
-                        <button
-                          onClick={() => {
-                            setShowServiceAIAssignment(false);
-                            setServiceAIAssignmentData(null);
-                          }}
-                          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium"
-                        >
-                          Close
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Three Columns Layout */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* Column 1: Pending Service Requests */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="font-bold text-sm text-gray-800">
-                      Pending Requests ({getPendingServiceRequestsCount()})
-                    </h3>
-                  </div>
-                  <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                    {getPendingServiceRequestsCount() === 0 ? (
-                      <div className="text-center py-6 text-gray-400 text-xs">
-                        No pending service requests
-                      </div>
-                    ) : (
-                      (() => {
-                        // Filter and deduplicate: Remove duplicates based on roomNumber, type, and details
-                        const pendingServices = serviceRequests
-                          .filter(
-                            (sr) =>
-                              sr.status === "PENDING" && sr.type !== "BUGGY",
-                          )
-                          .sort((a, b) => b.timestamp - a.timestamp);
-
-                        // Deduplicate: Group by roomNumber + type + details, keep only the most recent
-                        const seen: { [key: string]: ServiceRequest } = {};
-
-                        for (const service of pendingServices) {
-                          // Create a unique key based on roomNumber, type, and details
-                          const key = `${service.roomNumber}-${service.type}-${(service.details || "").substring(0, 50)}`;
-
-                          if (!seen[key]) {
-                            seen[key] = service;
-                          } else {
-                            // If we've seen this before, keep the one with the most recent timestamp
-                            const existing = seen[key];
-                            if (
-                              existing &&
-                              service.timestamp > existing.timestamp
-                            ) {
-                              seen[key] = service;
-                            }
-                          }
-                        }
-
-                        return Object.values(seen);
-                      })().map((service) => {
-                        const waitTime = Math.floor(
-                          (Date.now() - service.timestamp) / 1000,
-                        ); // seconds
-                        const waitMinutes = Math.floor(waitTime / 60);
-
-                        let urgencyLevel = "normal";
-                        let bgColor = "bg-white";
-                        let borderColor = "border-gray-200";
-                        let textColor = "text-gray-900";
-
-                        if (waitTime >= 600) {
-                          // 10+ minutes = urgent
-                          urgencyLevel = "urgent";
-                          bgColor = "bg-red-50";
-                          borderColor = "border-red-300";
-                          textColor = "text-red-900";
-                        } else if (waitTime >= 300) {
-                          // 5-10 minutes = warning
-                          urgencyLevel = "warning";
-                          bgColor = "bg-orange-50";
-                          borderColor = "border-orange-300";
-                          textColor = "text-orange-900";
-                        }
-
-                        const getTypeColor = (type: string) => {
-                          switch (type) {
-                            case "DINING":
-                              return "bg-purple-100 text-purple-700 border-purple-200";
-                            case "SPA":
-                              return "bg-pink-100 text-pink-700 border-pink-200";
-                            case "POOL":
-                              return "bg-cyan-100 text-cyan-700 border-cyan-200";
-                            case "BUTLER":
-                              return "bg-amber-100 text-amber-700 border-amber-200";
-                            case "HOUSEKEEPING":
-                              return "bg-indigo-100 text-indigo-700 border-indigo-200";
-                            default:
-                              return "bg-gray-100 text-gray-700 border-gray-200";
-                          }
-                        };
-
-                        // Parse details to extract items if present
-                        const detailsText = service.details || "";
-                        const itemsMatch =
-                          detailsText.match(/Items:\s*([^.]+)/i);
-                        const itemsText = itemsMatch
-                          ? itemsMatch[1].trim()
-                          : "";
-                        const remainingDetails = itemsText
-                          ? detailsText
-                              .replace(/Items:\s*[^.]+\.\s*/i, "")
-                              .replace(/Order for:\s*/i, "")
-                              .trim()
-                          : detailsText.replace(/Order for:\s*/i, "").trim();
-
-                        return (
-                          <div
-                            key={service.id}
-                            className={`${bgColor} ${borderColor} p-2.5 rounded-lg border-2 transition-all duration-200 shadow-sm`}
-                          >
-                            <div className="flex items-start justify-between gap-2 mb-1.5">
-                              <div className="flex-1 min-w-0">
-                                {/* Header: Type and Room */}
-                                <div className="flex items-center gap-2 mb-1.5">
-                                  <span
-                                    className={`text-xs px-2 py-1 rounded font-bold border ${getTypeColor(service.type)}`}
-                                  >
-                                    {service.type}
-                                  </span>
-                                  <span
-                                    className={`text-sm font-bold ${textColor}`}
-                                  >
-                                    Room {service.roomNumber}
-                                  </span>
-                                </div>
-
-                                {/* Items if available */}
-                                {itemsText && (
-                                  <div
-                                    className={`text-xs ${textColor} mb-1 font-medium`}
-                                  >
-                                    {itemsText}
-                                  </div>
-                                )}
-
-                                {/* Wait time */}
-                                <div className="flex items-center gap-1.5 text-[10px] mt-1.5 pt-1.5 border-t border-gray-200">
-                                  <Clock size={11} className={`${textColor}`} />
-                                  <span
-                                    className={`font-semibold ${textColor}`}
-                                  >
-                                    Waiting {waitMinutes}m
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-
-                {/* Column 2: Staff List */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="font-bold text-sm text-gray-800">
-                      Staff Fleet (
-                      {users.filter((u) => u.role === UserRole.STAFF).length})
-                    </h3>
-                  </div>
-                  <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                    {users.filter((u) => u.role === UserRole.STAFF).length ===
-                    0 ? (
-                      <div className="text-center py-6 text-gray-400 text-xs">
-                        No staff members
-                      </div>
-                    ) : (
-                      (() => {
-                        const staffUsers = users.filter(
-                          (u) => u.role === UserRole.STAFF,
-                        );
-                        return staffUsers.map((staff) => {
-                          const staffStatus = getStaffStatus(staff);
-                          const department = staff.department || "General";
-
-                          // Count active services for this staff's department
-                          const activeServices = serviceRequests.filter(
-                            (sr) => {
-                              if (sr.type === "BUGGY") return false;
-                              const srDepartment = getDepartmentForServiceType(
-                                sr.type,
-                              );
-                              return (
-                                sr.status === "CONFIRMED" &&
-                                (srDepartment === department ||
-                                  department === "All")
-                              );
-                            },
-                          );
-
-                          const isOnline =
-                            staff.updatedAt &&
-                            Date.now() - staff.updatedAt < 30000;
-
-                          let bgColor = "bg-white";
-                          let borderColor = "border-gray-200";
-                          let statusBadgeClass = "bg-gray-400 text-white";
-                          let statusText = "OFFLINE";
-
-                          if (isOnline) {
-                            if (staffStatus === "BUSY") {
-                              bgColor = "bg-orange-50";
-                              borderColor = "border-orange-300";
-                              statusBadgeClass = "bg-orange-500 text-white";
-                              statusText = "BUSY";
-                            } else {
-                              bgColor = "bg-green-50";
-                              borderColor = "border-green-300";
-                              statusBadgeClass = "bg-green-500 text-white";
-                              statusText = "AVAILABLE";
-                            }
-                          }
-
-                          return (
-                            <div
-                              key={staff.id}
-                              className={`${bgColor} ${borderColor} p-3 rounded-lg border-2 transition-all duration-200 shadow-sm`}
-                            >
-                              <div className="flex items-start gap-2.5 mb-2">
-                                <div
-                                  className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                    isOnline
-                                      ? staffStatus === "BUSY"
-                                        ? "bg-orange-200"
-                                        : "bg-green-200"
-                                      : "bg-gray-200"
-                                  }`}
-                                >
-                                  <Users
-                                    size={16}
-                                    className={
-                                      isOnline
-                                        ? staffStatus === "BUSY"
-                                          ? "text-orange-700"
-                                          : "text-green-700"
-                                        : "text-gray-600"
-                                    }
-                                  />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <div
-                                      className={`font-bold text-sm ${
-                                        isOnline
-                                          ? staffStatus === "BUSY"
-                                            ? "text-orange-900"
-                                            : "text-green-900"
-                                          : "text-gray-900"
-                                      }`}
-                                    >
-                                      {staff.lastName || "Staff"}
-                                    </div>
-                                  </div>
-                                  <div
-                                    className={`text-[11px] ${
-                                      isOnline
-                                        ? staffStatus === "BUSY"
-                                          ? "text-orange-700"
-                                          : "text-green-700"
-                                        : "text-gray-500"
-                                    }`}
-                                  >
-                                    {department}
-                                  </div>
-                                  {activeServices.length > 0 && (
-                                    <div className="text-[10px] text-gray-600 mt-1">
-                                      {activeServices.length} active service(s)
-                                    </div>
-                                  )}
-                                </div>
-                                <span
-                                  className={`text-[10px] px-2 py-1 rounded font-bold whitespace-nowrap ${statusBadgeClass}`}
-                                >
-                                  {statusText}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()
-                    )}
-                  </div>
-                </div>
-
-                {/* Column 3: Active Service Requests (Confirmed) */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="font-bold text-sm text-gray-800">
-                      Active Services ({getConfirmedServiceRequestsCount()})
-                    </h3>
-                  </div>
-                  <div className="space-y-2 max-h-[350px] overflow-y-auto">
-                    {getConfirmedServiceRequestsCount() === 0 ? (
-                      <div className="text-center py-6 text-gray-400 text-xs">
-                        No active service requests
-                      </div>
-                    ) : (
-                      serviceRequests
-                        .filter(
-                          (sr) =>
-                            sr.status === "CONFIRMED" && sr.type !== "BUGGY",
-                        )
-                        .sort(
-                          (a, b) => (a.confirmedAt || 0) - (b.confirmedAt || 0),
-                        )
-                        .map((service) => {
-                          const getTypeColor = (type: string) => {
-                            switch (type) {
-                              case "DINING":
-                                return "bg-purple-100 text-purple-700 border-purple-200";
-                              case "SPA":
-                                return "bg-pink-100 text-pink-700 border-pink-200";
-                              case "POOL":
-                                return "bg-cyan-100 text-cyan-700 border-cyan-200";
-                              case "BUTLER":
-                                return "bg-amber-100 text-amber-700 border-amber-200";
-                              case "HOUSEKEEPING":
-                                return "bg-indigo-100 text-indigo-700 border-indigo-200";
-                              default:
-                                return "bg-gray-100 text-gray-700 border-gray-200";
-                            }
-                          };
-
-                          const confirmedTime =
-                            service.confirmedAt || service.timestamp;
-                          const timeSinceConfirmed = Math.floor(
-                            (Date.now() - confirmedTime) / 1000 / 60,
-                          ); // minutes
-
-                          return (
-                            <div
-                              key={service.id}
-                              className="bg-blue-50 border-blue-200 p-3 rounded-lg border-2 transition-all duration-200 shadow-sm"
-                            >
-                              <div className="flex items-start justify-between gap-2 mb-2">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span
-                                      className={`text-xs px-2 py-0.5 rounded font-bold border ${getTypeColor(service.type)}`}
-                                    >
-                                      {service.type}
-                                    </span>
-                                    <span className="text-sm font-bold text-blue-900">
-                                      Room {service.roomNumber}
-                                    </span>
-                                    <span className="text-[10px] bg-blue-200 text-blue-900 px-2 py-0.5 rounded font-bold">
-                                      CONFIRMED
-                                    </span>
-                                  </div>
-                                  <div className="text-xs text-blue-900 mb-1.5">
-                                    {service.details}
-                                  </div>
-                                  <div className="flex items-center gap-2 text-[10px] text-blue-600">
-                                    <CheckCircle size={10} />
-                                    <span>
-                                      Confirmed {timeSinceConfirmed}m ago
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    await updateServiceStatus(
-                                      service.id,
-                                      "COMPLETED",
-                                    );
-                                    const refreshed =
-                                      await getServiceRequests();
-                                    setServiceRequests(refreshed);
-                                  } catch (error) {
-                                    console.error(
-                                      "Failed to complete service:",
-                                      error,
-                                    );
-                                  }
-                                }}
-                                className="w-full bg-emerald-600 text-white text-xs font-semibold px-3 py-1.5 rounded-md hover:bg-emerald-700 transition"
-                              >
-                                Complete
-                              </button>
-                            </div>
-                          );
-                        })
-                    )}
-                  </div>
-
-                  {/* Recent Completed Section */}
-                  <div className="mt-4 pt-3 border-t border-gray-200">
-                    <h4 className="font-bold text-[10px] text-gray-500 uppercase mb-2 tracking-wider">
-                      RECENT COMPLETED.
-                    </h4>
-                    <div className="space-y-1.5 max-h-[350px] overflow-y-auto">
-                      {(() => {
-                        // Sort completed services by completion time (most recent first)
-                        const completedServices = serviceRequests
-                          .filter(
-                            (sr) =>
-                              sr.status === "COMPLETED" && sr.type !== "BUGGY",
-                          )
-                          .sort((a, b) => {
-                            const timeA = a.completedAt || a.timestamp || 0;
-                            const timeB = b.completedAt || b.timestamp || 0;
-                            return timeB - timeA; // Most recent first
-                          })
-                          .slice(0, 5);
-
-                        const getTypeColor = (type: string) => {
-                          switch (type) {
-                            case "DINING":
-                              return "bg-purple-100 text-purple-700 border-purple-200";
-                            case "SPA":
-                              return "bg-pink-100 text-pink-700 border-pink-200";
-                            case "POOL":
-                              return "bg-cyan-100 text-cyan-700 border-cyan-200";
-                            case "BUTLER":
-                              return "bg-amber-100 text-amber-700 border-amber-200";
-                            case "HOUSEKEEPING":
-                              return "bg-indigo-100 text-indigo-700 border-indigo-200";
-                            default:
-                              return "bg-gray-100 text-gray-700 border-gray-200";
-                          }
-                        };
-
-                        return completedServices.map((service) => {
-                          // Calculate time ago
-                          const completedTime =
-                            service.completedAt ||
-                            service.timestamp ||
-                            Date.now();
-                          const timeAgo = Math.floor(
-                            (Date.now() - completedTime) / 1000 / 60,
-                          ); // minutes ago
-                          let timeAgoText = "";
-                          if (timeAgo < 1) {
-                            timeAgoText = "Just now";
-                          } else if (timeAgo < 60) {
-                            timeAgoText = `${timeAgo}m ago`;
-                          } else {
-                            const hoursAgo = Math.floor(timeAgo / 60);
-                            timeAgoText = `${hoursAgo}h ago`;
-                          }
-
-                          // Truncate details if too long
-                          const truncateText = (
-                            text: string,
-                            maxLength: number = 25,
-                          ) => {
-                            if (text.length <= maxLength) return text;
-                            return text.substring(0, maxLength - 3) + "...";
-                          };
-
-                          return (
-                            <div
-                              key={service.id}
-                              className="bg-gray-50 p-2.5 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors"
-                            >
-                              <div className="flex items-start justify-between gap-2 mb-1.5">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1.5 mb-1">
-                                    <span
-                                      className={`text-[10px] px-1.5 py-0.5 rounded font-bold border ${getTypeColor(service.type)}`}
-                                    >
-                                      {service.type}
-                                    </span>
-                                    <span className="text-xs font-bold text-gray-800">
-                                      Room {service.roomNumber}
-                                    </span>
-                                    {service.rating && (
-                                      <div className="flex items-center gap-0.5">
-                                        <Star
-                                          size={10}
-                                          className="text-yellow-500 fill-yellow-500"
-                                        />
-                                        <span className="text-[9px] font-semibold text-gray-600">
-                                          {service.rating}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="text-[10px] text-gray-600 mb-0.5">
-                                    {truncateText(service.details)}
-                                  </div>
-                                </div>
-                                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                  <span className="flex items-center gap-0.5 text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">
-                                    <CheckCircle size={9} />
-                                    Completed
-                                  </span>
-                                  <span className="text-[9px] text-gray-400 font-medium">
-                                    {timeAgoText}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()}
-                      {serviceRequests.filter(
-                        (sr) =>
-                          sr.status === "COMPLETED" && sr.type !== "BUGGY",
-                      ).length === 0 && (
-                        <div className="text-center py-3 text-gray-400 text-[10px]">
-                          No completed services yet.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
         </div>
       </div>
 
@@ -6355,6 +5735,380 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                 );
               })()}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reports View */}
+      {viewMode === "REPORTS" && (
+        <div className="space-y-6">
+          {/* Filters */}
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Period</label>
+                <select
+                  value={reportPeriod}
+                  onChange={(e) => {
+                    setReportPeriod(e.target.value as any);
+                    if (e.target.value !== 'custom') {
+                      setReportStartDate('');
+                      setReportEndDate('');
+                    }
+                  }}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                >
+                  <option value="day">Today</option>
+                  <option value="week">Last 7 Days</option>
+                  <option value="month">This Month</option>
+                  <option value="custom">Custom Range</option>
+                </select>
+              </div>
+              
+              {reportPeriod === 'custom' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Start Date</label>
+                    <input
+                      type="date"
+                      value={reportStartDate}
+                      onChange={(e) => setReportStartDate(e.target.value)}
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">End Date</label>
+                    <input
+                      type="date"
+                      value={reportEndDate}
+                      onChange={(e) => setReportEndDate(e.target.value)}
+                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                    />
+                  </div>
+                </>
+              )}
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Driver (Optional)</label>
+                <select
+                  value={reportDriverId}
+                  onChange={(e) => setReportDriverId(e.target.value)}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                >
+                  <option value="">All Drivers</option>
+                  {users
+                    .filter(u => u.role === UserRole.DRIVER)
+                    .map(driver => (
+                      <option key={driver.id} value={driver.id}>
+                        {driver.firstName} {driver.lastName} ({driver.roomNumber})
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  setIsLoadingReports(true);
+                  try {
+                    const params: any = {};
+                    if (reportPeriod === 'custom') {
+                      if (reportStartDate) params.startDate = reportStartDate;
+                      if (reportEndDate) params.endDate = reportEndDate;
+                    } else {
+                      params.period = reportPeriod;
+                    }
+                    if (reportDriverId) params.driverId = reportDriverId;
+                    
+                    const [ridesData, statsData] = await Promise.all([
+                      getHistoricalRideReports(params),
+                      getReportStatistics(params)
+                    ]);
+                    setReportRides(ridesData);
+                    setReportStats(statsData);
+                  } catch (error) {
+                    console.error('Failed to load reports:', error);
+                  } finally {
+                    setIsLoadingReports(false);
+                  }
+                }}
+                className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm font-semibold flex items-center gap-2"
+              >
+                <RefreshCw size={14} className={isLoadingReports ? 'animate-spin' : ''} />
+                {isLoadingReports ? 'Loading...' : 'Refresh'}
+              </button>
+              
+              {reportRides.length > 0 && (
+                <button
+                  onClick={() => {
+                    const periodLabel = reportPeriod === 'day' ? 'today' : reportPeriod === 'week' ? 'last7days' : reportPeriod === 'month' ? 'thismonth' : 'custom';
+                    const filename = `ride-reports-${periodLabel}-${new Date().toISOString().split('T')[0]}.csv`;
+                    exportRidesToCSV(reportRides, filename);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold flex items-center gap-2"
+                >
+                  <Download size={14} />
+                  Export CSV
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Statistics Cards */}
+          {reportStats && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div className="text-sm text-gray-500 mb-1">Total Rides</div>
+                <div className="text-2xl font-bold text-emerald-600">{reportStats.totalRides}</div>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div className="text-sm text-gray-500 mb-1">Total Guests</div>
+                <div className="text-2xl font-bold text-blue-600">{reportStats.totalGuests}</div>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div className="text-sm text-gray-500 mb-1">Average Rating</div>
+                <div className="text-2xl font-bold text-yellow-600">
+                  {reportStats.avgRating > 0 ? reportStats.avgRating.toFixed(1) : 'N/A'}
+                  {reportStats.avgRating > 0 && <Star size={16} className="inline ml-1 text-yellow-400" />}
+                </div>
+                <div className="text-xs text-gray-400 mt-1">({reportStats.totalRatings} ratings)</div>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div className="text-sm text-gray-500 mb-1">Avg Response Time</div>
+                <div className="text-2xl font-bold text-purple-600">
+                  {reportStats.avgResponseTime > 0 
+                    ? `${Math.round(reportStats.avgResponseTime / 1000 / 60)} min`
+                    : 'N/A'}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Rides Table */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="font-semibold text-gray-800">Ride History</h3>
+              <span className="text-sm text-gray-500">{reportRides.length} rides</span>
+            </div>
+            
+            {isLoadingReports ? (
+              <div className="p-10 text-center">
+                <Loader2 size={32} className="mx-auto mb-4 text-emerald-600 animate-spin" />
+                <p className="text-gray-500">Loading reports...</p>
+              </div>
+            ) : reportRides.length === 0 ? (
+              <div className="p-10 text-center text-gray-400">
+                <BarChart3 size={48} className="mx-auto mb-4 opacity-20" />
+                <p>No rides found for the selected period.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Guest</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Room</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Route</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Driver</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Requested</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Completed</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Rating</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {reportRides.map((ride) => {
+                      const driver = users.find(u => u.id === ride.driverId);
+                      return (
+                        <tr key={ride.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm text-gray-600">#{ride.id}</td>
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{ride.guestName}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{ride.roomNumber}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            <div className="flex items-center gap-1">
+                              <span className="text-emerald-600">{ride.pickup}</span>
+                              <ArrowRight size={12} className="text-gray-400" />
+                              <span className="text-blue-600">{ride.destination}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {driver ? `${driver.firstName} ${driver.lastName}` : `Driver ${ride.driverId || 'N/A'}`}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {ride.timestamp ? new Date(ride.timestamp).toLocaleString() : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {ride.completedAt ? new Date(ride.completedAt).toLocaleString() : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {ride.rating ? (
+                              <div className="flex items-center gap-1">
+                                <Star size={14} className="text-yellow-400 fill-yellow-400" />
+                                <span className="font-semibold">{ride.rating}</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Driver Performance Analytics View */}
+      {viewMode === "PERFORMANCE" && (
+        <div className="space-y-6">
+          {/* Filters */}
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Period</label>
+                <select
+                  value={performancePeriod}
+                  onChange={(e) => setPerformancePeriod(e.target.value as any)}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                >
+                  <option value="day">Today</option>
+                  <option value="week">Last 7 Days</option>
+                  <option value="month">This Month</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Driver (Optional)</label>
+                <select
+                  value={performanceDriverId}
+                  onChange={(e) => setPerformanceDriverId(e.target.value)}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                >
+                  <option value="">All Drivers</option>
+                  {users
+                    .filter(u => u.role === UserRole.DRIVER)
+                    .map(driver => (
+                      <option key={driver.id} value={driver.id}>
+                        {driver.firstName} {driver.lastName} ({driver.roomNumber})
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+            
+            <button
+              onClick={async () => {
+                setIsLoadingPerformance(true);
+                try {
+                  const params: any = { period: performancePeriod };
+                  if (performanceDriverId) params.driverId = performanceDriverId;
+                  const stats = await getDriverPerformanceStats(params);
+                  setDriverPerformanceStats(stats);
+                } catch (error) {
+                  console.error('Failed to load performance stats:', error);
+                } finally {
+                  setIsLoadingPerformance(false);
+                }
+              }}
+              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm font-semibold flex items-center gap-2"
+            >
+              <RefreshCw size={14} className={isLoadingPerformance ? 'animate-spin' : ''} />
+              {isLoadingPerformance ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
+
+          {/* Performance Stats Table */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                <TrendingUp size={20} className="text-indigo-600" />
+                Driver Performance Analytics
+              </h3>
+              <span className="text-sm text-gray-500">{driverPerformanceStats.length} drivers</span>
+            </div>
+            
+            {isLoadingPerformance ? (
+              <div className="p-10 text-center">
+                <Loader2 size={32} className="mx-auto mb-4 text-indigo-600 animate-spin" />
+                <p className="text-gray-500">Loading performance data...</p>
+              </div>
+            ) : driverPerformanceStats.length === 0 ? (
+              <div className="p-10 text-center text-gray-400">
+                <Award size={48} className="mx-auto mb-4 opacity-20" />
+                <p>No performance data found for the selected period.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Rank</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Driver</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Total Rides</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Avg Rating</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Avg Response</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Avg Trip Time</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Performance Score</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {driverPerformanceStats.map((stats, index) => {
+                      const rank = index + 1;
+                      const scoreColor = stats.performance_score >= 80 ? 'text-green-600' : 
+                                       stats.performance_score >= 60 ? 'text-yellow-600' : 'text-red-600';
+                      return (
+                        <tr key={stats.driver_id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm">
+                            {rank === 1 && <Award size={16} className="inline text-yellow-500 mr-1" />}
+                            <span className="font-bold text-gray-700">#{rank}</span>
+                          </td>
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{stats.driver_name}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{stats.total_rides}</td>
+                          <td className="px-4 py-3 text-sm">
+                            {stats.avg_rating > 0 ? (
+                              <div className="flex items-center gap-1">
+                                <Star size={14} className="text-yellow-400 fill-yellow-400" />
+                                <span className="font-semibold">{stats.avg_rating.toFixed(1)}</span>
+                                <span className="text-xs text-gray-400">({stats.rating_count})</span>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {stats.avg_response_time > 0 
+                              ? `${Math.round(stats.avg_response_time / 1000 / 60)} min`
+                              : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {stats.avg_trip_time > 0 
+                              ? `${Math.round(stats.avg_trip_time / 1000 / 60)} min`
+                              : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className={`h-2 rounded-full ${stats.performance_score >= 80 ? 'bg-green-500' : stats.performance_score >= 60 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                                  style={{ width: `${Math.min(stats.performance_score, 100)}%` }}
+                                />
+                              </div>
+                              <span className={`font-bold ${scoreColor} min-w-[50px]`}>
+                                {stats.performance_score.toFixed(1)}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

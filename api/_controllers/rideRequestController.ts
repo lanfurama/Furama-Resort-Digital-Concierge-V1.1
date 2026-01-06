@@ -201,5 +201,127 @@ export const rideRequestController = {
       res.status(500).json({ error: error.message });
     }
   },
+
+  async getHistoricalReports(req: Request, res: Response) {
+    try {
+      const { startDate, endDate, period, driverId, status } = req.query;
+
+      const params: {
+        startDate?: Date;
+        endDate?: Date;
+        period?: 'day' | 'week' | 'month';
+        driverId?: number;
+        status?: any;
+      } = {};
+
+      if (startDate && typeof startDate === 'string') {
+        params.startDate = new Date(startDate);
+      }
+      if (endDate && typeof endDate === 'string') {
+        params.endDate = new Date(endDate);
+      }
+      if (period && (period === 'day' || period === 'week' || period === 'month')) {
+        params.period = period;
+      }
+      if (driverId) {
+        const driverIdNum = parseInt(driverId as string);
+        if (!isNaN(driverIdNum)) {
+          params.driverId = driverIdNum;
+        }
+      }
+      if (status) {
+        params.status = status as any;
+      }
+
+      const rides = await rideRequestModel.getHistoricalReports(params);
+      res.json(rides);
+    } catch (error: any) {
+      console.error('Error fetching historical reports:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  async getReportStatistics(req: Request, res: Response) {
+    try {
+      const { startDate, endDate, period, driverId } = req.query;
+
+      const params: {
+        startDate?: Date;
+        endDate?: Date;
+        period?: 'day' | 'week' | 'month';
+        driverId?: number;
+      } = {};
+
+      if (startDate && typeof startDate === 'string') {
+        params.startDate = new Date(startDate);
+      }
+      if (endDate && typeof endDate === 'string') {
+        params.endDate = new Date(endDate);
+      }
+      if (period && (period === 'day' || period === 'week' || period === 'month')) {
+        params.period = period;
+      }
+      if (driverId) {
+        const driverIdNum = parseInt(driverId as string);
+        if (!isNaN(driverIdNum)) {
+          params.driverId = driverIdNum;
+        }
+      }
+
+      const stats = await rideRequestModel.getReportStatistics(params);
+
+      // Enrich driver names
+      if (stats.ridesByDriver.length > 0) {
+        const allUsers = await userModel.getAll();
+        stats.ridesByDriver = stats.ridesByDriver.map(driverStat => {
+          const driver = allUsers.find(u => u.id === driverStat.driver_id);
+          return {
+            ...driverStat,
+            driver_name: driver ? `${driver.firstName || ''} ${driver.lastName || ''}`.trim() || `Driver ${driverStat.driver_id}` : driverStat.driver_name
+          };
+        });
+      }
+
+      res.json(stats);
+    } catch (error: any) {
+      console.error('Error fetching report statistics:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  async getDriverPerformanceStats(req: Request, res: Response) {
+    try {
+      const { startDate, endDate, period, driverId } = req.query;
+
+      const params: {
+        startDate?: Date;
+        endDate?: Date;
+        period?: 'day' | 'week' | 'month';
+        driverId?: number;
+      } = {};
+
+      if (startDate && typeof startDate === 'string') {
+        params.startDate = new Date(startDate);
+      }
+      if (endDate && typeof endDate === 'string') {
+        params.endDate = new Date(endDate);
+      }
+      if (period && (period === 'day' || period === 'week' || period === 'month')) {
+        params.period = period;
+      }
+      if (driverId) {
+        const driverIdNum = parseInt(driverId as string);
+        if (!isNaN(driverIdNum)) {
+          params.driverId = driverIdNum;
+        }
+      }
+
+      const stats = await rideRequestModel.getDriverPerformanceStats(params);
+      res.json(stats);
+    } catch (error: any) {
+      console.error('Error fetching driver performance stats:', error);
+      res.status(500).json({ error: error.message });
+    }
+  },
 };
 
