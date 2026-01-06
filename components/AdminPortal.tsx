@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, MapPin, Utensils, Sparkles, X, Calendar, Megaphone, BrainCircuit, Filter, Users, Shield, FileText, Upload, UserCheck, Download, Home, List, History, Clock, Star, Key, Car, Settings, RefreshCw, Zap, Grid3x3, CheckCircle, AlertCircle, Info, Brain, ArrowRight, Loader2, Pencil, Copy, Check, Search } from 'lucide-react';
-import { getLocations, getLocationsSync, addLocation, updateLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, updateMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, updatePromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, getUsersSync, addUser, updateUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory, getRides, getRidesSync, updateRideStatus, generateCheckInCode } from '../services/dataService';
+import { getLocations, getLocationsSync, addLocation, updateLocation, deleteLocation, getMenu, getMenuSync, addMenuItem, updateMenuItem, deleteMenuItem, getEvents, getEventsSync, addEvent, deleteEvent, getPromotions, getPromotionsSync, addPromotion, updatePromotion, deletePromotion, getKnowledgeBase, getKnowledgeBaseSync, addKnowledgeItem, deleteKnowledgeItem, getUsers, getUsersSync, addUser, updateUser, deleteUser, resetUserPassword, importGuestsFromCSV, getGuestCSVContent, getRoomTypes, addRoomType, updateRoomType, deleteRoomType, getRooms, addRoom, deleteRoom, importRoomsFromCSV, getUnifiedHistory, getRides, getRidesSync, updateRideStatus, generateCheckInCode, getDriverSchedules, getAllDriverSchedulesByDateRange, upsertDriverSchedule, deleteDriverSchedule, DriverSchedule } from '../services/dataService';
 import { parseAdminInput, generateTranslations } from '../services/geminiService';
 import { Location, MenuItem, ResortEvent, Promotion, KnowledgeItem, User, UserRole, Department, RoomType, Room, RideRequest, BuggyStatus } from '../types';
 import Loading from './Loading';
@@ -14,7 +14,7 @@ interface AdminPortalProps {
 }
 
 const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
-    const [tab, setTab] = useState<'LOCATIONS' | 'MENU' | 'EVENTS' | 'PROMOS' | 'KNOWLEDGE' | 'USERS' | 'GUESTS' | 'ROOMS' | 'HISTORY' | 'FLEET'>('LOCATIONS');
+    const [tab, setTab] = useState<'LOCATIONS' | 'MENU' | 'EVENTS' | 'PROMOS' | 'KNOWLEDGE' | 'USERS' | 'GUESTS' | 'ROOMS' | 'HISTORY' | 'FLEET' | 'SCHEDULES'>('LOCATIONS');
     
     // Data State
     const [locations, setLocations] = useState<Location[]>([]);
@@ -27,6 +27,22 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const [rooms, setRooms] = useState<Room[]>([]);
     const [serviceHistory, setServiceHistory] = useState<any[]>([]);
     const [rides, setRides] = useState<RideRequest[]>([]);
+    const [driverSchedules, setDriverSchedules] = useState<DriverSchedule[]>([]);
+    
+    // Schedule Management State
+    const [selectedDriverForSchedule, setSelectedDriverForSchedule] = useState<string | null>(null);
+    const [scheduleDateRange, setScheduleDateRange] = useState<{ start: string; end: string }>({
+        start: new Date().toISOString().split('T')[0],
+        end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 30 days from now
+    });
+    const [editingSchedule, setEditingSchedule] = useState<DriverSchedule | null>(null);
+    const [newSchedule, setNewSchedule] = useState<Omit<DriverSchedule, 'id' | 'driver_id' | 'created_at' | 'updated_at'>>({
+        date: new Date().toISOString().split('T')[0],
+        shift_start: '08:00:00',
+        shift_end: '17:00:00',
+        is_day_off: false,
+        notes: null
+    });
     
     // Fleet Config State
     const [showFleetSettings, setShowFleetSettings] = useState(false);
@@ -159,6 +175,25 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
         }
     }, []);
     
+    // Load driver schedules when SCHEDULES tab is active
+    useEffect(() => {
+        if (tab !== 'SCHEDULES') return;
+        
+        const loadSchedules = async () => {
+            try {
+                const schedules = await getAllDriverSchedulesByDateRange(
+                    scheduleDateRange.start,
+                    scheduleDateRange.end
+                );
+                setDriverSchedules(schedules);
+            } catch (error) {
+                console.error('Failed to load driver schedules:', error);
+            }
+        };
+        
+        loadSchedules();
+    }, [tab, scheduleDateRange]);
+
     // Auto-refresh rides and users when FLEET tab is active
     useEffect(() => {
         if (tab !== 'FLEET') return;
@@ -442,8 +477,18 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     };
 
     // Helper: Calculate cost for a (driver, ride) pair
-    const calculateAssignmentCost = (driver: User, ride: RideRequest): number => {
+    const calculateAssignmentCost = async (driver: User, ride: RideRequest): Promise<number> => {
         const driverIdStr = driver.id ? String(driver.id) : '';
+        
+        // Check driver schedule availability
+        const rideDate = new Date(ride.timestamp).toISOString().split('T')[0];
+        const currentTime = new Date().toTimeString().substring(0, 8); // HH:MM:SS format
+        const isScheduledAvailable = await checkDriverAvailability(driverIdStr, rideDate, currentTime);
+        
+        // If driver is not available according to schedule, return very high cost
+        if (!isScheduledAvailable) {
+            return 10000000; // Very high cost to prevent assignment
+        }
         
         // Check driver status
         const driverActiveRides = rides.filter(r => {
@@ -731,7 +776,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 if (!onlineDriverIds.has(driverIdStr)) {
                     continue;
                 }
-                const cost = calculateAssignmentCost(driver, representativeRide);
+                const cost = await calculateAssignmentCost(driver, representativeRide);
                 assignments.push({ driver, rides: group.rides, cost, totalGuests: group.totalGuests });
             }
         }
@@ -1450,6 +1495,9 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 <button onClick={() => setTab('HISTORY')} className={`flex-1 min-w-[80px] py-4 font-semibold flex flex-col md:flex-row items-center justify-center md:space-x-2 border-b-2 ${tab === 'HISTORY' ? 'border-emerald-600 text-emerald-800' : 'border-transparent text-gray-500'}`}>
                     <History size={18} /> <span className="text-xs md:text-sm">History</span>
                 </button>
+                <button onClick={() => setTab('SCHEDULES')} className={`flex-1 min-w-[80px] py-4 font-semibold flex flex-col md:flex-row items-center justify-center md:space-x-2 border-b-2 ${tab === 'SCHEDULES' ? 'border-emerald-600 text-emerald-800' : 'border-transparent text-gray-500'}`}>
+                    <Clock size={18} /> <span className="text-xs md:text-sm">Schedules</span>
+                </button>
             </div>
 
             {/* Main Content */}
@@ -1467,6 +1515,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                             {tab === 'USERS' && 'Staff Management'}
                             {tab === 'GUESTS' && 'Guest Check-in Management'}
                             {tab === 'HISTORY' && 'Service Order History'}
+                            {tab === 'SCHEDULES' && 'Driver Schedule Management'}
                         </h2>
                     
                     <div className="flex items-center space-x-2 w-full md:w-auto">
@@ -3923,6 +3972,235 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                         </div>
                     )}
                         </>
+                    )}
+
+                    {/* SCHEDULES Tab Content */}
+                    {tab === 'SCHEDULES' && (
+                        <div className="space-y-6">
+                            {/* Header with Date Range Filter */}
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                                <div className="flex items-center gap-4">
+                                    <label className="text-sm font-semibold text-gray-700">Date Range:</label>
+                                    <input
+                                        type="date"
+                                        value={scheduleDateRange.start}
+                                        onChange={(e) => setScheduleDateRange({ ...scheduleDateRange, start: e.target.value })}
+                                        className="border border-gray-300 rounded px-3 py-1.5 text-sm"
+                                    />
+                                    <span className="text-gray-500">to</span>
+                                    <input
+                                        type="date"
+                                        value={scheduleDateRange.end}
+                                        onChange={(e) => setScheduleDateRange({ ...scheduleDateRange, end: e.target.value })}
+                                        className="border border-gray-300 rounded px-3 py-1.5 text-sm"
+                                    />
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                const schedules = await getAllDriverSchedulesByDateRange(
+                                                    scheduleDateRange.start,
+                                                    scheduleDateRange.end
+                                                );
+                                                setDriverSchedules(schedules);
+                                            } catch (error) {
+                                                console.error('Failed to refresh schedules:', error);
+                                            }
+                                        }}
+                                        className="px-4 py-1.5 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm font-semibold flex items-center gap-2"
+                                    >
+                                        <RefreshCw size={14} /> Refresh
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Driver Selection */}
+                            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Select Driver:</label>
+                                <select
+                                    value={selectedDriverForSchedule || ''}
+                                    onChange={(e) => setSelectedDriverForSchedule(e.target.value || null)}
+                                    className="w-full md:w-64 border border-gray-300 rounded px-3 py-2 text-sm"
+                                >
+                                    <option value="">All Drivers</option>
+                                    {users.filter(u => u.role === UserRole.DRIVER).map(driver => (
+                                        <option key={driver.id} value={driver.id}>
+                                            {driver.lastName || `Driver ${driver.id}`}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Schedule Calendar View */}
+                            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                                <div className="p-4 border-b border-gray-200 bg-gray-50">
+                                    <h3 className="font-bold text-lg text-gray-800">Driver Schedules</h3>
+                                    <p className="text-sm text-gray-500 mt-1">Manage work shifts and days off for drivers</p>
+                                </div>
+                                
+                                <div className="p-4">
+                                    {selectedDriverForSchedule ? (
+                                        <div className="space-y-4">
+                                            {/* Add New Schedule */}
+                                            <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+                                                <h4 className="font-semibold text-emerald-800 mb-3">Add/Edit Schedule</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Date</label>
+                                                        <input
+                                                            type="date"
+                                                            value={newSchedule.date}
+                                                            onChange={(e) => setNewSchedule({ ...newSchedule, date: e.target.value })}
+                                                            className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={newSchedule.is_day_off}
+                                                                onChange={(e) => setNewSchedule({ ...newSchedule, is_day_off: e.target.checked })}
+                                                                className="mr-2"
+                                                            />
+                                                            Day Off
+                                                        </label>
+                                                    </div>
+                                                    {!newSchedule.is_day_off && (
+                                                        <>
+                                                            <div>
+                                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Shift Start</label>
+                                                                <input
+                                                                    type="time"
+                                                                    value={newSchedule.shift_start || ''}
+                                                                    onChange={(e) => setNewSchedule({ ...newSchedule, shift_start: e.target.value + ':00' })}
+                                                                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-semibold text-gray-700 mb-1">Shift End</label>
+                                                                <input
+                                                                    type="time"
+                                                                    value={newSchedule.shift_end?.substring(0, 5) || ''}
+                                                                    onChange={(e) => setNewSchedule({ ...newSchedule, shift_end: e.target.value + ':00' })}
+                                                                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                                                                />
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                    <div className="md:col-span-2">
+                                                        <label className="block text-xs font-semibold text-gray-700 mb-1">Notes</label>
+                                                        <input
+                                                            type="text"
+                                                            value={newSchedule.notes || ''}
+                                                            onChange={(e) => setNewSchedule({ ...newSchedule, notes: e.target.value || null })}
+                                                            placeholder="Optional notes..."
+                                                            className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2 mt-4">
+                                                    <button
+                                                        onClick={async () => {
+                                                            try {
+                                                                await upsertDriverSchedule(selectedDriverForSchedule, newSchedule);
+                                                                const schedules = await getAllDriverSchedulesByDateRange(
+                                                                    scheduleDateRange.start,
+                                                                    scheduleDateRange.end
+                                                                );
+                                                                setDriverSchedules(schedules);
+                                                                setNewSchedule({
+                                                                    date: new Date().toISOString().split('T')[0],
+                                                                    shift_start: '08:00:00',
+                                                                    shift_end: '17:00:00',
+                                                                    is_day_off: false,
+                                                                    notes: null
+                                                                });
+                                                                alert('Schedule saved successfully!');
+                                                            } catch (error: any) {
+                                                                alert(`Failed to save schedule: ${error?.message || 'Unknown error'}`);
+                                                            }
+                                                        }}
+                                                        className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm font-semibold"
+                                                    >
+                                                        Save Schedule
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setNewSchedule({
+                                                            date: new Date().toISOString().split('T')[0],
+                                                            shift_start: '08:00:00',
+                                                            shift_end: '17:00:00',
+                                                            is_day_off: false,
+                                                            notes: null
+                                                        })}
+                                                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-sm font-semibold"
+                                                    >
+                                                        Reset
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Schedule List */}
+                                            <div>
+                                                <h4 className="font-semibold text-gray-800 mb-3">Existing Schedules</h4>
+                                                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                                                    {driverSchedules
+                                                        .filter(s => String(s.driver_id) === selectedDriverForSchedule)
+                                                        .sort((a, b) => a.date.localeCompare(b.date))
+                                                        .map(schedule => (
+                                                            <div key={schedule.id} className="bg-gray-50 p-3 rounded-lg border border-gray-200 flex items-center justify-between">
+                                                                <div className="flex-1">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <span className="font-semibold text-gray-800">{new Date(schedule.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                                                                        {schedule.is_day_off ? (
+                                                                            <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">Day Off</span>
+                                                                        ) : (
+                                                                            <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-semibold">
+                                                                                {schedule.shift_start?.substring(0, 5)} - {schedule.shift_end?.substring(0, 5)}
+                                                                            </span>
+                                                                        )}
+                                                                        {schedule.notes && (
+                                                                            <span className="text-xs text-gray-500 italic">{schedule.notes}</span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (confirm('Delete this schedule?')) {
+                                                                            try {
+                                                                                await deleteDriverSchedule(String(schedule.driver_id), schedule.date);
+                                                                                const schedules = await getAllDriverSchedulesByDateRange(
+                                                                                    scheduleDateRange.start,
+                                                                                    scheduleDateRange.end
+                                                                                );
+                                                                                setDriverSchedules(schedules);
+                                                                            } catch (error: any) {
+                                                                                alert(`Failed to delete schedule: ${error?.message || 'Unknown error'}`);
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    {driverSchedules.filter(s => String(s.driver_id) === selectedDriverForSchedule).length === 0 && (
+                                                        <div className="text-center py-8 text-gray-400 text-sm">
+                                                            No schedules found for this driver in the selected date range.
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-12 text-gray-400">
+                                            <Clock size={48} className="mx-auto mb-4 text-gray-300" />
+                                            <p className="text-lg font-semibold mb-2">Select a driver to manage schedules</p>
+                                            <p className="text-sm">Choose a driver from the dropdown above to view and manage their work schedule.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>

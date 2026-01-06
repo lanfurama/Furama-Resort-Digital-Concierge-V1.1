@@ -4121,3 +4121,124 @@ export const getDriverPerformanceStats = async (
     return [];
   }
 };
+
+// --- DRIVER SCHEDULE MANAGEMENT ---
+export interface DriverSchedule {
+  id?: number;
+  driver_id: number;
+  date: string; // YYYY-MM-DD format
+  shift_start?: string | null; // HH:MM:SS format
+  shift_end?: string | null; // HH:MM:SS format
+  is_day_off?: boolean;
+  notes?: string | null;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+// Get all schedules for a driver
+export const getDriverSchedules = async (driverId: string): Promise<DriverSchedule[]> => {
+  try {
+    const schedules = await apiClient.get<DriverSchedule[]>(`/driver-schedules/driver/${driverId}`);
+    return schedules;
+  } catch (error) {
+    console.error("Failed to fetch driver schedules:", error);
+    return [];
+  }
+};
+
+// Get schedules for a date range
+export const getDriverSchedulesByDateRange = async (
+  driverId: string,
+  startDate: string,
+  endDate: string
+): Promise<DriverSchedule[]> => {
+  try {
+    const schedules = await apiClient.get<DriverSchedule[]>(
+      `/driver-schedules/driver/${driverId}/range?startDate=${startDate}&endDate=${endDate}`
+    );
+    return schedules;
+  } catch (error) {
+    console.error("Failed to fetch driver schedules by date range:", error);
+    return [];
+  }
+};
+
+// Get all schedules for a date range (all drivers)
+export const getAllDriverSchedulesByDateRange = async (
+  startDate: string,
+  endDate: string
+): Promise<DriverSchedule[]> => {
+  try {
+    const schedules = await apiClient.get<DriverSchedule[]>(
+      `/driver-schedules/range?startDate=${startDate}&endDate=${endDate}`
+    );
+    return schedules;
+  } catch (error) {
+    console.error("Failed to fetch all driver schedules:", error);
+    return [];
+  }
+};
+
+// Check if driver is available
+export const checkDriverAvailability = async (
+  driverId: string,
+  date: string,
+  time?: string
+): Promise<boolean> => {
+  try {
+    const params = new URLSearchParams({ date });
+    if (time) params.append('time', time);
+    const result = await apiClient.get<{ isAvailable: boolean }>(
+      `/driver-schedules/driver/${driverId}/availability?${params.toString()}`
+    );
+    return result.isAvailable;
+  } catch (error) {
+    console.error("Failed to check driver availability:", error);
+    // Default to available if check fails
+    return true;
+  }
+};
+
+// Create or update a schedule
+export const upsertDriverSchedule = async (
+  driverId: string,
+  schedule: Omit<DriverSchedule, 'id' | 'driver_id' | 'created_at' | 'updated_at'>
+): Promise<DriverSchedule> => {
+  try {
+    const result = await apiClient.post<DriverSchedule>(
+      `/driver-schedules/driver/${driverId}`,
+      schedule
+    );
+    return result;
+  } catch (error) {
+    console.error("Failed to upsert driver schedule:", error);
+    throw error;
+  }
+};
+
+// Update a schedule
+export const updateDriverSchedule = async (
+  driverId: string,
+  schedule: Omit<DriverSchedule, 'id' | 'driver_id' | 'created_at' | 'updated_at'>
+): Promise<DriverSchedule> => {
+  try {
+    const result = await apiClient.put<DriverSchedule>(
+      `/driver-schedules/driver/${driverId}`,
+      schedule
+    );
+    return result;
+  } catch (error) {
+    console.error("Failed to update driver schedule:", error);
+    throw error;
+  }
+};
+
+// Delete a schedule
+export const deleteDriverSchedule = async (driverId: string, date: string): Promise<void> => {
+  try {
+    await apiClient.delete(`/driver-schedules/driver/${driverId}?date=${date}`);
+  } catch (error) {
+    console.error("Failed to delete driver schedule:", error);
+    throw error;
+  }
+};

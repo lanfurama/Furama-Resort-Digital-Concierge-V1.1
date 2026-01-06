@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { getRides, getDriversWithLocations, updateRideStatus, getLocations, getSystemConfig, updateSystemConfig, getUsers } from '../services/dataService';
+import { getRides, getDriversWithLocations, updateRideStatus, updateRide, getLocations, getSystemConfig, updateSystemConfig, getUsers } from '../services/dataService';
 import { optimizeBuggyFleet } from '../services/geminiService';
+import { calculateETAFromDriverToPickup, getDriverCoordinates } from '../services/locationService';
 import { RideRequest, BuggyStatus, User, UserRole } from '../types';
 import { Car, Clock, MapPin, CheckCircle, RefreshCw, Zap, User as UserIcon, Settings, Save, Map, List, Navigation, AlertTriangle, X, Check, Filter, ZoomIn, ZoomOut } from 'lucide-react';
 import { RESORT_CENTER } from '../constants';
@@ -123,7 +124,57 @@ const BuggyFleetManager: React.FC = () => {
         refreshData();
         const interval = setInterval(refreshData, 3000); // Live poll every 3 seconds
         return () => clearInterval(interval);
-    }, [config]); 
+    }, [config]);
+
+    // Real-time ETA calculation and update
+    useEffect(() => {
+        const updateETAs = async () => {
+            // Only update ETA for rides that are ASSIGNED or ARRIVING (driver is on the way)
+            const ridesToUpdate = rides.filter(r => 
+                (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING) && 
+                r.driverId
+            );
+
+            for (const ride of ridesToUpdate) {
+                const driver = drivers.find(d => d.id === ride.driverId);
+                if (!driver) continue;
+
+                // Get driver coordinates
+                const driverCoords = getDriverCoordinates(driver, locations);
+                if (!driverCoords) continue;
+
+                // Calculate ETA
+                const eta = calculateETAFromDriverToPickup(
+                    driverCoords.lat,
+                    driverCoords.lng,
+                    ride.pickup,
+                    locations
+                );
+
+                // Only update if ETA is different (to avoid unnecessary API calls)
+                if (eta !== null && eta !== ride.eta) {
+                    try {
+                        await updateRide({
+                            id: ride.id,
+                            eta: eta
+                        });
+                        // Update local state
+                        setRides(prevRides => 
+                            prevRides.map(r => 
+                                r.id === ride.id ? { ...r, eta } : r
+                            )
+                        );
+                    } catch (error) {
+                        console.error(`Failed to update ETA for ride ${ride.id}:`, error);
+                    }
+                }
+            }
+        };
+
+        // Update ETAs every 10 seconds (less frequent than location updates)
+        const etaInterval = setInterval(updateETAs, 10000);
+        return () => clearInterval(etaInterval);
+    }, [rides, drivers, locations]); 
 
     // Filtered lists (Need these for map logic too)
     const pendingRides = rides.filter(r => r.status === BuggyStatus.SEARCHING);
@@ -478,9 +529,16 @@ const BuggyFleetManager: React.FC = () => {
                                     >
                                         <div className="flex justify-between items-start mb-2">
                                             <span className="font-bold text-gray-900">Room {ride.roomNumber}</span>
-                                            <span className={`text-xs flex items-center font-bold ${isOverdue ? 'text-red-500 animate-pulse' : 'text-gray-500'}`}>
-                                                <Clock size={12} className="mr-1"/> {Math.floor(waitTime / 60)}m {Math.floor(waitTime % 60)}s
-                                            </span>
+                                            <div className="flex flex-col items-end gap-1">
+                                                <span className={`text-xs flex items-center font-bold ${isOverdue ? 'text-red-500 animate-pulse' : 'text-gray-500'}`}>
+                                                    <Clock size={12} className="mr-1"/> {Math.floor(waitTime / 60)}m {Math.floor(waitTime % 60)}s
+                                                </span>
+                                                {ride.driverId && ride.eta !== undefined && (
+                                                    <span className="text-[10px] text-emerald-600 font-bold flex items-center">
+                                                        <Navigation size={10} className="mr-1"/> ETA: {ride.eta} min
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                         <div className="text-sm text-gray-600 space-y-1">
                                             <div className="flex items-center"><div className="w-2 h-2 rounded-full bg-slate-400 mr-2"/> {ride.pickup}</div>
@@ -708,20 +766,35 @@ const BuggyFleetManager: React.FC = () => {
                     </div>
                     <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-white">
                         {activeRides.length === 0 && <div className="text-center text-slate-400 py-10 text-sm">No active trips.</div>}
-                        {activeRides.map(ride => (
-                            <div key={ride.id} className="p-3 rounded-lg border border-slate-200 bg-slate-50">
-                                <div className="flex justify-between mb-1">
-                                    <span className="font-bold text-sm text-gray-900">Room {ride.roomNumber}</span>
-                                    <span className="text-xs text-blue-600 font-bold">{ride.status}</span>
+                        {activeRides.map(ride => {
+                            const driver = drivers.find(d => d.id === ride.driverId);
+                            return (
+                                <div key={ride.id} className="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                                    <div className="flex justify-between mb-1">
+                                        <span className="font-bold text-sm text-gray-900">Room {ride.roomNumber}</span>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <span className="text-xs text-blue-600 font-bold">{ride.status}</span>
+                                            {ride.eta !== undefined && (ride.status === BuggyStatus.ASSIGNED || ride.status === BuggyStatus.ARRIVING) && (
+                                                <span className="text-[10px] text-emerald-600 font-bold flex items-center">
+                                                    <Navigation size={10} className="mr-1"/> ETA: {ride.eta} min
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="text-xs text-gray-500 mb-2">
+                                        Driver: {driver?.name || 'Unknown'}
+                                        {driver?.currentLat !== undefined && driver?.currentLng !== undefined && (
+                                            <span className="ml-2 text-emerald-600">📍 GPS</span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center text-xs text-gray-600">
+                                        <span className="truncate w-1/2">{ride.pickup}</span>
+                                        <span className="mx-1">→</span>
+                                        <span className="truncate w-1/2">{ride.destination}</span>
+                                    </div>
                                 </div>
-                                <div className="text-xs text-gray-500 mb-2">Driver: {drivers.find(d => d.id === ride.driverId)?.name || 'Unknown'}</div>
-                                <div className="flex items-center text-xs text-gray-600">
-                                    <span className="truncate w-1/2">{ride.pickup}</span>
-                                    <span className="mx-1">→</span>
-                                    <span className="truncate w-1/2">{ride.destination}</span>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
 
                         <div className="mt-4 pt-4 border-t border-slate-200">
                             <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Recent Completed</h4>

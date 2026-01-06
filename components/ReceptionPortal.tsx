@@ -43,6 +43,7 @@ import {
   updateRide,
   cancelRide,
   setDriverOnlineFor10Hours,
+  checkDriverAvailability,
 } from "../services/dataService";
 import { authenticateStaff } from "../services/authService";
 import {
@@ -143,6 +144,9 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
   // Current time state for countdown
   const [currentTime, setCurrentTime] = useState(Date.now());
+  
+  // Auto-assign countdown state (updates every second)
+  const [autoAssignCountdown, setAutoAssignCountdown] = useState<number | null>(null);
 
   // Cache for guest information by room number
   const [guestInfoCache, setGuestInfoCache] = useState<
@@ -745,6 +749,59 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
     return () => clearInterval(timeInterval);
   }, []);
+
+  // Update auto-assign countdown every second
+  useEffect(() => {
+    const updateCountdown = () => {
+      const pendingRides = rides.filter(
+        (r) => r.status === BuggyStatus.SEARCHING,
+      );
+      const hasPendingRides = pendingRides.length > 0;
+      const hasOnlineDrivers = getOnlineDriversCount() > 0;
+
+      if (
+        fleetConfig.autoAssignEnabled &&
+        hasPendingRides &&
+        hasOnlineDrivers
+      ) {
+        // Find the oldest pending ride
+        const oldestRide = pendingRides.reduce(
+          (oldest, ride) => {
+            return ride.timestamp < oldest.timestamp ? ride : oldest;
+          },
+          pendingRides[0],
+        );
+
+        const waitTimeSeconds = Math.floor(
+          (Date.now() - oldestRide.timestamp) / 1000,
+        );
+        const remainingSeconds =
+          fleetConfig.maxWaitTimeBeforeAutoAssign - waitTimeSeconds;
+
+        if (remainingSeconds > 0) {
+          setAutoAssignCountdown(remainingSeconds);
+        } else {
+          setAutoAssignCountdown(0); // Auto assign will trigger soon
+        }
+      } else {
+        setAutoAssignCountdown(null);
+      }
+    };
+
+    // Update immediately
+    updateCountdown();
+
+    // Update every second
+    const countdownInterval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(countdownInterval);
+  }, [
+    rides,
+    users, // getOnlineDriversCount depends on users
+    fleetConfig.autoAssignEnabled,
+    fleetConfig.maxWaitTimeBeforeAutoAssign,
+    currentTime, // Include currentTime to trigger recalculation when time updates
+  ]);
 
   // Auto-refresh rides, users, and service requests
   useEffect(() => {
@@ -1484,8 +1541,18 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   };
 
   // Helper: Calculate cost for a (driver, ride) pair
-  const calculateAssignmentCost = (driver: User, ride: RideRequest): number => {
+  const calculateAssignmentCost = async (driver: User, ride: RideRequest): Promise<number> => {
     const driverIdStr = driver.id ? String(driver.id) : "";
+
+    // Check driver schedule availability
+    const rideDate = new Date(ride.timestamp).toISOString().split('T')[0];
+    const currentTime = new Date().toTimeString().substring(0, 8); // HH:MM:SS format
+    const isScheduledAvailable = await checkDriverAvailability(driverIdStr, rideDate, currentTime);
+    
+    // If driver is not available according to schedule, return very high cost
+    if (!isScheduledAvailable) {
+      return 10000000; // Very high cost to prevent assignment
+    }
 
     // Check driver status
     const driverActiveRides = rides.filter((r) => {
@@ -1892,7 +1959,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           if (!onlineDriverIds.has(driverIdStr)) {
             continue;
           }
-          const cost = calculateAssignmentCost(driver, ride);
+          const cost = await calculateAssignmentCost(driver, ride);
           assignments.push({
             driver,
             rides: group.rides,
@@ -2533,37 +2600,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       const hasPendingRides = pendingRides.length > 0;
                       const hasOnlineDrivers = getOnlineDriversCount() > 0;
 
-                      // Calculate countdown for auto assign
-                      let countdownSeconds = null;
-                      if (
-                        fleetConfig.autoAssignEnabled &&
-                        hasPendingRides &&
-                        hasOnlineDrivers
-                      ) {
-                        // Find the oldest pending ride
-                        const oldestRide = pendingRides.reduce(
-                          (oldest, ride) => {
-                            return ride.timestamp < oldest.timestamp
-                              ? ride
-                              : oldest;
-                          },
-                          pendingRides[0],
-                        );
-
-                        const waitTimeSeconds = Math.floor(
-                          (currentTime - oldestRide.timestamp) / 1000,
-                        );
-                        const remainingSeconds =
-                          fleetConfig.maxWaitTimeBeforeAutoAssign -
-                          waitTimeSeconds;
-
-                        if (remainingSeconds > 0) {
-                          countdownSeconds = remainingSeconds;
-                        } else {
-                          countdownSeconds = 0; // Auto assign will trigger soon
-                        }
-                      }
-
                       const formatCountdown = (seconds: number): string => {
                         if (seconds <= 0) return "0s";
                         const mins = Math.floor(seconds / 60);
@@ -2585,11 +2621,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                           <Zap size={14} className="md:w-4 md:h-4" />
                           <span className="hidden sm:inline">Assign by AI</span>
                           <span className="sm:hidden">AI</span>
-                          {countdownSeconds !== null && (
+                          {autoAssignCountdown !== null && (
                             <span className="ml-1 text-[10px] md:text-xs bg-blue-500/80 px-1.5 py-0.5 rounded font-bold">
-                              {countdownSeconds <= 0
+                              {autoAssignCountdown <= 0
                                 ? "NOW"
-                                : formatCountdown(countdownSeconds)}
+                                : formatCountdown(autoAssignCountdown)}
                             </span>
                           )}
                         </button>

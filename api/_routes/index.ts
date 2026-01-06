@@ -13,6 +13,7 @@ import roomTypeRoutes from './roomTypeRoutes.js';
 import roomRoutes from './roomRoutes.js';
 import notificationRoutes from './notificationRoutes.js';
 import hotelReviewRoutes from './hotelReviewRoutes.js';
+import driverScheduleRoutes from './driverScheduleRoutes.js';
 
 const router = Router();
 
@@ -30,6 +31,7 @@ router.use('/room-types', roomTypeRoutes);
 router.use('/rooms', roomRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/hotel-reviews', hotelReviewRoutes);
+router.use('/driver-schedules', driverScheduleRoutes);
 
 export default router;
 

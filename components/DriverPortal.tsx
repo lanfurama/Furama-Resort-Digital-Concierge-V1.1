@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { getRides, updateRideStatus, getLastMessage, createManualRide, getLocations, setDriverOnlineFor10Hours } from '../services/dataService';
+import { getRides, updateRideStatus, getLastMessage, createManualRide, getLocations, setDriverOnlineFor10Hours, getDriverSchedules, DriverSchedule } from '../services/dataService';
 import { RideRequest, BuggyStatus } from '../types';
-import { Car, MapPin, Navigation, CheckCircle, Clock, MessageSquare, History, Plus, X, Loader2, User, Star, Zap } from 'lucide-react';
+import { Car, MapPin, Navigation, CheckCircle, Clock, MessageSquare, History, Plus, X, Loader2, User, Star, Zap, Calendar } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import ServiceChat from './ServiceChat';
 
@@ -31,6 +31,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         destination: ''
     });
     const [locations, setLocations] = useState<any[]>([]);
+    const [mySchedules, setMySchedules] = useState<DriverSchedule[]>([]);
     
     // Current time state for real-time waiting time updates
     const [currentTime, setCurrentTime] = useState(Date.now());
@@ -64,6 +65,39 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             }
         };
         loadLocations();
+    }, []);
+
+    // Load driver schedules
+    useEffect(() => {
+        const loadSchedules = async () => {
+            const savedUser = localStorage.getItem('furama_user');
+            if (!savedUser) return;
+            
+            try {
+                const user = JSON.parse(savedUser);
+                if (!user.id) return;
+                
+                // Load schedules for next 7 days
+                const today = new Date();
+                const nextWeek = new Date(today);
+                nextWeek.setDate(today.getDate() + 7);
+                
+                const schedules = await getDriverSchedules(String(user.id));
+                // Filter to next 7 days
+                const upcomingSchedules = schedules.filter(s => {
+                    const scheduleDate = new Date(s.date);
+                    return scheduleDate >= today && scheduleDate <= nextWeek;
+                });
+                setMySchedules(upcomingSchedules);
+            } catch (error) {
+                console.error('Failed to load driver schedules:', error);
+            }
+        };
+        
+        loadSchedules();
+        // Refresh schedules every 5 minutes
+        const interval = setInterval(loadSchedules, 5 * 60 * 1000);
+        return () => clearInterval(interval);
     }, []);
 
     // Set driver online status to 10 hours on first login
@@ -480,6 +514,23 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                             <MapPin size={12} className="text-gray-400 flex-shrink-0" />
                             <p className="text-xs text-gray-600 truncate">{driverInfo.location}</p>
                         </div>
+                        {/* Today's Schedule */}
+                        {(() => {
+                            const today = new Date().toISOString().split('T')[0];
+                            const todaySchedule = mySchedules.find(s => s.date === today);
+                            if (todaySchedule) {
+                                return (
+                                    <div className="flex items-center gap-1.5 mt-1">
+                                        <Calendar size={12} className="text-emerald-500 flex-shrink-0" />
+                                        <p className="text-xs text-emerald-600 font-semibold">
+                                            {todaySchedule.is_day_off ? 'Day Off' : 
+                                             `${todaySchedule.shift_start?.substring(0, 5)} - ${todaySchedule.shift_end?.substring(0, 5)}`}
+                                        </p>
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })()}
                     </div>
                 </div>
                 
@@ -662,6 +713,41 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                                             </div>
                                         </div>
                                     ))
+                                )}
+                                
+                                {/* Upcoming Schedule Section */}
+                                {mySchedules.length > 0 && (
+                                    <div className="mt-6 bg-white p-4 rounded-lg border border-emerald-200">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Calendar size={18} className="text-emerald-600" />
+                                            <h3 className="font-bold text-sm text-gray-800">Upcoming Schedule</h3>
+                                        </div>
+                                        <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                                            {mySchedules.slice(0, 7).map(schedule => {
+                                                const scheduleDate = new Date(schedule.date);
+                                                const isToday = scheduleDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+                                                return (
+                                                    <div key={schedule.id} className={`flex items-center justify-between p-2 rounded-lg ${isToday ? 'bg-emerald-50 border border-emerald-300' : 'bg-gray-50'}`}>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs font-semibold text-gray-600 min-w-[80px]">
+                                                                {scheduleDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                                                            </span>
+                                                            {schedule.is_day_off ? (
+                                                                <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-semibold">Day Off</span>
+                                                            ) : (
+                                                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-semibold">
+                                                                    {schedule.shift_start?.substring(0, 5)} - {schedule.shift_end?.substring(0, 5)}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {isToday && (
+                                                            <span className="text-xs font-bold text-emerald-600">Today</span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                         )}

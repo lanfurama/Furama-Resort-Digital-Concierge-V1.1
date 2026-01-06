@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapPin, Clock, Car, Navigation, LocateFixed, XCircle, Search, Utensils, Coffee, Waves, Building2, CheckCircle, Loader2, ChevronDown, X } from 'lucide-react';
 import { BuggyStatus, User, RideRequest, Location } from '../types';
-import { getLocations, requestRide, getActiveRideForUser, cancelRide, getUsers, getRides } from '../services/dataService';
+import { getLocations, requestRide, getActiveRideForUser, cancelRide, getUsers, getRides, getDriversWithLocations, updateRide } from '../services/dataService';
+import { calculateETAFromDriverToPickup, getDriverCoordinates } from '../services/locationService';
 import { THEME_COLORS, RESORT_CENTER } from '../constants';
 import ServiceChat from './ServiceChat';
 import { useTranslation } from '../contexts/LanguageContext';
@@ -448,6 +449,59 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       
       fetchDriverName();
   }, [activeRide?.driverId, activeRide?.status, t]); // Removed activeRide and user.roomNumber from deps
+  
+  // Real-time ETA calculation and update
+  useEffect(() => {
+      const updateETA = async () => {
+          // Only update ETA for rides that are ASSIGNED or ARRIVING (driver is on the way)
+          if (!activeRide || 
+              !(activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) ||
+              !activeRide.driverId) {
+              return;
+          }
+
+          try {
+              // Fetch driver location
+              const drivers = await getDriversWithLocations();
+              const driver = drivers.find(d => d.id === activeRide.driverId);
+              
+              if (!driver) return;
+
+              // Get driver coordinates
+              const driverCoords = getDriverCoordinates(driver, locations);
+              if (!driverCoords) return;
+
+              // Calculate ETA
+              const eta = calculateETAFromDriverToPickup(
+                  driverCoords.lat,
+                  driverCoords.lng,
+                  activeRide.pickup,
+                  locations
+              );
+
+              // Only update if ETA is different (to avoid unnecessary API calls)
+              if (eta !== null && eta !== activeRide.eta) {
+                  try {
+                      await updateRide({
+                          id: activeRide.id,
+                          eta: eta
+                      });
+                      // Update local state
+                      setActiveRide(prev => prev ? { ...prev, eta } : undefined);
+                      activeRideRef.current = activeRide ? { ...activeRide, eta } : undefined;
+                  } catch (error) {
+                      console.error(`Failed to update ETA for ride ${activeRide.id}:`, error);
+                  }
+              }
+          } catch (error) {
+              console.error('Failed to calculate ETA:', error);
+          }
+      };
+
+      // Update ETA every 10 seconds (less frequent than location updates)
+      const etaInterval = setInterval(updateETA, 10000);
+      return () => clearInterval(etaInterval);
+  }, [activeRide, locations]);
   
   // Auto-hide notification after 5 seconds
   useEffect(() => {
