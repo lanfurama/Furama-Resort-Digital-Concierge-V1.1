@@ -79,6 +79,10 @@ ios/
 *.mobileprovision
 *.p12
 *.cer
+keystore-info.txt
+keystore.properties
+driver-app/keystore-info.txt
+driver-app/android/keystore.properties
 
 # Editor directories and files
 .vscode/*
