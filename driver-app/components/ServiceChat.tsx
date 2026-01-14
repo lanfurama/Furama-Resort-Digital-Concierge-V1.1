@@ -16,21 +16,21 @@ interface ServiceChatProps {
 }
 
 const SUPPORTED_LANGUAGES = [
-    'Original', 
-    'Vietnamese', 
-    'English', 
-    'Korean', 
-    'Japanese', 
-    'Chinese', 
-    'French', 
+    'Original',
+    'Vietnamese',
+    'English',
+    'Korean',
+    'Japanese',
+    'Chinese',
+    'French',
     'Russian'
 ];
 
-const ServiceChat: React.FC<ServiceChatProps> = ({ 
-    serviceType, 
-    roomNumber, 
-    label = "Staff", 
-    autoOpen = false, 
+const ServiceChat: React.FC<ServiceChatProps> = ({
+    serviceType,
+    roomNumber,
+    label = "Staff",
+    autoOpen = false,
     userRole = 'user',
     onClose
 }) => {
@@ -60,7 +60,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
     const [showLangSelector, setShowLangSelector] = useState(false);
     const [translatedCache, setTranslatedCache] = useState<Record<string, string>>({});
     const [userManuallyChangedLang, setUserManuallyChangedLang] = useState(false);
-    
+
     // Fetch guest language from database when userRole is 'user' (guest)
     useEffect(() => {
         const fetchGuestLanguage = async () => {
@@ -79,10 +79,10 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                 }
             }
         };
-        
+
         fetchGuestLanguage();
     }, [userRole, roomNumber, userManuallyChangedLang]);
-    
+
     // Auto-update targetLang when app language changes (unless user manually changed it)
     useEffect(() => {
         if (!userManuallyChangedLang) {
@@ -99,10 +99,10 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
             try {
                 const msgs = await getServiceMessages(roomNumber, serviceType);
                 const currentCount = messages.length;
-                
-            // Simple check to avoid tight loops if object ref changes but content is same
+
+                // Simple check to avoid tight loops if object ref changes but content is same
                 if (msgs.length !== currentCount || JSON.stringify(msgs) !== JSON.stringify(messages)) {
-                setMessages(msgs);
+                    setMessages(msgs);
                 }
             } catch (error) {
                 console.error('Failed to fetch messages:', error);
@@ -144,7 +144,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
             }
 
             // Find messages that need translation (from the other person and not in cache)
-            const msgsToTranslate = messages.filter(msg => 
+            const msgsToTranslate = messages.filter(msg =>
                 msg.role !== userRole && // Only translate other person's messages
                 !translatedCache[msg.id] // Not yet translated
             );
@@ -154,7 +154,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
             console.log(`[ServiceChat] Translating ${msgsToTranslate.length} messages to ${targetLang} for ${userRole === 'user' ? 'guest' : 'staff'}`);
 
             const newTranslations: Record<string, string> = {};
-            
+
             await Promise.all(msgsToTranslate.map(async (msg) => {
                 try {
                     const translated = await translateText(msg.text, targetLang);
@@ -216,7 +216,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
     const toggleOpen = async () => {
         const newState = !isOpen;
         setIsOpen(newState);
-        
+
         // Mark messages as read when opening chat
         if (newState && messages.length > 0) {
             const lastMessage = messages[messages.length - 1];
@@ -225,7 +225,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
             }
             setUnreadCount(0);
         }
-        
+
         if (!newState && onClose) onClose();
     }
 
@@ -237,25 +237,25 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                     {/* Header */}
                     <div className="bg-emerald-900 text-white p-3 flex justify-between items-center shadow-md relative">
                         <div className="flex items-center space-x-2">
-                             <div className="p-1.5 bg-white/10 rounded-full">
+                            <div className="p-1.5 bg-white/10 rounded-full">
                                 {userRole === 'user' ? <Shield size={16} /> : <User size={16} />}
-                             </div>
-                             <div>
-                                 <h3 className="font-bold text-sm">Chat with {label}</h3>
-                                 <p className="text-[10px] opacity-70 flex items-center"><span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1"></span> Online</p>
-                             </div>
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-sm">Chat with {label}</h3>
+                                <p className="text-[10px] opacity-70 flex items-center"><span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1"></span> Online</p>
+                            </div>
                         </div>
-                        
+
                         <div className="flex items-center space-x-1">
                             {/* Language Selector Toggle */}
-                            <button 
+                            <button
                                 onClick={() => setShowLangSelector(!showLangSelector)}
                                 className={`p-1.5 rounded-full hover:bg-white/10 transition ${targetLang !== 'Original' ? 'text-amber-300' : 'text-white'}`}
                                 title="Translate Chat"
                             >
                                 <Globe size={16} />
                             </button>
-                            <button onClick={handleClose} className="hover:text-emerald-300 p-1"><X size={18}/></button>
+                            <button onClick={handleClose} className="hover:text-emerald-300 p-1"><X size={18} /></button>
                         </div>
 
                         {/* Language Dropdown */}
@@ -263,12 +263,12 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                             <div className="absolute top-12 right-2 bg-white text-gray-800 rounded-lg shadow-xl border border-gray-100 py-2 w-32 z-50 animate-in fade-in zoom-in-95">
                                 <p className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase">Translate to</p>
                                 {SUPPORTED_LANGUAGES.map(lang => (
-                                    <button 
+                                    <button
                                         key={lang}
-                                        onClick={() => { 
-                                            setTargetLang(lang); 
+                                        onClick={() => {
+                                            setTargetLang(lang);
                                             setUserManuallyChangedLang(true);
-                                            setShowLangSelector(false); 
+                                            setShowLangSelector(false);
                                         }}
                                         className={`w-full text-left px-3 py-1.5 text-xs hover:bg-emerald-50 ${targetLang === lang ? 'text-emerald-600 font-bold bg-emerald-50' : ''}`}
                                     >
@@ -282,26 +282,25 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                     {/* Messages */}
                     <div className="flex-1 overflow-y-auto p-3 bg-gray-50 space-y-3">
                         {messages.length === 0 && (
-                             <div className="text-center text-gray-400 text-xs mt-10">
-                                 <p>Start a conversation with {userRole === 'user' ? `the ${label.toLowerCase()}` : `Guest Room ${roomNumber}`}.</p>
-                             </div>
+                            <div className="text-center text-gray-400 text-xs mt-10">
+                                <p>Start a conversation with {userRole === 'user' ? `the ${label.toLowerCase()}` : `Guest Room ${roomNumber}`}.</p>
+                            </div>
                         )}
                         {messages.map(msg => {
                             const isMe = msg.role === userRole;
                             // Display translation if: it's not me, target lang is selected, and translation exists
-                            const displayText = (!isMe && targetLang !== 'Original' && translatedCache[msg.id]) 
-                                ? translatedCache[msg.id] 
+                            const displayText = (!isMe && targetLang !== 'Original' && translatedCache[msg.id])
+                                ? translatedCache[msg.id]
                                 : msg.text;
-                            
+
                             const isTranslated = !isMe && targetLang !== 'Original' && translatedCache[msg.id];
 
                             return (
                                 <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
-                                        isMe ? 'bg-emerald-600 text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'
-                                    }`}>
+                                    <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm ${isMe ? 'bg-emerald-600 text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'
+                                        }`}>
                                         <p>{displayText}</p>
-                                        
+
                                         {/* Translation Indicator */}
                                         {isTranslated && (
                                             <div className="flex items-center mt-1 pt-1 border-t border-gray-100/50">
@@ -320,22 +319,22 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                         <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Input */}
+                    {/* Input - Mobile Optimized */}
                     <div className="p-3 bg-white border-t border-gray-100 flex items-center gap-2">
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                             placeholder={`Type a message${targetLang !== 'Original' ? ' (Auto-translating for ' + (userRole === 'user' ? 'Staff' : 'Guest') + ')' : ''}...`}
-                            className="flex-1 bg-gray-100 rounded-full px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            className="flex-1 bg-gray-100 rounded-full px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 min-h-[44px]"
                         />
-                        <button 
+                        <button
                             onClick={handleSend}
                             disabled={!input.trim()}
-                            className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition disabled:opacity-50"
+                            className="touch-btn p-3 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition disabled:opacity-50 active:scale-95"
                         >
-                            <Send size={16} />
+                            <Send size={18} />
                         </button>
                     </div>
                 </div>
@@ -343,7 +342,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
 
             {/* Toggle Button (Only show if not auto-open or if role is user to avoid clutter on staff screen) */}
             {!autoOpen && (
-                <button 
+                <button
                     onClick={toggleOpen}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-full shadow-lg transition transform hover:scale-105 active:scale-95 pointer-events-auto flex items-center justify-center relative"
                     style={{ marginBottom: '0' }}

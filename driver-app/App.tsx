@@ -14,7 +14,7 @@ const AppContent: React.FC = () => {
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  
+
   // Translation hook
   const { setLanguage } = useTranslation();
 
@@ -46,11 +46,11 @@ const AppContent: React.FC = () => {
     e.preventDefault();
     setIsAuthLoading(true);
     setAuthError('');
-    
+
     try {
       // Staff/Driver Login: Username + Password - Calls API
       const foundUser = await authenticateStaff(usernameInput, passwordInput);
-      
+
       if (!foundUser) {
         setAuthError('Invalid credentials. Please check Username and Password.');
         setIsAuthLoading(false);
@@ -99,7 +99,7 @@ const AppContent: React.FC = () => {
         console.error('Failed to parse user from localStorage:', e);
       }
     }
-    
+
     setUser(null);
     setUsernameInput('');
     setPasswordInput('');
@@ -115,7 +115,7 @@ const AppContent: React.FC = () => {
       <div className="min-h-screen bg-stone-100 flex flex-col justify-center items-center p-6 relative overflow-hidden">
         {/* Background Accent */}
         <div className="absolute top-0 left-0 w-full h-1/2 bg-emerald-900 rounded-b-[3rem] z-0"></div>
-        
+
         <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 z-10 relative">
           <div className="text-center mb-8">
             <h1 className="font-serif text-3xl font-bold text-emerald-900 mb-2">FURAMA</h1>
@@ -126,8 +126,8 @@ const AppContent: React.FC = () => {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Username</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 value={usernameInput}
                 onChange={(e) => setUsernameInput(e.target.value)}
                 className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-black"
@@ -140,7 +140,7 @@ const AppContent: React.FC = () => {
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">Password</label>
               </div>
               <div className="relative">
-                <input 
+                <input
                   type={showPassword ? "text" : "password"}
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
@@ -148,12 +148,12 @@ const AppContent: React.FC = () => {
                   placeholder="Enter password"
                   required
                 />
-                <button 
+                <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600 rounded-lg active:scale-95"
                 >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
                 </button>
               </div>
             </div>
@@ -165,8 +165,8 @@ const AppContent: React.FC = () => {
               </div>
             )}
 
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={isAuthLoading}
               className="w-full bg-emerald-800 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-emerald-900 transition transform active:scale-95 disabled:opacity-70 flex justify-center items-center"
             >
@@ -177,7 +177,7 @@ const AppContent: React.FC = () => {
               )}
             </button>
           </form>
-          
+
           <div className="mt-8 text-center">
             <p className="text-xs text-gray-400">© 2025 Furama Resort Danang. All rights reserved.</p>
           </div>

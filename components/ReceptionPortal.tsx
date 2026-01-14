@@ -2562,10 +2562,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   >
                     <button
                       onClick={() => setShowFleetSettings(false)}
-                      className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="touch-btn absolute top-3 right-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors active:scale-95"
                       aria-label="Close"
                     >
-                      <X size={20} />
+                      <X size={22} />
                     </button>
                     <h3 className="font-bold text-lg text-gray-800 mb-4 flex items-center pr-8">
                       <Settings size={18} className="mr-2" /> Dispatch
