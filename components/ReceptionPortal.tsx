@@ -33,6 +33,7 @@ import {
   Download,
   TrendingUp,
   Award,
+  Plus,
 } from "lucide-react";
 import {
   getRides,
@@ -2291,8 +2292,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           {/* Buggy Fleet Dispatch */}
           {viewMode === "BUGGY" && (
             <>
-              {/* Fleet Header */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4 px-2 md:px-4 py-2 md:py-3">
+              {/* Fleet Header - Hidden on mobile for cleaner UI */}
+              <div className="hidden md:flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4 px-2 md:px-4 py-2 md:py-3">
                 <div className="flex items-center gap-2 md:gap-2.5">
                   <div className="w-8 h-8 md:w-9 md:h-9 bg-emerald-600 rounded-md flex items-center justify-center flex-shrink-0">
                     <Car size={18} className="md:w-5 md:h-5 text-white" />
@@ -2306,8 +2307,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                     </p>
                   </div>
                 </div>
-                {/* Status Indicator */}
-                <div className="flex items-center gap-1.5 md:gap-2 bg-white rounded-lg px-2 md:px-3 py-1.5 border border-gray-200 shadow-sm w-full md:w-auto">
+                {/* Status Indicator - Hidden on mobile (info in stats cards) */}
+                <div className="hidden md:flex items-center gap-1.5 md:gap-2 bg-white rounded-lg px-2 md:px-3 py-1.5 border border-gray-200 shadow-sm w-full md:w-auto">
                   <div className="flex items-center gap-1 md:gap-1.5 flex-1 md:flex-initial">
                     <div className="flex items-center gap-1">
                       <AlertCircle size={12} className="md:w-[14px] md:h-[14px] text-orange-500 flex-shrink-0" />
@@ -2480,8 +2481,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   </div>
                 </div>
 
-                {/* Drivers Offline */}
-                <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-md p-2 md:p-1.5 border border-gray-200/60">
+                {/* Drivers Offline - Hidden on mobile */}
+                <div className="hidden md:block bg-gradient-to-br from-gray-50 to-slate-50 rounded-md p-2 md:p-1.5 border border-gray-200/60">
                   <div className="flex items-center justify-between gap-1">
                     <div className="flex items-center gap-1 min-w-0">
                       <Users
@@ -2531,8 +2532,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   </div>
                 </div>
 
-                {/* Completed Today */}
-                <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-md p-2 md:p-1.5 border border-emerald-200/60">
+                {/* Completed Today - Hidden on mobile */}
+                <div className="hidden md:block bg-gradient-to-br from-emerald-50 to-green-50 rounded-md p-2 md:p-1.5 border border-emerald-200/60">
                   <div className="flex items-center justify-between gap-1">
                     <div className="flex items-center gap-1 min-w-0">
                       <CheckCircle
@@ -2557,7 +2558,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   onClick={() => setShowFleetSettings(false)}
                 >
                   <div
-                    className="bg-white rounded-xl shadow-2xl border border-gray-200 w-96 p-6 animate-in slide-in-from-top-5 relative"
+                    className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[95vw] max-w-96 p-4 md:p-6 mx-2 animate-in slide-in-from-top-5 relative"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
@@ -3607,10 +3608,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   )}
                 </div>
 
-                {/* Column 3: Recent Completed */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="font-bold text-sm text-gray-800">
+                {/* Column 3: Recent Completed - Hidden on mobile */}
+                <div className="hidden lg:block bg-white rounded-lg shadow-sm border border-gray-200 p-2 md:p-3">
+                  <div className="flex justify-between items-center mb-2 md:mb-3">
+                    <h3 className="font-bold text-xs md:text-sm text-gray-800">
                       Recent Completed
                     </h3>
                   </div>
@@ -4474,11 +4475,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
             </div>
           )}
 
-          {/* Create New Ride Modal */}
+          {/* Create New Ride Modal - Centered on Mobile */}
           {showCreateRideModal && (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 md:p-4">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
-                <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 p-2 md:p-3 flex justify-between items-center z-10 rounded-t-2xl">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
+                <div className="bg-white border-b border-gray-200 p-3 flex justify-between items-center z-10 rounded-t-2xl">
                   <h3 className="font-bold text-base md:text-lg text-gray-900">
                     Create New Ride
                   </h3>
@@ -4490,11 +4491,12 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   </button>
                 </div>
 
-                <div className="p-4 md:p-6 flex-1 flex flex-col justify-center items-center bg-gray-50">
+                {/* Voice Input Section - Compact on mobile */}
+                <div className="p-3 md:p-4 flex flex-col items-center bg-gray-50 border-b border-gray-200">
                   <button
                     type="button"
                     onClick={handleToggleListening}
-                    className={`relative w-24 h-24 md:w-32 md:h-32 rounded-full transition-all duration-300 flex items-center justify-center ${isListening ? "bg-red-500 text-white shadow-2xl shadow-red-500/50" : "bg-blue-500 text-white hover:bg-blue-600 shadow-2xl shadow-blue-500/50"}`}
+                    className={`relative w-16 h-16 md:w-24 md:h-24 rounded-full transition-all duration-300 flex items-center justify-center ${isListening ? "bg-red-500 text-white shadow-xl shadow-red-500/50" : "bg-blue-500 text-white hover:bg-blue-600 shadow-xl shadow-blue-500/50"}`}
                     style={
                       isListening && audioLevel > 0
                         ? {
@@ -4507,7 +4509,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                     {isListening && (
                       <>
                         <div className="absolute inset-0 rounded-full bg-red-400 animate-ping-slow"></div>
-                        {/* Animated rings based on audio level */}
                         <div
                           className="absolute inset-0 rounded-full border-2 border-red-300 opacity-75"
                           style={{
@@ -4515,33 +4516,18 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             animation: "pulse 1s ease-in-out infinite",
                           }}
                         ></div>
-                        <div
-                          className="absolute inset-0 rounded-full border-2 border-red-200 opacity-50"
-                          style={{
-                            transform: `scale(${1 + (audioLevel / 100) * 0.3})`,
-                            animation: "pulse 1.2s ease-in-out infinite",
-                            animationDelay: "0.2s",
-                          }}
-                        ></div>
                       </>
                     )}
                     <Mic
-                      size={48}
-                      className={`md:w-16 md:h-16 transition-transform duration-100 ${isListening && audioLevel > 50 ? "animate-bounce" : ""
+                      size={28}
+                      className={`md:w-10 md:h-10 transition-transform duration-100 ${isListening && audioLevel > 50 ? "animate-bounce" : ""
                         }`}
-                      style={
-                        isListening && audioLevel > 50
-                          ? {
-                            transform: `scale(${1 + (audioLevel / 100) * 0.1})`,
-                          }
-                          : {}
-                      }
                     />
                   </button>
-                  <p className="mt-4 md:mt-6 text-gray-600 font-medium text-center text-sm md:text-base px-4">
+                  <p className="mt-2 text-gray-500 font-medium text-center text-xs md:text-sm">
                     {isListening
                       ? "Listening..."
-                      : "Press the button and speak to create a ride"}
+                      : "Tap to speak or fill form below"}
                   </p>
                   {/* Silence countdown indicator */}
                   {isListening && silenceCountdown !== null && silenceRemainingTime !== null && (
@@ -4647,10 +4633,12 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   )}
                 </div>
 
-                <div className="p-4 md:p-6 border-t overflow-y-auto max-h-[50vh] md:max-h-none">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                {/* Form Section - Compact layout to avoid scroll */}
+                <div className="p-3 flex-1 overflow-y-auto">
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Row 1: Room + Guest Name */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
                         Room
                       </label>
                       <input
@@ -4663,51 +4651,52 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             roomNumber: e.target.value,
                           }))
                         }
-                        className="w-full p-3 md:p-2.5 border rounded-md bg-white text-gray-900 placeholder:text-gray-400 text-base md:text-sm min-h-[44px] md:min-h-0"
+                        className="w-full px-2.5 py-2 border rounded-md bg-white text-gray-900 placeholder:text-gray-400 text-sm min-h-[40px]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
                         Guest Name
                       </label>
                       <input
                         type="text"
                         value={newRideData.guestName}
-                        placeholder="Enter guest name"
+                        placeholder="Name"
                         onChange={(e) =>
                           setNewRideData((p) => ({
                             ...p,
                             guestName: e.target.value,
                           }))
                         }
-                        className="w-full p-3 md:p-2.5 border rounded-md bg-white text-gray-900 placeholder:text-gray-400 text-base md:text-sm min-h-[44px] md:min-h-0"
+                        className="w-full px-2.5 py-2 border rounded-md bg-white text-gray-900 placeholder:text-gray-400 text-sm min-h-[40px]"
                       />
                     </div>
+                    {/* Row 2: Pickup + Destination */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
                         Pickup
                       </label>
                       <input
                         type="text"
                         value={newRideData.pickup}
-                        placeholder="Click to select pickup location"
+                        placeholder="Select pickup"
                         readOnly
                         onClick={() => {
                           setLocationModal({ isOpen: true, type: "pickup" });
                           setLocationFilterType("ALL");
                           setPickupSearchQuery("");
                         }}
-                        className="w-full p-3 md:p-2.5 border rounded-md cursor-pointer bg-white text-gray-900 placeholder:text-gray-400 text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
+                        className="w-full px-2.5 py-2 border rounded-md cursor-pointer bg-white text-gray-900 placeholder:text-gray-400 text-sm min-h-[40px] touch-manipulation"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
                         Destination
                       </label>
                       <input
                         type="text"
                         value={newRideData.destination}
-                        placeholder="Click to select destination"
+                        placeholder="Select destination"
                         readOnly
                         onClick={() => {
                           setLocationModal({
@@ -4717,77 +4706,47 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                           setLocationFilterType("ALL");
                           setDestinationSearchQuery("");
                         }}
-                        className="w-full p-3 md:p-2.5 border rounded-md cursor-pointer bg-white text-gray-900 placeholder:text-gray-400 text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
+                        className="w-full px-2.5 py-2 border rounded-md cursor-pointer bg-white text-gray-900 placeholder:text-gray-400 text-sm min-h-[40px] touch-manipulation"
                       />
                     </div>
+                    {/* Row 3: Guest Count + Notes (compact) */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                        Guest Count
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
+                        Guests
                       </label>
                       <input
                         type="number"
                         min="1"
                         max="7"
                         value={newRideData.guestCount || 1}
-                        placeholder="Number of guests (1-7)"
+                        placeholder="1-7"
                         onChange={(e) =>
                           setNewRideData((p) => ({
                             ...p,
                             guestCount: parseInt(e.target.value) || 1,
                           }))
                         }
-                        className="w-full p-3 md:p-2.5 border rounded-md bg-white text-gray-900 placeholder:text-gray-400 text-base md:text-sm min-h-[44px] md:min-h-0"
+                        className="w-full px-2.5 py-2 border rounded-md bg-white text-gray-900 placeholder:text-gray-400 text-sm min-h-[40px]"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
                         Notes
                       </label>
-                      <textarea
+                      <input
+                        type="text"
                         value={newRideData.notes}
-                        placeholder="Special requests, luggage info, etc."
+                        placeholder="Optional notes"
                         onChange={(e) =>
                           setNewRideData((p) => ({
                             ...p,
                             notes: e.target.value,
                           }))
                         }
-                        rows={2}
-                        className="w-full p-3 md:p-2.5 border rounded-md bg-white text-gray-900 placeholder:text-gray-400 text-base md:text-sm resize-none min-h-[80px] md:min-h-0"
+                        className="w-full px-2.5 py-2 border rounded-md bg-white text-gray-900 placeholder:text-gray-400 text-sm min-h-[40px]"
                       />
                     </div>
                   </div>
-                </div>
-
-                <div className="p-4 border-t bg-gray-50 flex flex-col sm:flex-row justify-end gap-3 rounded-b-2xl">
-                  <button
-                    onClick={() => setShowCreateRideModal(false)}
-                    className="w-full sm:w-auto px-4 py-3 md:py-2.5 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCreateRide}
-                    disabled={
-                      isCreatingRide ||
-                      !newRideData.roomNumber ||
-                      !newRideData.pickup ||
-                      !newRideData.destination
-                    }
-                    className="w-full sm:w-auto px-4 py-3 md:py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
-                  >
-                    {isCreatingRide ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        Creating...
-                      </>
-                    ) : (
-                      <>
-                        <Car size={16} />
-                        Create Ride
-                      </>
-                    )}
-                  </button>
                 </div>
               </div>
             </div>
@@ -5155,10 +5114,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                     <div className="space-y-3">{renderRouteSteps()}</div>
                   </div>
                 </div>
-                <div className="p-4 border-t bg-gray-50 flex justify-end gap-3 rounded-b-xl">
+                <div className="p-3 md:p-4 border-t bg-gray-50 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 rounded-b-xl">
                   <button
                     onClick={() => setShowDetailRequestModal(false)}
-                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium"
+                    className="w-full sm:w-auto px-4 py-3 md:py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
                   >
                     Close
                   </button>
@@ -5168,7 +5127,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       setSelectedRideForAssign(selectedRideForDetail);
                       setShowManualAssignModal(true);
                     }}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium flex items-center gap-2"
+                    className="w-full sm:w-auto px-4 py-3 md:py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium flex items-center justify-center gap-2 text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
                   >
                     <Car size={16} />
                     Assign Driver
@@ -5829,18 +5788,17 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         </div>
       )}
 
-      {/* Floating New Ride Button - Centered with Text */}
+      {/* Floating New Ride Button - Circular with Text */}
       {viewMode === "BUGGY" && !showCreateRideModal && (
         <button
           onClick={() => setShowCreateRideModal(true)}
-          className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-full border-4 border-emerald-400 flex items-center justify-center gap-2 px-6 py-4 md:px-5 md:py-3 transition-all z-50 touch-manipulation hover:scale-105 active:scale-95 min-h-[56px] md:min-h-[48px]"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-full w-20 h-20 md:w-16 md:h-16 flex items-center justify-center transition-all z-50 touch-manipulation hover:scale-110 active:scale-95"
           style={{
-            boxShadow: "0 15px 40px -5px rgba(16, 185, 129, 0.7), 0 0 20px rgba(16, 185, 129, 0.4)",
+            boxShadow: "0 8px 30px -4px rgba(16, 185, 129, 0.6), 0 4px 15px rgba(16, 185, 129, 0.3)",
           }}
           title="Create New Ride"
         >
-          <Car size={24} className="md:w-5 md:h-5" strokeWidth={2.5} />
-          <span className="text-base md:text-sm font-semibold">New Ride</span>
+          <span className="text-xs md:text-[10px] font-bold text-center leading-tight">New<br />Ride</span>
         </button>
       )}
     </div>
