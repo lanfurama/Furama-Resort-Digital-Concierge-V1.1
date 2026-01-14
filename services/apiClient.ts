@@ -1,7 +1,25 @@
 // API Client helper for making API calls
 // API and frontend run on the same port (3000), so we use relative paths
 // API endpoints are prefixed with /api/v1
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api/v1';
+let API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api/v1';
+
+// Fix Mixed Content Issue: If running on HTTPS but API URL is HTTP (common in dev),
+// switch to relative path if it's the same host, or upgrade protocol.
+if (typeof window !== 'undefined' && window.location.protocol === 'https:' && API_BASE_URL.startsWith('http:')) {
+  try {
+    const url = new URL(API_BASE_URL);
+    if (url.hostname === window.location.hostname) {
+      // Same host (e.g. localhost), use relative path to respect HTTPS
+      API_BASE_URL = '/api/v1';
+    } else {
+      // Different host, try upgrade to HTTPS
+      API_BASE_URL = API_BASE_URL.replace('http:', 'https:');
+    }
+  } catch (e) {
+    // Parse error, fallback to relative
+    API_BASE_URL = '/api/v1';
+  }
+}
 
 async function apiRequest<T>(
   endpoint: string,
