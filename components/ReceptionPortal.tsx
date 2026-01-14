@@ -163,6 +163,21 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     errorMessage?: string;
   } | null>(null);
 
+  // AI Assignment Progress State for inline indicator
+  const [aiAssignmentProgress, setAIAssignmentProgress] = useState<{
+    isProcessing: boolean;
+    processedCount: number;
+    totalCount: number;
+    currentRideId: string | null;
+    results: Array<{ rideId: string; driverName: string; success: boolean }>;
+  }>({
+    isProcessing: false,
+    processedCount: 0,
+    totalCount: 0,
+    currentRideId: null,
+    results: [],
+  });
+
   // Service AI Assignment Modal State
   const [showServiceAIAssignment, setShowServiceAIAssignment] = useState(false);
   const [serviceAIAssignmentData, setServiceAIAssignmentData] = useState<{
@@ -178,6 +193,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   const handleAutoAssignRef = useRef<
     ((isAutoTriggered: boolean) => Promise<void>) | null
   >(null);
+
+  // Refs for latest values to avoid stale closures in interval
+  const ridesRef = useRef<RideRequest[]>([]);
+  const fleetConfigRef = useRef(fleetConfig);
 
   // Current time state for countdown
   const [currentTime, setCurrentTime] = useState(Date.now());
@@ -204,6 +223,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   const [performancePeriod, setPerformancePeriod] = useState<'day' | 'week' | 'month'>('week');
   const [performanceDriverId, setPerformanceDriverId] = useState<string>('');
   const [isLoadingPerformance, setIsLoadingPerformance] = useState(false);
+
+  // Pagination States for performance optimization
+  const [pendingRidesLimit, setPendingRidesLimit] = useState(10);
+  const [driverListLimit, setDriverListLimit] = useState(15);
 
   // Create New Ride Modal State
   const [showCreateRideModal, setShowCreateRideModal] = useState(false);
@@ -1022,23 +1045,33 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   }, [users, rides, mapInstance, driverViewMode, mapError, driverFilter]);
 
   // Auto-assign logic: Automatically assign rides that have been waiting too long
-  // DISABLED: Auto-assign feature is turned off by default
+  // Keep refs in sync with state values
   useEffect(() => {
-    // Always return early - auto-assign is disabled
-    // This ensures no interval is set and no auto-assignment happens
+    ridesRef.current = rides;
+  }, [rides]);
+
+  useEffect(() => {
+    fleetConfigRef.current = fleetConfig;
+  }, [fleetConfig]);
+
+  // Main auto-assign interval - uses refs to avoid stale closures
+  useEffect(() => {
+    // Early return if disabled
     if (!fleetConfig.autoAssignEnabled) {
-      // Auto-assign is disabled, do nothing
+      console.log("[Auto-Assign] Auto-assign is disabled");
       return;
     }
 
-    // This code should never execute since autoAssignEnabled is always false
-    // But keeping it here for safety in case the feature is re-enabled in the future
     console.log(
       "[Auto-Assign] Auto-assign is enabled, checking every 5 seconds...",
     );
 
     const checkAndAutoAssign = async () => {
-      const pendingRides = rides.filter(
+      // Use refs for latest values to avoid stale closures
+      const currentRides = ridesRef.current;
+      const currentFleetConfig = fleetConfigRef.current;
+
+      const pendingRides = currentRides.filter(
         (r) => r.status === BuggyStatus.SEARCHING,
       );
       console.log(
@@ -1055,17 +1088,17 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         console.log(
           "[Auto-Assign] Skipping - last auto-assign was less than 10 seconds ago",
         );
-        return; // Skip if last auto-assign was less than 10 seconds ago
+        return;
       }
 
       // Check if any ride has been waiting longer than maxWaitTimeBeforeAutoAssign
       const ridesToAutoAssign = pendingRides.filter((ride) => {
         const waitTime = Math.floor((now - ride.timestamp) / 1000); // seconds
         const shouldAssign =
-          waitTime >= fleetConfig.maxWaitTimeBeforeAutoAssign;
+          waitTime >= currentFleetConfig.maxWaitTimeBeforeAutoAssign;
         if (shouldAssign) {
           console.log(
-            `[Auto-Assign] Ride ${ride.id} has been waiting ${waitTime}s (threshold: ${fleetConfig.maxWaitTimeBeforeAutoAssign}s)`,
+            `[Auto-Assign] Ride ${ride.id} has been waiting ${waitTime}s (threshold: ${currentFleetConfig.maxWaitTimeBeforeAutoAssign}s)`,
           );
         }
         return shouldAssign;
@@ -1073,13 +1106,34 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
       if (ridesToAutoAssign.length > 0) {
         console.log(
-          `[Auto-Assign] Found ${ridesToAutoAssign.length} ride(s) waiting over ${fleetConfig.maxWaitTimeBeforeAutoAssign}s, triggering auto-assign...`,
+          `[Auto-Assign] Found ${ridesToAutoAssign.length} ride(s) waiting over ${currentFleetConfig.maxWaitTimeBeforeAutoAssign}s, triggering auto-assign...`,
         );
         lastAutoAssignRef.current = now;
-        // Trigger auto-assign for these rides (silently, without showing modal)
+
+        // Set progress indicator - START
+        setAIAssignmentProgress({
+          isProcessing: true,
+          processedCount: 0,
+          totalCount: ridesToAutoAssign.length,
+          currentRideId: ridesToAutoAssign[0]?.id || null,
+          results: [],
+        });
+
+        // Trigger auto-assign for these rides
         if (handleAutoAssignRef.current) {
-          await handleAutoAssignRef.current(true); // Pass true to indicate auto-triggered
+          await handleAutoAssignRef.current(true);
         }
+
+        // Set progress indicator - COMPLETE (after 2s delay for visual feedback)
+        setTimeout(() => {
+          setAIAssignmentProgress({
+            isProcessing: false,
+            processedCount: ridesToAutoAssign.length,
+            totalCount: ridesToAutoAssign.length,
+            currentRideId: null,
+            results: [],
+          });
+        }, 2000);
       } else {
         console.log("[Auto-Assign] No rides need auto-assignment yet");
       }
@@ -1092,11 +1146,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     checkAndAutoAssign();
 
     return () => clearInterval(autoAssignInterval);
-  }, [
-    rides,
-    fleetConfig.autoAssignEnabled,
-    fleetConfig.maxWaitTimeBeforeAutoAssign,
-  ]);
+  }, [fleetConfig.autoAssignEnabled]); // Only re-create interval when toggle changes
 
   // Helper: Resolve location coordinates from location name
   const resolveLocationCoordinates = (
@@ -2185,7 +2235,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     >
       {/* Header */}
       {!embedded && (
-        <header className="bg-emerald-900 text-white py-2 md:py-3 px-3 md:px-4 flex justify-between items-center shadow-lg sticky top-0 z-20">
+        <header
+          role="banner"
+          aria-label="Dispatch Center Header"
+          className="bg-emerald-900 text-white py-2 md:py-3 px-3 md:px-4 flex justify-between items-center shadow-lg sticky top-0 z-20"
+        >
           <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
             <div
               className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${viewMode === "BUGGY" ? "bg-emerald-700" :
@@ -2205,7 +2259,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
             </div>
             <div className="min-w-0">
               <h1 className="text-sm md:text-lg font-bold truncate">Dispatch Center</h1>
-              <p className="text-[10px] md:text-xs text-emerald-200 truncate">
+              <p className="text-[10px] md:text-xs text-emerald-100 truncate">
                 {viewMode === "BUGGY"
                   ? "BUGGY FLEET MANAGEMENT"
                   : "SERVICE REQUEST MANAGEMENT"}
@@ -2237,12 +2291,13 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               <div className="text-xs md:text-sm font-semibold">
                 {user.lastName || "Reception"}
               </div>
-              <div className="text-[10px] md:text-xs text-emerald-200">
+              <div className="text-[10px] md:text-xs text-emerald-100">
                 ID: {user.id || "N/A"}
               </div>
             </div>
             <button
               onClick={onLogout}
+              aria-label="Logout from Dispatch Center"
               className="text-xs md:text-sm bg-emerald-800 px-2 md:px-3 py-1.5 md:py-2 rounded hover:bg-emerald-700 border border-emerald-700 flex items-center gap-1 min-h-[36px] touch-manipulation"
             >
               <span className="hidden sm:inline">Logout</span>
@@ -2256,38 +2311,44 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       <div className={`flex-1 ${embedded ? "" : "p-4 md:p-6"} overflow-auto`}>
         <div className="space-y-4">
           {/* View Mode Tabs */}
-          <div className="flex items-center gap-2 mb-4 px-2 md:px-4">
+          <nav role="navigation" aria-label="View mode navigation" className="flex items-center gap-2 mb-4 px-2 md:px-4">
             <button
               onClick={() => setViewMode("BUGGY")}
+              aria-current={viewMode === "BUGGY" ? "page" : undefined}
+              aria-label="Switch to Buggy Fleet view"
               className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm transition-all min-h-[44px] touch-manipulation ${viewMode === "BUGGY"
                 ? "bg-emerald-600 text-white shadow-md"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
             >
-              <Car size={16} className="md:w-[18px] md:h-[18px]" />
+              <Car size={16} className="md:w-[18px] md:h-[18px]" aria-hidden="true" />
               <span className="whitespace-nowrap">Buggy Fleet</span>
             </button>
             <button
               onClick={() => setViewMode("REPORTS")}
+              aria-current={viewMode === "REPORTS" ? "page" : undefined}
+              aria-label="Switch to Reports view"
               className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm transition-all min-h-[44px] touch-manipulation ${viewMode === "REPORTS"
                 ? "bg-purple-600 text-white shadow-md"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
             >
-              <BarChart3 size={16} className="md:w-[18px] md:h-[18px]" />
+              <BarChart3 size={16} className="md:w-[18px] md:h-[18px]" aria-hidden="true" />
               <span className="whitespace-nowrap">Reports</span>
             </button>
             <button
               onClick={() => setViewMode("PERFORMANCE")}
+              aria-current={viewMode === "PERFORMANCE" ? "page" : undefined}
+              aria-label="Switch to Performance view"
               className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm transition-all min-h-[44px] touch-manipulation ${viewMode === "PERFORMANCE"
                 ? "bg-indigo-600 text-white shadow-md"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
             >
-              <TrendingUp size={16} className="md:w-[18px] md:h-[18px]" />
+              <TrendingUp size={16} className="md:w-[18px] md:h-[18px]" aria-hidden="true" />
               <span className="whitespace-nowrap">Performance</span>
             </button>
-          </div>
+          </nav>
 
           {/* Buggy Fleet Dispatch */}
           {viewMode === "BUGGY" && (
@@ -2459,7 +2520,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               </div>
 
               {/* Dashboard Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-3 mb-4 px-2 md:px-0">
+              <div
+                role="region"
+                aria-label="Fleet status overview"
+                className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-3 mb-4 px-2 md:px-0"
+              >
                 {/* Drivers Online */}
                 <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-md p-2 md:p-1.5 border border-green-200/60">
                   <div className="flex items-center justify-between gap-1">
@@ -3002,21 +3067,46 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       })()}
 
                       <div className="flex items-center gap-1.5 md:gap-2">
-                        {/* Toggle Switch - Disabled */}
+                        {/* AI Assignment Progress Indicator - Inline */}
+                        {aiAssignmentProgress.isProcessing && (
+                          <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 border border-blue-200 rounded-lg animate-pulse">
+                            <Loader2 size={12} className="text-blue-600 animate-spin" />
+                            <span className="text-[10px] md:text-xs text-blue-700 font-medium">
+                              AI: {aiAssignmentProgress.processedCount}/{aiAssignmentProgress.totalCount}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Toggle Switch - Enabled with ARIA */}
                         <button
-                          disabled={true}
-                          onClick={() => { }}
-                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 bg-gray-300 cursor-not-allowed opacity-50 touch-manipulation`}
-                          title="Auto Assign is disabled"
+                          role="switch"
+                          aria-checked={fleetConfig.autoAssignEnabled}
+                          aria-label="Auto Assign AI toggle"
+                          disabled={aiAssignmentProgress.isProcessing}
+                          onClick={() => {
+                            setFleetConfig(prev => ({
+                              ...prev,
+                              autoAssignEnabled: !prev.autoAssignEnabled
+                            }));
+                          }}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 touch-manipulation ${fleetConfig.autoAssignEnabled
+                            ? "bg-emerald-500"
+                            : "bg-gray-300"
+                            } ${aiAssignmentProgress.isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}
+                          title={fleetConfig.autoAssignEnabled ? "Auto Assign is ON" : "Auto Assign is OFF"}
                         >
                           <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-1`}
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${fleetConfig.autoAssignEnabled ? "translate-x-4" : "translate-x-1"
+                              }`}
                           />
                         </button>
 
-                        {/* Auto Assign Info */}
-                        <span className="text-[10px] md:text-xs text-gray-500 font-medium">
-                          Auto: Off
+                        {/* Auto Assign Status */}
+                        <span
+                          aria-live="polite"
+                          className={`text-[10px] md:text-xs font-medium ${fleetConfig.autoAssignEnabled ? "text-emerald-600" : "text-gray-600"
+                            }`}>
+                          {fleetConfig.autoAssignEnabled ? "AI: On" : "AI: Off"}
                         </span>
                       </div>
                     </div>
@@ -3030,7 +3120,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                     ) : (
                       (() => {
                         // Sort by wait time (longest first) and map to display
-                        const pendingRides = rides
+                        const allPendingRides = rides
                           .filter((r) => r.status === BuggyStatus.SEARCHING)
                           .map((ride) => {
                             const waitTime = Math.floor(
@@ -3040,100 +3130,118 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                           })
                           .sort((a, b) => b.waitTime - a.waitTime); // Longest wait first
 
-                        return pendingRides.map(({ ride, waitTime }, index) => {
-                          const waitMinutes = Math.floor(waitTime / 60);
-                          const waitSeconds = waitTime % 60;
+                        const totalPendingCount = allPendingRides.length;
+                        const pendingRides = allPendingRides.slice(0, pendingRidesLimit);
 
-                          // Determine urgency level based on wait time
-                          let urgencyLevel: "normal" | "warning" | "urgent" =
-                            "normal";
-                          if (waitTime >= 600) urgencyLevel = "urgent";
-                          else if (waitTime >= 300) urgencyLevel = "warning";
+                        return (
+                          <>
+                            {pendingRides.map(({ ride, waitTime }, index) => {
+                              const waitMinutes = Math.floor(waitTime / 60);
+                              const waitSeconds = waitTime % 60;
 
-                          const styles = {
-                            urgent: {
-                              bg: "bg-red-50",
-                              border: "border-red-300",
-                              badge: "bg-red-100 text-red-700",
-                            },
-                            warning: {
-                              bg: "bg-orange-50",
-                              border: "border-orange-300",
-                              badge: "bg-orange-100 text-orange-700",
-                            },
-                            normal: {
-                              bg: "bg-white",
-                              border: "border-gray-200",
-                              badge: "bg-gray-100 text-gray-600",
-                            },
-                          };
-                          const style = styles[urgencyLevel];
+                              // Determine urgency level based on wait time
+                              let urgencyLevel: "normal" | "warning" | "urgent" =
+                                "normal";
+                              if (waitTime >= 600) urgencyLevel = "urgent";
+                              else if (waitTime >= 300) urgencyLevel = "warning";
 
-                          return (
-                            <div
-                              key={ride.id}
-                              onClick={() => {
-                                setSelectedRideForDetail(ride);
-                                setShowDetailRequestModal(true);
-                              }}
-                              className={`${style.bg} ${style.border} p-2 md:p-2.5 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-md hover:border-emerald-400 touch-manipulation`}
-                            >
-                              {/* Header Row: Room + Guest + Pax + Wait Time */}
-                              <div className="flex items-center justify-between gap-2 mb-1">
-                                <div className="flex items-center gap-1 md:gap-1.5 min-w-0 flex-1">
-                                  <span className="font-semibold text-xs md:text-sm text-gray-800">
-                                    #{ride.roomNumber}
-                                  </span>
-                                  <span className="text-[10px] md:text-xs text-gray-500 truncate">
-                                    {ride.guestName}
-                                  </span>
-                                  <span className="text-[9px] md:text-[10px] text-gray-500 flex-shrink-0">
-                                    {ride.guestCount || 1} pax
-                                  </span>
-                                </div>
-                                <span
-                                  className={`text-[9px] md:text-[10px] px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${style.badge}`}
-                                >
-                                  {waitMinutes}m {waitSeconds}s
-                                </span>
-                              </div>
+                              const styles = {
+                                urgent: {
+                                  bg: "bg-red-50",
+                                  border: "border-red-300",
+                                  badge: "bg-red-100 text-red-700",
+                                },
+                                warning: {
+                                  bg: "bg-orange-50",
+                                  border: "border-orange-300",
+                                  badge: "bg-orange-100 text-orange-700",
+                                },
+                                normal: {
+                                  bg: "bg-white",
+                                  border: "border-gray-200",
+                                  badge: "bg-gray-100 text-gray-600",
+                                },
+                              };
+                              const style = styles[urgencyLevel];
 
-                              {/* Route Row */}
-                              <div className="flex items-center gap-1 md:gap-1.5 text-[10px] md:text-xs mt-1 flex-wrap">
-                                <span className="text-gray-500 flex-shrink-0">From:</span>
-                                <span className="text-gray-700 font-medium truncate min-w-0">
-                                  {ride.pickup}
-                                </span>
-                                <span className="text-gray-400 flex-shrink-0">→</span>
-                                <span className="text-gray-500 flex-shrink-0">To:</span>
-                                <span className="text-gray-700 font-medium truncate min-w-0">
-                                  {ride.destination}
-                                </span>
-                              </div>
-
-                              {/* Notes - if exists */}
-                              {ride.notes && ride.notes.trim() && (
-                                <div className="text-[9px] md:text-[10px] text-amber-600 truncate mt-1">
-                                  Note: {ride.notes}
-                                </div>
-                              )}
-
-                              {/* Assign Driver Button */}
-                              <div className="mt-2 pt-2 border-t border-gray-200/60">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation(); // prevent opening detail modal
-                                    setSelectedRideForAssign(ride);
-                                    setShowManualAssignModal(true);
+                              return (
+                                <div
+                                  key={ride.id}
+                                  onClick={() => {
+                                    setSelectedRideForDetail(ride);
+                                    setShowDetailRequestModal(true);
                                   }}
-                                  className="w-full bg-emerald-600 text-white text-[10px] md:text-xs font-semibold px-2 md:px-3 py-2 md:py-1.5 rounded-md hover:bg-emerald-700 transition min-h-[36px] md:min-h-0 touch-manipulation"
+                                  className={`${style.bg} ${style.border} p-2 md:p-2.5 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-md hover:border-emerald-400 touch-manipulation`}
                                 >
-                                  Assign Driver
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        });
+                                  {/* Header Row: Room + Guest + Pax + Wait Time */}
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <div className="flex items-center gap-1 md:gap-1.5 min-w-0 flex-1">
+                                      <span className="font-semibold text-xs md:text-sm text-gray-800">
+                                        #{ride.roomNumber}
+                                      </span>
+                                      <span className="text-[10px] md:text-xs text-gray-500 truncate">
+                                        {ride.guestName}
+                                      </span>
+                                      <span className="text-[9px] md:text-[10px] text-gray-500 flex-shrink-0">
+                                        {ride.guestCount || 1} pax
+                                      </span>
+                                    </div>
+                                    <span
+                                      className={`text-[9px] md:text-[10px] px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${style.badge}`}
+                                    >
+                                      {waitMinutes}m {waitSeconds}s
+                                    </span>
+                                  </div>
+
+                                  {/* Route Row */}
+                                  <div className="flex items-center gap-1 md:gap-1.5 text-[10px] md:text-xs mt-1 flex-wrap">
+                                    <span className="text-gray-500 flex-shrink-0">From:</span>
+                                    <span className="text-gray-700 font-medium truncate min-w-0">
+                                      {ride.pickup}
+                                    </span>
+                                    <span className="text-gray-400 flex-shrink-0">→</span>
+                                    <span className="text-gray-500 flex-shrink-0">To:</span>
+                                    <span className="text-gray-700 font-medium truncate min-w-0">
+                                      {ride.destination}
+                                    </span>
+                                  </div>
+
+                                  {/* Notes - if exists */}
+                                  {ride.notes && ride.notes.trim() && (
+                                    <div className="text-[9px] md:text-[10px] text-amber-600 truncate mt-1">
+                                      Note: {ride.notes}
+                                    </div>
+                                  )}
+
+                                  {/* Assign Driver Button */}
+                                  <div className="mt-2 pt-2 border-t border-gray-200/60">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation(); // prevent opening detail modal
+                                        setSelectedRideForAssign(ride);
+                                        setShowManualAssignModal(true);
+                                      }}
+                                      className="w-full bg-emerald-600 text-white text-[10px] md:text-xs font-semibold px-2 md:px-3 py-2 md:py-1.5 rounded-md hover:bg-emerald-700 transition min-h-[36px] md:min-h-0 touch-manipulation"
+                                    >
+                                      Assign Driver
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {/* Load More Button for Pending Rides */}
+                            {totalPendingCount > pendingRidesLimit && (
+                              <button
+                                onClick={() => setPendingRidesLimit(prev => prev + 10)}
+                                className="w-full mt-2 py-2 px-3 text-[10px] md:text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-all touch-manipulation min-h-[40px] flex items-center justify-center gap-1"
+                                aria-label={`Load more pending rides. ${totalPendingCount - pendingRidesLimit} remaining`}
+                              >
+                                <span>⬇</span>
+                                <span>Load More ({totalPendingCount - pendingRidesLimit} remaining)</span>
+                              </button>
+                            )}
+                          </>
+                        );
                       })()
                     )}
                   </div>
@@ -3324,188 +3432,226 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             );
                           });
 
-                        return sortedDrivers.map(
-                          ({
-                            driver,
-                            driverRides,
-                            hasActiveRide,
-                            driverStatus,
-                          }) => {
-                            const driverDisplayName =
-                              driver.lastName || "Unknown";
-                            const driverLocation = getDriverLocation(driver);
+                        const totalDriverCount = sortedDrivers.length;
+                        const paginatedDrivers = sortedDrivers.slice(0, driverListLimit);
 
-                            // Status styling
-                            const statusStyles = {
-                              AVAILABLE: {
-                                bg: "bg-green-50",
-                                border: "border-green-300",
-                                badge: "bg-green-500 text-white",
-                                text: "ONLINE",
-                              },
-                              NEAR_COMPLETION: {
-                                bg: "bg-blue-50",
-                                border: "border-blue-300",
-                                badge: "bg-blue-500 text-white",
-                                text: "FINISHING",
-                              },
-                              BUSY: {
-                                bg: "bg-orange-50",
-                                border: "border-orange-300",
-                                badge: "bg-orange-500 text-white",
-                                text: "BUSY",
-                              },
-                              OFFLINE: {
-                                bg: "bg-gray-50",
-                                border: "border-gray-200",
-                                badge: "bg-gray-400 text-white",
-                                text: "OFFLINE",
-                              },
-                            };
-                            const style = statusStyles[driverStatus];
+                        return (
+                          <>
+                            {paginatedDrivers.map(
+                              ({
+                                driver,
+                                driverRides,
+                                hasActiveRide,
+                                driverStatus,
+                              }) => {
+                                const driverDisplayName =
+                                  driver.lastName || "Unknown";
+                                const driverLocation = getDriverLocation(driver);
 
-                            return (
-                              <div
-                                key={driver.id}
-                                className={`${style.bg} ${style.border} p-2 md:p-2.5 rounded-lg border transition-all duration-200`}
-                              >
-                                {/* Driver Header - Compact */}
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-1.5 md:gap-2 min-w-0 flex-1">
-                                    <span className="font-bold text-xs md:text-sm text-gray-800 truncate">
-                                      {driverDisplayName}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-1 md:gap-1.5 flex-shrink-0">
-                                    {hasActiveRide && (
-                                      <span className="text-[9px] md:text-[10px] text-gray-600 font-medium">
-                                        {driverRides.length} job
-                                        {driverRides.length > 1 ? "s" : ""}
-                                      </span>
-                                    )}
-                                    {driverStatus !== "NEAR_COMPLETION" && (
-                                      <span
-                                        className={`text-[8px] md:text-[9px] px-1.5 py-0.5 rounded font-bold ${style.badge}`}
-                                      >
-                                        {style.text}
-                                      </span>
-                                    )}
-                                    {driverStatus === "OFFLINE" && (
-                                      <button
-                                        onClick={() => {
-                                          setSelectedDriverForOnline(driver);
-                                          setShowAdminAuthModal(true);
-                                          setAdminUsername("");
-                                          setAdminPassword("");
-                                          setAdminAuthError("");
-                                        }}
-                                        className="text-[8px] md:text-[9px] px-1.5 md:px-2 py-0.5 rounded font-medium bg-emerald-500 hover:bg-emerald-600 text-white transition-colors min-h-[28px] md:min-h-0 touch-manipulation"
-                                        title="Set driver online (Admin required)"
-                                      >
-                                        Set Online
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
+                                // Status styling
+                                const statusStyles = {
+                                  AVAILABLE: {
+                                    bg: "bg-green-50",
+                                    border: "border-green-300",
+                                    badge: "bg-green-500 text-white",
+                                    text: "ONLINE",
+                                  },
+                                  NEAR_COMPLETION: {
+                                    bg: "bg-blue-50",
+                                    border: "border-blue-300",
+                                    badge: "bg-blue-500 text-white",
+                                    text: "FINISHING",
+                                  },
+                                  BUSY: {
+                                    bg: "bg-orange-50",
+                                    border: "border-orange-300",
+                                    badge: "bg-orange-500 text-white",
+                                    text: "BUSY",
+                                  },
+                                  OFFLINE: {
+                                    bg: "bg-gray-50",
+                                    border: "border-gray-200",
+                                    badge: "bg-gray-400 text-white",
+                                    text: "OFFLINE",
+                                  },
+                                };
+                                const style = statusStyles[driverStatus];
 
-                                {/* Active Rides - Compact List */}
-                                {hasActiveRide && (
-                                  <div className="mt-1.5 space-y-1">
-                                    {driverRides.map((ride, idx) => {
-                                      const tripProgress =
-                                        ride.status === BuggyStatus.ON_TRIP &&
-                                          ride.pickedUpAt
-                                          ? Math.floor(
-                                            (Date.now() - ride.pickedUpAt) /
-                                            60000,
-                                          )
-                                          : null;
-                                      const guestInfo =
-                                        guestInfoCache[ride.roomNumber];
-
-                                      return (
-                                        <div
-                                          key={ride.id || idx}
-                                          className="bg-white/60 rounded px-2 md:px-2.5 py-1.5 border border-gray-200/50"
+                                return (
+                                  <div
+                                    key={driver.id}
+                                    className={`${style.bg} ${style.border} p-2 md:p-2.5 rounded-lg border transition-all duration-200`}
+                                  >
+                                    {/* Driver Header - Compact */}
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-1.5 md:gap-2 min-w-0 flex-1">
+                                        <span className="font-bold text-xs md:text-sm text-gray-800 truncate">
+                                          {driverDisplayName}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1 md:gap-1.5 flex-shrink-0">
+                                        {hasActiveRide && (
+                                          <span className="text-[9px] md:text-[10px] text-gray-600 font-medium">
+                                            {driverRides.length} job
+                                            {driverRides.length > 1 ? "s" : ""}
+                                          </span>
+                                        )}
+                                        {/* Enhanced Status Badge with Icon and Animation */}
+                                        <span
+                                          className={`text-[8px] md:text-[9px] px-1.5 md:px-2 py-0.5 md:py-1 rounded font-bold ${style.badge} flex items-center gap-1 transition-all`}
+                                          role="status"
+                                          aria-label={`Driver status: ${style.text}`}
                                         >
-                                          <div className="flex items-center justify-between gap-2">
-                                            <div className="flex-1 min-w-0">
-                                              {/* Room + Status + Route inline */}
-                                              <div className="flex items-center gap-1 md:gap-1.5 text-[10px] md:text-xs flex-wrap">
-                                                <span className="font-semibold text-gray-800">
-                                                  #{ride.roomNumber}
-                                                </span>
-                                                {guestInfo && (
-                                                  <span className="text-gray-500 truncate">
-                                                    {guestInfo.last_name}
-                                                  </span>
-                                                )}
-                                                <span className="text-[8px] md:text-[9px] text-gray-500">
-                                                  {ride.guestCount || 1} pax
-                                                </span>
-                                                <span
-                                                  className={`text-[8px] md:text-[9px] px-1 py-0.5 rounded font-bold ${ride.status ===
+                                          {/* Status Icon */}
+                                          {driverStatus === "AVAILABLE" && (
+                                            <>
+                                              <span className="relative flex h-2 w-2">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-300 opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-200"></span>
+                                              </span>
+                                              <CheckCircle size={10} className="hidden md:inline" aria-hidden="true" />
+                                            </>
+                                          )}
+                                          {driverStatus === "NEAR_COMPLETION" && (
+                                            <Loader2 size={10} className="animate-spin" aria-hidden="true" />
+                                          )}
+                                          {driverStatus === "BUSY" && (
+                                            <Car size={10} aria-hidden="true" />
+                                          )}
+                                          {driverStatus === "OFFLINE" && (
+                                            <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" aria-hidden="true"></span>
+                                          )}
+                                          <span>{style.text}</span>
+                                        </span>
+                                        {driverStatus === "OFFLINE" && (
+                                          <button
+                                            onClick={() => {
+                                              setSelectedDriverForOnline(driver);
+                                              setShowAdminAuthModal(true);
+                                              setAdminUsername("");
+                                              setAdminPassword("");
+                                              setAdminAuthError("");
+                                            }}
+                                            className="text-[8px] md:text-[9px] px-1.5 md:px-2 py-0.5 rounded font-medium bg-emerald-500 hover:bg-emerald-600 text-white transition-colors min-h-[28px] md:min-h-0 touch-manipulation"
+                                            title="Set driver online (Admin required)"
+                                          >
+                                            Set Online
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Active Rides - Compact List */}
+                                    {hasActiveRide && (
+                                      <div className="mt-1.5 space-y-1">
+                                        {driverRides.map((ride, idx) => {
+                                          const tripProgress =
+                                            ride.status === BuggyStatus.ON_TRIP &&
+                                              ride.pickedUpAt
+                                              ? Math.floor(
+                                                (Date.now() - ride.pickedUpAt) /
+                                                60000,
+                                              )
+                                              : null;
+                                          const guestInfo =
+                                            guestInfoCache[ride.roomNumber];
+
+                                          return (
+                                            <div
+                                              key={ride.id || idx}
+                                              className="bg-white/60 rounded px-2 md:px-2.5 py-1.5 border border-gray-200/50"
+                                            >
+                                              <div className="flex items-center justify-between gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                  {/* Room + Status + Route inline */}
+                                                  <div className="flex items-center gap-1 md:gap-1.5 text-[10px] md:text-xs flex-wrap">
+                                                    <span className="font-semibold text-gray-800">
+                                                      #{ride.roomNumber}
+                                                    </span>
+                                                    {guestInfo && (
+                                                      <span className="text-gray-500 truncate">
+                                                        {guestInfo.last_name}
+                                                      </span>
+                                                    )}
+                                                    <span className="text-[8px] md:text-[9px] text-gray-500">
+                                                      {ride.guestCount || 1} pax
+                                                    </span>
+                                                    <span
+                                                      className={`text-[8px] md:text-[9px] px-1 py-0.5 rounded font-bold ${ride.status ===
+                                                        BuggyStatus.ON_TRIP
+                                                        ? "bg-emerald-100 text-emerald-700"
+                                                        : ride.status ===
+                                                          BuggyStatus.ARRIVING
+                                                          ? "bg-blue-100 text-blue-700"
+                                                          : "bg-amber-100 text-amber-700"
+                                                        }`}
+                                                    >
+                                                      {ride.status ===
+                                                        BuggyStatus.ON_TRIP
+                                                        ? "ON-TRIP"
+                                                        : ride.status ===
+                                                          BuggyStatus.ARRIVING
+                                                          ? "ARRIVING"
+                                                          : "ASSIGNED"}
+                                                    </span>
+                                                    {tripProgress !== null && (
+                                                      <span className="text-[8px] md:text-[9px] text-gray-500">
+                                                        {tripProgress}m
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                  {/* Route */}
+                                                  <div className="text-[9px] md:text-[10px] text-gray-600 truncate mt-0.5">
+                                                    {ride.pickup} →{" "}
+                                                    {ride.destination}
+                                                  </div>
+                                                </div>
+                                                {/* Action Button */}
+                                                <button
+                                                  onClick={() =>
+                                                    ride.status ===
+                                                      BuggyStatus.ON_TRIP
+                                                      ? handleEndRide(ride.id)
+                                                      : handlePickupGuest(ride.id)
+                                                  }
+                                                  className={`text-[9px] md:text-[10px] px-2 py-1.5 md:py-1 rounded font-medium transition-colors flex-shrink-0 flex items-center gap-1 min-h-[32px] md:min-h-0 touch-manipulation ${ride.status ===
                                                     BuggyStatus.ON_TRIP
-                                                    ? "bg-emerald-100 text-emerald-700"
-                                                    : ride.status ===
-                                                      BuggyStatus.ARRIVING
-                                                      ? "bg-blue-100 text-blue-700"
-                                                      : "bg-amber-100 text-amber-700"
+                                                    ? "bg-emerald-500 hover:bg-emerald-600 text-white"
+                                                    : "bg-blue-500 hover:bg-blue-600 text-white"
                                                     }`}
                                                 >
                                                   {ride.status ===
-                                                    BuggyStatus.ON_TRIP
-                                                    ? "ON-TRIP"
-                                                    : ride.status ===
-                                                      BuggyStatus.ARRIVING
-                                                      ? "ARRIVING"
-                                                      : "ASSIGNED"}
-                                                </span>
-                                                {tripProgress !== null && (
-                                                  <span className="text-[8px] md:text-[9px] text-gray-500">
-                                                    {tripProgress}m
-                                                  </span>
-                                                )}
-                                              </div>
-                                              {/* Route */}
-                                              <div className="text-[9px] md:text-[10px] text-gray-600 truncate mt-0.5">
-                                                {ride.pickup} →{" "}
-                                                {ride.destination}
+                                                    BuggyStatus.ON_TRIP ? (
+                                                    <>
+                                                      <CheckCircle size={12} />
+                                                      <span>Completed</span>
+                                                    </>
+                                                  ) : (
+                                                    "Pickup"
+                                                  )}
+                                                </button>
                                               </div>
                                             </div>
-                                            {/* Action Button */}
-                                            <button
-                                              onClick={() =>
-                                                ride.status ===
-                                                  BuggyStatus.ON_TRIP
-                                                  ? handleEndRide(ride.id)
-                                                  : handlePickupGuest(ride.id)
-                                              }
-                                              className={`text-[9px] md:text-[10px] px-2 py-1.5 md:py-1 rounded font-medium transition-colors flex-shrink-0 flex items-center gap-1 min-h-[32px] md:min-h-0 touch-manipulation ${ride.status ===
-                                                BuggyStatus.ON_TRIP
-                                                ? "bg-emerald-500 hover:bg-emerald-600 text-white"
-                                                : "bg-blue-500 hover:bg-blue-600 text-white"
-                                                }`}
-                                            >
-                                              {ride.status ===
-                                                BuggyStatus.ON_TRIP ? (
-                                                <>
-                                                  <CheckCircle size={12} />
-                                                  <span>Completed</span>
-                                                </>
-                                              ) : (
-                                                "Pickup"
-                                              )}
-                                            </button>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
+                                          );
+                                        })}
+                                      </div>
+                                    )}
                                   </div>
-                                )}
-                              </div>
-                            );
-                          },
+                                );
+                              },
+                            )}
+                            {/* Load More Button for Driver Fleet */}
+                            {totalDriverCount > driverListLimit && (
+                              <button
+                                onClick={() => setDriverListLimit(prev => prev + 15)}
+                                className="w-full mt-2 py-2 px-3 text-[10px] md:text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-all touch-manipulation min-h-[40px] flex items-center justify-center gap-1"
+                                aria-label={`Load more drivers. ${totalDriverCount - driverListLimit} remaining`}
+                              >
+                                <span>⬇</span>
+                                <span>Load More ({totalDriverCount - driverListLimit} remaining)</span>
+                              </button>
+                            )}
+                          </>
                         );
                       })()}
                     </div>
@@ -4656,7 +4802,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
-                        Guest Name
+                        Guest Name <span className="text-gray-400 font-normal normal-case">(optional)</span>
                       </label>
                       <input
                         type="text"
@@ -4886,7 +5032,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       </div>
 
       {/* Ride Detail Modal */}
-      {showDetailRequestModal &&
+      {
+        showDetailRequestModal &&
         selectedRideForDetail &&
         (() => {
           const renderRouteSteps = () => {
@@ -5136,43 +5283,85 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               </div>
             </div>
           );
-        })()}
+        })()
+      }
       {/* Manual Assign Driver Modal */}
-      {showManualAssignModal && selectedRideForAssign && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => setShowManualAssignModal(false)}
-        >
+      {
+        showManualAssignModal && selectedRideForAssign && (
           <div
-            className="backdrop-blur-xl bg-white rounded-2xl shadow-2xl w-[95vw] sm:w-full max-w-2xl max-h-[90vh] overflow-y-auto border-2 border-gray-200"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowManualAssignModal(false)}
           >
-            <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 p-4 md:p-5 flex justify-between items-center z-10">
-              <div className="min-w-0 flex-1 pr-2">
-                <h3 className="font-bold text-base md:text-lg text-gray-900">
-                  Assign Driver
-                </h3>
-                <p className="text-xs md:text-sm text-gray-600 mt-1 truncate">
-                  {selectedRideForAssign.guestName} •{" "}
-                  {selectedRideForAssign.pickup} →{" "}
-                  {selectedRideForAssign.destination}
-                </p>
+            <div
+              className="backdrop-blur-xl bg-white rounded-2xl shadow-2xl w-[95vw] sm:w-full max-w-2xl max-h-[90vh] overflow-y-auto border-2 border-gray-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 p-4 md:p-5 flex justify-between items-center z-10">
+                <div className="min-w-0 flex-1 pr-2">
+                  <h3 className="font-bold text-base md:text-lg text-gray-900">
+                    Assign Driver
+                  </h3>
+                  <p className="text-xs md:text-sm text-gray-600 mt-1 truncate">
+                    {selectedRideForAssign.guestName} •{" "}
+                    {selectedRideForAssign.pickup} →{" "}
+                    {selectedRideForAssign.destination}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowManualAssignModal(false)}
+                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center flex-shrink-0"
+                >
+                  <X size={20} />
+                </button>
               </div>
-              <button
-                onClick={() => setShowManualAssignModal(false)}
-                className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center flex-shrink-0"
-              >
-                <X size={20} />
-              </button>
-            </div>
 
-            <div className="p-4 md:p-5">
-              {(() => {
-                const onlineDrivers = users
-                  .filter((u) => u.role === UserRole.DRIVER)
-                  .filter((driver) => {
+              <div className="p-4 md:p-5">
+                {(() => {
+                  const onlineDrivers = users
+                    .filter((u) => u.role === UserRole.DRIVER)
+                    .filter((driver) => {
+                      const driverIdStr = driver.id ? String(driver.id) : "";
+                      const hasActiveRide = rides.some((r) => {
+                        const rideDriverId = r.driverId ? String(r.driverId) : "";
+                        return (
+                          rideDriverId === driverIdStr &&
+                          (r.status === BuggyStatus.ASSIGNED ||
+                            r.status === BuggyStatus.ARRIVING ||
+                            r.status === BuggyStatus.ON_TRIP)
+                        );
+                      });
+                      if (hasActiveRide) return true;
+                      if (driver.updatedAt) {
+                        const timeSinceUpdate = Date.now() - driver.updatedAt;
+                        if (timeSinceUpdate < 30000) return true;
+                      }
+                      return false;
+                    });
+
+                  const handleAssignDriver = async (driver: User) => {
+                    try {
+                      await updateRideStatus(
+                        selectedRideForAssign.id,
+                        BuggyStatus.ARRIVING,
+                        driver.id,
+                        5,
+                      );
+                      const refreshedRides = await getRides();
+                      setRides(refreshedRides);
+                      setShowManualAssignModal(false);
+                      setSelectedRideForAssign(null);
+                      alert(
+                        `Successfully assigned driver ${driver.lastName} to Room ${selectedRideForAssign.roomNumber}`,
+                      );
+                    } catch (error) {
+                      console.error("Failed to assign driver:", error);
+                      alert("Failed to assign driver. Please try again.");
+                    }
+                  };
+
+                  const getDriverStatus = (driver: User) => {
                     const driverIdStr = driver.id ? String(driver.id) : "";
-                    const hasActiveRide = rides.some((r) => {
+                    const activeRide = rides.find((r) => {
                       const rideDriverId = r.driverId ? String(r.driverId) : "";
                       return (
                         rideDriverId === driverIdStr &&
@@ -5181,627 +5370,596 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                           r.status === BuggyStatus.ON_TRIP)
                       );
                     });
-                    if (hasActiveRide) return true;
-                    if (driver.updatedAt) {
-                      const timeSinceUpdate = Date.now() - driver.updatedAt;
-                      if (timeSinceUpdate < 30000) return true;
+                    if (activeRide) {
+                      return {
+                        status: "busy",
+                        text: `On Trip: Room ${activeRide.roomNumber}`,
+                        color: "bg-orange-100 text-orange-700",
+                      };
                     }
-                    return false;
-                  });
-
-                const handleAssignDriver = async (driver: User) => {
-                  try {
-                    await updateRideStatus(
-                      selectedRideForAssign.id,
-                      BuggyStatus.ARRIVING,
-                      driver.id,
-                      5,
-                    );
-                    const refreshedRides = await getRides();
-                    setRides(refreshedRides);
-                    setShowManualAssignModal(false);
-                    setSelectedRideForAssign(null);
-                    alert(
-                      `Successfully assigned driver ${driver.lastName} to Room ${selectedRideForAssign.roomNumber}`,
-                    );
-                  } catch (error) {
-                    console.error("Failed to assign driver:", error);
-                    alert("Failed to assign driver. Please try again.");
-                  }
-                };
-
-                const getDriverStatus = (driver: User) => {
-                  const driverIdStr = driver.id ? String(driver.id) : "";
-                  const activeRide = rides.find((r) => {
-                    const rideDriverId = r.driverId ? String(r.driverId) : "";
-                    return (
-                      rideDriverId === driverIdStr &&
-                      (r.status === BuggyStatus.ASSIGNED ||
-                        r.status === BuggyStatus.ARRIVING ||
-                        r.status === BuggyStatus.ON_TRIP)
-                    );
-                  });
-                  if (activeRide) {
                     return {
-                      status: "busy",
-                      text: `On Trip: Room ${activeRide.roomNumber}`,
-                      color: "bg-orange-100 text-orange-700",
+                      status: "available",
+                      text: "Available",
+                      color: "bg-emerald-100 text-emerald-700",
                     };
-                  }
-                  return {
-                    status: "available",
-                    text: "Available",
-                    color: "bg-emerald-100 text-emerald-700",
                   };
-                };
 
-                return (
-                  <div className="space-y-4">
-                    {/* Online Drivers */}
-                    {onlineDrivers.length > 0 ? (
-                      <div>
-                        <h4 className="font-bold text-sm text-gray-700 mb-3 flex items-center gap-2">
-                          <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                          Online Drivers ({onlineDrivers.length})
-                        </h4>
-                        <div className="grid grid-cols-1 gap-2">
-                          {onlineDrivers.map((driver) => {
-                            const driverStatus = getDriverStatus(driver);
-                            return (
-                              <button
-                                key={driver.id}
-                                onClick={() => handleAssignDriver(driver)}
-                                disabled={driverStatus.status === "busy"}
-                                className={`p-3 md:p-4 rounded-lg border-2 transition-all text-left min-h-[60px] md:min-h-0 touch-manipulation ${driverStatus.status === "busy"
-                                  ? "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
-                                  : "border-emerald-200 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100 cursor-pointer"
-                                  }`}
-                              >
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="font-bold text-sm md:text-base text-gray-900">
-                                        {driver.lastName}
-                                      </span>
-                                      <span
-                                        className={`text-[10px] md:text-xs px-2 py-0.5 rounded font-semibold ${driverStatus.color}`}
-                                      >
-                                        {driverStatus.text}
-                                      </span>
+                  return (
+                    <div className="space-y-4">
+                      {/* Online Drivers */}
+                      {onlineDrivers.length > 0 ? (
+                        <div>
+                          <h4 className="font-bold text-sm text-gray-700 mb-3 flex items-center gap-2">
+                            <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                            Online Drivers ({onlineDrivers.length})
+                          </h4>
+                          <div className="grid grid-cols-1 gap-2">
+                            {onlineDrivers.map((driver) => {
+                              const driverStatus = getDriverStatus(driver);
+                              return (
+                                <button
+                                  key={driver.id}
+                                  onClick={() => handleAssignDriver(driver)}
+                                  disabled={driverStatus.status === "busy"}
+                                  className={`p-3 md:p-4 rounded-lg border-2 transition-all text-left min-h-[60px] md:min-h-0 touch-manipulation ${driverStatus.status === "busy"
+                                    ? "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
+                                    : "border-emerald-200 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100 cursor-pointer"
+                                    }`}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-bold text-sm md:text-base text-gray-900">
+                                          {driver.lastName}
+                                        </span>
+                                        <span
+                                          className={`text-[10px] md:text-xs px-2 py-0.5 rounded font-semibold ${driverStatus.color}`}
+                                        >
+                                          {driverStatus.text}
+                                        </span>
+                                      </div>
                                     </div>
+                                    {driverStatus.status === "available" && (
+                                      <div className="ml-2 flex-shrink-0">
+                                        <span className="text-emerald-600 font-semibold text-xs md:text-sm">
+                                          Assign →
+                                        </span>
+                                      </div>
+                                    )}
                                   </div>
-                                  {driverStatus.status === "available" && (
-                                    <div className="ml-2 flex-shrink-0">
-                                      <span className="text-emerald-600 font-semibold text-xs md:text-sm">
-                                        Assign →
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              </button>
-                            );
-                          })}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-gray-500">
-                        <p className="font-semibold">
-                          No online drivers available
-                        </p>
-                        <p className="text-sm mt-1">
-                          Please wait for drivers to come online.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <p className="font-semibold">
+                            No online drivers available
+                          </p>
+                          <p className="text-sm mt-1">
+                            Please wait for drivers to come online.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Reports View */}
-      {viewMode === "REPORTS" && (
-        <div className="space-y-6">
-          {/* Filters */}
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Period</label>
-                <select
-                  value={reportPeriod}
-                  onChange={(e) => {
-                    setReportPeriod(e.target.value as any);
-                    if (e.target.value !== 'custom') {
-                      setReportStartDate('');
-                      setReportEndDate('');
-                    }
-                  }}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-                >
-                  <option value="day">Today</option>
-                  <option value="week">Last 7 Days</option>
-                  <option value="month">This Month</option>
-                  <option value="custom">Custom Range</option>
-                </select>
-              </div>
-
-              {reportPeriod === 'custom' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Start Date</label>
-                    <input
-                      type="date"
-                      value={reportStartDate}
-                      onChange={(e) => setReportStartDate(e.target.value)}
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">End Date</label>
-                    <input
-                      type="date"
-                      value={reportEndDate}
-                      onChange={(e) => setReportEndDate(e.target.value)}
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-                    />
-                  </div>
-                </>
-              )}
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Driver (Optional)</label>
-                <select
-                  value={reportDriverId}
-                  onChange={(e) => setReportDriverId(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-                >
-                  <option value="">All Drivers</option>
-                  {users
-                    .filter(u => u.role === UserRole.DRIVER)
-                    .map(driver => (
-                      <option key={driver.id} value={driver.id}>
-                        {driver.firstName} {driver.lastName} ({driver.roomNumber})
-                      </option>
-                    ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={async () => {
-                  setIsLoadingReports(true);
-                  try {
-                    const params: any = {};
-                    if (reportPeriod === 'custom') {
-                      if (reportStartDate) params.startDate = reportStartDate;
-                      if (reportEndDate) params.endDate = reportEndDate;
-                    } else {
-                      params.period = reportPeriod;
-                    }
-                    if (reportDriverId) params.driverId = reportDriverId;
-
-                    const [ridesData, statsData] = await Promise.all([
-                      getHistoricalRideReports(params),
-                      getReportStatistics(params)
-                    ]);
-                    setReportRides(ridesData);
-                    setReportStats(statsData);
-                  } catch (error) {
-                    console.error('Failed to load reports:', error);
-                  } finally {
-                    setIsLoadingReports(false);
-                  }
-                }}
-                className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm font-semibold flex items-center gap-2"
-              >
-                <RefreshCw size={14} className={isLoadingReports ? 'animate-spin' : ''} />
-                {isLoadingReports ? 'Loading...' : 'Refresh'}
-              </button>
-
-              {reportRides.length > 0 && (
-                <button
-                  onClick={() => {
-                    const periodLabel = reportPeriod === 'day' ? 'today' : reportPeriod === 'week' ? 'last7days' : reportPeriod === 'month' ? 'thismonth' : 'custom';
-                    const filename = `ride-reports-${periodLabel}-${new Date().toISOString().split('T')[0]}.csv`;
-                    exportRidesToCSV(reportRides, filename);
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold flex items-center gap-2"
-                >
-                  <Download size={14} />
-                  Export CSV
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Statistics Cards */}
-          {reportStats && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                <div className="text-sm text-gray-500 mb-1">Total Rides</div>
-                <div className="text-2xl font-bold text-emerald-600">{reportStats.totalRides}</div>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                <div className="text-sm text-gray-500 mb-1">Total Guests</div>
-                <div className="text-2xl font-bold text-blue-600">{reportStats.totalGuests}</div>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                <div className="text-sm text-gray-500 mb-1">Average Rating</div>
-                <div className="text-2xl font-bold text-yellow-600">
-                  {reportStats.avgRating > 0 ? reportStats.avgRating.toFixed(1) : 'N/A'}
-                  {reportStats.avgRating > 0 && <Star size={16} className="inline ml-1 text-yellow-400" />}
-                </div>
-                <div className="text-xs text-gray-400 mt-1">({reportStats.totalRatings} ratings)</div>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                <div className="text-sm text-gray-500 mb-1">Avg Response Time</div>
-                <div className="text-2xl font-bold text-purple-600">
-                  {reportStats.avgResponseTime > 0
-                    ? `${Math.round(reportStats.avgResponseTime / 1000 / 60)} min`
-                    : 'N/A'}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Rides Table */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="font-semibold text-gray-800">Ride History</h3>
-              <span className="text-sm text-gray-500">{reportRides.length} rides</span>
-            </div>
-
-            {isLoadingReports ? (
-              <div className="p-10 text-center">
-                <Loader2 size={32} className="mx-auto mb-4 text-emerald-600 animate-spin" />
-                <p className="text-gray-500">Loading reports...</p>
-              </div>
-            ) : reportRides.length === 0 ? (
-              <div className="p-10 text-center text-gray-400">
-                <BarChart3 size={48} className="mx-auto mb-4 opacity-20" />
-                <p>No rides found for the selected period.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">ID</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Guest</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Room</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Route</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Driver</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Requested</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Completed</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Rating</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {reportRides.map((ride) => {
-                      const driver = users.find(u => u.id === ride.driverId);
-                      return (
-                        <tr key={ride.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-600">#{ride.id}</td>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{ride.guestName}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{ride.roomNumber}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            <div className="flex items-center gap-1">
-                              <span className="text-emerald-600">{ride.pickup}</span>
-                              <ArrowRight size={12} className="text-gray-400" />
-                              <span className="text-blue-600">{ride.destination}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {driver ? `${driver.firstName} ${driver.lastName}` : `Driver ${ride.driverId || 'N/A'}`}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {ride.timestamp ? new Date(ride.timestamp).toLocaleString() : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {ride.completedAt ? new Date(ride.completedAt).toLocaleString() : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm">
-                            {ride.rating ? (
-                              <div className="flex items-center gap-1">
-                                <Star size={14} className="text-yellow-400 fill-yellow-400" />
-                                <span className="font-semibold">{ride.rating}</span>
-                              </div>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Driver Performance Analytics View */}
-      {viewMode === "PERFORMANCE" && (
-        <div className="space-y-6">
-          {/* Filters */}
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Period</label>
-                <select
-                  value={performancePeriod}
-                  onChange={(e) => setPerformancePeriod(e.target.value as any)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-                >
-                  <option value="day">Today</option>
-                  <option value="week">Last 7 Days</option>
-                  <option value="month">This Month</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Driver (Optional)</label>
-                <select
-                  value={performanceDriverId}
-                  onChange={(e) => setPerformanceDriverId(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
-                >
-                  <option value="">All Drivers</option>
-                  {users
-                    .filter(u => u.role === UserRole.DRIVER)
-                    .map(driver => (
-                      <option key={driver.id} value={driver.id}>
-                        {driver.firstName} {driver.lastName} ({driver.roomNumber})
-                      </option>
-                    ))}
-                </select>
-              </div>
-            </div>
-
-            <button
-              onClick={async () => {
-                setIsLoadingPerformance(true);
-                try {
-                  const params: any = { period: performancePeriod };
-                  if (performanceDriverId) params.driverId = performanceDriverId;
-                  const stats = await getDriverPerformanceStats(params);
-                  setDriverPerformanceStats(stats);
-                } catch (error) {
-                  console.error('Failed to load performance stats:', error);
-                } finally {
-                  setIsLoadingPerformance(false);
-                }
-              }}
-              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm font-semibold flex items-center gap-2"
-            >
-              <RefreshCw size={14} className={isLoadingPerformance ? 'animate-spin' : ''} />
-              {isLoadingPerformance ? 'Loading...' : 'Refresh'}
-            </button>
-          </div>
-
-          {/* Performance Stats Table */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                <TrendingUp size={20} className="text-indigo-600" />
-                Driver Performance Analytics
-              </h3>
-              <span className="text-sm text-gray-500">{driverPerformanceStats.length} drivers</span>
-            </div>
-
-            {isLoadingPerformance ? (
-              <div className="p-10 text-center">
-                <Loader2 size={32} className="mx-auto mb-4 text-indigo-600 animate-spin" />
-                <p className="text-gray-500">Loading performance data...</p>
-              </div>
-            ) : driverPerformanceStats.length === 0 ? (
-              <div className="p-10 text-center text-gray-400">
-                <Award size={48} className="mx-auto mb-4 opacity-20" />
-                <p>No performance data found for the selected period.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Rank</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Driver</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Total Rides</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Avg Rating</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Avg Response</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Avg Trip Time</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Performance Score</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {driverPerformanceStats.map((stats, index) => {
-                      const rank = index + 1;
-                      const scoreColor = stats.performance_score >= 80 ? 'text-green-600' :
-                        stats.performance_score >= 60 ? 'text-yellow-600' : 'text-red-600';
-                      return (
-                        <tr key={stats.driver_id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm">
-                            {rank === 1 && <Award size={16} className="inline text-yellow-500 mr-1" />}
-                            <span className="font-bold text-gray-700">#{rank}</span>
-                          </td>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{stats.driver_name}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{stats.total_rides}</td>
-                          <td className="px-4 py-3 text-sm">
-                            {stats.avg_rating > 0 ? (
-                              <div className="flex items-center gap-1">
-                                <Star size={14} className="text-yellow-400 fill-yellow-400" />
-                                <span className="font-semibold">{stats.avg_rating.toFixed(1)}</span>
-                                <span className="text-xs text-gray-400">({stats.rating_count})</span>
-                              </div>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {stats.avg_response_time > 0
-                              ? `${Math.round(stats.avg_response_time / 1000 / 60)} min`
-                              : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {stats.avg_trip_time > 0
-                              ? `${Math.round(stats.avg_trip_time / 1000 / 60)} min`
-                              : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm">
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 bg-gray-200 rounded-full h-2">
-                                <div
-                                  className={`h-2 rounded-full ${stats.performance_score >= 80 ? 'bg-green-500' : stats.performance_score >= 60 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                                  style={{ width: `${Math.min(stats.performance_score, 100)}%` }}
-                                />
-                              </div>
-                              <span className={`font-bold ${scoreColor} min-w-[50px]`}>
-                                {stats.performance_score.toFixed(1)}
-                              </span>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Admin Auth Modal for Setting Driver Online */}
-      {showAdminAuthModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col">
-            <div className="p-4 md:p-5 border-b flex justify-between items-center">
-              <h3 className="font-bold text-base md:text-lg text-gray-900">
-                Admin Authentication Required
-              </h3>
-              <button
-                onClick={() => {
-                  setShowAdminAuthModal(false);
-                  setSelectedDriverForOnline(null);
-                  setAdminUsername("");
-                  setAdminPassword("");
-                  setAdminAuthError("");
-                }}
-                className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center flex-shrink-0"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-4 md:p-6 space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-800">
-                  <strong>Setting driver online:</strong>{" "}
-                  {selectedDriverForOnline?.lastName || "Unknown"}
-                </p>
-                <p className="text-xs text-blue-600 mt-1">
-                  Admin credentials required to set driver online status.
-                </p>
-              </div>
-
-              {adminAuthError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-sm text-red-800">{adminAuthError}</p>
-                </div>
-              )}
-
-              <div className="space-y-3">
+      {
+        viewMode === "REPORTS" && (
+          <div className="space-y-6">
+            {/* Filters */}
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Admin Username
-                  </label>
-                  <input
-                    type="text"
-                    value={adminUsername}
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Period</label>
+                  <select
+                    value={reportPeriod}
                     onChange={(e) => {
-                      setAdminUsername(e.target.value);
-                      setAdminAuthError("");
-                    }}
-                    placeholder="Enter admin username"
-                    className="w-full px-3 py-3 md:py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-sm min-h-[44px] md:min-h-0"
-                    disabled={isAuthenticating}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Admin Password
-                  </label>
-                  <input
-                    type="password"
-                    value={adminPassword}
-                    onChange={(e) => {
-                      setAdminPassword(e.target.value);
-                      setAdminAuthError("");
-                    }}
-                    placeholder="Enter admin password"
-                    className="w-full px-3 py-3 md:py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-sm min-h-[44px] md:min-h-0"
-                    disabled={isAuthenticating}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !isAuthenticating) {
-                        handleAdminAuth();
+                      setReportPeriod(e.target.value as any);
+                      if (e.target.value !== 'custom') {
+                        setReportStartDate('');
+                        setReportEndDate('');
                       }
                     }}
-                  />
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                  >
+                    <option value="day">Today</option>
+                    <option value="week">Last 7 Days</option>
+                    <option value="month">This Month</option>
+                    <option value="custom">Custom Range</option>
+                  </select>
                 </div>
+
+                {reportPeriod === 'custom' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Start Date</label>
+                      <input
+                        type="date"
+                        value={reportStartDate}
+                        onChange={(e) => setReportStartDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">End Date</label>
+                      <input
+                        type="date"
+                        value={reportEndDate}
+                        onChange={(e) => setReportEndDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Driver (Optional)</label>
+                  <select
+                    value={reportDriverId}
+                    onChange={(e) => setReportDriverId(e.target.value)}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                  >
+                    <option value="">All Drivers</option>
+                    {users
+                      .filter(u => u.role === UserRole.DRIVER)
+                      .map(driver => (
+                        <option key={driver.id} value={driver.id}>
+                          {driver.firstName} {driver.lastName} ({driver.roomNumber})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    setIsLoadingReports(true);
+                    try {
+                      const params: any = {};
+                      if (reportPeriod === 'custom') {
+                        if (reportStartDate) params.startDate = reportStartDate;
+                        if (reportEndDate) params.endDate = reportEndDate;
+                      } else {
+                        params.period = reportPeriod;
+                      }
+                      if (reportDriverId) params.driverId = reportDriverId;
+
+                      const [ridesData, statsData] = await Promise.all([
+                        getHistoricalRideReports(params),
+                        getReportStatistics(params)
+                      ]);
+                      setReportRides(ridesData);
+                      setReportStats(statsData);
+                    } catch (error) {
+                      console.error('Failed to load reports:', error);
+                    } finally {
+                      setIsLoadingReports(false);
+                    }
+                  }}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm font-semibold flex items-center gap-2"
+                >
+                  <RefreshCw size={14} className={isLoadingReports ? 'animate-spin' : ''} />
+                  {isLoadingReports ? 'Loading...' : 'Refresh'}
+                </button>
+
+                {reportRides.length > 0 && (
+                  <button
+                    onClick={() => {
+                      const periodLabel = reportPeriod === 'day' ? 'today' : reportPeriod === 'week' ? 'last7days' : reportPeriod === 'month' ? 'thismonth' : 'custom';
+                      const filename = `ride-reports-${periodLabel}-${new Date().toISOString().split('T')[0]}.csv`;
+                      exportRidesToCSV(reportRides, filename);
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold flex items-center gap-2"
+                  >
+                    <Download size={14} />
+                    Export CSV
+                  </button>
+                )}
               </div>
             </div>
 
-            <div className="p-4 border-t bg-gray-50 flex flex-col sm:flex-row justify-end gap-3 rounded-b-2xl">
-              <button
-                onClick={() => {
-                  setShowAdminAuthModal(false);
-                  setSelectedDriverForOnline(null);
-                  setAdminUsername("");
-                  setAdminPassword("");
-                  setAdminAuthError("");
-                }}
-                className="w-full sm:w-auto px-4 py-3 md:py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
-                disabled={isAuthenticating}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAdminAuth}
-                disabled={isAuthenticating || !adminUsername || !adminPassword}
-                className="w-full sm:w-auto px-4 py-3 md:py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
-              >
-                {isAuthenticating ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Authenticating...
-                  </>
-                ) : (
-                  "Authenticate & Set Online"
-                )}
-              </button>
+            {/* Statistics Cards */}
+            {reportStats && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                  <div className="text-sm text-gray-500 mb-1">Total Rides</div>
+                  <div className="text-2xl font-bold text-emerald-600">{reportStats.totalRides}</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                  <div className="text-sm text-gray-500 mb-1">Total Guests</div>
+                  <div className="text-2xl font-bold text-blue-600">{reportStats.totalGuests}</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                  <div className="text-sm text-gray-500 mb-1">Average Rating</div>
+                  <div className="text-2xl font-bold text-yellow-600">
+                    {reportStats.avgRating > 0 ? reportStats.avgRating.toFixed(1) : 'N/A'}
+                    {reportStats.avgRating > 0 && <Star size={16} className="inline ml-1 text-yellow-400" />}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">({reportStats.totalRatings} ratings)</div>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                  <div className="text-sm text-gray-500 mb-1">Avg Response Time</div>
+                  <div className="text-2xl font-bold text-purple-600">
+                    {reportStats.avgResponseTime > 0
+                      ? `${Math.round(reportStats.avgResponseTime / 1000 / 60)} min`
+                      : 'N/A'}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Rides Table */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 className="font-semibold text-gray-800">Ride History</h3>
+                <span className="text-sm text-gray-500">{reportRides.length} rides</span>
+              </div>
+
+              {isLoadingReports ? (
+                <div className="p-10 text-center">
+                  <Loader2 size={32} className="mx-auto mb-4 text-emerald-600 animate-spin" />
+                  <p className="text-gray-500">Loading reports...</p>
+                </div>
+              ) : reportRides.length === 0 ? (
+                <div className="p-10 text-center text-gray-400">
+                  <BarChart3 size={48} className="mx-auto mb-4 opacity-20" />
+                  <p>No rides found for the selected period.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">ID</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Guest</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Room</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Route</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Driver</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Requested</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Completed</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Rating</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {reportRides.map((ride) => {
+                        const driver = users.find(u => u.id === ride.driverId);
+                        return (
+                          <tr key={ride.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm text-gray-600">#{ride.id}</td>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{ride.guestName}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{ride.roomNumber}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              <div className="flex items-center gap-1">
+                                <span className="text-emerald-600">{ride.pickup}</span>
+                                <ArrowRight size={12} className="text-gray-400" />
+                                <span className="text-blue-600">{ride.destination}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              {driver ? `${driver.firstName} ${driver.lastName}` : `Driver ${ride.driverId || 'N/A'}`}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              {ride.timestamp ? new Date(ride.timestamp).toLocaleString() : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              {ride.completedAt ? new Date(ride.completedAt).toLocaleString() : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              {ride.rating ? (
+                                <div className="flex items-center gap-1">
+                                  <Star size={14} className="text-yellow-400 fill-yellow-400" />
+                                  <span className="font-semibold">{ride.rating}</span>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
+
+      {/* Driver Performance Analytics View */}
+      {
+        viewMode === "PERFORMANCE" && (
+          <div className="space-y-6">
+            {/* Filters */}
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Period</label>
+                  <select
+                    value={performancePeriod}
+                    onChange={(e) => setPerformancePeriod(e.target.value as any)}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                  >
+                    <option value="day">Today</option>
+                    <option value="week">Last 7 Days</option>
+                    <option value="month">This Month</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Driver (Optional)</label>
+                  <select
+                    value={performanceDriverId}
+                    onChange={(e) => setPerformanceDriverId(e.target.value)}
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                  >
+                    <option value="">All Drivers</option>
+                    {users
+                      .filter(u => u.role === UserRole.DRIVER)
+                      .map(driver => (
+                        <option key={driver.id} value={driver.id}>
+                          {driver.firstName} {driver.lastName} ({driver.roomNumber})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              <button
+                onClick={async () => {
+                  setIsLoadingPerformance(true);
+                  try {
+                    const params: any = { period: performancePeriod };
+                    if (performanceDriverId) params.driverId = performanceDriverId;
+                    const stats = await getDriverPerformanceStats(params);
+                    setDriverPerformanceStats(stats);
+                  } catch (error) {
+                    console.error('Failed to load performance stats:', error);
+                  } finally {
+                    setIsLoadingPerformance(false);
+                  }
+                }}
+                className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm font-semibold flex items-center gap-2"
+              >
+                <RefreshCw size={14} className={isLoadingPerformance ? 'animate-spin' : ''} />
+                {isLoadingPerformance ? 'Loading...' : 'Refresh'}
+              </button>
+            </div>
+
+            {/* Performance Stats Table */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                  <TrendingUp size={20} className="text-indigo-600" />
+                  Driver Performance Analytics
+                </h3>
+                <span className="text-sm text-gray-500">{driverPerformanceStats.length} drivers</span>
+              </div>
+
+              {isLoadingPerformance ? (
+                <div className="p-10 text-center">
+                  <Loader2 size={32} className="mx-auto mb-4 text-indigo-600 animate-spin" />
+                  <p className="text-gray-500">Loading performance data...</p>
+                </div>
+              ) : driverPerformanceStats.length === 0 ? (
+                <div className="p-10 text-center text-gray-400">
+                  <Award size={48} className="mx-auto mb-4 opacity-20" />
+                  <p>No performance data found for the selected period.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Rank</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Driver</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Total Rides</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Avg Rating</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Avg Response</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Avg Trip Time</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Performance Score</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {driverPerformanceStats.map((stats, index) => {
+                        const rank = index + 1;
+                        const scoreColor = stats.performance_score >= 80 ? 'text-green-600' :
+                          stats.performance_score >= 60 ? 'text-yellow-600' : 'text-red-600';
+                        return (
+                          <tr key={stats.driver_id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm">
+                              {rank === 1 && <Award size={16} className="inline text-yellow-500 mr-1" />}
+                              <span className="font-bold text-gray-700">#{rank}</span>
+                            </td>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{stats.driver_name}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{stats.total_rides}</td>
+                            <td className="px-4 py-3 text-sm">
+                              {stats.avg_rating > 0 ? (
+                                <div className="flex items-center gap-1">
+                                  <Star size={14} className="text-yellow-400 fill-yellow-400" />
+                                  <span className="font-semibold">{stats.avg_rating.toFixed(1)}</span>
+                                  <span className="text-xs text-gray-400">({stats.rating_count})</span>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              {stats.avg_response_time > 0
+                                ? `${Math.round(stats.avg_response_time / 1000 / 60)} min`
+                                : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              {stats.avg_trip_time > 0
+                                ? `${Math.round(stats.avg_trip_time / 1000 / 60)} min`
+                                : '-'}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className={`h-2 rounded-full ${stats.performance_score >= 80 ? 'bg-green-500' : stats.performance_score >= 60 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                                    style={{ width: `${Math.min(stats.performance_score, 100)}%` }}
+                                  />
+                                </div>
+                                <span className={`font-bold ${scoreColor} min-w-[50px]`}>
+                                  {stats.performance_score.toFixed(1)}
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      }
+
+      {/* Admin Auth Modal for Setting Driver Online */}
+      {
+        showAdminAuthModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col">
+              <div className="p-4 md:p-5 border-b flex justify-between items-center">
+                <h3 className="font-bold text-base md:text-lg text-gray-900">
+                  Admin Authentication Required
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowAdminAuthModal(false);
+                    setSelectedDriverForOnline(null);
+                    setAdminUsername("");
+                    setAdminPassword("");
+                    setAdminAuthError("");
+                  }}
+                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center flex-shrink-0"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-4 md:p-6 space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>Setting driver online:</strong>{" "}
+                    {selectedDriverForOnline?.lastName || "Unknown"}
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    Admin credentials required to set driver online status.
+                  </p>
+                </div>
+
+                {adminAuthError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-sm text-red-800">{adminAuthError}</p>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Admin Username
+                    </label>
+                    <input
+                      type="text"
+                      value={adminUsername}
+                      onChange={(e) => {
+                        setAdminUsername(e.target.value);
+                        setAdminAuthError("");
+                      }}
+                      placeholder="Enter admin username"
+                      className="w-full px-3 py-3 md:py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-sm min-h-[44px] md:min-h-0"
+                      disabled={isAuthenticating}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Admin Password
+                    </label>
+                    <input
+                      type="password"
+                      value={adminPassword}
+                      onChange={(e) => {
+                        setAdminPassword(e.target.value);
+                        setAdminAuthError("");
+                      }}
+                      placeholder="Enter admin password"
+                      className="w-full px-3 py-3 md:py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-sm min-h-[44px] md:min-h-0"
+                      disabled={isAuthenticating}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !isAuthenticating) {
+                          handleAdminAuth();
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border-t bg-gray-50 flex flex-col sm:flex-row justify-end gap-3 rounded-b-2xl">
+                <button
+                  onClick={() => {
+                    setShowAdminAuthModal(false);
+                    setSelectedDriverForOnline(null);
+                    setAdminUsername("");
+                    setAdminPassword("");
+                    setAdminAuthError("");
+                  }}
+                  className="w-full sm:w-auto px-4 py-3 md:py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
+                  disabled={isAuthenticating}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAdminAuth}
+                  disabled={isAuthenticating || !adminUsername || !adminPassword}
+                  className="w-full sm:w-auto px-4 py-3 md:py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
+                >
+                  {isAuthenticating ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Authenticating...
+                    </>
+                  ) : (
+                    "Authenticate & Set Online"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
 
       {/* Floating New Ride Button - Circular with Text */}
-      {viewMode === "BUGGY" && !showCreateRideModal && (
-        <button
-          onClick={() => setShowCreateRideModal(true)}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-full w-20 h-20 md:w-16 md:h-16 flex items-center justify-center transition-all z-50 touch-manipulation hover:scale-110 active:scale-95"
-          style={{
-            boxShadow: "0 8px 30px -4px rgba(16, 185, 129, 0.6), 0 4px 15px rgba(16, 185, 129, 0.3)",
-          }}
-          title="Create New Ride"
-        >
-          <span className="text-xs md:text-[10px] font-bold text-center leading-tight">New<br />Ride</span>
-        </button>
-      )}
-    </div>
+      {
+        viewMode === "BUGGY" && !showCreateRideModal && (
+          <button
+            onClick={() => setShowCreateRideModal(true)}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-full w-20 h-20 md:w-16 md:h-16 flex items-center justify-center transition-all z-50 touch-manipulation hover:scale-110 active:scale-95"
+            style={{
+              boxShadow: "0 8px 30px -4px rgba(16, 185, 129, 0.6), 0 4px 15px rgba(16, 185, 129, 0.3)",
+            }}
+            title="Create New Ride"
+          >
+            <span className="text-xs md:text-[10px] font-bold text-center leading-tight">New<br />Ride</span>
+          </button>
+        )
+      }
+    </div >
   );
 };
 
