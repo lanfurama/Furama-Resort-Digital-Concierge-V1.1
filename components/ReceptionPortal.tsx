@@ -641,6 +641,40 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     return saved !== null ? saved === "true" : true; // Default to enabled
   });
 
+  // Screen Wake Lock (Keep Screen On)
+  useEffect(() => {
+    let wakeLock: any = null;
+
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await (navigator as any).wakeLock.request('screen');
+          console.log('[Reception] Wake Lock is active');
+
+          document.addEventListener('visibilitychange', handleVisibilityChange);
+        }
+      } catch (err) {
+        console.error('[Reception] Wake Lock request failed:', err);
+      }
+    };
+
+    const handleVisibilityChange = async () => {
+      if (wakeLock !== null && document.visibilityState === 'visible') {
+        await requestWakeLock();
+      }
+    };
+
+    requestWakeLock();
+
+    return () => {
+      if (wakeLock) {
+        wakeLock.release();
+        wakeLock = null;
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   // Load data on mount
   useEffect(() => {
     const loadData = async () => {

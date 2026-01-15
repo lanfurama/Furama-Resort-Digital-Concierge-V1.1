@@ -1,0 +1,23 @@
+{
+    "name": "Furama Resort Digital Concierge",
+    "short_name": "Furama Concierge",
+    "description": "Digital Concierge Application for Furama Resort",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#f8f9fa",
+    "theme_color": "#065f46",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "/buggy app logo.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml"
+        }
+    ]
+}
