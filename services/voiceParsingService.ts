@@ -199,11 +199,11 @@ export const parseVoiceTranscript = (
   // Find locations using keyword matching with fuzzy matching (Levenshtein distance)
   const findLocation = (searchText: string): string | null => {
     if (!searchText || !locations || locations.length === 0) return null;
-    
+
     const lowerSearch = searchText.toLowerCase().trim();
 
     // 1. Exact match (case insensitive)
-    let match = locations.find(loc => 
+    let match = locations.find(loc =>
       loc.name.toLowerCase() === lowerSearch
     );
     if (match) return match.name;
@@ -220,7 +220,7 @@ export const parseVoiceTranscript = (
       location: loc,
       score: similarityScore(lowerSearch, loc.name.toLowerCase())
     })).filter(m => m.score > 0.7).sort((a, b) => b.score - a.score);
-    
+
     if (matchesWithScore.length > 0 && matchesWithScore[0].score > 0.7) {
       return matchesWithScore[0].location.name;
     }
@@ -277,7 +277,7 @@ export const parseVoiceTranscript = (
     if (words.length > 0) {
       const partialMatches = locations.map(loc => {
         const locWords = loc.name.toLowerCase().split(/\s+/);
-        const bestScore = Math.max(...words.map(word => 
+        const bestScore = Math.max(...words.map(word =>
           Math.max(...locWords.map(locWord => {
             if (locWord.includes(word) || word.includes(locWord)) {
               return similarityScore(word, locWord);
@@ -287,7 +287,7 @@ export const parseVoiceTranscript = (
         ));
         return { location: loc, score: bestScore };
       }).filter(m => m.score > 0.6).sort((a, b) => b.score - a.score);
-      
+
       if (partialMatches.length > 0) {
         return partialMatches[0].location.name;
       }
@@ -300,30 +300,30 @@ export const parseVoiceTranscript = (
   // Enhanced patterns: 15+ variations including Vietnamese and English
   const routePatterns = [
     // Pattern 1-3: Basic from/to patterns
-    /(?:from|từ|pickup|đón|lấy)\s+(.+?)\s+(?:to|đến|destination|đi|go to|tới)\s+(.+)/i,
-    /(?:pickup|đón|lấy)\s+(.+?)\s+(?:destination|điểm đến|đi|tới)\s+(.+)/i,
+    /(?:from|từ|pickup|đón|lấy|yên|yến)\s+(.+?)\s+(?:to|đến|destination|đi|go to|tới)\s+(.+)/i,
+    /(?:pickup|đón|lấy|yên|yến)\s+(.+?)\s+(?:destination|điểm đến|đi|tới)\s+(.+)/i,
     /(.+?)\s+(?:to|đến|đi|tới)\s+(.+)/i,
-    
+
     // Pattern 4-6: Vietnamese variations
     /(?:đưa|chở|đưa đi)\s+(.+?)\s+(?:đến|tới|đi|về)\s+(.+)/i,
     /(?:xe|buggy)\s+(?:đến|tới|đi)\s+(.+?)\s+(?:từ|tại|ở)\s+(.+)/i,
     /(?:cần|muốn)\s+(?:đi|đến|tới)\s+(.+?)\s+(?:từ|tại|ở)\s+(.+)/i,
-    
+
     // Pattern 7-9: English variations
     /(?:take|bring|drive)\s+(?:me|us|guest)?\s+(?:from|at)?\s*(.+?)\s+(?:to|towards)\s+(.+)/i,
     /(?:need|want|request)\s+(?:a|an)?\s*(?:ride|buggy|car)?\s+(?:from|at)?\s*(.+?)\s+(?:to|towards)\s+(.+)/i,
     /(?:going|go)\s+(?:to|towards)\s+(.+?)\s+(?:from|at|starting at)\s+(.+)/i,
-    
+
     // Pattern 10-12: Mixed language and informal
     /(?:đi|go)\s+(.+?)\s+(?:từ|from)\s+(.+)/i,
-    /(?:pickup|đón)\s+(?:at|tại|ở)\s+(.+?)\s+(?:go|đi)\s+(?:to|đến)\s+(.+)/i,
+    /(?:pickup|đón|yên|yến)\s+(?:at|tại|ở)\s+(.+?)\s+(?:go|đi)\s+(?:to|đến)\s+(.+)/i,
     /(?:start|bắt đầu)\s+(?:from|từ|tại)\s+(.+?)\s+(?:end|kết thúc|đến)\s+(?:at|tại|ở)?\s*(.+)/i,
-    
+
     // Pattern 13-15: Additional variations
     /(?:transport|vận chuyển)\s+(?:from|từ)\s+(.+?)\s+(?:to|đến)\s+(.+)/i,
     /(?:move|di chuyển)\s+(?:from|từ)\s+(.+?)\s+(?:to|đến)\s+(.+)/i,
     /(?:transfer|chuyển)\s+(?:from|từ)\s+(.+?)\s+(?:to|đến)\s+(.+)/i,
-    
+
     // Pattern 16-18: Room number as pickup variations
     /(?:phòng|room)\s+([A-Z]?\d+[A-Z]?)\s+(?:đi|go|to|đến)\s+(.+)/i,
     /(?:villa|biệt thự)\s+([A-Z]\d+)\s+(?:đi|go|to|đến)\s+(.+)/i,
@@ -360,17 +360,17 @@ export const parseVoiceTranscript = (
         }
       }
     }
-    
+
     // If still not found, try fuzzy matching
     if (!foundPickup || !foundDestination) {
       const words = lowerText.split(/\s+/).filter(w => w.length > 2);
       const locationMatches = locations.map(loc => ({
         location: loc,
-        score: Math.max(...words.map(word => 
+        score: Math.max(...words.map(word =>
           similarityScore(word, loc.name.toLowerCase())
         ))
       })).filter(m => m.score > 0.6).sort((a, b) => b.score - a.score);
-      
+
       for (const match of locationMatches) {
         if (!foundPickup) {
           foundPickup = match.location.name;
@@ -458,15 +458,15 @@ export const processTranscript = async (
       );
     } catch (aiError: any) {
       console.error("AI parsing error:", aiError);
-      
+
       // Check if it's a network error
-      const isNetworkError = 
+      const isNetworkError =
         aiError?.message?.includes('network') ||
         aiError?.message?.includes('fetch') ||
         aiError?.message?.includes('NetworkError') ||
         aiError?.code === 'NETWORK_ERROR' ||
         !navigator.onLine;
-      
+
       if (isNetworkError) {
         callbacks.onError(
           "Lỗi kết nối mạng khi gọi AI. Đang sử dụng phương pháp phân tích từ khóa..."
@@ -480,7 +480,7 @@ export const processTranscript = async (
           "Lỗi khi gọi AI. Đang sử dụng phương pháp phân tích từ khóa..."
         );
       }
-      
+
       // Fall through to fallback parsing
       parsedData = null;
     }
