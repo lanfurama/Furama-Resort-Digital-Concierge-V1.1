@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import BuggyLoadingScreen from '../BuggyLoadingScreen';
+import Loading from '../Loading';
 import { UserRole } from '../../types';
 import { authenticateUserByCode, authenticateUser } from '../../services/authService';
 import { useTranslation } from '../../contexts/LanguageContext';
@@ -92,7 +92,7 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLangu
   };
 
   if (showLoading) {
-    return <BuggyLoadingScreen />;
+    return <Loading fullScreen={true} message="Loading Home..." />;
   }
 
   return (
@@ -118,8 +118,8 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLangu
                 setAuthError('');
               }}
               className={`flex-1 py-2 px-4 rounded-md text-sm font-semibold transition-all ${loginMethod === 'code'
-                  ? 'bg-white text-emerald-800 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
+                ? 'bg-white text-emerald-800 shadow-sm'
+                : 'text-gray-600 hover:text-gray-800'
                 }`}
             >
               Check-in Code
@@ -131,8 +131,8 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLangu
                 setAuthError('');
               }}
               className={`flex-1 py-2 px-4 rounded-md text-sm font-semibold transition-all ${loginMethod === 'room'
-                  ? 'bg-white text-emerald-800 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800'
+                ? 'bg-white text-emerald-800 shadow-sm'
+                : 'text-gray-600 hover:text-gray-800'
                 }`}
             >
               Room & Name

@@ -18,7 +18,7 @@ import { LoginTypeSelection } from './components/login/LoginTypeSelection';
 import { RoleSelection } from './components/login/RoleSelection';
 import GuestLoginPage from './pages/GuestLoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
-import BuggyLoadingScreen from './components/BuggyLoadingScreen';
+import Loading from './components/Loading';
 import StaffLoginPage from './pages/StaffLoginPage';
 import DriverLoginPage from './pages/DriverLoginPage';
 import ReceptionLoginPage from './pages/ReceptionLoginPage';
@@ -615,7 +615,7 @@ const AppContent: React.FC = () => {
   );
 
   if (isAppLoading) {
-    return <BuggyLoadingScreen />;
+    return <Loading fullScreen={true} message="Loading System..." />;
   }
 
   return (
