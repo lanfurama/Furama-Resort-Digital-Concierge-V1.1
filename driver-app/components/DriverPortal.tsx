@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { getRides, updateRideStatus, getLastMessage, createManualRide, getLocations, setDriverOnlineFor10Hours, markDriverOffline, updateDriverLocation, updateUser, getUsers } from '../services/dataService';
 import { RideRequest, BuggyStatus, User } from '../types';
@@ -13,7 +12,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     const { setLanguage } = useTranslation();
     const [rides, setRides] = useState<RideRequest[]>([]);
     const [myRideId, setMyRideId] = useState<string | null>(null);
-    const [viewMode, setViewMode] = useState<'REQUESTS' | 'HISTORY'>('REQUESTS');
+    const [viewMode, setViewMode] = useState<'REQUESTS' | 'HISTORY' | 'ACTIVE'>('REQUESTS');
     const [displayMode, setDisplayMode] = useState<'list' | 'grid'>('list'); // List or Grid view
     const [driverInfo, setDriverInfo] = useState<{ name: string, rating: number, location: string }>({
         name: 'Mr. Tuan',
@@ -286,43 +285,10 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             const user = JSON.parse(savedUser);
             if (!user.id || user.role !== 'DRIVER') return;
 
-            // Check if geolocation is available
-            if (!navigator.geolocation) {
-                console.warn('[GPS] Geolocation is not supported by this browser');
-                setGpsPermissionStatus('denied');
-                setShowGpsPermissionAlert(true);
-                return;
-            }
-
-            let watchId: number | null = null;
-            let lastSentLat: number | null = null;
-            let lastSentLng: number | null = null;
-
-            // Function to update location
-            const updateLocation = (position: GeolocationPosition) => {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-
-                // Permission granted
-                setGpsPermissionStatus('granted');
-                setShowGpsPermissionAlert(false);
-
-                // Only update if location changed significantly (more than 10 meters)
-                if (lastSentLat !== null && lastSentLng !== null) {
-                    const distance = Math.sqrt(
-                        Math.pow(lat - lastSentLat, 2) + Math.pow(lng - lastSentLng, 2)
-                    ) * 111000; // Convert to meters (rough approximation)
-
-                    if (distance < 10) {
-                        // Location hasn't changed significantly, skip update
-                        return;
-                    }
-                }
-
+            // Define update function
+            const updateLocationOnServer = (lat: number, lng: number) => {
                 // Update location on server
                 updateDriverLocation(user.id, lat, lng);
-                lastSentLat = lat;
-                lastSentLng = lng;
 
                 // Update local driver info with location name if available
                 if (locations.length > 0) {
@@ -347,37 +313,130 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                         }));
                     }
                 }
-            };
+            }
 
-            const handleError = (error: GeolocationPositionError) => {
-                console.error('[GPS] Error getting location:', error);
+            let watcherId: string | null = null;
 
-                if (error.code === error.PERMISSION_DENIED) {
+            const startTracking = async () => {
+                // Wake Lock Logic
+                let wakeLock: WakeLockSentinel | null = null;
+
+                const requestWakeLock = async () => {
+                    try {
+                        if ('wakeLock' in navigator) {
+                            wakeLock = await (navigator as any).wakeLock.request('screen');
+                            console.log('Wake Lock is active');
+
+                            // Re-request on visibility change
+                            document.addEventListener('visibilitychange', handleVisibilityChange);
+                        }
+                    } catch (err) {
+                        console.error('Wake Lock request failed:', err);
+                    }
+                };
+
+                const handleVisibilityChange = async () => {
+                    if (wakeLock !== null && document.visibilityState === 'visible') {
+                        await requestWakeLock();
+                    }
+                };
+
+                // Request Wake Lock
+                requestWakeLock();
+
+                // Standard Web Geolocation Setup
+                if (!navigator.geolocation) {
+                    console.warn('[GPS] Geolocation is not supported by this browser');
                     setGpsPermissionStatus('denied');
                     setShowGpsPermissionAlert(true);
-                } else if (error.code === error.POSITION_UNAVAILABLE) {
-                    console.warn('[GPS] Position unavailable');
-                } else if (error.code === error.TIMEOUT) {
-                    console.warn('[GPS] Request timeout');
+                    return;
                 }
+
+                // Initial check
+                navigator.permissions?.query({ name: 'geolocation' as PermissionName }).then((result) => {
+                    if (result.state === 'denied') setShowGpsPermissionAlert(true);
+                });
+
+                const webWatchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        setGpsPermissionStatus('granted');
+                        setShowGpsPermissionAlert(false);
+                        updateLocationOnServer(position.coords.latitude, position.coords.longitude);
+                    },
+                    (error) => {
+                        console.error('[GPS] Web Error:', error);
+                        if (error.code === error.PERMISSION_DENIED) {
+                            setGpsPermissionStatus('denied');
+                            setShowGpsPermissionAlert(true);
+                        }
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 15000,
+                        maximumAge: 10000
+                    }
+                );
+
+                // Store cleanup info on window helper
+                (window as any)._webWatchId = webWatchId;
+                (window as any)._wakeLockCleanup = () => {
+                    if (wakeLock) {
+                        wakeLock.release();
+                        wakeLock = null;
+                    }
+                    document.removeEventListener('visibilitychange', handleVisibilityChange);
+                };
             };
 
-            // Request location updates every 15 seconds
-            const locationOptions: PositionOptions = {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 5000
+            const setupWebGeolocation = () => {
+                if (!navigator.geolocation) {
+                    console.warn('[GPS] Geolocation is not supported by this browser');
+                    setGpsPermissionStatus('denied');
+                    setShowGpsPermissionAlert(true);
+                    return;
+                }
+
+                // Initial check
+                navigator.permissions?.query({ name: 'geolocation' as PermissionName }).then((result) => {
+                    if (result.state === 'denied') setShowGpsPermissionAlert(true);
+                });
+
+                const webWatchId = navigator.geolocation.watchPosition(
+                    (position) => {
+                        setGpsPermissionStatus('granted');
+                        setShowGpsPermissionAlert(false);
+                        updateLocationOnServer(position.coords.latitude, position.coords.longitude);
+                    },
+                    (error) => {
+                        console.error('[GPS] Web Error:', error);
+                        if (error.code === error.PERMISSION_DENIED) {
+                            setGpsPermissionStatus('denied');
+                            setShowGpsPermissionAlert(true);
+                        }
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 5000
+                    }
+                );
+
+                // Store simplified ID for cleanup (hacky mapping since one is string, one is number)
+                // We'll handle cleanup separately for web
+                (window as any)._webWatchId = webWatchId;
             };
 
-            // Get initial location
-            navigator.geolocation.getCurrentPosition(updateLocation, handleError, locationOptions);
+            startTracking();
 
-            // Watch position for continuous updates
-            watchId = navigator.geolocation.watchPosition(updateLocation, handleError, locationOptions);
-
+            // Cleanup
             return () => {
-                if (watchId !== null) {
-                    navigator.geolocation.clearWatch(watchId);
+                if ((window as any)._webWatchId !== undefined) {
+                    navigator.geolocation.clearWatch((window as any)._webWatchId);
+                    delete (window as any)._webWatchId;
+                }
+                if ((window as any)._wakeLockCleanup) {
+                    (window as any)._wakeLockCleanup();
+                    delete (window as any)._wakeLockCleanup;
                 }
             };
         } catch (e) {
