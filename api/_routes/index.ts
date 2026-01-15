@@ -18,6 +18,10 @@ import driverScheduleRoutes from './driverScheduleRoutes';
 const router = Router();
 
 console.log('🔑 Registering auth routes...');
+router.use((req, res, next) => {
+    console.log(`[API Router] ${req.method} ${req.originalUrl} -> ${req.url}`);
+    next();
+});
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/locations', locationRoutes);
