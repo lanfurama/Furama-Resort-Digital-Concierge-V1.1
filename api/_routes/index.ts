@@ -17,6 +17,7 @@ import driverScheduleRoutes from './driverScheduleRoutes';
 
 const router = Router();
 
+console.log('🔑 Registering auth routes...');
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/locations', locationRoutes);

@@ -71,7 +71,9 @@ app.get('/health', (req, res) => {
 });
 
 // API routes with /api/v1 prefix
+console.log('🔌 Registering API routes...', routes);
 app.use('/api/v1', routes);
+console.log('✅ API routes registered');
 
 // 404 handler for API routes (must be before Vite middleware)
 app.use('/api/*', (req, res) => {
@@ -104,7 +106,7 @@ async function setupVite() {
     const path = await import('path');
     const { existsSync } = await import('fs');
     const distPath = path.default.join(process.cwd(), 'dist');
-    
+
     if (existsSync(distPath)) {
       app.use(express.static(distPath));
       // SPA fallback: serve index.html for all non-API routes
@@ -144,7 +146,7 @@ if (process.env.VERCEL !== '1') {
       if (ENABLE_HTTPS && httpsOptions) {
         // Create HTTPS server
         const httpsServer = https.createServer(httpsOptions, app);
-        
+
         // Optional: Create HTTP server to redirect to HTTPS
         if (process.env.HTTPS_REDIRECT === 'true') {
           const httpServer = http.createServer((req, res) => {
@@ -152,13 +154,13 @@ if (process.env.VERCEL !== '1') {
             res.writeHead(301, { Location: httpsUrl });
             res.end();
           });
-          
+
           httpServer.listen(PORT, () => {
             console.log(`🔄 HTTP redirect server running on http://localhost:${PORT}`);
             console.log(`   Redirecting to https://localhost:${HTTPS_PORT}`);
           });
         }
-        
+
         httpsServer.listen(HTTPS_PORT, () => {
           console.log(`🔐 HTTPS Server is running on https://localhost:${HTTPS_PORT}`);
           console.log(`📡 API endpoints available at https://localhost:${HTTPS_PORT}/api/v1`);
