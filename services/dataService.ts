@@ -564,12 +564,12 @@ export const addUser = async (user: User): Promise<void> => {
     // Update local cache
     const mappedUser: User = {
       id: dbUser.id.toString(),
-      lastName: dbUser.last_name,
+      lastName: dbUser.first_name, // Map first_name to lastName
       roomNumber: dbUser.room_number,
       password: dbUser.password || undefined,
       villaType: dbUser.villa_type || undefined,
       role: dbUser.role as UserRole,
-      department: "All" as Department,
+      department: dbUser.department as Department, // Map department
       checkIn: dbUser.check_in
         ? typeof dbUser.check_in === "string"
           ? dbUser.check_in
@@ -581,6 +581,7 @@ export const addUser = async (user: User): Promise<void> => {
           : new Date(dbUser.check_out).toISOString()
         : undefined,
       language: dbUser.language || undefined,
+      vehicleType: dbUser.vehicle_type || undefined, // Map vehicle_type
     };
 
     users = [...users, mappedUser];
@@ -606,22 +607,23 @@ export const addUser = async (user: User): Promise<void> => {
 
 export const updateUser = async (
   id: string,
-  user: Partial<User>,
+  u: Partial<User>,
 ): Promise<User> => {
   try {
     const requestBody: any = {};
 
-    if (user.lastName !== undefined) requestBody.last_name = user.lastName;
-    if (user.roomNumber !== undefined)
-      requestBody.room_number = user.roomNumber;
-    if (user.villaType !== undefined)
-      requestBody.villa_type = user.villaType || null;
-    if (user.language !== undefined)
-      requestBody.language = user.language || "English";
-    if (user.notes !== undefined) requestBody.notes = user.notes || null;
-    if (user.checkIn !== undefined) requestBody.check_in = user.checkIn || null;
-    if (user.checkOut !== undefined)
-      requestBody.check_out = user.checkOut || null;
+    if (u.lastName !== undefined) requestBody.first_name = u.lastName; // Map lastName to first_name
+    if (u.roomNumber !== undefined) requestBody.room_number = u.roomNumber;
+    if (u.villaType !== undefined) requestBody.villa_type = u.villaType || null;
+    if (u.language !== undefined) requestBody.language = u.language || "English";
+    if (u.notes !== undefined) requestBody.notes = u.notes || null;
+    if (u.checkIn !== undefined) requestBody.check_in = u.checkIn || null;
+    if (u.checkOut !== undefined) requestBody.check_out = u.checkOut || null;
+    if (u.department !== undefined) requestBody.department = u.department; // Add department
+    if (u.vehicleType !== undefined) requestBody.vehicle_type = u.vehicleType; // Add vehicle_type
+
+    console.log("Updating user via API - ID:", id);
+    console.log("Updating user via API - Request Body:", requestBody);
 
     const dbUser = await apiClient.put<any>(`/users/${id}`, requestBody);
 
@@ -630,34 +632,35 @@ export const updateUser = async (
       console.warn(
         "API returned null response, constructing user from request body and existing data",
       );
-      const existingUser = users.find((u) => u.id === id);
+      const existingUser = users.find((user) => user.id === id);
       const updatedUser: User = {
         id: id,
         lastName:
-          user.lastName !== undefined
-            ? user.lastName
+          u.lastName !== undefined
+            ? u.lastName
             : existingUser?.lastName || "",
         roomNumber:
-          user.roomNumber !== undefined
-            ? user.roomNumber
+          u.roomNumber !== undefined
+            ? u.roomNumber
             : existingUser?.roomNumber || "",
         password: existingUser?.password || undefined,
         villaType:
-          user.villaType !== undefined
-            ? user.villaType
+          u.villaType !== undefined
+            ? u.villaType
             : existingUser?.villaType,
         role: existingUser?.role || ("GUEST" as UserRole),
-        department: "All" as Department,
+        department: u.department !== undefined ? u.department : existingUser?.department || "All", // Update department
         checkIn:
-          user.checkIn !== undefined ? user.checkIn : existingUser?.checkIn,
+          u.checkIn !== undefined ? u.checkIn : existingUser?.checkIn,
         checkOut:
-          user.checkOut !== undefined ? user.checkOut : existingUser?.checkOut,
+          u.checkOut !== undefined ? u.checkOut : existingUser?.checkOut,
         language:
-          user.language !== undefined ? user.language : existingUser?.language,
-        notes: user.notes !== undefined ? user.notes : existingUser?.notes,
+          u.language !== undefined ? u.language : existingUser?.language,
+        notes: u.notes !== undefined ? u.notes : existingUser?.notes,
+        vehicleType: u.vehicleType !== undefined ? u.vehicleType : existingUser?.vehicleType, // Update vehicle_type
       };
 
-      const existingIndex = users.findIndex((u) => u.id === id);
+      const existingIndex = users.findIndex((user) => user.id === id);
       if (existingIndex >= 0) {
         users[existingIndex] = updatedUser;
       } else {
@@ -675,57 +678,67 @@ export const updateUser = async (
     const updatedUser: User = {
       id: dbUser.id ? dbUser.id.toString() : id,
       lastName:
-        dbUser.last_name !== undefined
-          ? dbUser.last_name
-          : user.lastName !== undefined
-            ? user.lastName
+        dbUser.first_name !== undefined // Map first_name to lastName
+          ? dbUser.first_name
+          : u.lastName !== undefined
+            ? u.lastName
             : "",
       roomNumber:
         dbUser.room_number !== undefined
           ? dbUser.room_number
-          : user.roomNumber !== undefined
-            ? user.roomNumber
+          : u.roomNumber !== undefined
+            ? u.roomNumber
             : "",
       password: dbUser.password || undefined,
       villaType:
         dbUser.villa_type !== undefined
           ? dbUser.villa_type
-          : user.villaType !== undefined
-            ? user.villaType
+          : u.villaType !== undefined
+            ? u.villaType
             : undefined,
       role: dbUser.role
         ? (dbUser.role as UserRole)
-        : users.find((u) => u.id === id)?.role || ("GUEST" as UserRole),
-      department: "All" as Department,
+        : users.find((user) => user.id === id)?.role || ("GUEST" as UserRole),
+      department: dbUser.department
+        ? (dbUser.department as Department)
+        : u.department !== undefined
+          ? u.department
+          : "All", // Map department
       checkIn: dbUser.check_in
         ? typeof dbUser.check_in === "string"
           ? dbUser.check_in
           : new Date(dbUser.check_in).toISOString()
-        : user.checkIn !== undefined
-          ? user.checkIn
+        : u.checkIn !== undefined
+          ? u.checkIn
           : undefined,
       checkOut: dbUser.check_out
         ? typeof dbUser.check_out === "string"
           ? dbUser.check_out
           : new Date(dbUser.check_out).toISOString()
-        : user.checkOut !== undefined
-          ? user.checkOut
+        : u.checkOut !== undefined
+          ? u.checkOut
           : undefined,
       language:
         dbUser.language !== undefined
           ? dbUser.language
-          : user.language !== undefined
-            ? user.language
+          : u.language !== undefined
+            ? u.language
             : undefined,
       notes:
         dbUser.notes !== undefined
           ? dbUser.notes
-          : user.notes !== undefined
-            ? user.notes
+          : u.notes !== undefined
+            ? u.notes
+            : undefined,
+      vehicleType:
+        dbUser.vehicle_type !== undefined // Map vehicle_type
+          ? dbUser.vehicle_type
+          : u.vehicleType !== undefined
+            ? u.vehicleType
             : undefined,
     };
 
-    const existingIndex = users.findIndex((u) => u.id === id);
+    const existingIndex = users.findIndex((user) => user.id === id);
     if (existingIndex >= 0) {
       users[existingIndex] = updatedUser;
     } else {
@@ -814,7 +827,7 @@ export const generateCheckInCode = async (
       // Map database user to frontend User format
       const frontendUser: User = {
         id: response.user.id.toString(),
-        lastName: response.user.last_name,
+        lastName: response.user.first_name, // Map first_name to lastName
         roomNumber: response.user.room_number,
         villaType: response.user.villa_type,
         role: response.user.role as UserRole,
@@ -826,6 +839,8 @@ export const generateCheckInCode = async (
           ? new Date(response.user.check_out).toISOString()
           : undefined,
         checkInCode: response.checkInCode,
+        department: response.user.department as Department, // Map department
+        vehicleType: response.user.vehicle_type || undefined, // Map vehicle_type
       };
       return { checkInCode: response.checkInCode, user: frontendUser };
     }
@@ -969,12 +984,12 @@ export const getDriversWithLocations = async (): Promise<User[]> => {
     const dbDrivers = await apiClient.get<any[]>("/users/drivers/locations");
     return dbDrivers.map((user) => ({
       id: user.id.toString(),
-      lastName: user.last_name,
+      lastName: user.first_name, // Map first_name to lastName
       roomNumber: user.room_number,
       password: user.password || undefined,
       villaType: user.villa_type || undefined,
       role: user.role as UserRole,
-      department: "All" as Department,
+      department: user.department as Department, // Map department
       language: user.language || undefined,
       notes: user.notes || undefined,
       updatedAt: user.updated_at
@@ -985,6 +1000,7 @@ export const getDriversWithLocations = async (): Promise<User[]> => {
       locationUpdatedAt: user.location_updated_at
         ? new Date(user.location_updated_at).getTime()
         : undefined,
+      vehicleType: user.vehicle_type || undefined, // Map vehicle_type
     }));
   } catch (error) {
     console.error("Failed to fetch drivers with locations:", error);
@@ -1424,6 +1440,9 @@ export const deleteLocation = async (idOrName: string): Promise<void> => {
       data: error?.response?.data,
     });
     // Fallback to local state
+    locations = locations.filter(
+      (l) => l.name !== idOrName && l.id !== idOrName,
+    );
     const beforeCount = locations.length;
     locations = locations.filter(
       (l) => l.name !== idOrName && l.id !== idOrName,
@@ -1448,6 +1467,7 @@ export const getRoomTypes = async (): Promise<RoomType[]> => {
       name: rt.name,
       description: rt.description || undefined,
       locationId: rt.location_id ? rt.location_id.toString() : undefined,
+      isVIP: rt.is_vip || false, // Map is_vip
     }));
 
     console.log("Mapped room types:", mapped);
@@ -1477,6 +1497,7 @@ export const addRoomType = async (rt: RoomType): Promise<RoomType> => {
       name: rt.name,
       description: rt.description || null,
       location_id: location_id,
+      is_vip: rt.isVIP || false, // Add is_vip
     };
 
     console.log("Adding room type via API - Input:", rt);
@@ -1493,6 +1514,7 @@ export const addRoomType = async (rt: RoomType): Promise<RoomType> => {
       locationId: dbRoomType.location_id
         ? dbRoomType.location_id.toString()
         : undefined,
+      isVIP: dbRoomType.is_vip || false, // Map back
     };
 
     console.log("Mapped room type result:", result);
@@ -1546,6 +1568,9 @@ export const updateRoomType = async (
     if (rt.locationId !== undefined) {
       requestBody.location_id = location_id;
     }
+    if (rt.isVIP !== undefined) {
+      requestBody.is_vip = rt.isVIP; // Update is_vip
+    }
 
     console.log("updateRoomType - Input:", { id, rt });
     console.log("updateRoomType - Request Body:", requestBody);
@@ -1557,13 +1582,14 @@ export const updateRoomType = async (
 
     console.log("updateRoomType - API Response:", dbRoomType);
 
-    const result = {
+    const result: RoomType = {
       id: dbRoomType.id.toString(),
       name: dbRoomType.name,
       description: dbRoomType.description || undefined,
       locationId: dbRoomType.location_id
         ? dbRoomType.location_id.toString()
         : undefined,
+      isVIP: dbRoomType.is_vip || false, // Map back
     };
 
     console.log("updateRoomType - Mapped Result:", result);
@@ -1625,12 +1651,14 @@ export const addRoom = async (r: Room): Promise<Room> => {
       number: r.number,
       type_id: parseInt(r.typeId),
       status: r.status || "Available",
+      management_type: r.managementType || null, // Add management_type
     });
     return {
       id: dbRoom.id.toString(),
       number: dbRoom.number,
       typeId: dbRoom.type_id.toString(),
       status: dbRoom.status as "Available" | "Occupied" | "Maintenance",
+      managementType: dbRoom.management_type || undefined,
     };
   } catch (error) {
     console.error("Failed to add room:", error);
@@ -1641,9 +1669,56 @@ export const addRoom = async (r: Room): Promise<Room> => {
   }
 };
 
+export const updateRoom = async (
+  id: string,
+  r: Partial<Room>,
+): Promise<Room> => {
+  try {
+    // Build request body
+    const requestBody: any = {};
+    if (r.number !== undefined) requestBody.number = r.number;
+    if (r.typeId !== undefined) requestBody.type_id = parseInt(r.typeId);
+    if (r.status !== undefined) requestBody.status = r.status;
+    if (r.managementType !== undefined)
+      requestBody.management_type = r.managementType;
+
+    console.log("updateRoom - Input:", { id, r });
+    console.log("updateRoom - Request Body:", requestBody);
+
+    const dbRoom = await apiClient.put<any>(`/rooms/${id}`, requestBody);
+
+    console.log("updateRoom - API Response:", dbRoom);
+
+    const result: Room = {
+      id: dbRoom.id.toString(),
+      number: dbRoom.number,
+      typeId: dbRoom.type_id.toString(),
+      status: dbRoom.status as "Available" | "Occupied" | "Maintenance",
+      managementType: dbRoom.management_type || undefined,
+    };
+
+    // Update local cache
+    rooms = rooms.map((existing) => (existing.id === id ? result : existing));
+
+    return result;
+  } catch (error: any) {
+    console.error("Failed to update room:", error);
+    // Fallback to local
+    const existing = rooms.find((room) => room.id === id);
+    if (existing) {
+      const updated = { ...existing, ...r };
+      rooms = rooms.map((room) => (room.id === id ? updated : room));
+      return updated;
+    }
+    throw error;
+  }
+};
+
 export const deleteRoom = async (id: string): Promise<void> => {
   try {
     await apiClient.delete(`/rooms/${id}`);
+    // Update local cache
+    rooms = rooms.filter((r) => r.id !== id);
   } catch (error) {
     console.error("Failed to delete room:", error);
     // Fallback to local

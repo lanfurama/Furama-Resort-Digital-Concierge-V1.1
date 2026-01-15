@@ -18,6 +18,7 @@ import { LoginTypeSelection } from './components/login/LoginTypeSelection';
 import { RoleSelection } from './components/login/RoleSelection';
 import GuestLoginPage from './pages/GuestLoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
+import BuggyLoadingScreen from './components/BuggyLoadingScreen';
 import StaffLoginPage from './pages/StaffLoginPage';
 import DriverLoginPage from './pages/DriverLoginPage';
 import ReceptionLoginPage from './pages/ReceptionLoginPage';
@@ -78,6 +79,9 @@ const AppContent: React.FC = () => {
     }
   }, [view, user?.roomNumber]); // Only depend on roomNumber, not entire user object
 
+  // Loading State
+  const [isAppLoading, setIsAppLoading] = useState(true);
+
   // Restore user from localStorage on mount (only once - no dependencies)
   useEffect(() => {
     const savedUser = localStorage.getItem('furama_user');
@@ -90,10 +94,21 @@ const AppContent: React.FC = () => {
         if (parsedUser.language) {
           setLanguage(parsedUser.language as any);
         }
+
+        // Show loading animation for 2.5 seconds to simulate system load
+        // This gives the "Buggy Loading" experience the user requested
+        setTimeout(() => {
+          setIsAppLoading(false);
+        }, 2500);
+
       } catch (error) {
         console.error('Failed to restore user from localStorage:', error);
         localStorage.removeItem('furama_user');
+        setIsAppLoading(false);
       }
+    } else {
+      // No user, stop loading immediately to show login
+      setIsAppLoading(false);
     }
   }, []); // Empty array - only run once on mount
 
@@ -598,6 +613,10 @@ const AppContent: React.FC = () => {
       </div>
     </button>
   );
+
+  if (isAppLoading) {
+    return <BuggyLoadingScreen />;
+  }
 
   return (
     <>

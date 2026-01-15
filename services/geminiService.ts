@@ -131,6 +131,26 @@ SPEECH RECOGNITION ERROR HANDLING:
 - "acc" usually refers to "ACC" (Asian Civic Center / Restaurant). Matches to "ACC".
 - "lobby" refers to "Reception".
 
+7. PHONETIC ENGLISH INTERPRETATION (Critical for Bilingual Support):
+   The user might speak English while the Speech-to-Text engine is set to Vietnamese. You MUST interpret these phonetic approximations:
+   - "niu rai" / "niu lai" / "nhiu lai" → "New Ride"
+   - "rum" / "rùm" / "rôm" → "Room"
+   - "oan" / "uân" / "quân" → "One" (1)
+   - "tu" / "tư" / "tờ" → "Two" (2) / "To"
+   - "tri" / "tờ ri" / "thờ ri" → "Three" (3)
+   - "for" / "pho" / "phò" → "Four" (4)
+   - "phai" / "phài" → "Five" (5)
+   - "xích" / "sích" → "Six" (6)
+   - "se vần" / "xe vần" → "Seven" (7)
+   - "gâu tu" / "gô tu" / "go to" → "Go To"
+   - "pic úp" / "bích úp" / "píc ắp" → "Pick Up" / "Pickup"
+   - "láp to" / "lốp by" / "lô bi" → "Lobby"
+   - "vui la" / "vi la" / "biệt thự" → "Villa"
+   - "biển" / "bít" / "bíc" → "Beach"
+
+   Example: "Niu rai rùm oan zia rô oan" → "New ride room 101"
+   Example: "Pic úp ất vi la đi thri" → "Pick up at Villa D3"
+
 Return JSON with exact location names matching the valid locations list.`;
 
   if (!ai) {

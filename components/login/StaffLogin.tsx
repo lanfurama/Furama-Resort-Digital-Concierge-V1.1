@@ -29,7 +29,7 @@ export const StaffLogin: React.FC<StaffLoginProps> = ({ role, onLoginSuccess, se
       case UserRole.SUPERVISOR:
         return 'Supervisor';
       case UserRole.RECEPTION:
-        return 'Reception';
+        return 'Hotline';
       default:
         return 'Staff';
     }
@@ -74,7 +74,7 @@ export const StaffLogin: React.FC<StaffLoginProps> = ({ role, onLoginSuccess, se
     <div className="min-h-screen bg-stone-100 flex flex-col justify-center items-center p-6 relative overflow-hidden">
       {/* Background Accent */}
       <div className="absolute top-0 left-0 w-full h-1/2 bg-emerald-900 rounded-b-[3rem] z-0"></div>
-      
+
       {/* Back Button */}
       <button
         onClick={() => navigate('/fu25ad/login')}
@@ -83,7 +83,7 @@ export const StaffLogin: React.FC<StaffLoginProps> = ({ role, onLoginSuccess, se
         <ArrowLeft size={20} />
         <span className="text-sm font-semibold">Back to Role Selection</span>
       </button>
-      
+
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 z-10 relative">
         <div className="text-center mb-8">
           <h1 className="font-serif text-3xl font-bold text-emerald-900 mb-2">FURAMA</h1>
@@ -95,8 +95,8 @@ export const StaffLogin: React.FC<StaffLoginProps> = ({ role, onLoginSuccess, se
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Username</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-black"
@@ -109,7 +109,7 @@ export const StaffLogin: React.FC<StaffLoginProps> = ({ role, onLoginSuccess, se
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">Password</label>
             </div>
             <div className="relative">
-              <input 
+              <input
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -117,7 +117,7 @@ export const StaffLogin: React.FC<StaffLoginProps> = ({ role, onLoginSuccess, se
                 placeholder="Enter password"
                 required
               />
-              <button 
+              <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
@@ -134,8 +134,8 @@ export const StaffLogin: React.FC<StaffLoginProps> = ({ role, onLoginSuccess, se
             </div>
           )}
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={isAuthLoading}
             className="w-full bg-emerald-800 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-emerald-900 transition transform active:scale-95 disabled:opacity-70 flex justify-center items-center"
           >
@@ -146,7 +146,7 @@ export const StaffLogin: React.FC<StaffLoginProps> = ({ role, onLoginSuccess, se
             )}
           </button>
         </form>
-        
+
         <div className="mt-8 text-center">
           <p className="text-xs text-gray-400">© 2025 Furama Resort Danang. All rights reserved.</p>
         </div>

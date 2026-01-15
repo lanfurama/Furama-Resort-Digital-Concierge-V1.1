@@ -59,6 +59,7 @@ export interface User {
   currentLat?: number; // Current latitude (for DRIVER role)
   currentLng?: number; // Current longitude (for DRIVER role)
   locationUpdatedAt?: number; // Timestamp when location was last updated
+  vehicleType?: 'VIP' | 'NORMAL'; // New VIP matching field
 }
 
 export interface RoomType {
@@ -66,6 +67,7 @@ export interface RoomType {
   name: string;
   description?: string;
   locationId?: string; // Link to a Location
+  isVIP?: boolean; // New VIP status
 }
 
 export interface Room {
@@ -73,6 +75,7 @@ export interface Room {
   number: string;
   typeId: string; // Links to RoomType
   status?: "Available" | "Occupied" | "Maintenance";
+  managementType?: "FURAMA_MANAGED" | "OWNER_MANAGED";
 }
 
 // Translation Helper Interface
@@ -167,13 +170,13 @@ export interface RideRequest {
 export interface ServiceRequest {
   id: string;
   type:
-    | "DINING"
-    | "SPA"
-    | "POOL"
-    | "BUTLER"
-    | "HOUSEKEEPING"
-    | "BUGGY"
-    | "EXTEND_STAY";
+  | "DINING"
+  | "SPA"
+  | "POOL"
+  | "BUTLER"
+  | "HOUSEKEEPING"
+  | "BUGGY"
+  | "EXTEND_STAY";
   status: string;
   details: string;
   items?: MenuItem[]; // Stored items to support dynamic translation display

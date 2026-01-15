@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import BuggyLoadingScreen from '../BuggyLoadingScreen';
 import { UserRole } from '../../types';
 import { authenticateUserByCode, authenticateUser } from '../../services/authService';
 import { useTranslation } from '../../contexts/LanguageContext';
@@ -11,23 +12,24 @@ interface GuestLoginProps {
 export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLanguage }) => {
   // Login method: 'code' or 'room'
   const [loginMethod, setLoginMethod] = useState<'code' | 'room'>('code');
-  
+
   // Check-in code method
   const [checkInCode, setCheckInCode] = useState(() => {
     const saved = localStorage.getItem('guest_check_in_code');
     return saved || '';
   });
   const [rememberCode, setRememberCode] = useState(true);
-  
+
   // Room number + last name method
   const [roomNumber, setRoomNumber] = useState(() => {
     const saved = localStorage.getItem('guest_room_number');
     return saved || '';
   });
   const [lastName, setLastName] = useState('');
-  
+
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [showLoading, setShowLoading] = useState(false);
   const { t } = useTranslation();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,8 +72,12 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLangu
         // Save room number to localStorage
         localStorage.setItem('guest_room_number', roomNumber.trim());
       }
-      
+
+
       if (foundUser) {
+        // Show loading screen immediately
+        setShowLoading(true);
+
         onLoginSuccess(foundUser);
         if (foundUser.language) {
           setLanguage(foundUser.language);
@@ -85,11 +91,15 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLangu
     }
   };
 
+  if (showLoading) {
+    return <BuggyLoadingScreen />;
+  }
+
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col justify-center items-center p-6 relative overflow-hidden">
       {/* Background Accent */}
       <div className="absolute top-0 left-0 w-full h-1/2 bg-emerald-900 rounded-b-[3rem] z-0"></div>
-      
+
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 z-10 relative">
         <div className="text-center mb-8">
           <h1 className="font-serif text-3xl font-bold text-emerald-900 mb-2">FURAMA</h1>
@@ -107,11 +117,10 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLangu
                 setLoginMethod('code');
                 setAuthError('');
               }}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-semibold transition-all ${
-                loginMethod === 'code'
+              className={`flex-1 py-2 px-4 rounded-md text-sm font-semibold transition-all ${loginMethod === 'code'
                   ? 'bg-white text-emerald-800 shadow-sm'
                   : 'text-gray-600 hover:text-gray-800'
-              }`}
+                }`}
             >
               Check-in Code
             </button>
@@ -121,11 +130,10 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLangu
                 setLoginMethod('room');
                 setAuthError('');
               }}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-semibold transition-all ${
-                loginMethod === 'room'
+              className={`flex-1 py-2 px-4 rounded-md text-sm font-semibold transition-all ${loginMethod === 'room'
                   ? 'bg-white text-emerald-800 shadow-sm'
                   : 'text-gray-600 hover:text-gray-800'
-              }`}
+                }`}
             >
               Room & Name
             </button>
@@ -137,8 +145,8 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLangu
             <>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Check-in Code</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={checkInCode}
                   onChange={(e) => setCheckInCode(e.target.value.toUpperCase())}
                   className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-black text-center text-2xl font-bold tracking-widest"
@@ -172,8 +180,8 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLangu
             <>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Last Name</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-black"
@@ -185,8 +193,8 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLangu
 
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Room Number</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={roomNumber}
                   onChange={(e) => setRoomNumber(e.target.value)}
                   className="w-full px-4 py-3 rounded-lg border border-gray-200 bg-gray-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none transition text-black"
@@ -204,8 +212,8 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLangu
             </div>
           )}
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={isAuthLoading}
             className="w-full bg-emerald-800 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-emerald-900 transition transform active:scale-95 disabled:opacity-70 flex justify-center items-center"
           >
@@ -216,7 +224,7 @@ export const GuestLogin: React.FC<GuestLoginProps> = ({ onLoginSuccess, setLangu
             )}
           </button>
         </form>
-        
+
         <div className="mt-8 text-center">
           <p className="text-xs text-gray-400">© 2025 Furama Resort Danang. All rights reserved.</p>
         </div>

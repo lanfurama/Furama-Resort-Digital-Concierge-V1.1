@@ -10,7 +10,7 @@ const CollectionLoginPage: React.FC = () => {
   const { setLanguage } = useTranslation();
   const navigate = useNavigate();
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
-  
+
   // Mapping từ role sang route path
   const roleToRouteMap: Record<UserRole, string> = {
     [UserRole.RECEPTION]: '/reception/login',
@@ -25,7 +25,7 @@ const CollectionLoginPage: React.FC = () => {
   const allowedRoles = [
     {
       role: UserRole.RECEPTION,
-      label: 'Reception',
+      label: 'Hotline',
       icon: Building2,
       description: 'Front Desk Access',
       color: 'from-pink-500 to-rose-600',
@@ -80,7 +80,7 @@ const CollectionLoginPage: React.FC = () => {
     if (user.language) {
       setLanguage(user.language as any);
     }
-    
+
     // Set driver online for 10 hours on first login (chỉ cho DRIVER)
     if (user.id && user.role === UserRole.DRIVER) {
       try {
@@ -90,7 +90,7 @@ const CollectionLoginPage: React.FC = () => {
         // Continue with login even if this fails
       }
     }
-    
+
     // Redirect based on role
     switch (user.role) {
       case UserRole.SUPERVISOR:
@@ -138,7 +138,7 @@ const CollectionLoginPage: React.FC = () => {
     <div className="min-h-screen bg-stone-100 flex flex-col justify-center items-center p-6 relative overflow-hidden">
       {/* Background Accent */}
       <div className="absolute top-0 left-0 w-full h-1/2 bg-emerald-900 rounded-b-[3rem] z-0"></div>
-      
+
       <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8 z-10 relative">
         <div className="text-center mb-8">
           <h1 className="font-serif text-3xl font-bold text-emerald-900 mb-2">FURAMA</h1>
@@ -169,7 +169,7 @@ const CollectionLoginPage: React.FC = () => {
             );
           })}
         </div>
-        
+
         <div className="mt-8 text-center">
           <p className="text-xs text-gray-400">© 2025 Furama Resort Danang. All rights reserved.</p>
         </div>

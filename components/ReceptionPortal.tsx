@@ -271,7 +271,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       // Process transcript when recording stops
       await handleProcessTranscript(finalTranscript);
     },
-    silenceTimeout: 5000,
+    silenceTimeout: 3000,
     t, // Pass translation function for multilingual error messages
   });
 
@@ -2323,7 +2323,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
             )}
             <div className="text-right hidden sm:block">
               <div className="text-xs md:text-sm font-semibold">
-                {user.lastName || "Reception"}
+                {user.lastName || "Hotline"}
               </div>
               <div className="text-[10px] md:text-xs text-emerald-100">
                 ID: {user.id || "N/A"}
@@ -4707,42 +4707,36 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   <p className="mt-2 text-gray-500 font-medium text-center text-xs md:text-sm">
                     {isListening
                       ? "Listening..."
-                      : "Tap to speak or fill form below"}
+                      : "Tap to speak"}
                   </p>
                   {/* Silence countdown indicator */}
                   {isListening && silenceCountdown !== null && silenceRemainingTime !== null && (
-                    <div className="mt-3 w-full max-w-xs mx-auto animate-in fade-in slide-in-from-bottom-2">
-                      <div className="bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-orange-400 rounded-xl p-4 shadow-lg">
-                        <div className="flex items-center justify-center gap-2 mb-3">
-                          <AlertCircle size={20} className="text-orange-600 animate-pulse" />
-                          <p className="text-orange-800 font-semibold text-sm md:text-base">
-                            Im lặng phát hiện - Dừng ghi âm sau:
-                          </p>
-                        </div>
-                        <div className="mt-2 flex items-center justify-center mb-3">
-                          <div className="text-5xl md:text-6xl font-bold text-orange-600 animate-pulse drop-shadow-sm">
-                            {silenceCountdown}
-                          </div>
-                          <span className="text-3xl md:text-4xl font-semibold text-orange-600 ml-1">
-                            s
+                    <div className="mt-4 animate-in fade-in slide-in-from-bottom-2 z-10 transition-all duration-300">
+                      <div className="bg-white/95 backdrop-blur shadow-lg border border-orange-200 rounded-2xl px-5 py-3 flex flex-col items-center gap-2 min-w-[200px]">
+                        <div className="flex items-center gap-2 w-full justify-center">
+                          <AlertCircle size={14} className="text-orange-500 animate-pulse" />
+                          <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                            Im lặng
                           </span>
                         </div>
-                        {/* Enhanced Progress bar with accurate time-based calculation */}
-                        <div className="mt-3 w-full bg-orange-200 rounded-full h-3 overflow-hidden shadow-inner">
-                          <div
-                            className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-500 h-3 rounded-full transition-all duration-100 ease-linear relative overflow-hidden"
-                            style={{
-                              width: `${Math.max(0, Math.min(100, (silenceRemainingTime / 5000) * 100))}%`,
-                            }}
-                          >
-                            {/* Animated shimmer effect */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
-                          </div>
+
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-3xl font-bold text-orange-600 tabular-nums leading-none tracking-tight">
+                            {silenceCountdown}
+                          </span>
+                          <span className="text-xs font-medium text-orange-400">s</span>
+                          <span className="text-xs text-gray-400 ml-1">chờ dừng</span>
                         </div>
-                        {/* Time remaining text */}
-                        <p className="mt-2 text-center text-xs text-orange-700 font-medium">
-                          {(silenceRemainingTime / 1000).toFixed(1)} giây còn lại
-                        </p>
+
+                        {/* Compact Progress Line */}
+                        <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden mt-1">
+                          <div
+                            className="bg-gradient-to-r from-orange-400 to-red-500 h-full rounded-full transition-all duration-100 linear"
+                            style={{
+                              width: `${Math.min(100, (silenceRemainingTime / 3000) * 100)}%`,
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
@@ -4831,7 +4825,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             roomNumber: e.target.value,
                           }))
                         }
-                        className="w-full px-2.5 py-2 border rounded-md bg-white text-gray-900 placeholder:text-gray-400 text-sm min-h-[40px]"
+                        className="w-full px-2.5 py-2 border rounded-md bg-gray-100 text-gray-500 cursor-not-allowed placeholder:text-gray-400 text-sm min-h-[40px]"
+                        disabled
                       />
                     </div>
                     <div>
@@ -4848,7 +4843,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             guestName: e.target.value,
                           }))
                         }
-                        className="w-full px-2.5 py-2 border rounded-md bg-white text-gray-900 placeholder:text-gray-400 text-sm min-h-[40px]"
+                        className="w-full px-2.5 py-2 border rounded-md bg-gray-100 text-gray-500 cursor-not-allowed placeholder:text-gray-400 text-sm min-h-[40px]"
+                        disabled
                       />
                     </div>
                     {/* Row 2: Pickup + Destination */}
@@ -4866,7 +4862,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                           setLocationFilterType("ALL");
                           setPickupSearchQuery("");
                         }}
-                        className="w-full px-2.5 py-2 border rounded-md cursor-pointer bg-white text-gray-900 placeholder:text-gray-400 text-sm min-h-[40px] touch-manipulation"
+                        className="w-full px-2.5 py-2 border rounded-md bg-gray-100 text-gray-500 cursor-not-allowed placeholder:text-gray-400 text-sm min-h-[40px] touch-manipulation"
+                        disabled
                       />
                     </div>
                     <div>
@@ -4886,7 +4883,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                           setLocationFilterType("ALL");
                           setDestinationSearchQuery("");
                         }}
-                        className="w-full px-2.5 py-2 border rounded-md cursor-pointer bg-white text-gray-900 placeholder:text-gray-400 text-sm min-h-[40px] touch-manipulation"
+                        className="w-full px-2.5 py-2 border rounded-md bg-gray-100 text-gray-500 cursor-not-allowed placeholder:text-gray-400 text-sm min-h-[40px] touch-manipulation"
+                        disabled
                       />
                     </div>
                     {/* Row 3: Guest Count + Notes (compact) */}
@@ -4906,7 +4904,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             guestCount: parseInt(e.target.value) || 1,
                           }))
                         }
-                        className="w-full px-2.5 py-2 border rounded-md bg-white text-gray-900 placeholder:text-gray-400 text-sm min-h-[40px]"
+                        className="w-full px-2.5 py-2 border rounded-md bg-gray-100 text-gray-500 cursor-not-allowed placeholder:text-gray-400 text-sm min-h-[40px]"
+                        disabled
                       />
                     </div>
                     <div>
@@ -4923,7 +4922,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             notes: e.target.value,
                           }))
                         }
-                        className="w-full px-2.5 py-2 border rounded-md bg-white text-gray-900 placeholder:text-gray-400 text-sm min-h-[40px]"
+                        className="w-full px-2.5 py-2 border rounded-md bg-gray-100 text-gray-500 cursor-not-allowed placeholder:text-gray-400 text-sm min-h-[40px]"
+                        disabled
                       />
                     </div>
                   </div>
@@ -5982,7 +5982,10 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       {
         viewMode === "BUGGY" && !showCreateRideModal && (
           <button
-            onClick={() => setShowCreateRideModal(true)}
+            onClick={() => {
+              setShowCreateRideModal(true);
+              handleToggleListening();
+            }}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-full w-20 h-20 md:w-16 md:h-16 flex items-center justify-center transition-all z-50 touch-manipulation hover:scale-110 active:scale-95"
             style={{
               boxShadow: "0 8px 30px -4px rgba(16, 185, 129, 0.6), 0 4px 15px rgba(16, 185, 129, 0.3)",
