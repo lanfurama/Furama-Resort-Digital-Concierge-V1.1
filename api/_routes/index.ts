@@ -1,19 +1,19 @@
 import { Router } from 'express';
-import authRoutes from './authRoutes.js';
-import userRoutes from './userRoutes.js';
-import locationRoutes from './locationRoutes.js';
-import menuItemRoutes from './menuItemRoutes.js';
-import promotionRoutes from './promotionRoutes.js';
-import knowledgeItemRoutes from './knowledgeItemRoutes.js';
-import resortEventRoutes from './resortEventRoutes.js';
-import rideRequestRoutes from './rideRequestRoutes.js';
-import serviceRequestRoutes from './serviceRequestRoutes.js';
-import chatMessageRoutes from './chatMessageRoutes.js';
-import roomTypeRoutes from './roomTypeRoutes.js';
-import roomRoutes from './roomRoutes.js';
-import notificationRoutes from './notificationRoutes.js';
-import hotelReviewRoutes from './hotelReviewRoutes.js';
-import driverScheduleRoutes from './driverScheduleRoutes.js';
+import authRoutes from './authRoutes';
+import userRoutes from './userRoutes';
+import locationRoutes from './locationRoutes';
+import menuItemRoutes from './menuItemRoutes';
+import promotionRoutes from './promotionRoutes';
+import knowledgeItemRoutes from './knowledgeItemRoutes';
+import resortEventRoutes from './resortEventRoutes';
+import rideRequestRoutes from './rideRequestRoutes';
+import serviceRequestRoutes from './serviceRequestRoutes';
+import chatMessageRoutes from './chatMessageRoutes';
+import roomTypeRoutes from './roomTypeRoutes';
+import roomRoutes from './roomRoutes';
+import notificationRoutes from './notificationRoutes';
+import hotelReviewRoutes from './hotelReviewRoutes';
+import driverScheduleRoutes from './driverScheduleRoutes';
 
 const router = Router();
 
