@@ -94,6 +94,11 @@ CRITICAL EXTRACTION RULES (follow these precisely for >95% accuracy):
      * "D03", "D11", "P03" → "D03", "D11", "P03"
      * "ACC", "ABC" (2-3 letters) → "ACC", "ABC"
      * "101", "2001", "101A" → "101", "2001", "101A"
+     * PHONETIC NUMBERS (Vietnamese style):
+       - "một linh một" -> "101"
+       - "hai không năm" -> "205"
+       - "một một hai" -> "112"
+       - "ba lẻ năm" -> "305"
    - Common patterns: [Letter][Digits] (D11, A101), [Digits] (101, 2001), [2-3 Letters] (ACC)
    - If room number is in pickup text, extract it separately
    - Room numbers are typically: 2-4 digits, or 1 letter + 1-3 digits, or 2-3 letters
@@ -101,17 +106,19 @@ CRITICAL EXTRACTION RULES (follow these precisely for >95% accuracy):
 2. PICKUP LOCATION MATCHING (>90% accuracy required):
    - Match location names EXACTLY from the valid locations list above
    - If pickup is NOT specified, use the extracted room number as pickup location
+   - Keywords indicating PICKUP: "từ", "ở", "tại", "đón", "pickup", "from", "lấy".
    - Smart matching for common terms (use EXACT names from list):
-     * "pool" or "hồ bơi" → prefer "Lagoon Pool" or "Ocean Pool" (check context for which one)
-     * "restaurant" or "nhà hàng" → match to specific restaurant: "ACC", "Cafe Indochine", "Don Cipriani's", etc.
+     * "pool" or "hồ bơi", "bể bơi" → prefer "Lagoon Pool" or "Ocean Pool" (check context for which one)
+     * "restaurant" or "nhà hàng" or "ăn" → match to specific restaurant: "ACC", "Cafe Indochine", "Don Cipriani's", etc.
      * "villa" or "biệt thự" → match villa areas: "D1", "D2", "D3", "D4", "D5", "D6", "D7", "Villas"
-     * "lobby" or "sảnh" or "reception" → match "Reception" or "Main Lobby"
-     * "beach" or "bãi biển" → match "Beach Access" or "Beach"
+     * "lobby" or "sảnh" or "reception" or "lễ tân" → match "Reception" or "Main Lobby"
+     * "beach" or "bãi biển" or "biển" → match "Beach Access" or "Beach"
    - If multiple matches possible, choose the MOST COMMON/POPULAR one from the list
    - IMPORTANT: Return the EXACT name as it appears in the valid locations list (case-sensitive)
 
 3. DESTINATION LOCATION MATCHING (>90% accuracy required):
    - Same rules as pickup location
+   - Keywords indicating DESTINATION: "đến", "tới", "đi", "ra", "về", "to", "go to", "cho".
    - MUST be different from pickup location
    - Match EXACTLY from valid locations list
 
@@ -126,20 +133,21 @@ VALIDATION:
 - Location names: Must be EXACT matches from the valid locations list
 - Pickup and destination: Must be different
 
-SPEECH RECOGNITION ERROR HANDLING:
+SPEECH RECOGNITION ERROR HANDLING & PHONETICS:
 - Vietnamese STT often mistakes "Đón" (Pick up) for "Yên", "Yến", "Đơn", "Đông". If you see "Yên khách", "Yến khách", interpret as "Đón khách" (Pick up guest).
 - "acc" usually refers to "ACC" (Asian Civic Center / Restaurant). Matches to "ACC".
 - "lobby" refers to "Reception".
+- "về" often means going back to room or lobby.
 
-7. PHONETIC ENGLISH INTERPRETATION (Critical for Bilingual Support):
+PHONETIC ENGLISH INTERPRETATION (Critical for Bilingual Support):
    The user might speak English while the Speech-to-Text engine is set to Vietnamese. You MUST interpret these phonetic approximations:
    - "niu rai" / "niu lai" / "nhiu lai" → "New Ride"
    - "rum" / "rùm" / "rôm" → "Room"
    - "oan" / "uân" / "quân" → "One" (1)
    - "tu" / "tư" / "tờ" → "Two" (2) / "To"
-   - "tri" / "tờ ri" / "thờ ri" → "Three" (3)
+   - "tri" / "tờ ri" / "thờ ri" / "thuy" → "Three" (3)
    - "for" / "pho" / "phò" → "Four" (4)
-   - "phai" / "phài" → "Five" (5)
+   - "phai" / "phài" / "five" → "Five" (5)
    - "xích" / "sích" → "Six" (6)
    - "se vần" / "xe vần" → "Seven" (7)
    - "gâu tu" / "gô tu" / "go to" → "Go To"
@@ -150,6 +158,7 @@ SPEECH RECOGNITION ERROR HANDLING:
 
    Example: "Niu rai rùm oan zia rô oan" → "New ride room 101"
    Example: "Pic úp ất vi la đi thri" → "Pick up at Villa D3"
+   Example: "Cho xe từ sảnh về vi la đê ba" → "Pickup: Main Lobby, Destination: Villa D3"
 
 Return JSON with exact location names matching the valid locations list.`;
 
@@ -182,7 +191,8 @@ Return JSON with exact location names matching the valid locations list.`;
           console.log(`[AI Parse] Fixed pickup: "${parsed.pickup}" → "${closestPickup.name}"`);
           parsed.pickup = closestPickup.name;
         } else {
-          console.warn(`[AI Parse] Could not match pickup location: "${parsed.pickup}"`);
+          console.warn(`[AI Parse] Could not match pickup location: "${parsed.pickup}" strictly. Clearing.`);
+          parsed.pickup = null;
         }
       }
     }
@@ -195,7 +205,8 @@ Return JSON with exact location names matching the valid locations list.`;
           console.log(`[AI Parse] Fixed destination: "${parsed.destination}" → "${closestDest.name}"`);
           parsed.destination = closestDest.name;
         } else {
-          console.warn(`[AI Parse] Could not match destination location: "${parsed.destination}"`);
+          console.warn(`[AI Parse] Could not match destination location: "${parsed.destination}" strictly. Clearing.`);
+          parsed.destination = null;
         }
       }
     }
@@ -486,8 +497,8 @@ function findClosestLocation(
       const match = locations.find(l => l.name === target);
       if (match) return match;
 
-      console.warn(`[FindClosestLocation] Target "${target}" not found in locations! Returning literal.`);
-      return { name: target, type: 'PLACE', id: 'synonym-fallback' };
+      console.warn(`[FindClosestLocation] Target "${target}" not found in locations! Ignoring synonym.`);
+      // STRICT MODE: Do not return partial match if not in DB
     }
   }
 

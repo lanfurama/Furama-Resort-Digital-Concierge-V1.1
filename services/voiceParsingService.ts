@@ -92,6 +92,18 @@ export const normalizeTranscript = (text: string): string => {
     "mà",
     "với",
     "cho",
+    "kiểu",
+    "kiểu như",
+    "cái gì nhỉ",
+    "nhé",
+    "ạ",
+    "vâng",
+    "dạ",
+    "í",
+    "ý",
+    "nhá",
+    "nhỉ",
+    "cái",
   ];
 
   let normalized = text.trim();
@@ -206,11 +218,23 @@ export const parseVoiceTranscript = (
     const synonymMap: Record<string, string> = {
       "nhà hàng ý": "Don Cipriani's Italian Restaurant",
       "italian restaurant": "Don Cipriani's Italian Restaurant",
+      "ý": "Don Cipriani's Italian Restaurant",
+      "don cipriani": "Don Cipriani's Italian Restaurant",
+      "nhà hàng á": "Cafe Indochine",
+      "indochine": "Cafe Indochine",
       "hồ bơi": "Lagoon Pool",
       "pool": "Lagoon Pool",
+      "bể bơi": "Lagoon Pool",
       "sảnh": "Main Lobby",
       "lobby": "Main Lobby",
-      "reception": "Main Lobby"
+      "reception": "Main Lobby",
+      "lễ tân": "Main Lobby",
+      "cổng": "Main Entrance",
+      "main entrance": "Main Entrance",
+      "biển": "Beach",
+      "bãi biển": "Beach",
+      "spa": "V-Senses Wellness & Spa",
+      "gym": "Health Club"
     };
 
     for (const [key, target] of Object.entries(synonymMap)) {
@@ -245,16 +269,16 @@ export const parseVoiceTranscript = (
 
     // 4. Keyword matching with expanded keywords
     const keywordMap: Record<string, string[]> = {
-      pool: ["pool", "hồ bơi", "bể bơi", "swimming pool", "hồ", "bể"],
-      restaurant: ["restaurant", "nhà hàng", "restaurant", "dining", "ăn", "nhà ăn"],
-      villa: ["villa", "biệt thự", "villas", "villa area", "khu biệt thự"],
-      lobby: ["lobby", "sảnh", "reception", "lễ tân", "sảnh chính", "main lobby"],
-      beach: ["beach", "bãi biển", "biển", "seaside", "bờ biển"],
-      gym: ["gym", "phòng gym", "phòng tập", "fitness", "gymnasium"],
-      spa: ["spa", "massage", "thư giãn", "wellness"],
-      bar: ["bar", "quán bar", "lounge", "quầy bar"],
-      shop: ["shop", "cửa hàng", "store", "gift shop", "quà lưu niệm"],
-      parking: ["parking", "bãi đỗ xe", "parking lot", "đỗ xe"],
+      pool: ["pool", "hồ bơi", "bể bơi", "swimming pool", "hồ", "bể", "bơi"],
+      restaurant: ["restaurant", "nhà hàng", "restaurant", "dining", "ăn", "nhà ăn", "buffet", "điểm tâm"],
+      villa: ["villa", "biệt thự", "villas", "villa area", "khu biệt thự", "căn"],
+      lobby: ["lobby", "sảnh", "reception", "lễ tân", "sảnh chính", "main lobby", "checkin", "check-in"],
+      beach: ["beach", "bãi biển", "biển", "seaside", "bờ biển", "cát"],
+      gym: ["gym", "phòng gym", "phòng tập", "fitness", "gymnasium", "thể hình"],
+      spa: ["spa", "massage", "thư giãn", "wellness", "xông hơi", "trị liệu"],
+      bar: ["bar", "quán bar", "lounge", "quầy bar", "club", "pub"],
+      shop: ["shop", "cửa hàng", "store", "gift shop", "quà lưu niệm", "mua sắm"],
+      parking: ["parking", "bãi đỗ xe", "parking lot", "đỗ xe", "gửi xe"],
     };
 
     for (const [category, keywords] of Object.entries(keywordMap)) {
@@ -318,14 +342,14 @@ export const parseVoiceTranscript = (
   // Enhanced patterns: 15+ variations including Vietnamese and English
   const routePatterns = [
     // Pattern 1-3: Basic from/to patterns
-    /(?:from|từ|pickup|đón|lấy|yên|yến)\s+(.+?)\s+(?:to|đến|destination|đi|go to|tới)\s+(.+)/i,
-    /(?:pickup|đón|lấy|yên|yến)\s+(.+?)\s+(?:destination|điểm đến|đi|tới)\s+(.+)/i,
-    /(.+?)\s+(?:to|đến|đi|tới)\s+(.+)/i,
+    /(?:from|từ|pickup|đón|lấy|yên|yến|tại|ở)\s+(.+?)\s+(?:to|đến|destination|đi|go to|tới|ra|về)\s+(.+)/i,
+    /(?:pickup|đón|lấy|yên|yến)\s+(.+?)\s+(?:destination|điểm đến|đi|tới|ra|về)\s+(.+)/i,
+    /(.+?)\s+(?:to|đến|đi|tới|ra|về)\s+(.+)/i,
 
     // Pattern 4-6: Vietnamese variations
-    /(?:đưa|chở|đưa đi)\s+(.+?)\s+(?:đến|tới|đi|về)\s+(.+)/i,
-    /(?:xe|buggy)\s+(?:đến|tới|đi)\s+(.+?)\s+(?:từ|tại|ở)\s+(.+)/i,
-    /(?:cần|muốn)\s+(?:đi|đến|tới)\s+(.+?)\s+(?:từ|tại|ở)\s+(.+)/i,
+    /(?:đưa|chở|đưa đi|chở đi)\s+(.+?)\s+(?:đến|tới|đi|về|ra)\s+(.+)/i,
+    /(?:xe|buggy)\s+(?:đến|tới|đi|ra|về)\s+(.+?)\s+(?:từ|tại|ở)\s+(.+)/i,
+    /(?:cần|muốn|cho)\s*(?:xe|buggy)?\s*(?:đi|đến|tới|ra|về)\s+(.+?)\s+(?:từ|tại|ở)\s+(.+)/i,
 
     // Pattern 7-9: English variations
     /(?:take|bring|drive)\s+(?:me|us|guest)?\s+(?:from|at)?\s*(.+?)\s+(?:to|towards)\s+(.+)/i,
@@ -333,19 +357,19 @@ export const parseVoiceTranscript = (
     /(?:going|go)\s+(?:to|towards)\s+(.+?)\s+(?:from|at|starting at)\s+(.+)/i,
 
     // Pattern 10-12: Mixed language and informal
-    /(?:đi|go)\s+(.+?)\s+(?:từ|from)\s+(.+)/i,
-    /(?:pickup|đón|yên|yến)\s+(?:at|tại|ở)\s+(.+?)\s+(?:go|đi)\s+(?:to|đến)\s+(.+)/i,
-    /(?:start|bắt đầu)\s+(?:from|từ|tại)\s+(.+?)\s+(?:end|kết thúc|đến)\s+(?:at|tại|ở)?\s*(.+)/i,
+    /(?:đi|go|ra|về)\s+(.+?)\s+(?:từ|from)\s+(.+)/i,
+    /(?:pickup|đón|yên|yến)\s+(?:at|tại|ở)\s+(.+?)\s+(?:go|đi|ra|về)\s+(?:to|đến|tới)\s+(.+)/i,
+    /(?:start|bắt đầu)\s+(?:from|từ|tại)\s+(.+?)\s+(?:end|kết thúc|đến|tới)\s+(?:at|tại|ở)?\s*(.+)/i,
 
     // Pattern 13-15: Additional variations
-    /(?:transport|vận chuyển)\s+(?:from|từ)\s+(.+?)\s+(?:to|đến)\s+(.+)/i,
+    /(?:transport|vận chuyển|di chuyển)\s+(?:from|từ)\s+(.+?)\s+(?:to|đến)\s+(.+)/i,
     /(?:move|di chuyển)\s+(?:from|từ)\s+(.+?)\s+(?:to|đến)\s+(.+)/i,
     /(?:transfer|chuyển)\s+(?:from|từ)\s+(.+?)\s+(?:to|đến)\s+(.+)/i,
 
     // Pattern 16-18: Room number as pickup variations
-    /(?:phòng|room)\s+([A-Z]?\d+[A-Z]?)\s+(?:đi|go|to|đến)\s+(.+)/i,
-    /(?:villa|biệt thự)\s+([A-Z]\d+)\s+(?:đi|go|to|đến)\s+(.+)/i,
-    /(?:từ|from)\s+(?:phòng|room)\s+([A-Z]?\d+[A-Z]?)\s+(?:đến|to)\s+(.+)/i,
+    /(?:phòng|room|tại|ở)\s+([A-Z]?\d+[A-Z]?)\s+(?:đi|go|to|đến|ra|về)\s+(.+)/i,
+    /(?:villa|biệt thự|tại|ở)\s+([A-Z]\d+)\s+(?:đi|go|to|đến|ra|về)\s+(.+)/i,
+    /(?:từ|from)\s+(?:phòng|room)\s+([A-Z]?\d+[A-Z]?)\s+(?:đến|to|ra|về)\s+(.+)/i,
   ];
 
   let foundPickup: string | null = null;
