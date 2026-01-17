@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { userModel } from '../_models/userModel.js';
+import { getUserFriendlyError } from '../_utils/errorUtils.js';
 
 export const userController = {
   async getAll(req: Request, res: Response) {
@@ -7,7 +8,7 @@ export const userController = {
       const users = await userModel.getAll();
       res.json(users);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'user') });
     }
   },
 
@@ -20,7 +21,7 @@ export const userController = {
       }
       res.json(user);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'user') });
     }
   },
 
@@ -33,7 +34,7 @@ export const userController = {
       }
       res.json(user);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'user') });
     }
   },
 
@@ -42,7 +43,7 @@ export const userController = {
       const user = await userModel.create(req.body);
       res.status(201).json(user);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'user', 'create') });
     }
   },
 
@@ -52,7 +53,7 @@ export const userController = {
       console.log('Updating user:', { id, body: req.body });
       console.log('Request body keys:', Object.keys(req.body));
       console.log('Language value:', req.body.language);
-      
+
       const user = await userModel.update(id, req.body);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
@@ -63,7 +64,7 @@ export const userController = {
     } catch (error: any) {
       console.error('Error updating user:', error);
       console.error('Error stack:', error.stack);
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'user', 'update') });
     }
   },
 
@@ -76,7 +77,7 @@ export const userController = {
       }
       res.status(204).send();
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'user', 'delete') });
     }
   },
 
@@ -90,7 +91,7 @@ export const userController = {
       res.json(user);
     } catch (error: any) {
       console.error('Error marking driver offline:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'user', 'update') });
     }
   },
 
@@ -114,7 +115,7 @@ export const userController = {
       res.json(user);
     } catch (error: any) {
       console.error('Error updating driver location:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'user', 'update') });
     }
   },
 
@@ -124,7 +125,7 @@ export const userController = {
       res.json(drivers);
     } catch (error: any) {
       console.error('Error fetching drivers with locations:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'user') });
     }
   },
 
@@ -156,7 +157,7 @@ export const userController = {
       };
 
       let checkInCode = generateCode();
-      
+
       // Ensure code is unique (very unlikely collision, but check anyway)
       let attempts = 0;
       while (await userModel.getByCheckInCode(checkInCode) && attempts < 10) {
@@ -166,7 +167,7 @@ export const userController = {
 
       // Update user with the new check-in code
       const updatedUser = await userModel.update(id, { check_in_code: checkInCode });
-      
+
       if (!updatedUser) {
         return res.status(500).json({ error: 'Failed to update user' });
       }
@@ -178,7 +179,7 @@ export const userController = {
       });
     } catch (error: any) {
       console.error('Error generating check-in code:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'user', 'update') });
     }
   },
 
@@ -197,7 +198,7 @@ export const userController = {
     } catch (error: any) {
       console.error('[userController.setOnlineFor10Hours] Error setting driver online for 10 hours:', error);
       console.error('[userController.setOnlineFor10Hours] Error stack:', error.stack);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'user', 'update') });
     }
   },
 };

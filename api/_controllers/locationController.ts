@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { locationModel } from '../_models/locationModel.js';
+import { getUserFriendlyError } from '../_utils/errorUtils.js';
 
 export const locationController = {
   async getAll(req: Request, res: Response) {
@@ -7,7 +8,7 @@ export const locationController = {
       const locations = await locationModel.getAll();
       res.json(locations);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'location') });
     }
   },
 
@@ -20,7 +21,7 @@ export const locationController = {
       }
       res.json(location);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'location') });
     }
   },
 
@@ -29,7 +30,7 @@ export const locationController = {
       const location = await locationModel.create(req.body);
       res.status(201).json(location);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'location', 'create') });
     }
   },
 
@@ -42,7 +43,7 @@ export const locationController = {
       }
       res.json(location);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'location', 'update') });
     }
   },
 
@@ -55,7 +56,7 @@ export const locationController = {
       }
       res.status(204).send();
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'location', 'delete') });
     }
   },
 };

@@ -63,6 +63,7 @@ import {
   extractRoomNumber,
 } from "../services/geminiService";
 import { useVoiceRecording } from "../hooks/useVoiceRecording";
+import { useAdaptivePolling } from "../hooks/useAdaptivePolling";
 import {
   processTranscript,
   ParsedVoiceData,
@@ -442,6 +443,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
   // Handle processing transcript using voice parsing service
   const handleProcessTranscript = async (text: string) => {
+    console.log(`[ReceptionPortal] Processing transcript: "${text}" with ${locations.length} locations`);
     setIsProcessing(true);
     setVoiceResult({ status: null, message: "" });
 
@@ -771,26 +773,29 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   ]);
 
   // Auto-refresh rides, users, and service requests
-  useEffect(() => {
-    const refreshInterval = setInterval(async () => {
-      try {
-        const [refreshedRides, refreshedUsers, refreshedServices] =
-          await Promise.all([
-            getRides().catch(() => getRidesSync()),
-            getUsers().catch(() => getUsersSync()),
-            getServiceRequests().catch(() => []),
-          ]);
+  const refreshData = useCallback(async () => {
+    try {
+      const [refreshedRides, refreshedUsers, refreshedServices] =
+        await Promise.all([
+          getRides().catch(() => getRidesSync()),
+          getUsers().catch(() => getUsersSync()),
+          getServiceRequests().catch(() => []),
+        ]);
 
-        setRides(refreshedRides);
-        setUsers(refreshedUsers);
-        setServiceRequests(refreshedServices);
-      } catch (error) {
-        console.error("Failed to auto-refresh data:", error);
-      }
-    }, 3000); // Refresh every 3 seconds
-
-    return () => clearInterval(refreshInterval);
+      setRides(refreshedRides);
+      setUsers(refreshedUsers);
+      setServiceRequests(refreshedServices);
+    } catch (error) {
+      console.error("Failed to auto-refresh data:", error);
+    }
   }, []);
+
+  useAdaptivePolling(refreshData, {
+    activeInterval: 3000,
+    idleInterval: 10000,
+    backgroundInterval: 60000,
+    enabled: true
+  });
 
   // Load guest information for active rides
   useEffect(() => {
@@ -2193,7 +2198,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       });
       setPickupSearchQuery("");
       setDestinationSearchQuery("");
-      setTranscript("");
       setVoiceResult({ status: null, message: "" });
     } catch (error: any) {
       console.error("Failed to create ride:", error);
@@ -4709,6 +4713,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       ? "Listening..."
                       : "Tap to speak"}
                   </p>
+
+
                   {/* Silence countdown indicator */}
                   {isListening && silenceCountdown !== null && silenceRemainingTime !== null && (
                     <div className="mt-4 animate-in fade-in slide-in-from-bottom-2 z-10 transition-all duration-300">
@@ -4927,6 +4933,34 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="p-3 md:p-4 border-t bg-gray-50 flex justify-end gap-3 z-10 rounded-b-2xl">
+                  <button
+                    onClick={() => setShowCreateRideModal(false)}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors min-h-[44px] md:min-h-0"
+                    disabled={isCreatingRide}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateRide}
+                    disabled={isCreatingRide || !newRideData.roomNumber || !newRideData.pickup || !newRideData.destination}
+                    className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20 flex items-center gap-2 min-h-[44px] md:min-h-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isCreatingRide ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={18} />
+                        Create Ride
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>

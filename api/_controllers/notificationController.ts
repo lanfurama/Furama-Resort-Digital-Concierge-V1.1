@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { notificationModel } from '../_models/notificationModel.js';
+import { getUserFriendlyError } from '../_utils/errorUtils.js';
 
 export const notificationController = {
   async getAll(req: Request, res: Response) {
@@ -7,7 +8,7 @@ export const notificationController = {
       const notifications = await notificationModel.getAll();
       res.json(notifications);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'notification') });
     }
   },
 
@@ -20,7 +21,7 @@ export const notificationController = {
       }
       res.json(notification);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'notification') });
     }
   },
 
@@ -30,7 +31,7 @@ export const notificationController = {
       const notifications = await notificationModel.getByRecipientId(recipientId);
       res.json(notifications);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'notification') });
     }
   },
 
@@ -40,7 +41,7 @@ export const notificationController = {
       const notifications = await notificationModel.getUnreadByRecipientId(recipientId);
       res.json(notifications);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'notification') });
     }
   },
 
@@ -49,7 +50,7 @@ export const notificationController = {
       const notification = await notificationModel.create(req.body);
       res.status(201).json(notification);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'notification', 'create') });
     }
   },
 
@@ -62,7 +63,7 @@ export const notificationController = {
       }
       res.json(notification);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'notification', 'update') });
     }
   },
 
@@ -75,7 +76,7 @@ export const notificationController = {
       }
       res.json(notification);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'notification', 'update') });
     }
   },
 
@@ -85,7 +86,7 @@ export const notificationController = {
       const count = await notificationModel.markAllAsRead(recipientId);
       res.json({ success: true, count });
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'notification', 'update') });
     }
   },
 
@@ -98,7 +99,7 @@ export const notificationController = {
       }
       res.status(204).send();
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'notification', 'delete') });
     }
   },
 };

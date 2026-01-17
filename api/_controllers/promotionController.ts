@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { promotionModel } from '../_models/promotionModel.js';
+import { getUserFriendlyError } from '../_utils/errorUtils.js';
 
 export const promotionController = {
   async getAll(req: Request, res: Response) {
@@ -8,7 +9,7 @@ export const promotionController = {
       const promotions = await promotionModel.getAll(language);
       res.json(promotions);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'promotion') });
     }
   },
 
@@ -21,7 +22,7 @@ export const promotionController = {
       }
       res.json(promotion);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'promotion') });
     }
   },
 
@@ -30,7 +31,7 @@ export const promotionController = {
       const promotion = await promotionModel.create(req.body);
       res.status(201).json(promotion);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'promotion', 'create') });
     }
   },
 
@@ -43,7 +44,7 @@ export const promotionController = {
       }
       res.json(promotion);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'promotion', 'update') });
     }
   },
 
@@ -56,7 +57,7 @@ export const promotionController = {
       }
       res.status(204).send();
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'promotion', 'delete') });
     }
   },
 };

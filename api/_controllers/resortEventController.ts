@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { resortEventModel } from '../_models/resortEventModel.js';
+import { getUserFriendlyError } from '../_utils/errorUtils.js';
 
 export const resortEventController = {
   async getAll(req: Request, res: Response) {
@@ -8,7 +9,7 @@ export const resortEventController = {
       const events = await resortEventModel.getAll(language);
       res.json(events);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'event') });
     }
   },
 
@@ -21,7 +22,7 @@ export const resortEventController = {
       }
       res.json(event);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'event') });
     }
   },
 
@@ -30,7 +31,7 @@ export const resortEventController = {
       const event = await resortEventModel.create(req.body);
       res.status(201).json(event);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'event', 'create') });
     }
   },
 
@@ -43,7 +44,7 @@ export const resortEventController = {
       }
       res.json(event);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'event', 'update') });
     }
   },
 
@@ -56,7 +57,7 @@ export const resortEventController = {
       }
       res.status(204).send();
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'event', 'delete') });
     }
   },
 };

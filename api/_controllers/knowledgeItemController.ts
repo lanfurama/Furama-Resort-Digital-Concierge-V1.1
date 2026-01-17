@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { knowledgeItemModel } from '../_models/knowledgeItemModel.js';
+import { getUserFriendlyError } from '../_utils/errorUtils.js';
 
 export const knowledgeItemController = {
   async getAll(req: Request, res: Response) {
@@ -7,7 +8,7 @@ export const knowledgeItemController = {
       const knowledgeItems = await knowledgeItemModel.getAll();
       res.json(knowledgeItems);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
 
@@ -20,7 +21,7 @@ export const knowledgeItemController = {
       }
       res.json(knowledgeItem);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
 
@@ -29,7 +30,7 @@ export const knowledgeItemController = {
       const knowledgeItem = await knowledgeItemModel.create(req.body);
       res.status(201).json(knowledgeItem);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error) });
     }
   },
 
@@ -42,7 +43,7 @@ export const knowledgeItemController = {
       }
       res.json(knowledgeItem);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error) });
     }
   },
 
@@ -55,7 +56,7 @@ export const knowledgeItemController = {
       }
       res.status(204).send();
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
 };

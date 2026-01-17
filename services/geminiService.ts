@@ -238,8 +238,107 @@ Return JSON with exact location names matching the valid locations list.`;
     return parsed;
   } catch (e) {
     console.error("AI Parse Error (Ride Request)", e);
-    return null;
+    console.log("[AI Parse] Attempting fallback parsing...");
+    return parseRideRequestFallback(input, locations);
   }
+};
+
+// Fallback parser using Regex and string matching (Robust offline support)
+export const parseRideRequestFallback = (
+  input: string,
+  locations: Array<{ id?: string; name: string; type?: string }>
+): any => {
+  const normalizedInput = input.toLowerCase().replace(/\s+/g, " ").trim();
+  const result: any = {
+    guestCount: 1
+  };
+
+  // 1. Extract Room Number
+  const roomNumber = extractRoomNumber(input);
+  if (roomNumber) {
+    result.roomNumber = roomNumber;
+  }
+
+  // 2. Identify Intent & Locations
+  // Common patterns: 
+  // "Room X to Y", "From X to Y", "Pickup at X go to Y"
+  // "Phòng X đi Y", "Từ X đến Y", "Đón tại X đi Y"
+
+  const locationNames = locations.map(l => l.name);
+
+  // Helper to find location in a text segment
+  const findLocationInText = (text: string): string | null => {
+    if (!text) return null;
+    const match = findClosestLocation(text, locations);
+    return match ? match.name : null;
+  };
+
+  // Split input by directional keywords
+  // English: to, go to, for
+  // Vietnamese: đi, đến, tới, cho, ra
+  // Use non-capturing group for delimiters to avoid word boundary issues with Unicode
+  // Regex includes unicode escapes for solidity: đi (\u0111i), đến (\u0111\u1EBFn), tới (t\u1EDBi), ra (ra)
+  const dirRegex = /(?:\s|^)(to|go to|\u0111i|\u0111\u1EBFn|t\u1EDBi|ra)(?:\s|$)/i;
+  const toSplit = normalizedInput.split(dirRegex);
+
+  // e.g. "room 205" "to" "restaurant"
+  if (toSplit.length >= 3) {
+    const fromPart = toSplit[0];
+    const toPart = toSplit.slice(2).join(" "); // everything after the delimiter
+
+    const destMatch = findLocationInText(toPart);
+    if (destMatch) {
+      result.destination = destMatch;
+    }
+
+    // Try to find pickup in the first part (if it's not just the room number)
+    // Avoid re-matching the room number as a location if possible, unless it really looks like one
+    const pickupMatch = findLocationInText(fromPart);
+    if (pickupMatch && pickupMatch !== destMatch) {
+      // Only if pickupMatch is NOT the room number (unless it's a location ID like villa)
+      if (pickupMatch !== result.roomNumber) {
+        result.pickup = pickupMatch;
+      }
+    }
+  } else {
+    // No explicit "to" keyword, try to find any mentioned locations
+    // e.g. "Italian Restaurant" (Implies destination if room provided)
+    const foundLocation = findLocationInText(normalizedInput);
+    if (foundLocation) {
+      // If we found a location, assume it's destination
+      result.destination = foundLocation;
+    }
+  }
+
+  // 3. Default Pickup Logic
+  // If we have room number but no pickup, pickup = room number (standard logic)
+  // If no room number and no pickup, default to "Lobby" (Reception)
+  if (!result.pickup) {
+    if (result.roomNumber) {
+      result.pickup = result.roomNumber;
+    } else {
+      // If simply "Go to Italian Restaurant", assume from Lobby
+      // But only if we have a destination
+      if (result.destination) {
+        result.pickup = "Reception"; // Default to Reception
+      }
+    }
+  }
+
+  // 4. Pickup/Destination Collision Fix
+  if (result.pickup === result.destination) {
+    if (result.roomNumber) result.pickup = result.roomNumber;
+    else result.pickup = "Reception";
+  }
+
+  // 5. Special keyword handling (Guests count)
+  const guestMatch = normalizedInput.match(/\b(\d+)\s*(khách|người|guest|people|pax)\b/i);
+  if (guestMatch) {
+    result.guestCount = parseInt(guestMatch[1]);
+  }
+
+  console.log("[AI Parse] Fallback result:", result);
+  return result;
 };
 
 // Levenshtein distance for fuzzy string matching
@@ -352,6 +451,45 @@ function findClosestLocation(
   if (!searchTerm || !locations || locations.length === 0) return null;
 
   const lowerSearch = searchTerm.toLowerCase().trim();
+  console.log(`[FindClosestLocation] Searching for: "${lowerSearch}" amongst ${locations.length} locations`);
+
+  // 0. Explicit Synonym Map (Robust Fallback)
+  const synonymMap: Record<string, string> = {
+    "nhà hàng ý": "Don Cipriani's Italian Restaurant",
+    "italian restaurant": "Don Cipriani's Italian Restaurant",
+    "italian": "Don Cipriani's Italian Restaurant",
+    "don cipriani": "Don Cipriani's Italian Restaurant",
+    "nhà hàng": "Cafe Indochine", // Default to main restaurant if unspecified
+    "lễ tân": "Main Lobby",
+    "sảnh": "Main Lobby",
+    "lobby": "Main Lobby",
+    "reception": "Main Lobby",
+    "hồ bơi": "Lagoon Pool", // Default pool
+    "pool": "Lagoon Pool",
+    "biển": "Main Lobby", // Usually drop off at lobby for beach access if not specific
+    "bãi biển": "Main Lobby",
+    "villa reception": "Furama Villas Reception",
+    "lễ tân khu villa": "Furama Villas Reception"
+  };
+
+  // Check synonyms (Exact + Fuzzy)
+  for (const [key, target] of Object.entries(synonymMap)) {
+    // Exact/Contains match
+    if (lowerSearch.includes(key) || key.includes(lowerSearch)) {
+      const match = locations.find(l => l.name === target);
+      if (match) return match;
+    }
+
+    // Fuzzy match against synonym key (handle minor typos like "nhà h ng" instead of "nhà hàng")
+    if (similarityScore(lowerSearch, key) > 0.85) {
+      console.log(`[FindClosestLocation] Fuzzy synonym match: "${lowerSearch}" ~= "${key}" -> "${target}"`);
+      const match = locations.find(l => l.name === target);
+      if (match) return match;
+
+      console.warn(`[FindClosestLocation] Target "${target}" not found in locations! Returning literal.`);
+      return { name: target, type: 'PLACE', id: 'synonym-fallback' };
+    }
+  }
 
   // 1. Exact match (case insensitive) - highest priority
   let match = locations.find(loc => loc.name.toLowerCase() === lowerSearch);

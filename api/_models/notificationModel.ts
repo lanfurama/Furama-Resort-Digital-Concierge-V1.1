@@ -51,6 +51,28 @@ export const notificationModel = {
     return result.rows[0];
   },
 
+  async createMany(notifications: Omit<Notification, 'id' | 'created_at' | 'updated_at'>[]): Promise<Notification[]> {
+    if (notifications.length === 0) return [];
+
+    const values: any[] = [];
+    const placeholders: string[] = [];
+    let paramCount = 1;
+
+    notifications.forEach((n, index) => {
+      placeholders.push(`($${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++})`);
+      values.push(n.recipient_id, n.title, n.message, n.type, n.is_read || false);
+    });
+
+    const query = `
+      INSERT INTO notifications (recipient_id, title, message, type, is_read) 
+      VALUES ${placeholders.join(', ')} 
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, values);
+    return result.rows;
+  },
+
   async update(id: number, notification: Partial<Omit<Notification, 'id' | 'created_at' | 'updated_at'>>): Promise<Notification | null> {
     const fields: string[] = [];
     const values: any[] = [];

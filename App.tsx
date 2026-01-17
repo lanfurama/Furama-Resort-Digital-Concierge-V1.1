@@ -29,6 +29,7 @@ import { BuggyStatus } from './types';
 import { User as UserIcon, LogOut, MessageSquare, Car, Percent, ShoppingCart, Home } from 'lucide-react';
 import { LanguageProvider, useTranslation } from './contexts/LanguageContext';
 import { BuggyStatusProvider, useBuggyStatus } from './contexts/BuggyStatusContext';
+import PullToRefresh from './components/PullToRefresh';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{
@@ -301,6 +302,23 @@ const AppContent: React.FC = () => {
   const GuestHome: React.FC<{ user: User }> = ({ user }) => {
     const { buggyStatus, buggyWaitTime } = useBuggyStatus();
 
+    const handleRefresh = async () => {
+      // Simulate refresh delay for better UX
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      try {
+        // Refresh promotions
+        await getPromotions().then(setPromotions);
+
+        // Refresh active orders if user has room number
+        if (user.roomNumber) {
+          await getActiveGuestOrders(user.roomNumber).then(orders => setActiveOrderCount(orders.length));
+        }
+      } catch (error) {
+        console.error("Refresh failed:", error);
+      }
+    };
+
     return (
       <div className="flex flex-col h-screen bg-gray-50 max-w-md mx-auto shadow-2xl overflow-hidden relative">
         {/* Header */}
@@ -336,95 +354,97 @@ const AppContent: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto pb-20 relative bg-gray-50 scrollbar-hide">
-          {view === AppView.HOME && (
-            <div className="flex flex-col min-h-full">
-              {/* Hero Banner */}
-              <div className="mx-4 mt-4 h-40 rounded-2xl overflow-hidden relative shadow-lg mb-6">
-                <img
-                  src="https://furamavietnam.com/wp-content/uploads/2025/10/furama-resort-danang.jpg"
-                  className="absolute inset-0 w-full h-full object-cover"
-                  alt="Furama Resort Danang"
-                  onError={(e) => {
-                    const img = e.target as HTMLImageElement;
-                    if (img.src.includes('furama-resort-danang.jpg')) {
-                      img.src = "https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Exterior-1920x1080.jpg";
-                    } else if (img.src.includes('Exterior')) {
-                      img.src = "https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Pool-768x552.jpg";
-                    }
-                  }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/85 via-emerald-900/70 to-transparent flex items-center p-6">
-                  <div>
-                    <h2 className="text-white font-serif text-2xl font-bold mb-1 drop-shadow-lg">Furama Danang</h2>
-                    <p className="text-emerald-100 text-xs drop-shadow-md">A Culinary Beach Resort</p>
+        <PullToRefresh onRefresh={handleRefresh}>
+          <div className="flex-1 pb-20 relative bg-gray-50 scrollbar-hide min-h-full">
+            {view === AppView.HOME && (
+              <div className="flex flex-col min-h-full">
+                {/* Hero Banner */}
+                <div className="mx-4 mt-4 h-40 rounded-2xl overflow-hidden relative shadow-lg mb-6">
+                  <img
+                    src="https://furamavietnam.com/wp-content/uploads/2025/10/furama-resort-danang.jpg"
+                    className="absolute inset-0 w-full h-full object-cover"
+                    alt="Furama Resort Danang"
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      if (img.src.includes('furama-resort-danang.jpg')) {
+                        img.src = "https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Exterior-1920x1080.jpg";
+                      } else if (img.src.includes('Exterior')) {
+                        img.src = "https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Pool-768x552.jpg";
+                      }
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/85 via-emerald-900/70 to-transparent flex items-center p-6">
+                    <div>
+                      <h2 className="text-white font-serif text-2xl font-bold mb-1 drop-shadow-lg">Furama Danang</h2>
+                      <p className="text-emerald-100 text-xs drop-shadow-md">A Culinary Beach Resort</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Services Grid */}
+                <div className="px-4">
+                  <div className="flex justify-between items-center mb-2 px-1">
+                    <h3 className="font-bold text-gray-800 text-lg">{t('resort_services')}</h3>
+                  </div>
+                  <div className="-mx-4">
+                    <ServiceMenu onSelect={handleServiceSelect} />
+                  </div>
+                </div>
+
+                {/* Promotions Carousel */}
+                <div className="p-6 pt-2 pb-8">
+                  <h3 className="font-bold text-gray-800 text-lg mb-4 px-1">{t('exclusive_offers')}</h3>
+                  <div className="flex space-x-4 overflow-x-auto pb-4 snap-x scrollbar-hide">
+                    {promotions.map(promo => {
+                      const tr = promo.translations?.[language];
+                      const title = tr?.title || promo.title;
+                      const desc = tr?.description || promo.description;
+                      const discount = tr?.discount || promo.discount;
+                      return (
+                        <div
+                          key={promo.id}
+                          className={`min-w-[260px] p-5 rounded-2xl text-white shadow-lg snap-center relative overflow-hidden shrink-0 ${promo.imageUrl ? '' : (promo.imageColor || 'bg-emerald-500')
+                            }`}
+                          style={promo.imageUrl ? {
+                            backgroundImage: `url(${promo.imageUrl})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            backgroundRepeat: 'no-repeat'
+                          } : {}}
+                        >
+                          {promo.imageUrl && (
+                            <div className="absolute inset-0 bg-black/40 rounded-2xl shadow-lg"></div>
+                          )}
+                          <div className="relative z-10">
+                            <div className="bg-white/20 w-fit px-2 py-1 rounded text-[10px] font-bold mb-2 backdrop-blur-sm">{discount}</div>
+                            <h4 className="font-bold text-lg mb-1">{title}</h4>
+                            <p className="text-xs opacity-90 line-clamp-2">{desc}</p>
+                            <p className="text-[10px] mt-3 opacity-75">{promo.validUntil}</p>
+                          </div>
+                          <div className="absolute -bottom-4 -right-4 text-white/10">
+                            <Percent size={100} />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
+            )}
 
-              {/* Services Grid */}
-              <div className="px-4">
-                <div className="flex justify-between items-center mb-2 px-1">
-                  <h3 className="font-bold text-gray-800 text-lg">{t('resort_services')}</h3>
-                </div>
-                <div className="-mx-4">
-                  <ServiceMenu onSelect={handleServiceSelect} />
-                </div>
-              </div>
+            {/* Sub-Views */}
+            {view === AppView.BUGGY && user && <BuggyBooking user={user} onBack={() => setView(AppView.HOME)} />}
+            {view === AppView.CHAT && <ConciergeChat onClose={() => setView(AppView.HOME)} />}
+            {view === AppView.ACTIVE_ORDERS && user && <ActiveOrders user={user} onBack={() => setView(AppView.HOME)} />}
+            {view === AppView.ACCOUNT && user && <GuestAccount user={user} onBack={() => setView(AppView.HOME)} />}
 
-              {/* Promotions Carousel */}
-              <div className="p-6 pt-2 pb-8">
-                <h3 className="font-bold text-gray-800 text-lg mb-4 px-1">{t('exclusive_offers')}</h3>
-                <div className="flex space-x-4 overflow-x-auto pb-4 snap-x scrollbar-hide">
-                  {promotions.map(promo => {
-                    const tr = promo.translations?.[language];
-                    const title = tr?.title || promo.title;
-                    const desc = tr?.description || promo.description;
-                    const discount = tr?.discount || promo.discount;
-                    return (
-                      <div
-                        key={promo.id}
-                        className={`min-w-[260px] p-5 rounded-2xl text-white shadow-lg snap-center relative overflow-hidden shrink-0 ${promo.imageUrl ? '' : (promo.imageColor || 'bg-emerald-500')
-                          }`}
-                        style={promo.imageUrl ? {
-                          backgroundImage: `url(${promo.imageUrl})`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                          backgroundRepeat: 'no-repeat'
-                        } : {}}
-                      >
-                        {promo.imageUrl && (
-                          <div className="absolute inset-0 bg-black/40 rounded-2xl shadow-lg"></div>
-                        )}
-                        <div className="relative z-10">
-                          <div className="bg-white/20 w-fit px-2 py-1 rounded text-[10px] font-bold mb-2 backdrop-blur-sm">{discount}</div>
-                          <h4 className="font-bold text-lg mb-1">{title}</h4>
-                          <p className="text-xs opacity-90 line-clamp-2">{desc}</p>
-                          <p className="text-[10px] mt-3 opacity-75">{promo.validUntil}</p>
-                        </div>
-                        <div className="absolute -bottom-4 -right-4 text-white/10">
-                          <Percent size={100} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Sub-Views */}
-          {view === AppView.BUGGY && user && <BuggyBooking user={user} onBack={() => setView(AppView.HOME)} />}
-          {view === AppView.CHAT && <ConciergeChat onClose={() => setView(AppView.HOME)} />}
-          {view === AppView.ACTIVE_ORDERS && user && <ActiveOrders user={user} onBack={() => setView(AppView.HOME)} />}
-          {view === AppView.ACCOUNT && user && <GuestAccount user={user} onBack={() => setView(AppView.HOME)} />}
-
-          {view === AppView.DINING_ORDER && user && <ServiceBooking type="DINING" user={user} onBack={() => setView(AppView.HOME)} />}
-          {view === AppView.SPA_BOOKING && user && <ServiceBooking type="SPA" user={user} onBack={() => setView(AppView.HOME)} />}
-          {view === AppView.POOL_ORDER && user && <ServiceBooking type="POOL" user={user} onBack={() => setView(AppView.HOME)} />}
-          {view === AppView.BUTLER_REQUEST && user && <ServiceBooking type="BUTLER" user={user} onBack={() => setView(AppView.HOME)} />}
-          {view === AppView.EVENTS && <EventsList onBack={() => setView(AppView.HOME)} />}
-        </div>
+            {view === AppView.DINING_ORDER && user && <ServiceBooking type="DINING" user={user} onBack={() => setView(AppView.HOME)} />}
+            {view === AppView.SPA_BOOKING && user && <ServiceBooking type="SPA" user={user} onBack={() => setView(AppView.HOME)} />}
+            {view === AppView.POOL_ORDER && user && <ServiceBooking type="POOL" user={user} onBack={() => setView(AppView.HOME)} />}
+            {view === AppView.BUTLER_REQUEST && user && <ServiceBooking type="BUTLER" user={user} onBack={() => setView(AppView.HOME)} />}
+            {view === AppView.EVENTS && <EventsList onBack={() => setView(AppView.HOME)} />}
+          </div>
+        </PullToRefresh>
 
         {/* Bottom Navigation */}
         <div
@@ -473,7 +493,7 @@ const AppContent: React.FC = () => {
             label={t('account')}
           />
         </div>
-      </div>
+      </div >
     );
   };
 
@@ -619,7 +639,7 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <>
+    <BuggyStatusProvider user={user} currentView={view}>
       <PWAInstallPrompt />
       <Routes>
         {/* Public Routes */}
@@ -681,7 +701,7 @@ const AppContent: React.FC = () => {
         {/* Default redirect */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </>
+    </BuggyStatusProvider>
   );
 };
 
@@ -689,39 +709,8 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <LanguageProvider>
-      <AppContentWithProviders />
-    </LanguageProvider>
-  );
-};
-
-// Wrapper component to provide buggy status context
-const AppContentWithProviders: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [view, setView] = useState<AppView>(AppView.HOME);
-
-  // Load user from localStorage
-  useEffect(() => {
-    const savedUser = localStorage.getItem('furama_user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (error) {
-        console.error('Failed to restore user from localStorage:', error);
-        localStorage.removeItem('furama_user');
-      }
-    }
-  }, []);
-
-  // Use ref to track view for BuggyStatusProvider without causing re-renders
-  const viewRef = useRef<AppView>(view);
-  useEffect(() => {
-    viewRef.current = view;
-  }, [view]);
-
-  return (
-    <BuggyStatusProvider user={user} currentView={viewRef.current}>
       <AppContent />
-    </BuggyStatusProvider>
+    </LanguageProvider>
   );
 };
 

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { roomModel } from '../_models/roomModel.js';
+import { getUserFriendlyError } from '../_utils/errorUtils.js';
 
 export const roomController = {
   async getAll(req: Request, res: Response) {
@@ -7,7 +8,7 @@ export const roomController = {
       const rooms = await roomModel.getAll();
       res.json(rooms);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'room') });
     }
   },
 
@@ -20,7 +21,7 @@ export const roomController = {
       }
       res.json(room);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'room') });
     }
   },
 
@@ -33,7 +34,7 @@ export const roomController = {
       }
       res.json(room);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'room') });
     }
   },
 
@@ -43,7 +44,7 @@ export const roomController = {
       const rooms = await roomModel.getByTypeId(typeId);
       res.json(rooms);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'room') });
     }
   },
 
@@ -52,7 +53,7 @@ export const roomController = {
       const room = await roomModel.create(req.body);
       res.status(201).json(room);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'room', 'create') });
     }
   },
 
@@ -65,7 +66,7 @@ export const roomController = {
       }
       res.json(room);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'room', 'update') });
     }
   },
 
@@ -78,7 +79,7 @@ export const roomController = {
       }
       res.status(204).send();
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'room', 'delete') });
     }
   },
 
@@ -91,7 +92,7 @@ export const roomController = {
       const createdRooms = await roomModel.bulkCreate(rooms);
       res.status(201).json({ count: createdRooms.length, rooms: createdRooms });
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'room', 'create') });
     }
   },
 };

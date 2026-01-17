@@ -3,6 +3,7 @@ import { serviceRequestModel } from '../_models/serviceRequestModel.js';
 import { userModel } from '../_models/userModel.js';
 import { notificationModel } from '../_models/notificationModel.js';
 import { sendEmail } from '../_services/emailService.js';
+import { getUserFriendlyError } from '../_utils/errorUtils.js';
 
 export const serviceRequestController = {
   async getAll(req: Request, res: Response) {
@@ -10,7 +11,7 @@ export const serviceRequestController = {
       const services = await serviceRequestModel.getAll();
       res.json(services);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'service') });
     }
   },
 
@@ -23,7 +24,7 @@ export const serviceRequestController = {
       }
       res.json(service);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'service') });
     }
   },
 
@@ -33,7 +34,7 @@ export const serviceRequestController = {
       const services = await serviceRequestModel.getByRoomNumber(roomNumber);
       res.json(services);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'service') });
     }
   },
 
@@ -43,7 +44,7 @@ export const serviceRequestController = {
       const services = await serviceRequestModel.getByStatus(status as any);
       res.json(services);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'service') });
     }
   },
 
@@ -53,14 +54,14 @@ export const serviceRequestController = {
       const services = await serviceRequestModel.getByType(type as any);
       res.json(services);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'service') });
     }
   },
 
   async create(req: Request, res: Response) {
     try {
       const service = await serviceRequestModel.create(req.body);
-      
+
       // Send notifications for EXTEND_STAY requests
       if (service.type === 'EXTEND_STAY') {
         try {
@@ -68,19 +69,21 @@ export const serviceRequestController = {
           const receptionAndAdmins = allUsers.filter(
             u => u.role === 'RECEPTION' || u.role === 'ADMIN' || u.role === 'SUPERVISOR'
           );
-          
+
           const message = `Room ${service.room_number} requests to extend stay: ${service.details}`;
-          
-          // Notify reception and admins
+
+          const notificationsToCreate = [];
+
+          // Notifications for reception and admins
           for (const staff of receptionAndAdmins) {
-            await notificationModel.create({
+            notificationsToCreate.push({
               recipient_id: staff.room_number,
               title: 'Extend Stay Request',
               message: message,
               type: 'INFO',
               is_read: false
             });
-            
+
             // Send email if available
             if (staff.email && staff.email.trim() !== '') {
               try {
@@ -132,54 +135,58 @@ export const serviceRequestController = {
               }
             }
           }
-          
+
+          if (notificationsToCreate.length > 0) {
+            await notificationModel.createMany(notificationsToCreate as any);
+          }
+
           console.log(`[ServiceRequestController] Sent extend stay notifications to ${receptionAndAdmins.length} staff members`);
         } catch (notifError: any) {
           console.error('[ServiceRequestController] Error sending extend stay notifications:', notifError);
         }
       }
-      
+
       res.status(201).json(service);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'service', 'create') });
     }
   },
 
   async update(req: Request, res: Response) {
     try {
       const id = parseInt(req.params.id);
-      
+
       // Get current service request to check type and status
       const currentService = await serviceRequestModel.getById(id);
       if (!currentService) {
         return res.status(404).json({ error: 'Service request not found' });
       }
-      
+
       const service = await serviceRequestModel.update(id, req.body);
       if (!service) {
         return res.status(404).json({ error: 'Service request not found' });
       }
-      
+
       // Handle EXTEND_STAY confirmation: Update user's check_out date
-      if (service.type === 'EXTEND_STAY' && 
-          service.status === 'CONFIRMED' && 
-          currentService.status !== 'CONFIRMED') {
+      if (service.type === 'EXTEND_STAY' &&
+        service.status === 'CONFIRMED' &&
+        currentService.status !== 'CONFIRMED') {
         try {
           // Parse new check-out date from details
           // Format: "... [NEW_CHECKOUT_DATE:ISO_DATE]"
           const details = service.details;
           const dateMatch = details.match(/\[NEW_CHECKOUT_DATE:(.+?)\]/);
-          
+
           if (dateMatch) {
             const isoDate = dateMatch[1];
             const newCheckOutDate = new Date(isoDate);
             newCheckOutDate.setHours(12, 0, 0, 0); // Set to noon
-            
+
             // Update user's check_out date
             const user = await userModel.getByRoomNumber(service.room_number);
             if (user) {
               await userModel.update(user.id, { check_out: newCheckOutDate });
-              
+
               // Send notification to guest
               await notificationModel.create({
                 recipient_id: service.room_number,
@@ -188,7 +195,7 @@ export const serviceRequestController = {
                 type: 'SUCCESS',
                 is_read: false
               });
-              
+
               // Send email if available
               if (user.email && user.email.trim() !== '') {
                 try {
@@ -241,7 +248,7 @@ export const serviceRequestController = {
                   console.error(`[ServiceRequestController] Failed to send email:`, emailError);
                 }
               }
-              
+
               console.log(`[ServiceRequestController] ✅ Extended stay for Room ${service.room_number} to ${newCheckOutDate.toLocaleDateString()}`);
             }
           }
@@ -250,10 +257,10 @@ export const serviceRequestController = {
           // Don't fail the update, just log the error
         }
       }
-      
+
       res.json(service);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'service', 'update') });
     }
   },
 
@@ -266,7 +273,7 @@ export const serviceRequestController = {
       }
       res.status(204).send();
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'service', 'delete') });
     }
   },
 };

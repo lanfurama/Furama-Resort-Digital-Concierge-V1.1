@@ -3,6 +3,7 @@ import { rideRequestModel } from '../_models/rideRequestModel.js';
 import { notificationModel } from '../_models/notificationModel.js';
 import { userModel } from '../_models/userModel.js';
 import { sendBuggyRequestEmail, sendBuggyRequestEmailToDriver } from '../_services/emailService.js';
+import { getUserFriendlyError } from '../_utils/errorUtils.js';
 
 export const rideRequestController = {
   async getAll(req: Request, res: Response) {
@@ -10,7 +11,7 @@ export const rideRequestController = {
       const rides = await rideRequestModel.getAll();
       res.json(rides);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'ride') });
     }
   },
 
@@ -23,7 +24,7 @@ export const rideRequestController = {
       }
       res.json(ride);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'ride') });
     }
   },
 
@@ -33,7 +34,7 @@ export const rideRequestController = {
       const rides = await rideRequestModel.getByRoomNumber(roomNumber);
       res.json(rides);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'ride') });
     }
   },
 
@@ -46,7 +47,7 @@ export const rideRequestController = {
       }
       res.json(ride);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'ride') });
     }
   },
 
@@ -56,14 +57,14 @@ export const rideRequestController = {
       const rides = await rideRequestModel.getByStatus(status as any);
       res.json(rides);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'ride') });
     }
   },
 
   async create(req: Request, res: Response) {
     try {
       const ride = await rideRequestModel.create(req.body);
-      
+
       // Send notifications when a new ride request is created (status = SEARCHING)
       if (ride.status === 'SEARCHING') {
         try {
@@ -72,31 +73,32 @@ export const rideRequestController = {
           const adminsSupervisorsReception = allUsers.filter(
             u => u.role === 'ADMIN' || u.role === 'SUPERVISOR' || u.role === 'RECEPTION'
           );
-          
+
           // Get all online drivers (updated_at within last 3 minutes)
           const onlineDrivers = allUsers.filter(
-            u => u.role === 'DRIVER' && 
-            u.updated_at && 
-            (Date.now() - new Date(u.updated_at).getTime()) < 3 * 60 * 1000
+            u => u.role === 'DRIVER' &&
+              u.updated_at &&
+              (Date.now() - new Date(u.updated_at).getTime()) < 3 * 60 * 1000
           );
-          
+
           // Notification message
           const message = `New buggy request: Room ${ride.room_number} (${ride.guest_name}) from ${ride.pickup} to ${ride.destination}`;
-          
+
           console.log(`[RideRequestController] Found ${adminsSupervisorsReception.length} staff (Admin/Reception/Supervisor) to notify`);
           console.log(`[RideRequestController] Found ${onlineDrivers.length} online drivers to notify`);
-          
-          // Notify admins, supervisors, and reception (in-app + email)
+
+          const notificationsToCreate = [];
+
+          // Notifications for admins, supervisors, and reception
           for (const staff of adminsSupervisorsReception) {
-            // In-app notification
-            await notificationModel.create({
+            notificationsToCreate.push({
               recipient_id: staff.room_number,
               title: 'New Buggy Request',
               message: message,
               type: 'INFO',
               is_read: false
             });
-            
+
             // Email notification (only if email is available and valid)
             if (staff.email && staff.email.trim() !== '') {
               try {
@@ -115,18 +117,17 @@ export const rideRequestController = {
               console.log(`[RideRequestController] Skipping email for ${staff.role} ${staff.room_number} (no email address)`);
             }
           }
-          
-          // Notify online drivers (in-app + email)
+
+          // Notifications for online drivers
           for (const driver of onlineDrivers) {
-            // In-app notification
-            await notificationModel.create({
+            notificationsToCreate.push({
               recipient_id: driver.room_number,
               title: 'New Buggy Request Available',
               message: message,
               type: 'INFO',
               is_read: false
             });
-            
+
             // Email notification (only if email is available and valid)
             if (driver.email && driver.email.trim() !== '') {
               try {
@@ -145,17 +146,22 @@ export const rideRequestController = {
               console.log(`[RideRequestController] Skipping email for driver ${driver.room_number} (no email address)`);
             }
           }
-          
+
+          // Bulk create notifications
+          if (notificationsToCreate.length > 0) {
+            await notificationModel.createMany(notificationsToCreate as any);
+          }
+
           console.log(`[RideRequestController] Sent notifications: ${adminsSupervisorsReception.length} admins/supervisors/reception, ${onlineDrivers.length} online drivers`);
         } catch (notifError: any) {
           // Log error but don't fail the ride creation
           console.error('[RideRequestController] Error sending notifications:', notifError);
         }
       }
-      
+
       res.status(201).json(ride);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'ride', 'create') });
     }
   },
 
@@ -170,13 +176,13 @@ export const rideRequestController = {
         url: req.url,
         originalUrl: req.originalUrl
       });
-      
+
       const ride = await rideRequestModel.update(id, req.body);
       if (!ride) {
         console.log(`[RideRequestController] Ride ${id} not found`);
         return res.status(404).json({ error: 'Ride request not found' });
       }
-      
+
       console.log(`[RideRequestController] Ride ${id} updated successfully:`, ride);
       res.json(ride);
     } catch (error: any) {
@@ -185,7 +191,7 @@ export const rideRequestController = {
         error: error.message,
         stack: error.stack
       });
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'ride', 'update') });
     }
   },
 
@@ -198,7 +204,7 @@ export const rideRequestController = {
       }
       res.status(204).send();
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'ride', 'delete') });
     }
   },
 
@@ -237,7 +243,7 @@ export const rideRequestController = {
       res.json(rides);
     } catch (error: any) {
       console.error('Error fetching historical reports:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'ride') });
     }
   },
 
@@ -277,7 +283,7 @@ export const rideRequestController = {
           const driver = allUsers.find(u => u.id === driverStat.driver_id);
           return {
             ...driverStat,
-            driver_name: driver ? `${driver.firstName || ''} ${driver.lastName || ''}`.trim() || `Driver ${driverStat.driver_id}` : driverStat.driver_name
+            driver_name: driver ? (`${driver.last_name || ''}`.trim() || `Driver ${driverStat.driver_id}`) : driverStat.driver_name
           };
         });
       }
@@ -285,7 +291,7 @@ export const rideRequestController = {
       res.json(stats);
     } catch (error: any) {
       console.error('Error fetching report statistics:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'ride') });
     }
   },
 
@@ -320,7 +326,7 @@ export const rideRequestController = {
       res.json(stats);
     } catch (error: any) {
       console.error('Error fetching driver performance stats:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'ride') });
     }
   },
 };

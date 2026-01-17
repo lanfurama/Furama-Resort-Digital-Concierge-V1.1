@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { menuItemModel } from '../_models/menuItemModel.js';
+import { getUserFriendlyError } from '../_utils/errorUtils.js';
 
 export const menuItemController = {
   async getAll(req: Request, res: Response) {
@@ -9,7 +10,7 @@ export const menuItemController = {
       const menuItems = await menuItemModel.getAll(category, language);
       res.json(menuItems);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'menu') });
     }
   },
 
@@ -22,7 +23,7 @@ export const menuItemController = {
       }
       res.json(menuItem);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'menu') });
     }
   },
 
@@ -31,7 +32,7 @@ export const menuItemController = {
       const menuItem = await menuItemModel.create(req.body);
       res.status(201).json(menuItem);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'menu', 'create') });
     }
   },
 
@@ -44,7 +45,7 @@ export const menuItemController = {
       }
       res.json(menuItem);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error, 'menu', 'update') });
     }
   },
 
@@ -57,7 +58,7 @@ export const menuItemController = {
       }
       res.status(204).send();
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error, 'menu', 'delete') });
     }
   },
 };

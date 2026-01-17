@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { userModel } from '../_models/userModel';
+import { getUserFriendlyError } from '../_utils/errorUtils.js';
 
 export const authController = {
   // Guest Login: Check-in Code (new secure method)
@@ -71,7 +72,7 @@ export const authController = {
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: getUserFriendlyError(error)
       });
     }
   },
@@ -153,7 +154,7 @@ export const authController = {
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: getUserFriendlyError(error)
       });
     }
   },
@@ -220,7 +221,7 @@ export const authController = {
     } catch (error: any) {
       res.status(500).json({
         success: false,
-        error: error.message
+        error: getUserFriendlyError(error)
       });
     }
   },

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { hotelReviewModel } from '../_models/hotelReviewModel.js';
+import { getUserFriendlyError } from '../_utils/errorUtils.js';
 
 export const hotelReviewController = {
   async getAll(req: Request, res: Response) {
@@ -7,7 +8,7 @@ export const hotelReviewController = {
       const reviews = await hotelReviewModel.getAll();
       res.json(reviews);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
 
@@ -20,7 +21,7 @@ export const hotelReviewController = {
       }
       res.json(review);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
 
@@ -29,7 +30,7 @@ export const hotelReviewController = {
       const review = await hotelReviewModel.create(req.body);
       res.status(201).json(review);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error) });
     }
   },
 
@@ -42,7 +43,7 @@ export const hotelReviewController = {
       }
       res.json(review);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getUserFriendlyError(error) });
     }
   },
 
@@ -55,7 +56,7 @@ export const hotelReviewController = {
       }
       res.status(204).send();
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
 };

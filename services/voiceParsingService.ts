@@ -202,6 +202,24 @@ export const parseVoiceTranscript = (
 
     const lowerSearch = searchText.toLowerCase().trim();
 
+    // 0. Explicit Synonym Map
+    const synonymMap: Record<string, string> = {
+      "nhà hàng ý": "Don Cipriani's Italian Restaurant",
+      "italian restaurant": "Don Cipriani's Italian Restaurant",
+      "hồ bơi": "Lagoon Pool",
+      "pool": "Lagoon Pool",
+      "sảnh": "Main Lobby",
+      "lobby": "Main Lobby",
+      "reception": "Main Lobby"
+    };
+
+    for (const [key, target] of Object.entries(synonymMap)) {
+      if (lowerSearch.includes(key) || key.includes(lowerSearch)) {
+        const match = locations.find(l => l.name === target);
+        if (match) return match.name;
+      }
+    }
+
     // 1. Exact match (case insensitive)
     let match = locations.find(loc =>
       loc.name.toLowerCase() === lowerSearch

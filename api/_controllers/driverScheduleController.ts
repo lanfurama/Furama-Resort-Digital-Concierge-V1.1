@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { driverScheduleModel } from '../_models/driverScheduleModel.js';
+import { getUserFriendlyError } from '../_utils/errorUtils.js';
 
 export const driverScheduleController = {
   // Get all schedules for a driver
@@ -14,7 +15,7 @@ export const driverScheduleController = {
       res.json(schedules);
     } catch (error: any) {
       console.error('Error fetching driver schedules:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
 
@@ -40,7 +41,7 @@ export const driverScheduleController = {
       res.json(schedule);
     } catch (error: any) {
       console.error('Error fetching driver schedule:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
 
@@ -66,7 +67,7 @@ export const driverScheduleController = {
       res.json(schedules);
     } catch (error: any) {
       console.error('Error fetching driver schedules:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
 
@@ -83,7 +84,7 @@ export const driverScheduleController = {
       res.json(schedules);
     } catch (error: any) {
       console.error('Error fetching all driver schedules:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
 
@@ -109,7 +110,7 @@ export const driverScheduleController = {
       res.json({ isAvailable });
     } catch (error: any) {
       console.error('Error checking driver availability:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
 
@@ -139,7 +140,7 @@ export const driverScheduleController = {
       res.json(schedule);
     } catch (error: any) {
       console.error('Error upserting driver schedule:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
 
@@ -165,7 +166,7 @@ export const driverScheduleController = {
       res.json({ message: 'Schedule deleted successfully' });
     } catch (error: any) {
       console.error('Error deleting driver schedule:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
 };

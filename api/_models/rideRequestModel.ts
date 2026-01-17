@@ -23,36 +23,55 @@ export interface RideRequest {
 
 export const rideRequestModel = {
   async getAll(): Promise<RideRequest[]> {
-    const result = await pool.query('SELECT * FROM ride_requests ORDER BY timestamp DESC');
+    const result = await pool.query(`
+      SELECT r.*, u.last_name as driver_name 
+      FROM ride_requests r
+      LEFT JOIN users u ON r.driver_id = u.id
+      ORDER BY r.timestamp DESC
+    `);
     return result.rows;
   },
 
   async getById(id: number): Promise<RideRequest | null> {
-    const result = await pool.query('SELECT * FROM ride_requests WHERE id = $1', [id]);
+    const result = await pool.query(`
+      SELECT r.*, u.last_name as driver_name 
+      FROM ride_requests r
+      LEFT JOIN users u ON r.driver_id = u.id
+      WHERE r.id = $1
+    `, [id]);
     return result.rows[0] || null;
   },
 
   async getByRoomNumber(roomNumber: string): Promise<RideRequest[]> {
-    const result = await pool.query(
-      'SELECT * FROM ride_requests WHERE room_number = $1 ORDER BY timestamp DESC',
-      [roomNumber]
-    );
+    const result = await pool.query(`
+      SELECT r.*, u.last_name as driver_name 
+      FROM ride_requests r
+      LEFT JOIN users u ON r.driver_id = u.id
+      WHERE r.room_number = $1 
+      ORDER BY r.timestamp DESC
+    `, [roomNumber]);
     return result.rows;
   },
 
   async getActiveByRoomNumber(roomNumber: string): Promise<RideRequest | null> {
-    const result = await pool.query(
-      "SELECT * FROM ride_requests WHERE room_number = $1 AND status != 'COMPLETED' ORDER BY timestamp DESC LIMIT 1",
-      [roomNumber]
-    );
+    const result = await pool.query(`
+      SELECT r.*, u.last_name as driver_name 
+      FROM ride_requests r
+      LEFT JOIN users u ON r.driver_id = u.id
+      WHERE r.room_number = $1 AND r.status != 'COMPLETED' 
+      ORDER BY r.timestamp DESC LIMIT 1
+    `, [roomNumber]);
     return result.rows[0] || null;
   },
 
   async getByStatus(status: RideRequest['status']): Promise<RideRequest[]> {
-    const result = await pool.query(
-      'SELECT * FROM ride_requests WHERE status = $1 ORDER BY timestamp DESC',
-      [status]
-    );
+    const result = await pool.query(`
+      SELECT r.*, u.last_name as driver_name 
+      FROM ride_requests r
+      LEFT JOIN users u ON r.driver_id = u.id
+      WHERE r.status = $1 
+      ORDER BY r.timestamp DESC
+    `, [status]);
     return result.rows;
   },
 
@@ -122,34 +141,34 @@ export const rideRequestModel = {
       fields.push(`destination = $${paramCount++}`);
       values.push(rideRequest.destination);
     }
-    
+
     // Handle status change and set timestamps automatically
     if (rideRequest.status !== undefined) {
       fields.push(`status = $${paramCount++}`);
       values.push(rideRequest.status);
-      
+
       // Set timestamps based on status change
       const newStatus = rideRequest.status;
       const oldStatus = currentRide.status;
-      
+
       // When driver accepts ride (ASSIGNED or ARRIVING)
       if ((newStatus === 'ASSIGNED' || newStatus === 'ARRIVING') && oldStatus !== 'ASSIGNED' && oldStatus !== 'ARRIVING') {
         fields.push(`assigned_timestamp = CURRENT_TIMESTAMP`);
       }
-      
+
       // When driver picks up guest (ON_TRIP)
       if (newStatus === 'ON_TRIP' && oldStatus !== 'ON_TRIP') {
         fields.push(`pick_timestamp = CURRENT_TIMESTAMP`);
       }
-      
+
       // When ride is completed (COMPLETED)
       if (newStatus === 'COMPLETED' && oldStatus !== 'COMPLETED') {
         fields.push(`drop_timestamp = CURRENT_TIMESTAMP`);
       }
-      
+
       // Note: updated_at is automatically updated by database trigger
     }
-    
+
     if (rideRequest.timestamp !== undefined) {
       fields.push(`timestamp = $${paramCount++}`);
       values.push(rideRequest.timestamp);
@@ -289,7 +308,7 @@ export const rideRequestModel = {
     // Calculate statistics
     const totalRides = rides.length;
     const totalGuests = rides.reduce((sum, r) => sum + (r.guest_count || 1), 0);
-    
+
     const ratedRides = rides.filter(r => r.rating !== null && r.rating !== undefined);
     const totalRatings = ratedRides.length;
     const avgRating = totalRatings > 0
@@ -394,7 +413,7 @@ export const rideRequestModel = {
     drivers.forEach(driver => {
       driverStatsMap.set(driver.id, {
         driver_id: driver.id,
-        driver_name: `${driver.firstName || ''} ${driver.lastName || ''}`.trim() || `Driver ${driver.id}`,
+        driver_name: `${driver.last_name || ''}`.trim() || `Driver ${driver.id}`,
         total_rides: 0,
         total_rating: 0,
         rating_count: 0,
@@ -408,7 +427,7 @@ export const rideRequestModel = {
     // Process rides
     rides.forEach(ride => {
       if (!ride.driver_id) return;
-      
+
       const stats = driverStatsMap.get(ride.driver_id);
       if (!stats) return;
 
@@ -442,11 +461,11 @@ export const rideRequestModel = {
     // Calculate averages and performance scores
     const driverStatsArray = Array.from(driverStatsMap.values()).map(stats => {
       const avg_rating = stats.rating_count > 0 ? stats.total_rating / stats.rating_count : 0;
-      const avg_response_time = stats.response_time_count > 0 
-        ? stats.total_response_time / stats.response_time_count 
+      const avg_response_time = stats.response_time_count > 0
+        ? stats.total_response_time / stats.response_time_count
         : 0;
-      const avg_trip_time = stats.trip_time_count > 0 
-        ? stats.total_trip_time / stats.trip_time_count 
+      const avg_trip_time = stats.trip_time_count > 0
+        ? stats.total_trip_time / stats.trip_time_count
         : 0;
 
       // Calculate performance score (higher is better)
@@ -460,7 +479,7 @@ export const rideRequestModel = {
         ? Math.max(0, 100 - (avg_trip_time / 600000) * 5) // Faster = better, max 10 min
         : 50; // Default if no data
 
-      const performance_score = 
+      const performance_score =
         normalizedRides * 0.4 +
         normalizedRating * 0.3 +
         normalizedResponse * 0.2 +
