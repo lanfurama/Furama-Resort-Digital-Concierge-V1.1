@@ -20,17 +20,17 @@ const BuggyFleetManager: React.FC = () => {
     const [drivers, setDrivers] = useState<Driver[]>([]);
     const [isOptimizing, setIsOptimizing] = useState(false);
     const [selectedRide, setSelectedRide] = useState<string | null>(null);
-    
+
     // Track assignment intent before confirmation: { rideId, driverId }
-    const [pendingAssignment, setPendingAssignment] = useState<{rideId: string, driverId: string} | null>(null);
+    const [pendingAssignment, setPendingAssignment] = useState<{ rideId: string, driverId: string } | null>(null);
 
     // View Mode for Drivers Column
     const [driverViewMode, setDriverViewMode] = useState<'LIST' | 'MAP'>('MAP');
-    
+
     // Config State
     const [config, setConfig] = useState(getSystemConfig());
     const [showSettings, setShowSettings] = useState(false);
-    
+
     // Map Filter State
     const [driverFilter, setDriverFilter] = useState<'ALL' | 'AVAILABLE' | 'BUSY'>('ALL');
 
@@ -38,9 +38,9 @@ const BuggyFleetManager: React.FC = () => {
     const mapRef = useRef<HTMLDivElement>(null);
     const [mapInstance, setMapInstance] = useState<any>(null);
     const [markers, setMarkers] = useState<any[]>([]);
-    
+
     // Initialize mapError based on API Key presence to avoid unnecessary script loads
-    const [mapError, setMapError] = useState(!process.env.API_KEY); 
+    const [mapError, setMapError] = useState(!((import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY || (import.meta as any).env?.VITE_API_KEY || (typeof process !== 'undefined' && process.env?.API_KEY)));
 
     // Locations for Map Mapping
     const locations = getLocations();
@@ -49,18 +49,18 @@ const BuggyFleetManager: React.FC = () => {
         const currentRides = await getRides();
         const driversWithLocations = await getDriversWithLocations();
         const allRides = await getRides();
-        
+
         // Transform User[] to Driver[] with status and location info
         const transformedDrivers: Driver[] = driversWithLocations.map(user => {
             // Determine driver status based on active rides
-            const activeRide = allRides.find(r => 
-                r.driverId === user.id && 
+            const activeRide = allRides.find(r =>
+                r.driverId === user.id &&
                 (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING || r.status === BuggyStatus.ON_TRIP)
             );
-            
+
             // Determine if driver is online (updated within last 10 hours)
             const isOnline = user.updatedAt && (Date.now() - user.updatedAt) < (10 * 60 * 60 * 1000);
-            
+
             // Get location string
             let locationStr = "Unknown Location";
             if (activeRide) {
@@ -69,7 +69,7 @@ const BuggyFleetManager: React.FC = () => {
                 // Find nearest location to driver's GPS coordinates
                 let nearestLocation = locations[0];
                 let minDistance = Infinity;
-                
+
                 locations.forEach(loc => {
                     const dist = Math.sqrt(
                         Math.pow(user.currentLat! - loc.lat, 2) + Math.pow(user.currentLng! - loc.lng, 2)
@@ -79,7 +79,7 @@ const BuggyFleetManager: React.FC = () => {
                         nearestLocation = loc;
                     }
                 });
-                
+
                 // If within ~100 meters of a known location, show location name
                 if (minDistance < 0.001) {
                     locationStr = `Near ${nearestLocation.name}`;
@@ -90,7 +90,7 @@ const BuggyFleetManager: React.FC = () => {
                 const driverLocation = locations[parseInt(user.id || '0') % locations.length];
                 locationStr = driverLocation?.name || "Unknown Location";
             }
-            
+
             return {
                 ...user,
                 status: activeRide ? 'BUSY' : (isOnline ? 'AVAILABLE' : 'OFFLINE'),
@@ -99,20 +99,20 @@ const BuggyFleetManager: React.FC = () => {
                 currentRideId: activeRide?.id
             } as Driver;
         });
-        
+
         setRides(currentRides);
         setDrivers(transformedDrivers);
 
         // --- ADMIN SIDE AUTO-ASSIGN CHECKER ---
         if (config.autoAssignEnabled) {
             const now = Date.now();
-            const longWaitRides = currentRides.filter(r => 
-                r.status === BuggyStatus.SEARCHING && 
+            const longWaitRides = currentRides.filter(r =>
+                r.status === BuggyStatus.SEARCHING &&
                 (now - r.timestamp) > (config.maxWaitTimeBeforeAutoAssign * 1000)
             );
 
-            const available = currentDrivers.filter(d => d.status === 'AVAILABLE');
-            
+            const available = transformedDrivers.filter(d => d.status === 'AVAILABLE');
+
             if (longWaitRides.length > 0 && available.length > 0 && !isOptimizing) {
                 console.log("Auto-triggering AI Assignment due to wait time...");
                 handleAutoAssign(longWaitRides, available);
@@ -130,8 +130,8 @@ const BuggyFleetManager: React.FC = () => {
     useEffect(() => {
         const updateETAs = async () => {
             // Only update ETA for rides that are ASSIGNED or ARRIVING (driver is on the way)
-            const ridesToUpdate = rides.filter(r => 
-                (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING) && 
+            const ridesToUpdate = rides.filter(r =>
+                (r.status === BuggyStatus.ASSIGNED || r.status === BuggyStatus.ARRIVING) &&
                 r.driverId
             );
 
@@ -159,8 +159,8 @@ const BuggyFleetManager: React.FC = () => {
                             eta: eta
                         });
                         // Update local state
-                        setRides(prevRides => 
-                            prevRides.map(r => 
+                        setRides(prevRides =>
+                            prevRides.map(r =>
                                 r.id === ride.id ? { ...r, eta } : r
                             )
                         );
@@ -174,7 +174,7 @@ const BuggyFleetManager: React.FC = () => {
         // Update ETAs every 10 seconds (less frequent than location updates)
         const etaInterval = setInterval(updateETAs, 10000);
         return () => clearInterval(etaInterval);
-    }, [rides, drivers, locations]); 
+    }, [rides, drivers, locations]);
 
     // Filtered lists (Need these for map logic too)
     const pendingRides = rides.filter(r => r.status === BuggyStatus.SEARCHING);
@@ -197,7 +197,7 @@ const BuggyFleetManager: React.FC = () => {
     // --- GOOGLE MAPS INTEGRATION ---
     useEffect(() => {
         if (driverViewMode === 'MAP' && !mapInstance && !mapError) {
-            
+
             // Define global error handler for Auth Failure (Invalid Key)
             (window as any).gm_authFailure = () => {
                 console.error("Google Maps Authentication Error (gm_authFailure). Falling back to static map.");
@@ -214,16 +214,16 @@ const BuggyFleetManager: React.FC = () => {
             // Load Google Maps Script
             if (!document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]')) {
                 const script = document.createElement('script');
-                const apiKey = process.env.API_KEY || '';
+                const apiKey = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY || (import.meta as any).env?.VITE_API_KEY || (typeof process !== 'undefined' && process.env?.API_KEY) || '';
                 script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async&callback=initGoogleMap&v=weekly`;
                 script.async = true;
                 script.defer = true;
-                
+
                 script.onerror = () => {
                     console.error("Failed to load Google Maps script (Network Error).");
                     setMapError(true);
                 };
-                
+
                 (window as any).initGoogleMap = () => {
                     initMap();
                 };
@@ -235,7 +235,7 @@ const BuggyFleetManager: React.FC = () => {
 
     const initMap = () => {
         if (!mapRef.current || !(window as any).google || mapError) return;
-        
+
         try {
             const map = new (window as any).google.maps.Map(mapRef.current, {
                 center: { lat: RESORT_CENTER.lat, lng: RESORT_CENTER.lng },
@@ -263,7 +263,7 @@ const BuggyFleetManager: React.FC = () => {
         if (mapInstance && driverViewMode === 'MAP' && (window as any).google && !mapError) {
             markers.forEach(m => m.setMap(null));
             const newMarkers: any[] = [];
-            
+
             // Filter drivers based on filter state
             const filteredDrivers = drivers.filter(d => {
                 if (d.status === 'OFFLINE') return false;
@@ -275,7 +275,7 @@ const BuggyFleetManager: React.FC = () => {
                 const coords = resolveDriverCoordinates(driver);
                 let infoContent = '';
                 const activeRide = driver.currentRideId ? activeRides.find(r => r.id === driver.currentRideId) : null;
-                
+
                 if (activeRide) {
                     infoContent = `
                         <div style="color: #1f2937; padding: 4px; max-width: 200px;">
@@ -291,13 +291,13 @@ const BuggyFleetManager: React.FC = () => {
                     const lastRide = completedRides
                         .filter(r => r.driverId === driver.id)
                         .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0))[0];
-                    
+
                     let timeSinceStr = "No recent trips";
                     if (lastRide && lastRide.completedAt) {
                         const diffMins = Math.floor((Date.now() - lastRide.completedAt) / 60000);
                         timeSinceStr = diffMins === 0 ? "Just now" : `${diffMins} mins ago`;
                     }
-                    
+
                     // Location info
                     let locationInfo = driver.currentLocation;
                     let gpsInfo = "";
@@ -355,7 +355,7 @@ const BuggyFleetManager: React.FC = () => {
                 newMarkers.push(marker);
             });
             setMarkers(newMarkers);
-            
+
             // Auto-fit bounds to show all drivers
             if (newMarkers.length > 0 && mapInstance) {
                 const bounds = new (window as any).google.maps.LatLngBounds();
@@ -374,7 +374,7 @@ const BuggyFleetManager: React.FC = () => {
 
     // ... (Keep handleAssign, handleAutoAssign, handleSaveConfig, resolveDriverCoordinates unchanged)
     const handleAssign = async (rideId: string, driverId: string) => {
-        await updateRideStatus(rideId, BuggyStatus.ASSIGNED, driverId, 5); 
+        await updateRideStatus(rideId, BuggyStatus.ASSIGNED, driverId, 5);
         setSelectedRide(null);
         setPendingAssignment(null); // Clear pending state
         await refreshData();
@@ -403,7 +403,7 @@ const BuggyFleetManager: React.FC = () => {
         if (driver.currentLat !== undefined && driver.currentLng !== undefined) {
             return { lat: driver.currentLat, lng: driver.currentLng };
         }
-        
+
         // Priority 2: Parse GPS from location string
         if (driver.currentLocation.startsWith("GPS:")) {
             const parts = driver.currentLocation.replace("GPS:", "").split(",");
@@ -415,20 +415,20 @@ const BuggyFleetManager: React.FC = () => {
                 }
             }
         }
-        
+
         // Priority 3: Find location by name
-        const loc = locations.find(l => 
-            driver.currentLocation.includes(l.name) || 
+        const loc = locations.find(l =>
+            driver.currentLocation.includes(l.name) ||
             l.name.includes(driver.currentLocation) ||
             driver.currentLocation.includes(`Near ${l.name}`)
         );
         if (loc) return { lat: loc.lat, lng: loc.lng };
-        
+
         // Fallback: Resort center with small random offset
-        return { 
-            lat: RESORT_CENTER.lat + (Math.random() * 0.001 - 0.0005), 
-            lng: RESORT_CENTER.lng + (Math.random() * 0.001 - 0.0005) 
-        }; 
+        return {
+            lat: RESORT_CENTER.lat + (Math.random() * 0.001 - 0.0005),
+            lng: RESORT_CENTER.lng + (Math.random() * 0.001 - 0.0005)
+        };
     };
 
     // --- STATIC MAP HELPERS ---
@@ -447,13 +447,13 @@ const BuggyFleetManager: React.FC = () => {
             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
                 <div>
                     <h2 className="text-xl font-bold text-slate-800 flex items-center">
-                        <Car className="mr-2 text-emerald-600"/> Buggy Fleet Dispatch
+                        <Car className="mr-2 text-emerald-600" /> Buggy Fleet Dispatch
                     </h2>
                     <p className="text-xs text-slate-500">Manage real-time buggy requests and driver fleet.</p>
                 </div>
                 <div className="flex space-x-2">
-                    <button 
-                        onClick={() => setShowSettings(!showSettings)} 
+                    <button
+                        onClick={() => setShowSettings(!showSettings)}
                         className={`p-2 rounded-lg transition ${showSettings ? 'bg-slate-200 text-slate-800' : 'text-slate-500 hover:bg-slate-100'}`}
                     >
                         <Settings size={20} />
@@ -461,7 +461,7 @@ const BuggyFleetManager: React.FC = () => {
                     <button onClick={refreshData} className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
                         <RefreshCw size={20} />
                     </button>
-                    <button 
+                    <button
                         onClick={() => handleAutoAssign()}
                         disabled={isOptimizing || pendingRides.length === 0}
                         className={`flex items-center px-4 py-2 rounded-lg font-bold text-white shadow-md transition ${isOptimizing ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
@@ -476,24 +476,24 @@ const BuggyFleetManager: React.FC = () => {
             {showSettings && (
                 <div className="absolute top-20 right-4 z-20 bg-white p-6 rounded-xl shadow-2xl border border-slate-200 w-80 animate-in fade-in slide-in-from-top-5">
                     <h3 className="font-bold text-slate-800 mb-4 flex items-center">
-                        <Settings size={16} className="mr-2"/> Dispatch Configuration
+                        <Settings size={16} className="mr-2" /> Dispatch Configuration
                     </h3>
                     <div className="space-y-4">
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Max Wait Time (Seconds)</label>
-                            <input 
-                                type="number" 
+                            <input
+                                type="number"
                                 className="w-full border border-slate-300 rounded p-2 text-sm"
                                 value={config.maxWaitTimeBeforeAutoAssign}
-                                onChange={(e) => setConfig({...config, maxWaitTimeBeforeAutoAssign: parseInt(e.target.value) || 0})}
+                                onChange={(e) => setConfig({ ...config, maxWaitTimeBeforeAutoAssign: parseInt(e.target.value) || 0 })}
                             />
                         </div>
                         <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-slate-700">Enable Auto-Assign</span>
-                            <input 
-                                type="checkbox" 
+                            <input
+                                type="checkbox"
                                 checked={config.autoAssignEnabled}
-                                onChange={(e) => setConfig({...config, autoAssignEnabled: e.target.checked})}
+                                onChange={(e) => setConfig({ ...config, autoAssignEnabled: e.target.checked })}
                                 className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500"
                             />
                         </div>
@@ -518,12 +518,12 @@ const BuggyFleetManager: React.FC = () => {
                             const isPendingConfirmation = pendingAssignment?.rideId === ride.id;
 
                             return (
-                                <div 
-                                    key={ride.id} 
+                                <div
+                                    key={ride.id}
                                     className={`rounded-lg border transition ${isExpanded ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200' : 'bg-white border-slate-200 hover:border-emerald-300'}`}
                                 >
                                     {/* Header Section - Click to Toggle */}
-                                    <div 
+                                    <div
                                         onClick={() => setSelectedRide(isExpanded ? null : ride.id)}
                                         className="p-4 cursor-pointer"
                                     >
@@ -531,44 +531,44 @@ const BuggyFleetManager: React.FC = () => {
                                             <span className="font-bold text-gray-900">Room {ride.roomNumber}</span>
                                             <div className="flex flex-col items-end gap-1">
                                                 <span className={`text-xs flex items-center font-bold ${isOverdue ? 'text-red-500 animate-pulse' : 'text-gray-500'}`}>
-                                                    <Clock size={12} className="mr-1"/> {Math.floor(waitTime / 60)}m {Math.floor(waitTime % 60)}s
+                                                    <Clock size={12} className="mr-1" /> {Math.floor(waitTime / 60)}m {Math.floor(waitTime % 60)}s
                                                 </span>
                                                 {ride.driverId && ride.eta !== undefined && (
                                                     <span className="text-[10px] text-emerald-600 font-bold flex items-center">
-                                                        <Navigation size={10} className="mr-1"/> ETA: {ride.eta} min
+                                                        <Navigation size={10} className="mr-1" /> ETA: {ride.eta} min
                                                     </span>
                                                 )}
                                             </div>
                                         </div>
                                         <div className="text-sm text-gray-600 space-y-1">
-                                            <div className="flex items-center"><div className="w-2 h-2 rounded-full bg-slate-400 mr-2"/> {ride.pickup}</div>
-                                            <div className="flex items-center"><div className="w-2 h-2 rounded-full bg-emerald-500 mr-2"/> {ride.destination}</div>
+                                            <div className="flex items-center"><div className="w-2 h-2 rounded-full bg-slate-400 mr-2" /> {ride.pickup}</div>
+                                            <div className="flex items-center"><div className="w-2 h-2 rounded-full bg-emerald-500 mr-2" /> {ride.destination}</div>
                                         </div>
                                     </div>
-                                    
+
                                     {/* Details Section - Interactive */}
                                     {isExpanded && (
                                         <div className="px-4 pb-4 pt-0">
                                             <div className="pt-3 border-t border-gray-200/50 animate-in slide-in-from-top-2">
                                                 <label className="text-xs font-bold text-gray-500 mb-1 block">Assign Driver:</label>
-                                                
+
                                                 {isPendingConfirmation ? (
                                                     <div className="bg-white p-2 rounded border border-emerald-200 shadow-sm animate-in fade-in">
                                                         <div className="text-xs text-emerald-800 mb-2 font-bold text-center">
                                                             Assign to {drivers.find(d => d.id === pendingAssignment.driverId)?.name}?
                                                         </div>
                                                         <div className="flex space-x-2">
-                                                            <button 
+                                                            <button
                                                                 onClick={() => setPendingAssignment(null)}
                                                                 className="flex-1 py-1.5 px-2 bg-gray-50 border border-gray-300 rounded text-gray-600 text-xs font-medium hover:bg-gray-100 flex items-center justify-center"
                                                             >
-                                                                <X size={12} className="mr-1"/> Cancel
+                                                                <X size={12} className="mr-1" /> Cancel
                                                             </button>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => handleAssign(ride.id, pendingAssignment.driverId)}
                                                                 className="flex-1 py-1.5 px-2 bg-emerald-600 text-white rounded text-xs font-bold hover:bg-emerald-700 shadow-sm flex items-center justify-center"
                                                             >
-                                                                <Check size={12} className="mr-1"/> Confirm
+                                                                <Check size={12} className="mr-1" /> Confirm
                                                             </button>
                                                         </div>
                                                     </div>
@@ -582,7 +582,7 @@ const BuggyFleetManager: React.FC = () => {
                                                                 }
                                                             }}
                                                             value=""
-                                                            onClick={(e) => e.stopPropagation()} 
+                                                            onClick={(e) => e.stopPropagation()}
                                                         >
                                                             <option value="" disabled>Select a driver...</option>
                                                             {assignableDrivers.map(d => (
@@ -592,7 +592,7 @@ const BuggyFleetManager: React.FC = () => {
                                                             ))}
                                                         </select>
                                                         <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                                                            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                                                            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
                                                         </div>
                                                     </div>
                                                 )}
@@ -616,20 +616,20 @@ const BuggyFleetManager: React.FC = () => {
                         <div className="flex items-center gap-2">
                             {driverViewMode === 'MAP' && (
                                 <div className="flex bg-white rounded-lg p-0.5 border border-blue-100 mr-1">
-                                    <button 
-                                        onClick={() => setDriverFilter('ALL')} 
+                                    <button
+                                        onClick={() => setDriverFilter('ALL')}
                                         className={`px-2 py-1 text-[10px] rounded ${driverFilter === 'ALL' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-400 hover:text-slate-600'}`}
                                     >
                                         All
                                     </button>
-                                    <button 
-                                        onClick={() => setDriverFilter('AVAILABLE')} 
+                                    <button
+                                        onClick={() => setDriverFilter('AVAILABLE')}
                                         className={`px-2 py-1 text-[10px] rounded ${driverFilter === 'AVAILABLE' ? 'bg-emerald-100 text-emerald-700 font-bold' : 'text-slate-400 hover:text-slate-600'}`}
                                     >
                                         Available
                                     </button>
-                                    <button 
-                                        onClick={() => setDriverFilter('BUSY')} 
+                                    <button
+                                        onClick={() => setDriverFilter('BUSY')}
                                         className={`px-2 py-1 text-[10px] rounded ${driverFilter === 'BUSY' ? 'bg-orange-100 text-orange-700 font-bold' : 'text-slate-400 hover:text-slate-600'}`}
                                     >
                                         Busy
@@ -637,12 +637,12 @@ const BuggyFleetManager: React.FC = () => {
                                 </div>
                             )}
                             <div className="flex bg-white rounded-lg p-0.5 border border-blue-100">
-                                <button onClick={() => setDriverViewMode('LIST')} className={`p-1.5 rounded ${driverViewMode === 'LIST' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><List size={14}/></button>
-                                <button onClick={() => setDriverViewMode('MAP')} className={`p-1.5 rounded ${driverViewMode === 'MAP' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><Map size={14}/></button>
+                                <button onClick={() => setDriverViewMode('LIST')} className={`p-1.5 rounded ${driverViewMode === 'LIST' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><List size={14} /></button>
+                                <button onClick={() => setDriverViewMode('MAP')} className={`p-1.5 rounded ${driverViewMode === 'MAP' ? 'bg-blue-100 text-blue-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><Map size={14} /></button>
                             </div>
                         </div>
                     </div>
-                    
+
                     {driverViewMode === 'LIST' ? (
                         <div className="flex-1 overflow-y-auto p-3 space-y-3">
                             {drivers.map(driver => {
@@ -652,18 +652,17 @@ const BuggyFleetManager: React.FC = () => {
                                     <div key={driver.id} className="p-3 rounded-lg border border-slate-200 hover:bg-slate-50 bg-white">
                                         <div className="flex justify-between items-center mb-2">
                                             <div className="flex items-center">
-                                                <div className="bg-slate-200 p-1.5 rounded-full mr-2"><User size={16}/></div>
+                                                <div className="bg-slate-200 p-1.5 rounded-full mr-2"><User size={16} /></div>
                                                 <div>
                                                     <div className="font-bold text-sm text-gray-900">{driver.name}</div>
                                                     <div className="text-[10px] text-gray-500 flex items-center">
-                                                        <MapPin size={10} className="mr-1"/> {driver.currentLocation}
+                                                        <MapPin size={10} className="mr-1" /> {driver.currentLocation}
                                                     </div>
                                                 </div>
                                             </div>
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                                isAvailable ? 'bg-green-100 text-green-700' : 
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isAvailable ? 'bg-green-100 text-green-700' :
                                                 driver.status === 'OFFLINE' ? 'bg-slate-100 text-slate-500' : 'bg-orange-100 text-orange-700'
-                                            }`}>{driver.status}</span>
+                                                }`}>{driver.status}</span>
                                         </div>
                                         {activeRide && (
                                             <div className="mt-2 bg-orange-50 p-2 rounded text-xs border border-orange-100">
@@ -684,7 +683,7 @@ const BuggyFleetManager: React.FC = () => {
                         <div className="flex-1 relative bg-emerald-50 overflow-hidden min-h-[300px]">
                             {mapError ? (
                                 <>
-                                    <img src="https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Map-768x552.jpg" alt="Map" className="absolute inset-0 w-full h-full object-cover opacity-80"/>
+                                    <img src="https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Map-768x552.jpg" alt="Map" className="absolute inset-0 w-full h-full object-cover opacity-80" />
                                     {drivers
                                         .filter(d => {
                                             if (d.status === 'OFFLINE') return false;
@@ -699,7 +698,7 @@ const BuggyFleetManager: React.FC = () => {
                                                 <div key={driver.id} className="absolute transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group cursor-pointer hover:z-50" style={{ top: pos.top, left: pos.left }}>
                                                     <div className="bg-white/90 backdrop-blur-sm text-[9px] font-bold px-1.5 py-0.5 rounded shadow mb-1 whitespace-nowrap z-20 text-black">{driver.name.split(' ')[0]}</div>
                                                     <div className={`p-1.5 rounded-full shadow-lg border-2 border-white transition-transform duration-300 relative z-10 ${isBusy ? 'bg-orange-500' : 'bg-emerald-600'} ${!isBusy ? 'animate-bounce' : ''}`}>
-                                                        <Car size={14} className="text-white"/>
+                                                        <Car size={14} className="text-white" />
                                                     </div>
                                                     {driver.currentLat !== undefined && driver.currentLng !== undefined && (
                                                         <div className="mt-1 bg-white/90 backdrop-blur-sm text-[8px] px-1 py-0.5 rounded shadow text-gray-600">
@@ -710,34 +709,34 @@ const BuggyFleetManager: React.FC = () => {
                                             );
                                         })}
                                 </>
-                            ) : ( <div ref={mapRef} className="w-full h-full" /> )}
+                            ) : (<div ref={mapRef} className="w-full h-full" />)}
                             <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur p-2 rounded text-[10px] shadow border border-gray-200 z-10">
                                 <div className="flex items-center mb-1 text-gray-800"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-1.5"></div> Available Driver</div>
                                 <div className="flex items-center text-gray-800"><div className="w-2.5 h-2.5 rounded-full bg-orange-500 mr-1.5"></div> Busy / On Trip</div>
-                                {mapError && <div className="mt-1 text-red-500 font-bold text-[9px] flex items-center"><AlertTriangle size={8} className="mr-1"/> Static View (Map Error)</div>}
+                                {mapError && <div className="mt-1 text-red-500 font-bold text-[9px] flex items-center"><AlertTriangle size={8} className="mr-1" /> Static View (Map Error)</div>}
                                 {!mapError && (
                                     <div className="mt-1 text-emerald-600 font-bold text-[9px] flex items-center">
-                                        <MapPin size={8} className="mr-1"/> Real-time GPS Tracking
+                                        <MapPin size={8} className="mr-1" /> Real-time GPS Tracking
                                     </div>
                                 )}
                             </div>
                             {!mapError && mapInstance && (
                                 <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
-                                    <button 
+                                    <button
                                         onClick={() => mapInstance.setZoom(mapInstance.getZoom()! + 1)}
                                         className="bg-white/90 backdrop-blur p-1.5 rounded shadow border border-gray-200 hover:bg-white transition"
                                         title="Zoom In"
                                     >
-                                        <ZoomIn size={14} className="text-gray-700"/>
+                                        <ZoomIn size={14} className="text-gray-700" />
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={() => mapInstance.setZoom(mapInstance.getZoom()! - 1)}
                                         className="bg-white/90 backdrop-blur p-1.5 rounded shadow border border-gray-200 hover:bg-white transition"
                                         title="Zoom Out"
                                     >
-                                        <ZoomOut size={14} className="text-gray-700"/>
+                                        <ZoomOut size={14} className="text-gray-700" />
                                     </button>
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             if (mapInstance) {
                                                 const bounds = new (window as any).google.maps.LatLngBounds();
@@ -751,7 +750,7 @@ const BuggyFleetManager: React.FC = () => {
                                         className="bg-white/90 backdrop-blur p-1.5 rounded shadow border border-gray-200 hover:bg-white transition"
                                         title="Fit All Drivers"
                                     >
-                                        <Navigation size={14} className="text-gray-700"/>
+                                        <Navigation size={14} className="text-gray-700" />
                                     </button>
                                 </div>
                             )}
@@ -761,7 +760,7 @@ const BuggyFleetManager: React.FC = () => {
 
                 {/* Column 3: Active & Completed */}
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
-                     <div className="p-3 bg-slate-50 border-b border-slate-200 font-bold text-slate-700 flex justify-between">
+                    <div className="p-3 bg-slate-50 border-b border-slate-200 font-bold text-slate-700 flex justify-between">
                         <span>Active Trips ({activeRides.length})</span>
                     </div>
                     <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-white">
@@ -776,7 +775,7 @@ const BuggyFleetManager: React.FC = () => {
                                             <span className="text-xs text-blue-600 font-bold">{ride.status}</span>
                                             {ride.eta !== undefined && (ride.status === BuggyStatus.ASSIGNED || ride.status === BuggyStatus.ARRIVING) && (
                                                 <span className="text-[10px] text-emerald-600 font-bold flex items-center">
-                                                    <Navigation size={10} className="mr-1"/> ETA: {ride.eta} min
+                                                    <Navigation size={10} className="mr-1" /> ETA: {ride.eta} min
                                                 </span>
                                             )}
                                         </div>
@@ -801,7 +800,7 @@ const BuggyFleetManager: React.FC = () => {
                             {completedRides.slice(0, 5).map(ride => (
                                 <div key={ride.id} className="flex justify-between text-xs text-gray-500 py-1">
                                     <span>Room {ride.roomNumber}</span>
-                                    <span className="text-green-600 flex items-center"><CheckCircle size={10} className="mr-1"/> Done</span>
+                                    <span className="text-green-600 flex items-center"><CheckCircle size={10} className="mr-1" /> Done</span>
                                 </div>
                             ))}
                         </div>

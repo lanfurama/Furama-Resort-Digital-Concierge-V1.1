@@ -124,7 +124,7 @@ export interface ParsedVoiceData {
 export interface ProcessTranscriptCallbacks {
   onSuccess: (data: ParsedVoiceData) => void;
   onError: (message: string) => void;
-  onPartialSuccess: (data: ParsedVoiceData, foundFields: string[]) => void;
+  onPartialSuccess: (data: ParsedVoiceData, foundFields: string[], missingFields: string[]) => void;
 }
 
 /**
@@ -237,7 +237,9 @@ export const parseVoiceTranscript = (
       /(?:room|phòng|rồm|r)\s*:?\s*([A-Z]{1,3}\d{0,3}[A-Z]?|\d{2,4}[A-Z]?)/i,
       /(?:villa|biệt thự|v)\s*:?\s*([A-Z]\d{1,3})/i,
       /(?:số|number|no\.?|#)\s*:?\s*([A-Z]{1,3}\d{0,3}[A-Z]?|\d{2,4}[A-Z]?)/i,
-      /\b([A-Z]{2,3})\b/i,  // ACC, ABC (2-3 letters)
+      /(?:số|number|no\.?|#)\s*:?\s*([A-Z]{1,3}\d{0,3}[A-Z]?|\d{2,4}[A-Z]?)/i,
+      /\b([A-Z]{3})\b/i,  // ACC (3 letters - stricter check needed downstream or removed if too broad)
+      /\b([A-Z]{2})\b/i,  // D1 (2 letters? No, usually letter+digit)
       /\b([A-Z]\d{1,3})\b/i,  // D11, A101, D03 (letter + 1-3 digits)
       /\b([A-Z]?\d{2,4}[A-Z]?)\b/i,  // 101, 101A, 2001, A101
       /\b([DP]\d{1,2})\b/i,  // D11, P03
@@ -547,12 +549,12 @@ export const looksLikeRoomNumber = (text: string): boolean => {
   const trimmed = text.trim().toUpperCase();
   // Check various room number patterns
   return (
-    /^[A-Z]{2,3}$/.test(trimmed) || // ACC, ABC
+    /^[A-Z]{3}$/.test(trimmed) || // ACC, ABC (3 letters)
     /^[A-Z]\d{1,3}$/.test(trimmed) || // D11, A101
     /^[A-Z]?\d{2,3}[A-Z]?$/.test(trimmed) || // 101, 101A
     /^[A-Z]?\d{2,3}[A-Z]?$/.test(trimmed) || // 101, 101A
     /^[DP]\d{1,2}$/.test(trimmed) // D11, P03
-  );
+  ) && !["NAM", "AND", "THE", "FOR", "HIM", "HER", "YOU", "GUY"].includes(trimmed); // Exclude common false positives
 };
 
 /**
@@ -703,12 +705,13 @@ export const processTranscript = async (
       } else {
         // Partial data - show what was found
         const found: string[] = [];
-        if (parsedData.pickup) found.push("điểm đón");
-        if (parsedData.destination) found.push("điểm đến");
-        if (parsedData.roomNumber) found.push("số phòng");
+        const missing: string[] = [];
+        if (parsedData.pickup) found.push("điểm đón"); else missing.push("điểm đón");
+        if (parsedData.destination) found.push("điểm đến"); else missing.push("điểm đến");
+        if (parsedData.roomNumber) found.push("số phòng"); else missing.push("số phòng");
         if (parsedData.guestName) found.push("tên khách");
 
-        callbacks.onPartialSuccess(finalData, found);
+        callbacks.onPartialSuccess(finalData, found, missing);
       }
 
       return finalData;
@@ -769,12 +772,13 @@ export const processTranscript = async (
           callbacks.onSuccess(finalData);
         } else {
           const found: string[] = [];
-          if (fallbackData.pickup) found.push("điểm đón");
-          if (fallbackData.destination) found.push("điểm đến");
-          if (fallbackData.roomNumber) found.push("số phòng");
+          const missing: string[] = [];
+          if (fallbackData.pickup) found.push("điểm đón"); else missing.push("điểm đón");
+          if (fallbackData.destination) found.push("điểm đến"); else missing.push("điểm đến");
+          if (fallbackData.roomNumber) found.push("số phòng"); else missing.push("số phòng");
           if (fallbackData.guestName) found.push("tên khách");
 
-          callbacks.onPartialSuccess(finalData, found);
+          callbacks.onPartialSuccess(finalData, found, missing);
         }
 
         return finalData;
@@ -843,12 +847,13 @@ export const processTranscript = async (
           callbacks.onSuccess(finalData);
         } else {
           const found: string[] = [];
-          if (fallbackData.pickup) found.push("điểm đón");
-          if (fallbackData.destination) found.push("điểm đến");
-          if (fallbackData.roomNumber) found.push("số phòng");
+          const missing: string[] = [];
+          if (fallbackData.pickup) found.push("điểm đón"); else missing.push("điểm đón");
+          if (fallbackData.destination) found.push("điểm đến"); else missing.push("điểm đến");
+          if (fallbackData.roomNumber) found.push("số phòng"); else missing.push("số phòng");
           if (fallbackData.guestName) found.push("tên khách");
 
-          callbacks.onPartialSuccess(finalData, found);
+          callbacks.onPartialSuccess(finalData, found, missing);
         }
 
         return finalData;
@@ -865,5 +870,6 @@ export const processTranscript = async (
       );
       return null;
     }
-  };
+  }
+};
 

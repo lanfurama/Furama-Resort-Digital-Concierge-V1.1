@@ -15,7 +15,7 @@ import {
 } from "./dataService";
 import { ContentTranslation } from "../types";
 
-const apiKey = import.meta?.env?.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' && process.env ? process.env.VITE_GEMINI_API_KEY : undefined);
 if (!apiKey) {
   console.error("VITE_GEMINI_API_KEY is not set. Please check your .env file.");
   console.error("AI features will not work without a valid API key.");

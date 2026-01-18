@@ -1,0 +1,34 @@
+Starting verification for 'Nam' parsing fix...
+Test: Scenario: 'Nam' (Name/5 guests) from Lobby to Pool
+Input: "Nam khách đi từ Lobby đến Pool"
+Result (Partial): {
+  "pickup": "Main Lobby",
+  "destination": "Lagoon Pool",
+  "guestCount": 1
+}
+Found: điểm đón, điểm đến, Missing: số phòng
+✅ PASSED: 'Nam' was NOT parsed as Room Number.
+--------------------------------------------------
+Test: Scenario: Normal room number
+Input: "Room 101 đi Spa"
+Result (Success): {
+  "roomNumber": "101",
+  "pickup": "101",
+  "destination": "V-Senses Wellness & Spa",
+  "guestCount": 1
+}
+✅ PASSED: Room 101 correctly parsed.
+--------------------------------------------------
+Test: Scenario: Valid 3-letter room code (if ACC is valid)
+Input: "ACC đi ăn tối"
+Result (Success): {
+  "roomNumber": "esta",
+  "pickup": "esta",
+  "destination": "Don Cipriani's Italian Restaurant",
+  "guestCount": 1
+}
+--------------------------------------------------
+Test: Scenario: 'NAM' used as room start - should NOT be parsed as room NAM
+Input: "NAM đi spa"
+Result (Error): Không tìm thấy điểm đón. Vui lòng nói rõ ràng hơn, ví dụ: "đón phòng 101 đi hồ bơi" hoặc "from room 101 to pool".
+--------------------------------------------------

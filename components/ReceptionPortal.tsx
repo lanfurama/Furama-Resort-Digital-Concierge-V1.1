@@ -99,6 +99,7 @@ import {
   getConfirmedServiceRequestsCount as getConfirmedServiceRequestsCountUtil,
   getDepartmentForServiceType as getDepartmentForServiceTypeUtil,
 } from "./ReceptionPortal/utils/rideHelpers";
+import VoiceAssistantModal from "./ReceptionPortal/modals/VoiceAssistantModal";
 import {
   getDriverLocation as getDriverLocationUtil,
   resolveDriverCoordinates as resolveDriverCoordinatesUtil,
@@ -142,7 +143,24 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const [markers, setMarkers] = useState<any[]>([]);
-  const [mapError, setMapError] = useState(typeof process === 'undefined' || !process.env?.API_KEY);
+  const [mapError, setMapError] = useState(!((import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY || (import.meta as any).env?.VITE_API_KEY || (typeof process !== 'undefined' && process.env?.API_KEY)));
+  const [showVoiceOverlay, setShowVoiceOverlay] = useState(false);
+
+  // Handle toggling listening with overlay
+  const handleVoiceAssistantStart = () => {
+    setShowVoiceOverlay(true);
+    if (!isListening) {
+      handleToggleListening();
+    }
+  };
+
+  const handleVoiceAssistantClose = () => {
+    setShowVoiceOverlay(false);
+    if (isListening) {
+      stopRecording();
+    }
+  };
+
   const [driverFilter, setDriverFilter] = useState<'ALL' | 'AVAILABLE' | 'BUSY'>('ALL');
 
   // AI Assignment Modal State
@@ -452,7 +470,41 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       locations,
       {
         onSuccess: (data: ParsedVoiceData) => {
-          // Update form data
+          // Validate locations
+          const isValidLocation = (name: string | undefined) => {
+            if (!name) return true; // Empty is handled by missing field check elsewhere
+            const lowerName = name.toLowerCase();
+            return locations.some(l => l.name.toLowerCase() === lowerName ||
+              l.keywords?.some(k => k.toLowerCase() === lowerName));
+          };
+
+          const isPickupValid = isValidLocation(data.pickup);
+          const isDestValid = isValidLocation(data.destination);
+
+          if (!isPickupValid || !isDestValid) {
+            // Update partial data so user can see what was heard
+            setNewRideData((prev) => ({
+              ...prev,
+              roomNumber: data.roomNumber || (prev.roomNumber && prev.roomNumber.trim() ? prev.roomNumber : ""),
+              pickup: data.pickup || prev.pickup,
+              destination: data.destination || prev.destination,
+              guestName: data.guestName || prev.guestName,
+              guestCount: data.guestCount || prev.guestCount || 1,
+              notes: data.notes || prev.notes,
+            }));
+
+            const invalidFields = [];
+            if (!isPickupValid && data.pickup) invalidFields.push(`Điểm đón '${data.pickup}' không hợp lệ`);
+            if (!isDestValid && data.destination) invalidFields.push(`Điểm đến '${data.destination}' không hợp lệ`);
+
+            setVoiceResult({
+              status: "error",
+              message: `⚠️ ${invalidFields.join(". ")}. Vui lòng chọn địa điểm có trong danh sách.`,
+            });
+            return;
+          }
+
+          // Update form data (Valid case)
           setNewRideData((prev) => ({
             ...prev,
             roomNumber: data.roomNumber || (prev.roomNumber && prev.roomNumber.trim() ? prev.roomNumber : ""),
@@ -503,7 +555,22 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
             message,
           });
         },
-        onPartialSuccess: (data: ParsedVoiceData, foundFields: string[]) => {
+        onPartialSuccess: (data: ParsedVoiceData, foundFields: string[], missingFields: string[]) => {
+          // Validate locations
+          const isValidLocation = (name: string | undefined) => {
+            if (!name) return true;
+            const lowerName = name.toLowerCase();
+            return locations.some(l => l.name.toLowerCase() === lowerName ||
+              l.keywords?.some(k => k.toLowerCase() === lowerName));
+          };
+
+          const isPickupValid = isValidLocation(data.pickup);
+          const isDestValid = isValidLocation(data.destination);
+
+          const validationErrors: string[] = [];
+          if (!isPickupValid && data.pickup) validationErrors.push(`Điểm đón '${data.pickup}' không hợp lệ`);
+          if (!isDestValid && data.destination) validationErrors.push(`Điểm đến '${data.destination}' không hợp lệ`);
+
           // Update form data with partial results
           setNewRideData((prev) => ({
             ...prev,
@@ -515,9 +582,14 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
             notes: data.notes || prev.notes,
           }));
 
+          const missingMsg = missingFields.length > 0 ? `Thiếu: ${missingFields.join(", ")}` : "";
+          const errorMsg = validationErrors.length > 0
+            ? `⚠️ ${validationErrors.join(". ")}. ${missingMsg ? `(${missingMsg})` : ""}`
+            : `⚠️ Chưa đủ thông tin (Thiếu: ${missingFields.join(", ")}). Vui lòng nói lại rõ hơn.`;
+
           setVoiceResult({
-            status: "success",
-            message: `✅ Đã nhận diện: ${foundFields.join(", ")}. Vui lòng bổ sung thông tin còn thiếu.`,
+            status: "error",
+            message: errorMsg,
           });
         },
       },
@@ -2096,14 +2168,31 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
   // Handle creating new ride
   const handleCreateRide = async () => {
-    if (
-      !newRideData.roomNumber ||
-      !newRideData.pickup ||
-      !newRideData.destination
-    ) {
-      alert(
-        "Please fill in all required fields (Room Number, Pickup, Destination)",
-      );
+    const isPickupValid = locations.some(l => l.name === newRideData.pickup);
+    const isDestValid = locations.some(l => l.name === newRideData.destination);
+
+    if (!newRideData.roomNumber || !newRideData.roomNumber.trim()) {
+      alert("Please enter a valid Room Number.");
+      return;
+    }
+
+    if (!newRideData.pickup) {
+      alert("Pickup location is required.");
+      return;
+    }
+
+    if (!isPickupValid) {
+      alert(`Invalid Pickup Location: '${newRideData.pickup}'. Please select a location from the list.`);
+      return;
+    }
+
+    if (!newRideData.destination) {
+      alert("Destination is required.");
+      return;
+    }
+
+    if (!isDestValid) {
+      alert(`Invalid Destination: '${newRideData.destination}'. Please select a location from the list.`);
       return;
     }
 
@@ -4675,142 +4764,20 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   </button>
                 </div>
 
-                {/* Voice Input Section - Compact on mobile */}
                 <div className="p-3 md:p-4 flex flex-col items-center bg-gray-50 border-b border-gray-200">
                   <button
                     type="button"
-                    onClick={handleToggleListening}
-                    className={`relative w-16 h-16 md:w-24 md:h-24 rounded-full transition-all duration-300 flex items-center justify-center ${isListening ? "bg-red-500 text-white shadow-xl shadow-red-500/50" : "bg-blue-500 text-white hover:bg-blue-600 shadow-xl shadow-blue-500/50"}`}
-                    style={
-                      isListening && audioLevel > 0
-                        ? {
-                          transform: `scale(${1 + (audioLevel / 100) * 0.15})`,
-                          boxShadow: `0 0 ${20 + audioLevel * 0.5}px rgba(239, 68, 68, ${0.4 + (audioLevel / 100) * 0.3})`,
-                        }
-                        : {}
-                    }
+                    onClick={handleVoiceAssistantStart}
+                    className="relative w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 text-white shadow-xl shadow-blue-500/30 flex items-center justify-center hover:scale-105 transition-transform duration-300"
                   >
+                    <Mic size={28} className="md:w-9 md:h-9" />
                     {isListening && (
-                      <>
-                        <div className="absolute inset-0 rounded-full bg-red-400 animate-ping-slow"></div>
-                        <div
-                          className="absolute inset-0 rounded-full border-2 border-red-300 opacity-75"
-                          style={{
-                            transform: `scale(${1 + (audioLevel / 100) * 0.2})`,
-                            animation: "pulse 1s ease-in-out infinite",
-                          }}
-                        ></div>
-                      </>
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white rounded-full animate-pulse"></span>
                     )}
-                    <Mic
-                      size={28}
-                      className={`md:w-10 md:h-10 transition-transform duration-100 ${isListening && audioLevel > 50 ? "animate-bounce" : ""
-                        }`}
-                    />
                   </button>
-                  <p className="mt-2 text-gray-500 font-medium text-center text-xs md:text-sm">
-                    {isListening
-                      ? "Listening..."
-                      : "Tap to speak"}
+                  <p className="mt-3 text-gray-500 font-medium text-center text-xs md:text-sm">
+                    Tap to use Voice Assistant
                   </p>
-
-
-                  {/* Silence countdown indicator */}
-                  {isListening && silenceCountdown !== null && silenceRemainingTime !== null && (
-                    <div className="mt-4 animate-in fade-in slide-in-from-bottom-2 z-10 transition-all duration-300">
-                      <div className="bg-white/95 backdrop-blur shadow-lg border border-orange-200 rounded-2xl px-5 py-3 flex flex-col items-center gap-2 min-w-[200px]">
-                        <div className="flex items-center gap-2 w-full justify-center">
-                          <AlertCircle size={14} className="text-orange-500 animate-pulse" />
-                          <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Im lặng
-                          </span>
-                        </div>
-
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-3xl font-bold text-orange-600 tabular-nums leading-none tracking-tight">
-                            {silenceCountdown}
-                          </span>
-                          <span className="text-xs font-medium text-orange-400">s</span>
-                          <span className="text-xs text-gray-400 ml-1">chờ dừng</span>
-                        </div>
-
-                        {/* Compact Progress Line */}
-                        <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden mt-1">
-                          <div
-                            className="bg-gradient-to-r from-orange-400 to-red-500 h-full rounded-full transition-all duration-100 linear"
-                            style={{
-                              width: `${Math.min(100, (silenceRemainingTime / 3000) * 100)}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {(transcript || isProcessing || voiceResult.status) && (
-                    <div className="mt-4 w-full space-y-2">
-                      {transcript && (
-                        <div className="p-3 bg-white rounded-lg border text-center">
-                          <p className="font-mono text-gray-800 text-xs md:text-sm break-words">
-                            "{transcript}"
-                          </p>
-                        </div>
-                      )}
-                      {isProcessing && (
-                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 text-center">
-                          <p className="text-blue-600 font-medium animate-pulse text-sm md:text-base flex items-center justify-center gap-2">
-                            <Loader2 size={16} className="animate-spin" />
-                            Processing voice command...
-                          </p>
-                        </div>
-                      )}
-                      {voiceResult.status === "success" && (
-                        <div className="p-3 bg-green-50 rounded-lg border border-green-200 text-center">
-                          <p className="text-green-800 font-medium text-sm md:text-base flex items-center justify-center gap-2">
-                            <CheckCircle size={16} />
-                            {voiceResult.message}
-                          </p>
-                        </div>
-                      )}
-                      {voiceResult.status === "error" && (
-                        <div className="p-3 bg-red-50 rounded-lg border border-red-200 text-center">
-                          <p className="text-red-800 font-medium text-sm md:text-base flex items-center justify-center gap-2">
-                            <AlertCircle size={16} />
-                            {voiceResult.message}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Auto-confirm countdown */}
-                  {isAutoConfirming && (
-                    <div className="mt-4 w-full p-4 bg-gradient-to-r from-blue-50 to-emerald-50 rounded-lg border-2 border-emerald-300">
-                      <div className="text-center">
-                        <p className="text-sm text-gray-700 mb-2 font-medium">
-                          Tự động tạo ride sau:
-                        </p>
-                        <div className="text-5xl font-bold text-emerald-600 mb-2 animate-pulse">
-                          {countdown}
-                        </div>
-                        <p className="text-xs text-gray-500">
-                          {countdown > 1 ? "giây" : "giây - Đang tạo ride..."}
-                        </p>
-                        <button
-                          onClick={() => {
-                            setIsAutoConfirming(false);
-                            if (countdownTimerRef.current) {
-                              clearInterval(countdownTimerRef.current);
-                              countdownTimerRef.current = null;
-                            }
-                            setCountdown(5);
-                          }}
-                          className="mt-3 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium text-sm transition"
-                        >
-                          Hủy tự động
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Form Section - Compact layout to avoid scroll */}
@@ -6030,6 +5997,31 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           </button>
         )
       }
+      {/* Voice Assistant Overlay */}
+      <VoiceAssistantModal
+        isOpen={showVoiceOverlay}
+        onClose={handleVoiceAssistantClose}
+        isListening={isListening}
+        transcript={transcript}
+        voiceResult={voiceResult}
+        audioLevel={audioLevel}
+        processing={isProcessing}
+        parsedData={{
+          roomNumber: newRideData.roomNumber,
+          pickup: newRideData.pickup,
+          destination: newRideData.destination,
+          guestCount: newRideData.guestCount,
+          guestName: newRideData.guestName,
+          notes: newRideData.notes,
+        }}
+        onConfirm={() => handleCreateRide()}
+        onRetry={() => {
+          setVoiceResult({ status: null, message: "" });
+          if (!isListening) handleToggleListening();
+        }}
+        silenceCountdown={silenceCountdown}
+        silenceRemainingTime={silenceRemainingTime}
+      />
     </div >
   );
 };

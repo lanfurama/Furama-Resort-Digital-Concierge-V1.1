@@ -1,7 +1,10 @@
 // API Client helper for making API calls
 // API and frontend run on the same port (3000), so we use relative paths
 // API endpoints are prefixed with /api/v1
-let API_BASE_URL = (import.meta as any).env?.VITE_API_URL || process.env.VITE_API_URL || '/api/v1';
+let API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api/v1';
+if (typeof process !== 'undefined' && process.env && process.env.VITE_API_URL) {
+  API_BASE_URL = process.env.VITE_API_URL;
+}
 
 // Fix Mixed Content Issue: If running on HTTPS but API URL is HTTP (common in dev),
 // switch to relative path if it's the same host, or upgrade protocol.
