@@ -290,7 +290,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       // Process transcript when recording stops
       await handleProcessTranscript(finalTranscript);
     },
-    silenceTimeout: 3000,
+    silenceTimeout: 1000,
     t, // Pass translation function for multilingual error messages
   });
 
