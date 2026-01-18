@@ -15,7 +15,7 @@ import {
 } from "./dataService";
 import { ContentTranslation } from "../types";
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+const apiKey = import.meta?.env?.VITE_GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 if (!apiKey) {
   console.error("VITE_GEMINI_API_KEY is not set. Please check your .env file.");
   console.error("AI features will not work without a valid API key.");
@@ -93,12 +93,12 @@ CRITICAL EXTRACTION RULES (follow these precisely for >95% accuracy):
      * "Villa D03", "Biệt thự D5", "Villa D11" → "D03", "D5", "D11"
      * "D03", "D11", "P03" → "D03", "D11", "P03"
      * "ACC", "ABC" (2-3 letters) → "ACC", "ABC"
-     * "101", "2001", "101A" → "101", "2001", "101A"
+      * "101", "2001", "101A" → "101", "2001", "101A"
      * PHONETIC NUMBERS (Vietnamese style):
        - "một linh một" -> "101"
-       - "hai không năm" -> "205"
+       - "hai không năm" / "hai lẻ năm" -> "205" ("lẻ" = 0)
        - "một một hai" -> "112"
-       - "ba lẻ năm" -> "305"
+       - "ba lẻ năm" -> "305" ("lẻ" = 0)
    - Common patterns: [Letter][Digits] (D11, A101), [Digits] (101, 2001), [2-3 Letters] (ACC)
    - If room number is in pickup text, extract it separately
    - Room numbers are typically: 2-4 digits, or 1 letter + 1-3 digits, or 2-3 letters
@@ -109,10 +109,10 @@ CRITICAL EXTRACTION RULES (follow these precisely for >95% accuracy):
    - Keywords indicating PICKUP: "từ", "ở", "tại", "đón", "pickup", "from", "lấy".
    - Smart matching for common terms (use EXACT names from list):
      * "pool" or "hồ bơi", "bể bơi" → prefer "Lagoon Pool" or "Ocean Pool" (check context for which one)
-     * "restaurant" or "nhà hàng" or "ăn" → match to specific restaurant: "ACC", "Cafe Indochine", "Don Cipriani's", etc.
+     * "restaurant" or "nhà hàng" or "ăn" or "ăn sáng" → match to specific restaurant: "ACC", "Cafe Indochine", "Don Cipriani's", etc.
      * "villa" or "biệt thự" → match villa areas: "D1", "D2", "D3", "D4", "D5", "D6", "D7", "Villas"
      * "lobby" or "sảnh" or "reception" or "lễ tân" → match "Reception" or "Main Lobby"
-     * "beach" or "bãi biển" or "biển" → match "Beach Access" or "Beach"
+     * "beach" or "bãi biển" or "biển" or "ra biển" → match "Beach Access" or "Beach"
    - If multiple matches possible, choose the MOST COMMON/POPULAR one from the list
    - IMPORTANT: Return the EXACT name as it appears in the valid locations list (case-sensitive)
 
@@ -157,7 +157,7 @@ PHONETIC ENGLISH INTERPRETATION (Critical for Bilingual Support):
    - "biển" / "bít" / "bíc" → "Beach"
 
    Example: "Niu rai rùm oan zia rô oan" → "New ride room 101"
-   Example: "Pic úp ất vi la đi thri" → "Pick up at Villa D3"
+   Example: "Pic úp ất vi la đi thri" → "Pick up at Villa D3" ("đi" = D, "thri" = 3)
    Example: "Cho xe từ sảnh về vi la đê ba" → "Pickup: Main Lobby, Destination: Villa D3"
 
 Return JSON with exact location names matching the valid locations list.`;
@@ -191,7 +191,7 @@ Return JSON with exact location names matching the valid locations list.`;
           console.log(`[AI Parse] Fixed pickup: "${parsed.pickup}" → "${closestPickup.name}"`);
           parsed.pickup = closestPickup.name;
         } else {
-          console.warn(`[AI Parse] Could not match pickup location: "${parsed.pickup}" strictly. Clearing.`);
+          console.warn(`[AI Parse] Could not match pickup location: "${parsed.pickup}" strictly.Clearing.`);
           parsed.pickup = null;
         }
       }
@@ -205,7 +205,7 @@ Return JSON with exact location names matching the valid locations list.`;
           console.log(`[AI Parse] Fixed destination: "${parsed.destination}" → "${closestDest.name}"`);
           parsed.destination = closestDest.name;
         } else {
-          console.warn(`[AI Parse] Could not match destination location: "${parsed.destination}" strictly. Clearing.`);
+          console.warn(`[AI Parse] Could not match destination location: "${parsed.destination}" strictly.Clearing.`);
           parsed.destination = null;
         }
       }
@@ -749,12 +749,12 @@ export const parseAdminInput = async (
   }
 
   const prompt = `Extract the following information from this text: "${input}".
-                  ${context ? `Use this context: ${context}.` : ""}
-                  For Ride Requests: 
-                    - If pickup is not mentioned, use the room number as the pickup location.
+    ${context ? `Use this context: ${context}.` : ""}
+                  For Ride Requests:
+  - If pickup is not mentioned, use the room number as the pickup location.
                     - Default guestCount to 1 if not specified.
-                    - Match location names exactly to the provided valid locations list. Use fuzzy matching for common variations (e.g., "pool" should match "Lagoon Pool" or "Ocean Pool", "restaurant" should match restaurant names).
-                    - For locations, be smart about synonyms: "pool" = any pool location, "restaurant" = any restaurant, "villa" = villa areas, "lobby" = reception/lobby areas, "beach" = beach access points.
+                    - Match location names exactly to the provided valid locations list.Use fuzzy matching for common variations(e.g., "pool" should match "Lagoon Pool" or "Ocean Pool", "restaurant" should match restaurant names).
+                    - For locations, be smart about synonyms: "pool" = any pool location, "restaurant" = any restaurant, "villa" = villa areas, "lobby" = reception / lobby areas, "beach" = beach access points.
                   For locations, if coordinates aren't provided, estimate them based on typical Da Nang beach resort coordinates near 16.04, 108.25.
                   For events, assume current year is 2024 if not specified.
                   For Menu Items, strictly categorize as 'Dining' or 'Spa' based on context.
@@ -798,7 +798,7 @@ export const createChatSession = async () => {
     const promosList = await getPromotions();
 
     const knowledge = knowledgeItems
-      .map((k) => `Q: ${k.question} A: ${k.answer}`)
+      .map((k) => `Q: ${k.question} A: ${k.answer} `)
       .join("\n");
     const events = eventsList
       .map((e) => `Event: ${e.title} at ${e.time} on ${e.date} (${e.location})`)
@@ -820,7 +820,7 @@ export const createChatSession = async () => {
         Your tone is polite, luxurious, and helpful.
         Assist guests with booking buggies, finding restaurants, and general information.
 
-        Here is the current Resort Knowledge Base (Answer these exactly):
+        Here is the current Resort Knowledge Base(Answer these exactly):
         ${knowledge}
 
         Current Resort Events:
@@ -869,10 +869,10 @@ export const translateText = async (
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `Translate the following text into ${targetLanguage}.
-            Preserve the original tone (polite, service-oriented).
+            Preserve the original tone(polite, service - oriented).
             Only output the translated text, no explanations.
 
-            Text: "${text}"`,
+    Text: "${text}"`,
     });
     return response.text?.trim() || text;
   } catch (e) {
@@ -899,10 +899,10 @@ export const generateTranslations = async (
       "Russian",
     ];
     const prompt = `Translate the following content fields into Vietnamese, Korean, Japanese, Chinese, and Russian.
-        Return a JSON object where keys are the language names (Vietnamese, Korean, Japanese, Chinese, Russian) and values are objects containing the translated fields.
+        Return a JSON object where keys are the language names(Vietnamese, Korean, Japanese, Chinese, Russian) and values are objects containing the translated fields.
 
         Source Content: ${JSON.stringify(content)}
-        `;
+  `;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
