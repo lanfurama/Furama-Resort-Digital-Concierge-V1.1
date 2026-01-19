@@ -58,7 +58,7 @@ const PHONETIC_MAPPINGS: Record<string, string> = {
   "tu": "2", "tư": "4",
   "tri": "3", "tờ ri": "3", "thờ ri": "3", "ba": "3",
   "for": "4", "pho": "4", "phò": "4", "bốn": "4",
-  "phai": "5", "phài": "5", "năm": "5",
+  "phai": "5", "phài": "5", "năm": "5", "nằm": "5", "lăm": "5",
   "xích": "6", "sích": "6", "sáu": "6",
   "se vần": "7", "xe vần": "7", "bảy": "7",
   "gâu tu": "go to", "gô tu": "go to", "đi": "go to", "đến": "go to", "tới": "go to", "ra": "go to", "về": "go to",
@@ -144,6 +144,14 @@ export const normalizeTranscript = (text: string): string => {
 
   // Specific fix for "Nam/Năm/Em" -> 5 when referring to guests
   processedText = processedText.replace(/(nam|năm|em|nằm|nâm)[\s\W]+(khách|người)/gi, "5 khách");
+
+  // Fix common ICP misinterpretations
+  processedText = processedText.replace(/\b(icp|ice pe|ai si pi|ai xi pi)\b/gi, "ICP");
+
+  // Fix "B1" to "P1" if "B1" isn't a likely villa (Villa usually B + 2 digits like B11, or user intent is commonly P1)
+  // Context dependent: "từ B1" -> "từ P1" if P1 is a valid room.
+  // Actually, let's just normalize common room typos
+  processedText = processedText.replace(/\b(bê một|b1)\b/gi, "P1"); // P1 is more common for 'room' context than B1 if B1 isn't a villa
 
   // ALGORITHMIC PRE-PROCESSING for STABILITY
   // 1. Prevent "Khách" being seen as Location "KH" by mapping to "guest"
