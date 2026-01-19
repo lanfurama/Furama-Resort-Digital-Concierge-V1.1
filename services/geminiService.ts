@@ -29,7 +29,7 @@ export const parseRideRequestWithContext = async (
   input: string,
   locations: Array<{ id?: string; name: string; type?: string; lat?: number; lng?: number }>,
 ) => {
-  const model = "gemini-1.5-flash"; // Use flash as requested
+  const model = "gemini-2.0-flash"; // Use the latest flash model available
 
   const schema: Schema = {
     type: Type.OBJECT,
