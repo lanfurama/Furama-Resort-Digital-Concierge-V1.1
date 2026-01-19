@@ -167,6 +167,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   const [vietnameseVoice, setVietnameseVoice] = useState<SpeechSynthesisVoice | null>(null);
 
   useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      console.warn("Speech Synthesis API not supported in this browser");
+      return;
+    }
+
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
       // Prioritize Google Vietnamese or Microsoft An if available, otherwise any 'vi' voice
@@ -182,7 +187,9 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     window.speechSynthesis.onvoiceschanged = loadVoices;
 
     return () => {
-      window.speechSynthesis.onvoiceschanged = null;
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
     };
   }, []);
 
@@ -772,8 +779,15 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
   // Sound notification state
   const [soundEnabled, setSoundEnabled] = useState(() => {
-    const saved = localStorage.getItem("reception_sound_enabled");
-    return saved !== null ? saved === "true" : true; // Default to enabled
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const saved = localStorage.getItem("reception_sound_enabled");
+        return saved !== null ? saved === "true" : true; // Default to enabled
+      }
+    } catch (e) {
+      console.warn("Failed to access localStorage for sound settings:", e);
+    }
+    return true;
   });
 
   // Screen Wake Lock (Keep Screen On)
@@ -833,13 +847,19 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     loadData();
 
     // Load fleet config from localStorage
-    const savedConfig = localStorage.getItem("fleetConfig");
-    if (savedConfig) {
-      try {
-        setFleetConfig(JSON.parse(savedConfig));
-      } catch (error) {
-        console.error("Failed to load fleet config:", error);
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const savedConfig = localStorage.getItem("fleetConfig");
+        if (savedConfig) {
+          try {
+            setFleetConfig(JSON.parse(savedConfig));
+          } catch (error) {
+            console.error("Failed to load fleet config:", error);
+          }
+        }
       }
+    } catch (e) {
+      console.warn("Failed to access localStorage for fleet config:", e);
     }
   }, []);
 

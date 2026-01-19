@@ -37,7 +37,15 @@ const ProtectedRoute: React.FC<{
   allowedRoles?: UserRole[];
   redirectTo?: string;
 }> = ({ children, allowedRoles, redirectTo = '/login' }) => {
-  const savedUser = localStorage.getItem('furama_user');
+  let savedUser = null;
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      savedUser = localStorage.getItem('furama_user');
+    }
+  } catch (e) {
+    console.warn("Failed to access localStorage in ProtectedRoute:", e);
+  }
+
   if (!savedUser) {
     return <Navigate to={redirectTo} replace />;
   }
@@ -85,30 +93,42 @@ const AppContent: React.FC = () => {
 
   // Restore user from localStorage on mount (only once - no dependencies)
   useEffect(() => {
-    const savedUser = localStorage.getItem('furama_user');
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        setUser(parsedUser);
+    try {
+      let savedUser = null;
+      if (typeof window !== 'undefined' && window.localStorage) {
+        savedUser = localStorage.getItem('furama_user');
+      }
 
-        // Restore language if available (only once)
-        if (parsedUser.language) {
-          setLanguage(parsedUser.language as any);
-        }
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          setUser(parsedUser);
 
-        // Show loading animation for 2.5 seconds to simulate system load
-        // This gives the "Buggy Loading" experience the user requested
-        setTimeout(() => {
+          // Restore language if available (only once)
+          if (parsedUser.language) {
+            setLanguage(parsedUser.language as any);
+          }
+
+          // Show loading animation for 2.5 seconds to simulate system load
+          setTimeout(() => {
+            setIsAppLoading(false);
+          }, 2500);
+
+        } catch (error) {
+          console.error('Failed to restore user from localStorage:', error);
+          try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+              localStorage.removeItem('furama_user');
+            }
+          } catch (e) { /* ignore */ }
           setIsAppLoading(false);
-        }, 2500);
-
-      } catch (error) {
-        console.error('Failed to restore user from localStorage:', error);
-        localStorage.removeItem('furama_user');
+        }
+      } else {
+        // No user, stop loading immediately to show login
         setIsAppLoading(false);
       }
-    } else {
-      // No user, stop loading immediately to show login
+    } catch (e) {
+      console.error("Failed to access localStorage in AppContent:", e);
       setIsAppLoading(false);
     }
   }, []); // Empty array - only run once on mount
@@ -223,13 +243,19 @@ const AppContent: React.FC = () => {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
 
     useEffect(() => {
-      const savedUser = localStorage.getItem('furama_user');
-      if (savedUser) {
-        try {
-          setCurrentUser(JSON.parse(savedUser));
-        } catch (e) {
-          console.error('Failed to load user:', e);
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const savedUser = localStorage.getItem('furama_user');
+          if (savedUser) {
+            try {
+              setCurrentUser(JSON.parse(savedUser));
+            } catch (e) {
+              console.error('Failed to parse user:', e);
+            }
+          }
         }
+      } catch (e) {
+        console.error('Failed to load user from localStorage:', e);
       }
     }, []);
 
@@ -259,13 +285,19 @@ const AppContent: React.FC = () => {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
 
     useEffect(() => {
-      const savedUser = localStorage.getItem('furama_user');
-      if (savedUser) {
-        try {
-          setCurrentUser(JSON.parse(savedUser));
-        } catch (e) {
-          console.error('Failed to load user:', e);
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const savedUser = localStorage.getItem('furama_user');
+          if (savedUser) {
+            try {
+              setCurrentUser(JSON.parse(savedUser));
+            } catch (e) {
+              console.error('Failed to parse user:', e);
+            }
+          }
         }
+      } catch (e) {
+        console.error('Failed to load user from localStorage:', e);
       }
     }, []);
 
@@ -277,13 +309,19 @@ const AppContent: React.FC = () => {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
 
     useEffect(() => {
-      const savedUser = localStorage.getItem('furama_user');
-      if (savedUser) {
-        try {
-          setCurrentUser(JSON.parse(savedUser));
-        } catch (e) {
-          console.error('Failed to load user:', e);
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const savedUser = localStorage.getItem('furama_user');
+          if (savedUser) {
+            try {
+              setCurrentUser(JSON.parse(savedUser));
+            } catch (e) {
+              console.error('Failed to parse user:', e);
+            }
+          }
         }
+      } catch (e) {
+        console.error('Failed to load user from localStorage:', e);
       }
     }, []);
 
