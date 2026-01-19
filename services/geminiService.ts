@@ -55,6 +55,13 @@ export const parseRideRequestWithContext = async (
     required: ["pickup", "dropoff"],
   };
 
+  if (schema.properties) {
+    schema.properties.notes = {
+      type: Type.STRING,
+      description: "Optional notes from the command (e.g. 'with luggage', 'urgent')",
+    };
+  }
+
   // Build compact location guide for the prompt
   // Include common codes like ACC, ICP, etc.
   const locationGuide = locations.map(l => {
@@ -64,28 +71,32 @@ export const parseRideRequestWithContext = async (
     return `- ${l.name}${desc !== l.name ? ` [Code: ${desc.match(/\[Code: (.*?)\]/)?.[1] || desc.match(/\((.*?)\)/)?.[1]}]` : ""}`;
   }).join("\n");
 
-  const prompt = `Bạn là trợ lý điều phối cho ứng dụng Buggy tại Furama Resort Đà Nẵng. 
-Nhiệm vụ của bạn là nghe lệnh từ hotline và chuyển nó thành định dạng JSON để hệ thống xử lý.
+  const prompt = `Bạn là trợ lý điều phối cho ứng dụng Buggy tại Furama Resort Đà Nẵng.
+Nhiệm vụ: Trích xuất thông tin từ câu lệnh điều phối viên thành JSON.
 
-DANH SÁCH MÃ ĐỊA ĐIỂM tiêu biểu:
-- ACC: Sảnh đón khách chính / Nhà hàng Asian Civic Center.
-- ICP: Cung hội nghị quốc tế (International Convention Palace).
-- Sảnh / Lễ tân: Main Lobby / Reception.
-- Hồ bơi: Lagoon Pool hoặc Ocean Pool.
-- Villa: Các căn villa như B11, D03, D5...
+***QUAN TRỌNG: CẤU TRÚC BẮT BUỘC***
+Người dùng sẽ nói theo form: "[Số khách] khách đi từ [Điểm đón] đến [Điểm đến], [Ghi chú tùy chọn]"
 
-HƯỚNG DẪN TRÍCH XUẤT:
-1. 'passengers': Số lượng khách (ví dụ: "5 người" -> 5). Mặc định là 1.
-2. 'pickup': Điểm đón (Mã hoặc tên địa điểm).
-3. 'dropoff': Điểm đến (Mã hoặc tên địa điểm).
-4. 'status': Trả về "valid" nếu có đủ pickup và dropoff, ngược lại "invalid".
+Ví dụ mẫu chuẩn:
+- "5 khách đi từ ACC đến ICP" -> {"passengers": 5, "pickup": "ACC", "dropoff": "ICP", "status": "valid"}
+- "2 người từ D1 tới Hồ Bơi, có trẻ em" -> {"passengers": 2, "pickup": "D1", "dropoff": "Lagoon Pool", "notes": "có trẻ em", "status": "valid"}
+- "1 khách từ Lễ tân về Phòng 101" -> {"passengers": 1, "pickup": "Main Lobby", "dropoff": "101", "status": "valid"}
 
-Lưu ý: Hotline có thể nói nhiều cách:
-- "Cho 5 người từ ACC qua ICP nhé"
-- "Từ 101 đi hồ bơi có 3 người"
-- "Đón phòng 205 ra biển 2 khách"
+HƯỚNG DẪN XỬ LÝ:
+1. 'passengers': Tìm số lượng đứng trước từ "khách", "người", "pax". Mặc định = 1.
+2. 'pickup': Tìm địa điểm sau từ "từ", "ở", "tại".
+3. 'dropoff': Tìm địa điểm sau từ "đến", "đi", "tới", "về", "qua".
+4. 'notes': Phần thông tin còn lại sau cùng (nếu có), thường sau dấu phẩy hoặc ngắt hơi.
+5. 'status': "valid" nếu có đủ pickup VÀ dropoff. Nếu thiếu 1 trong 2, trả về "invalid".
 
-Lệnh: "${input}"`;
+MÃ ĐỊA ĐIỂM THƯỜNG GẶP (Mapping):
+- ACC -> Asian Civic Center
+- ICP -> International Convention Palace
+- Sảnh / Lễ tân -> Main Lobby
+- Hồ bơi -> Lagoon Pool
+- Biển -> Beach Access
+
+Lệnh thực tế: "${input}"`;
 
   if (!ai) {
     console.error("Gemini AI is not initialized.");

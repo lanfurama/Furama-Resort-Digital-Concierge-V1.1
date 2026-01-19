@@ -148,9 +148,14 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                                 "{transcript}"
                             </p>
                         ) : (
-                            <p className="text-white/30 text-center italic">
-                                Hãy nói: "Đón tôi ở ACC đi Hồ Bơi" hoặc "Phòng 101 đi Nhà hàng"
-                            </p>
+                            <div className="text-white/60 text-center space-y-2">
+                                <p className="italic">
+                                    "5 khách đi từ D1 đến ACC, có trẻ em"
+                                </p>
+                                <p className="text-xs text-white/40 uppercase tracking-widest border-t border-white/10 pt-2 mt-2">
+                                    Cấu trúc: [Số khách] + [Điểm đón] + [Điểm đến] + [Ghi chú]
+                                </p>
+                            </div>
                         )}
                     </div>
 
