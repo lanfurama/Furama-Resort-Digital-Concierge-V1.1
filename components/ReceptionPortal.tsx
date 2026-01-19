@@ -342,75 +342,33 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   const [selectedRideForDetail, setSelectedRideForDetail] =
     useState<RideRequest | null>(null);
 
-  // Admin Auth Modal State (for setting driver online)
-  const [showAdminAuthModal, setShowAdminAuthModal] = useState(false);
-  const [selectedDriverForOnline, setSelectedDriverForOnline] =
-    useState<User | null>(null);
-  const [adminUsername, setAdminUsername] = useState("");
-  const [adminPassword, setAdminPassword] = useState("");
-  const [adminAuthError, setAdminAuthError] = useState("");
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
 
   // Handle admin authentication and toggle driver status
-  const handleAdminAuth = async () => {
-    if (!selectedDriverForOnline || !adminUsername || !adminPassword) {
-      return;
-    }
+  // Handle toggling driver status (Online <-> Offline) without auth
+  const handleToggleDriverStatus = async (driver: User) => {
+    if (!driver || !driver.id) return;
 
-    setIsAuthenticating(true);
-    setAdminAuthError("");
+    // Check current status (using last heartbeat < 30s as online criteria)
+    // We parse updatedAt to ensure correct date comparison
+    const updatedAt = driver.updatedAt ? new Date(driver.updatedAt).getTime() : 0;
+    const isOnline = updatedAt > 0 && (Date.now() - updatedAt < 30000);
 
     try {
-      // Authenticate admin
-      const adminUser = await authenticateStaff(adminUsername, adminPassword);
-
-      if (!adminUser) {
-        setAdminAuthError("Invalid admin credentials. Please try again.");
-        setIsAuthenticating(false);
-        return;
+      if (isOnline) {
+        // Set Offline
+        await markDriverOffline(driver.id);
+      } else {
+        // Set Online (10 hours)
+        await setDriverOnlineFor10Hours(driver.id);
       }
 
-      // Check if user is admin
-      if (adminUser.role !== UserRole.ADMIN) {
-        setAdminAuthError(
-          "Access denied. Only admin users can manage driver status.",
-        );
-        setIsAuthenticating(false);
-        return;
-      }
-
-      // Check current status
-      const isOnline =
-        selectedDriverForOnline.updatedAt &&
-        Date.now() - selectedDriverForOnline.updatedAt < 30000;
-
-      if (selectedDriverForOnline.id) {
-        if (isOnline) {
-          // Set Offline
-          await markDriverOffline(selectedDriverForOnline.id);
-        } else {
-          // Set Online (10 hours)
-          await setDriverOnlineFor10Hours(selectedDriverForOnline.id);
-        }
-
-        // Refresh users list
-        const refreshedUsers = await getUsers().catch(() => getUsersSync());
-        setUsers(refreshedUsers);
-
-        // Close modal
-        setShowAdminAuthModal(false);
-        setSelectedDriverForOnline(null);
-        setAdminUsername("");
-        setAdminPassword("");
-        setAdminAuthError("");
-      }
+      // Refresh users list
+      const refreshedUsers = await getUsers().catch(() => getUsersSync());
+      setUsers(refreshedUsers);
     } catch (error: any) {
-      console.error("Admin auth error:", error);
-      setAdminAuthError(
-        error.message || "Authentication failed. Please try again.",
-      );
-    } finally {
-      setIsAuthenticating(false);
+      console.error("Error toggling driver status:", error);
+      alert(error.message || "Failed to update driver status");
     }
   };
 
@@ -3754,11 +3712,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            setSelectedDriverForOnline(driver);
-                                            setShowAdminAuthModal(true);
-                                            setAdminUsername("");
-                                            setAdminPassword("");
-                                            setAdminAuthError("");
+                                            handleToggleDriverStatus(driver);
                                           }}
                                           className={`text-[8px] md:text-[9px] px-1.5 md:px-2 py-0.5 rounded font-medium text-white transition-colors min-h-[28px] md:min-h-0 touch-manipulation ${driverStatus === "OFFLINE"
                                             ? "bg-emerald-500 hover:bg-emerald-600"
@@ -3766,8 +3720,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                             }`}
                                           title={
                                             driverStatus === "OFFLINE"
-                                              ? "Set driver online (Admin required)"
-                                              : "Set driver offline (Admin required)"
+                                              ? "Set driver online"
+                                              : "Set driver offline"
                                           }
                                         >
                                           {driverStatus === "OFFLINE"
@@ -5999,125 +5953,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         )
       }
 
-      {/* Admin Auth Modal for Setting Driver Online */}
-      {
-        showAdminAuthModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col">
-              <div className="p-4 md:p-5 border-b flex justify-between items-center">
-                <h3 className="font-bold text-base md:text-lg text-gray-900">
-                  Admin Authentication Required
-                </h3>
-                <button
-                  onClick={() => {
-                    setShowAdminAuthModal(false);
-                    setSelectedDriverForOnline(null);
-                    setAdminUsername("");
-                    setAdminPassword("");
-                    setAdminAuthError("");
-                  }}
-                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center flex-shrink-0"
-                >
-                  <X size={20} />
-                </button>
-              </div>
 
-              <div className="p-4 md:p-6 space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800">
-                    <strong>
-                      {selectedDriverForOnline?.updatedAt &&
-                        Date.now() - selectedDriverForOnline.updatedAt < 30000
-                        ? "Setting driver OFFLINE:"
-                        : "Setting driver ONLINE:"}
-                    </strong>{" "}
-                    {selectedDriverForOnline?.lastName || "Unknown"}
-                  </p>
-                  <p className="text-xs text-blue-600 mt-1">
-                    Admin credentials required to update driver status.
-                  </p>
-                </div>
-
-                {adminAuthError && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                    <p className="text-sm text-red-800">{adminAuthError}</p>
-                  </div>
-                )}
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Admin Username
-                    </label>
-                    <input
-                      type="text"
-                      value={adminUsername}
-                      onChange={(e) => {
-                        setAdminUsername(e.target.value);
-                        setAdminAuthError("");
-                      }}
-                      placeholder="Enter admin username"
-                      className="w-full px-3 py-3 md:py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-sm min-h-[44px] md:min-h-0"
-                      disabled={isAuthenticating}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Admin Password
-                    </label>
-                    <input
-                      type="password"
-                      value={adminPassword}
-                      onChange={(e) => {
-                        setAdminPassword(e.target.value);
-                        setAdminAuthError("");
-                      }}
-                      placeholder="Enter admin password"
-                      className="w-full px-3 py-3 md:py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base md:text-sm min-h-[44px] md:min-h-0"
-                      disabled={isAuthenticating}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !isAuthenticating) {
-                          handleAdminAuth();
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 border-t bg-gray-50 flex flex-col sm:flex-row justify-end gap-3 rounded-b-2xl">
-                <button
-                  onClick={() => {
-                    setShowAdminAuthModal(false);
-                    setSelectedDriverForOnline(null);
-                    setAdminUsername("");
-                    setAdminPassword("");
-                    setAdminAuthError("");
-                  }}
-                  className="w-full sm:w-auto px-4 py-3 md:py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
-                  disabled={isAuthenticating}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAdminAuth}
-                  disabled={isAuthenticating || !adminUsername || !adminPassword}
-                  className="w-full sm:w-auto px-4 py-3 md:py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
-                >
-                  {isAuthenticating ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Authenticating...
-                    </>
-                  ) : (
-                    "Authenticate & Update Status"
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      }
 
       {/* Floating New Ride Button - Circular with Text */}
       {
