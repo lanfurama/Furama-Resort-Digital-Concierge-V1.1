@@ -149,6 +149,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
   // Handle toggling listening with overlay
   const handleVoiceAssistantStart = () => {
+    setShowCreateRideModal(true);
     setShowVoiceOverlay(true);
     if (!isListening) {
       handleToggleListening();
@@ -5901,9 +5902,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       {
         viewMode === "BUGGY" && !showCreateRideModal && (
           <button
-            onClick={() => {
-              setShowCreateRideModal(true);
-            }}
+            onClick={handleVoiceAssistantStart}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-full w-20 h-20 md:w-16 md:h-16 flex items-center justify-center transition-all z-50 touch-manipulation hover:scale-110 active:scale-95"
             style={{
               boxShadow: "0 8px 30px -4px rgba(16, 185, 129, 0.6), 0 4px 15px rgba(16, 185, 129, 0.3)",
