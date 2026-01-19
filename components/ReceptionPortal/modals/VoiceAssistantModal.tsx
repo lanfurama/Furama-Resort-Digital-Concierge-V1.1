@@ -67,9 +67,9 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                     {!isListening && !processing && !isSuccess && !isError && (
                         <div className="text-center space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-700">
                             <h2 className="text-3xl font-bold text-white tracking-tight">
-                                Concierge AI
+                                Trợ Lý Furama
                             </h2>
-                            <p className="text-blue-200/80">Tap the microphone to start</p>
+                            <p className="text-blue-200/80">Chạm vào micro để bắt đầu</p>
                         </div>
                     )}
 
@@ -116,7 +116,7 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                     <div className="text-center h-8">
                         {isListening ? (
                             <span className="text-blue-300 font-medium tracking-wide animate-pulse flex items-center gap-2 justify-center">
-                                Listening...
+                                Đang lắng nghe...
                                 {silenceCountdown !== null && (
                                     <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-200">
                                         {silenceCountdown}s
@@ -126,14 +126,14 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                         ) : processing ? (
                             <span className="text-indigo-300 font-medium tracking-wide flex items-center gap-2 justify-center">
                                 <Sparkles size={16} className="animate-pulse" />
-                                Processing...
+                                Đang xử lý...
                             </span>
                         ) : isSuccess ? (
-                            <span className="text-emerald-300 font-medium tracking-wide">Success</span>
+                            <span className="text-emerald-300 font-medium tracking-wide">Thành công</span>
                         ) : isError ? (
-                            <span className="text-orange-300 font-medium tracking-wide">Try Again</span>
+                            <span className="text-orange-300 font-medium tracking-wide">Thử lại</span>
                         ) : (
-                            <span className="text-white/40 text-sm">Ready</span>
+                            <span className="text-white/40 text-sm">Sẵn sàng</span>
                         )}
                     </div>
                 </div>
@@ -149,7 +149,7 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                             </p>
                         ) : (
                             <p className="text-white/30 text-center italic">
-                                Say something like "Book a buggy for Mr. Nam from Lobby to Pool"
+                                Hãy nói: "Đón tôi ở ACC đi Hồ Bơi" hoặc "Phòng 101 đi Nhà hàng"
                             </p>
                         )}
                     </div>
@@ -160,29 +160,29 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                             <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
                                 <div className="flex items-center gap-2 text-emerald-700 font-bold">
                                     <Sparkles size={16} />
-                                    <span>Ride Ticket</span>
+                                    <span>Thông Tin Chuyến Xe</span>
                                 </div>
                                 <span className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-1 rounded">
-                                    Verified
+                                    Đã xác thực
                                 </span>
                             </div>
 
                             <div className="space-y-3">
-                                <div className="grid grid-cols-[80px_1fr] items-center gap-2">
-                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Pickup</span>
+                                <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Điểm đón</span>
                                     <span className="font-semibold text-gray-800 text-lg truncate">{parsedData.pickup}</span>
                                 </div>
-                                <div className="grid grid-cols-[80px_1fr] items-center gap-2">
-                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Dropoff</span>
+                                <div className="grid grid-cols-[100px_1fr] items-center gap-2">
+                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Điểm đến</span>
                                     <span className="font-semibold text-gray-800 text-lg truncate">{parsedData.destination}</span>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 mt-2 pt-2 border-t border-gray-100">
                                     <div>
-                                        <span className="block text-xs font-bold text-gray-500 uppercase">Room</span>
-                                        <span className="font-medium text-gray-800">{parsedData.roomNumber || 'N/A'}</span>
+                                        <span className="block text-xs font-bold text-gray-500 uppercase">Số phòng</span>
+                                        <span className="font-medium text-gray-800">{parsedData.roomNumber || '---'}</span>
                                     </div>
                                     <div>
-                                        <span className="block text-xs font-bold text-gray-500 uppercase">Guests</span>
+                                        <span className="block text-xs font-bold text-gray-500 uppercase">Số khách</span>
                                         <span className="font-medium text-gray-800">{parsedData.guestCount || 1} {parsedData.guestName ? `(${parsedData.guestName})` : ''}</span>
                                     </div>
                                 </div>
@@ -205,7 +205,7 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                             onClick={onClose}
                             className="px-4 py-3 rounded-xl font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors border border-white/10"
                         >
-                            Cancel
+                            Hủy
                         </button>
 
                         {showResultCard ? (
@@ -213,7 +213,7 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                                 onClick={onConfirm}
                                 className="px-4 py-3 rounded-xl font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2"
                             >
-                                Confirm Ride <ArrowRight size={18} />
+                                Xác nhận <ArrowRight size={18} />
                             </button>
                         ) : (
                             <button
@@ -221,7 +221,7 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                                 disabled={isListening || processing}
                                 className="px-4 py-3 rounded-xl font-semibold bg-white text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
-                                {isListening ? 'Listening...' : <><Mic size={18} /> Tap to Speak</>}
+                                {isListening ? 'Đang nghe...' : <><Mic size={18} /> Chạm để nói</>}
                             </button>
                         )}
                     </div>
@@ -229,7 +229,7 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                     {/* Language Hint */}
                     <div className="mt-4 flex items-center justify-center gap-2 text-white/30 text-xs">
                         <Languages size={12} />
-                        <span>Supports Vietnamese & English</span>
+                        <span>Hỗ trợ Tiếng Việt & Tiếng Anh</span>
                     </div>
 
                 </div>

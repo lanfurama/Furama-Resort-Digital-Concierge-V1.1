@@ -501,71 +501,32 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       locations,
       {
         onSuccess: (data: ParsedVoiceData) => {
-          // Validate locations
-          const isValidLocation = (name: string | undefined) => {
-            if (!name) return true; // Empty is handled by missing field check elsewhere
-            const lowerName = name.toLowerCase();
-            return locations.some(l => l.name.toLowerCase() === lowerName ||
-              l.keywords?.some(k => k.toLowerCase() === lowerName));
-          };
-
-          const isPickupValid = isValidLocation(data.pickup);
-          const isDestValid = isValidLocation(data.destination);
-
-          if (!isPickupValid || !isDestValid) {
-            // Update partial data so user can see what was heard
-            setNewRideData((prev) => ({
-              ...prev,
-              roomNumber: data.roomNumber || (prev.roomNumber && prev.roomNumber.trim() ? prev.roomNumber : ""),
-              pickup: data.pickup || prev.pickup,
-              destination: data.destination || prev.destination,
-              guestName: data.guestName || prev.guestName,
-              guestCount: data.guestCount || prev.guestCount || 1,
-              notes: data.notes || prev.notes,
-            }));
-
-            const invalidFields = [];
-            if (!isPickupValid && data.pickup) invalidFields.push(`Điểm đón '${data.pickup}' không hợp lệ`);
-            if (!isDestValid && data.destination) invalidFields.push(`Điểm đến '${data.destination}' không hợp lệ`);
-
-            const errorMsg = `⚠️ ${invalidFields.join(". ")}. Vui lòng chọn địa điểm có trong danh sách.`;
-            setVoiceResult({
-              status: "error",
-              message: errorMsg,
-            });
-            speakFeedback(errorMsg);
-            return;
-          }
-
-          // Update form data (Valid case)
+          // Update form data (Now pre-validated by service)
           setNewRideData((prev) => ({
             ...prev,
             roomNumber: data.roomNumber || (prev.roomNumber && prev.roomNumber.trim() ? prev.roomNumber : ""),
             pickup: data.pickup || prev.pickup,
             destination: data.destination || prev.destination,
-            guestName: data.guestName || prev.guestName,
             guestCount: data.guestCount || prev.guestCount || 1,
             notes: data.notes || prev.notes,
           }));
 
           // Show success message and start auto-confirm countdown
-          const successMsg = "✅ Đã nhận diện thành công! Tự động tạo ride sau 5 giây...";
+          const successMsg = "✅ Đã nhận diện thành công! Tự động tạo chuyến sau 5 giây...";
           setVoiceResult({
             status: "success",
             message: successMsg,
           });
-          speakFeedback("Đã nhận diện thành công. Đang tự động tạo đơn."); // Speak a slightly shorter/natural version
+          speakFeedback("Đã nhận diện thành công. Đang tự động tạo chuyến.");
 
           setIsAutoConfirming(true);
           setCountdown(5);
 
-          // Clear existing countdown timer
           if (countdownTimerRef.current) {
             clearInterval(countdownTimerRef.current);
             countdownTimerRef.current = null;
           }
 
-          // Start countdown timer
           countdownTimerRef.current = setInterval(() => {
             setCountdown((prev) => {
               if (prev <= 1) {
@@ -573,7 +534,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   clearInterval(countdownTimerRef.current);
                   countdownTimerRef.current = null;
                 }
-                // Auto-create ride - add small delay to ensure state is updated
                 setIsAutoConfirming(false);
                 setTimeout(() => {
                   handleCreateRide();
@@ -592,36 +552,18 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           speakFeedback(message);
         },
         onPartialSuccess: (data: ParsedVoiceData, foundFields: string[], missingFields: string[]) => {
-          // Validate locations
-          const isValidLocation = (name: string | undefined) => {
-            if (!name) return true;
-            const lowerName = name.toLowerCase();
-            return locations.some(l => l.name.toLowerCase() === lowerName ||
-              l.keywords?.some(k => k.toLowerCase() === lowerName));
-          };
-
-          const isPickupValid = isValidLocation(data.pickup);
-          const isDestValid = isValidLocation(data.destination);
-
-          const validationErrors: string[] = [];
-          if (!isPickupValid && data.pickup) validationErrors.push(`Điểm đón '${data.pickup}' không hợp lệ`);
-          if (!isDestValid && data.destination) validationErrors.push(`Điểm đến '${data.destination}' không hợp lệ`);
-
           // Update form data with partial results
           setNewRideData((prev) => ({
             ...prev,
             roomNumber: data.roomNumber || (prev.roomNumber && prev.roomNumber.trim() ? prev.roomNumber : ""),
             pickup: data.pickup || prev.pickup,
             destination: data.destination || prev.destination,
-            guestName: data.guestName || prev.guestName,
             guestCount: data.guestCount || prev.guestCount || 1,
             notes: data.notes || prev.notes,
           }));
 
           const missingMsg = missingFields.length > 0 ? `Thiếu: ${missingFields.join(", ")}` : "";
-          const errorMsg = validationErrors.length > 0
-            ? `⚠️ ${validationErrors.join(". ")}. ${missingMsg ? `(${missingMsg})` : ""}`
-            : `⚠️ Chưa đủ thông tin (Thiếu: ${missingFields.join(", ")}). Vui lòng nói lại rõ hơn.`;
+          const errorMsg = `⚠️ Chưa đủ thông tin. ${missingMsg ? `(${missingMsg})` : ""} Vui lòng nói rõ hơn.`;
 
           setVoiceResult({
             status: "error",

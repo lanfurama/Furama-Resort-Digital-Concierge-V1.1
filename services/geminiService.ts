@@ -28,126 +28,67 @@ const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 export const parseRideRequestWithContext = async (
   input: string,
   locations: Array<{ id?: string; name: string; type?: string; lat?: number; lng?: number }>,
-  drivers?: Array<{ id?: string; lastName: string; roomNumber: string; currentLat?: number; currentLng?: number; updatedAt?: number }>,
 ) => {
-  const model = "gemini-2.5-flash";
+  const model = "gemini-1.5-flash"; // Use flash as requested
 
   const schema: Schema = {
     type: Type.OBJECT,
     properties: {
-      roomNumber: {
-        type: Type.STRING,
-        description: "The guest's room number, e.g., '101' or 'Villa D03'",
+      passengers: {
+        type: Type.NUMBER,
+        description: "Number of guests (pax). Default to 1.",
       },
       pickup: {
         type: Type.STRING,
-        description:
-          "The pickup location name. Must match exactly one of the valid location names provided in context.",
+        description: "Pickup location code or name (e.g. ACC, 101, Lobby).",
       },
-      destination: {
+      dropoff: {
         type: Type.STRING,
-        description: "The destination location name. Must match exactly one of the valid location names provided in context.",
+        description: "Destination location code or name (e.g. ICP, Pool).",
       },
-      guestName: { type: Type.STRING, description: "The name of the guest." },
-      guestCount: {
-        type: Type.NUMBER,
-        description: "The number of guests, default to 1 if not mentioned.",
-      },
-      notes: {
+      status: {
         type: Type.STRING,
-        description:
-          "Any special notes or requests, like 'has luggage', 'needs baby seat', 'urgent', or 'has many bags'.",
+        enum: ["valid", "invalid"],
+        description: "Whether the request seems logically complete.",
       },
     },
-    required: ["pickup", "destination"],
+    required: ["pickup", "dropoff"],
   };
 
-  // Build detailed location context as JSON Array for stricter parsing
-  const locationContext = JSON.stringify(locations.map(l => l.name), null, 2);
+  // Build compact location guide for the prompt
+  // Include common codes like ACC, ICP, etc.
+  const locationGuide = locations.map(l => {
+    let desc = l.name;
+    if (l.name === "Asian Civic Center") desc += " (ACC)";
+    if (l.name === "International Convention Palace") desc += " (ICP)";
+    return `- ${l.name}${desc !== l.name ? ` [Code: ${desc.match(/\[Code: (.*?)\]/)?.[1] || desc.match(/\((.*?)\)/)?.[1]}]` : ""}`;
+  }).join("\n");
 
-  // Build driver context if available
-  let driverContext = "";
-  if (drivers && drivers.length > 0) {
-    const onlineDrivers = drivers.filter(d => d.currentLat && d.currentLng);
-    driverContext = `\n\nAvailable Drivers (${onlineDrivers.length} online):\n${onlineDrivers.map((d, idx) =>
-      `${idx + 1}. ${d.lastName} (ID: ${d.id}, Status: Online)`
-    ).join("\n")}`;
-  }
+  const prompt = `Bạn là trợ lý điều phối cho ứng dụng Buggy tại Furama Resort Đà Nẵng. 
+Nhiệm vụ của bạn là nghe lệnh từ hotline và chuyển nó thành định dạng JSON để hệ thống xử lý.
 
-  const prompt = `You are an intelligent assistant for Furama Resort & Villas Da Nang. Strictly extract ride request information from this VIETNAMESE text: "${input}"
+DANH SÁCH MÃ ĐỊA ĐIỂM tiêu biểu:
+- ACC: Sảnh đón khách chính / Nhà hàng Asian Civic Center.
+- ICP: Cung hội nghị quốc tế (International Convention Palace).
+- Sảnh / Lễ tân: Main Lobby / Reception.
+- Hồ bơi: Lagoon Pool hoặc Ocean Pool.
+- Villa: Các căn villa như B11, D03, D5...
 
-VALID LOCATIONS (you MUST match locations exactly to these names - case-sensitive matching):
-${locationContext}
+HƯỚNG DẪN TRÍCH XUẤT:
+1. 'passengers': Số lượng khách (ví dụ: "5 người" -> 5). Mặc định là 1.
+2. 'pickup': Điểm đón (Mã hoặc tên địa điểm).
+3. 'dropoff': Điểm đến (Mã hoặc tên địa điểm).
+4. 'status': Trả về "valid" nếu có đủ pickup và dropoff, ngược lại "invalid".
 
-${driverContext ? driverContext : ""}
+Lưu ý: Hotline có thể nói nhiều cách:
+- "Cho 5 người từ ACC qua ICP nhé"
+- "Từ 101 đi hồ bơi có 3 người"
+- "Đón phòng 205 ra biển 2 khách"
 
-CRITICAL EXTRACTION RULES (follow these precisely for >95% accuracy):
-
-1. ROOM NUMBER EXTRACTION (>95% accuracy required):
-   - Extract room number if mentioned in ANY format:
-     * "Room 101", "Phòng 101", "R101" → "101"
-     * "Villa D03", "Biệt thự D5", "Villa D11" → "D03", "D5", "D11"
-     * "D03", "D11", "P03" → "D03", "D11", "P03"
-     * "ACC", "ABC" (2-3 letters) → "ACC", "ABC"
-      * "101", "2001", "101A" → "101", "2001", "101A"
-     * PHONETIC NUMBERS (Vietnamese style):
-       - "một linh một" -> "101"
-       - "hai không năm" / "hai lẻ năm" -> "205" ("lẻ" = 0)
-       - "một một hai" -> "112"
-       - "ba lẻ năm" -> "305" ("lẻ" = 0)
-   - Common patterns: [Letter][Digits] (D11, A101), [Digits] (101, 2001), [2-3 Letters] (ACC)
-   - If room number is in pickup text, extract it separately
-   - Room numbers are typically: 2-4 digits, or 1 letter + 1-3 digits, or 2-3 letters
-
-2. PICKUP LOCATION MATCHING (>90% accuracy required):
-   - Match location names EXACTLY from the valid locations list above
-   - If pickup is NOT specified, use the extracted room number as pickup location
-   - Keywords indicating PICKUP: "từ", "ở", "tại", "đón", "pickup", "from", "lấy".
-   - Smart matching for common terms (use EXACT names from list):
-     * "pool" or "hồ bơi", "bể bơi" → prefer "Lagoon Pool" or "Ocean Pool" (check context for which one)
-     * "restaurant" or "nhà hàng" or "ăn" or "ăn sáng" → match to specific restaurant: "ACC", "Cafe Indochine", "Don Cipriani's", etc.
-     * "villa" or "biệt thự" → match villa areas: "D1", "D2", "D3", "D4", "D5", "D6", "D7", "Villas"
-     * "lobby" or "sảnh" or "reception" or "lễ tân" → match "Reception" or "Main Lobby"
-     * "beach" or "bãi biển" or "biển" or "ra biển" → match "Beach Access" or "Beach"
-     * SHORT NAMES: If user says "B11" and list has "Villa B11", match to "Villa B11". If "Indochine", match "Cafe Indochine".
-   - If multiple matches possible, choose the MOST COMMON/POPULAR one from the list
-   - IMPORTANT: Return the EXACT name as it appears in the valid locations list (case-sensitive)
-
-3. DESTINATION LOCATION MATCHING (>90% accuracy required):
-   - Same rules as pickup location
-   - Keywords indicating DESTINATION: "đến", "tới", "đi", "ra", "về", "to", "go to", "cho".
-   - MUST be different from pickup location
-   - Match EXACTLY from valid locations list
-
-4. GUEST NAME: Extract if mentioned (optional)
-
-5. GUEST COUNT: Default to 1 if not specified
-
-6. NOTES: Extract special requests (luggage, baby seat, urgent, many bags, etc.)
-
-VALIDATION:
-- Room number format: Must match patterns [A-Z]{1,3}\\d{0,3}[A-Z]? or \\d{2,4}[A-Z]? or [A-Z]\\d{1,3}
-- Location names: Must be EXACT matches from the valid locations list
-- Pickup and destination: Must be different
-
-SPEECH RECOGNITION ERROR HANDLING & PHONETICS:
-- Vietnamese STT often mistakes "Đón" (Pick up) for "Yên", "Yến", "Đơn", "Đông". If you see "Yên khách", "Yến khách", interpret as "Đón khách" (Pick up guest).
-- "acc" usually refers to "ACC" (Asian Civic Center / Restaurant). Matches to "ACC".
-- "lobby" refers to "Reception".
-- "về" often means going back to room or lobby.
-- "Khách" or "Người" means "Guest". "Năm khách" = "5 guests". Do NOT parse "Khách" or "KH" as a location unless it is in the exact locations list.
-- "Nam" or "Năm" usually means "5" (number), especially if followed by "khách". Do NOT parse as location "NAM" unless extracted from "Nam Tram" etc.
-- "ACB" often refers to "ACC" (Asian Civic Center).
-- "ICP" often refers to "ICP" (International Convention Palace).
-- "vi la" / "villa" -> match to valid Villa location.
-
-- "vi la" / "villa" -> match to valid Villa location.
-
-
-Return JSON with exact location names matching the valid locations list.`;
+Lệnh: "${input}"`;
 
   if (!ai) {
-    console.error("Gemini AI is not initialized. Please check VITE_GEMINI_API_KEY in .env file.");
+    console.error("Gemini AI is not initialized.");
     return null;
   }
 
@@ -161,80 +102,10 @@ Return JSON with exact location names matching the valid locations list.`;
       },
     });
 
-    const parsed = JSON.parse(response.text || "{}");
-
-    // Post-processing validation and correction for >90% location accuracy
-    const locationNames = locations.map(loc => loc.name);
-
-    // Validate and fix pickup location
-    if (parsed.pickup) {
-      if (!locationNames.includes(parsed.pickup)) {
-        // Try to find closest match with improved algorithm
-        const closestPickup = findClosestLocation(parsed.pickup, locations);
-        if (closestPickup) {
-          console.log(`[AI Parse] Fixed pickup: "${parsed.pickup}" → "${closestPickup.name}"`);
-          parsed.pickup = closestPickup.name;
-        } else {
-          console.warn(`[AI Parse] Could not match pickup location: "${parsed.pickup}" strictly.Clearing.`);
-          parsed.pickup = null;
-        }
-      }
-    }
-
-    // Validate and fix destination location
-    if (parsed.destination) {
-      if (!locationNames.includes(parsed.destination)) {
-        const closestDest = findClosestLocation(parsed.destination, locations);
-        if (closestDest) {
-          console.log(`[AI Parse] Fixed destination: "${parsed.destination}" → "${closestDest.name}"`);
-          parsed.destination = closestDest.name;
-        } else {
-          console.warn(`[AI Parse] Could not match destination location: "${parsed.destination}" strictly.Clearing.`);
-          parsed.destination = null;
-        }
-      }
-    }
-
-    // Post-processing validation for room number (>95% accuracy)
-    if (parsed.roomNumber) {
-      // Use enhanced extraction function to validate/improve room number
-      const extracted = extractRoomNumber(parsed.roomNumber);
-      if (extracted && extracted !== parsed.roomNumber) {
-        console.log(`[AI Parse] Improved room number: "${parsed.roomNumber}" → "${extracted}"`);
-        parsed.roomNumber = extracted;
-      } else if (!extracted) {
-        // Try to extract from pickup if room number seems invalid
-        if (parsed.pickup) {
-          const fromPickup = extractRoomNumber(parsed.pickup);
-          if (fromPickup) {
-            console.log(`[AI Parse] Extracted room number from pickup: "${fromPickup}"`);
-            parsed.roomNumber = fromPickup;
-          }
-        }
-      }
-    } else if (parsed.pickup) {
-      // Try to extract room number from pickup if not provided
-      const extracted = extractRoomNumber(parsed.pickup);
-      if (extracted) {
-        console.log(`[AI Parse] Extracted room number from pickup: "${extracted}"`);
-        parsed.roomNumber = extracted;
-      }
-    }
-
-    // Ensure pickup and destination are different
-    if (parsed.pickup && parsed.destination && parsed.pickup === parsed.destination) {
-      console.warn(`[AI Parse] Pickup and destination are the same: "${parsed.pickup}"`);
-      // If pickup is a room number, keep it; otherwise try to use room number as pickup
-      if (parsed.roomNumber && !locationNames.includes(parsed.roomNumber)) {
-        parsed.pickup = parsed.roomNumber;
-      }
-    }
-
-    return parsed;
+    return JSON.parse(response.text || "{}");
   } catch (e) {
     console.error("AI Parse Error (Ride Request)", e);
-    console.log("[AI Parse] Attempting fallback parsing...");
-    return parseRideRequestFallback(input, locations);
+    return null;
   }
 };
 

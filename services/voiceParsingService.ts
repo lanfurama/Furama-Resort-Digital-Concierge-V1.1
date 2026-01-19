@@ -636,7 +636,7 @@ export const isLocationName = (
 };
 
 /**
- * Process transcript with AI parsing and fallback to keyword matching
+ * Process transcript with AI parsing and database validation
  */
 export const processTranscript = async (
   text: string,
@@ -649,279 +649,87 @@ export const processTranscript = async (
     return null;
   }
 
-  // Normalize transcript first
+  // 1. STT & Normalization
   const normalizedText = normalizeTranscript(text);
   console.log("[VoiceParsing] Original:", text);
   console.log("[VoiceParsing] Normalized:", normalizedText);
 
-
-
-
   if (!normalizedText || normalizedText.length < 5) {
-    callbacks.onError(
-      "Câu nói quá ngắn hoặc không rõ ràng. Vui lòng thử lại."
-    );
+    callbacks.onError("Câu nói quá ngắn hoặc không rõ ràng. Vui lòng thử lại.");
     return null;
   }
 
   try {
-    // Use AI parsing instead of simple keyword matching
+    // 2. Entity Extraction (Gemini)
     let parsedData;
     try {
-      parsedData = await parseRideRequestWithContext(
-        normalizedText,
-        locations
-      );
-    } catch (aiError: any) {
+      parsedData = await parseRideRequestWithContext(normalizedText, locations);
+    } catch (aiError) {
       console.error("AI parsing error:", aiError);
-
-      // Check if it's a network error
-      const isNetworkError =
-        aiError?.message?.includes('network') ||
-        aiError?.message?.includes('fetch') ||
-        aiError?.message?.includes('NetworkError') ||
-        aiError?.code === 'NETWORK_ERROR' ||
-        !navigator.onLine;
-
-      if (isNetworkError) {
-        callbacks.onError(
-          "Lỗi kết nối mạng khi gọi AI. Đang sử dụng phương pháp phân tích từ khóa..."
-        );
-      } else if (aiError?.message?.includes('API key') || aiError?.message?.includes('401') || aiError?.message?.includes('403')) {
-        callbacks.onError(
-          "Lỗi xác thực AI API. Đang sử dụng phương pháp phân tích từ khóa..."
-        );
-      } else {
-        callbacks.onError(
-          "Lỗi khi gọi AI. Đang sử dụng phương pháp phân tích từ khóa..."
-        );
-      }
-
-      // Fall through to fallback parsing
-      parsedData = null;
+      callbacks.onError("Lỗi khi kết nối với AI. Đang sử dụng phương pháp dự phòng...");
+      parsedData = parseVoiceTranscript(normalizedText, locations);
     }
 
-    if (parsedData && (parsedData.pickup || parsedData.destination)) {
-      // Process room number extraction
-      let roomNumber = parsedData.roomNumber;
-      // If no room number, try to extract from pickup
-      if (!roomNumber && parsedData.pickup) {
-        // First try to extract room number from pickup text
-        roomNumber = extractRoomNumber(parsedData.pickup) || null;
-
-        // If pickup itself looks like a room number and is not a known location, use it directly
-        if (!roomNumber && !isLocationName(parsedData.pickup, locations)) {
-          if (looksLikeRoomNumber(parsedData.pickup)) {
-            roomNumber = parsedData.pickup.trim().toUpperCase();
-          }
-        }
-
-        // If pickup is a known location that contains a room number, extract it
-        if (!roomNumber && isLocationName(parsedData.pickup, locations)) {
-          const extracted = extractRoomNumber(parsedData.pickup);
-          if (extracted) {
-            roomNumber = extracted;
-          }
-        }
-      }
-      // If still no room number, try from existing data
-      if (!roomNumber && existingData) {
-        roomNumber =
-          (existingData.pickup && extractRoomNumber(existingData.pickup)) ||
-          (existingData.pickup &&
-            looksLikeRoomNumber(existingData.pickup) &&
-            existingData.pickup.trim().toUpperCase()) ||
-          (existingData.roomNumber && existingData.roomNumber.trim()
-            ? existingData.roomNumber
-            : null) ||
-          null;
-      }
-
-      const finalData: ParsedVoiceData = {
-        roomNumber: roomNumber || existingData?.roomNumber,
-        pickup: parsedData.pickup || existingData?.pickup,
-        destination: parsedData.destination || existingData?.destination,
-        guestName: parsedData.guestName || existingData?.guestName,
-        guestCount: parsedData.guestCount || existingData?.guestCount || 1,
-        notes: parsedData.notes || existingData?.notes,
-      };
-
-      // Check if we have minimum required fields
-      const finalRoomNumber = roomNumber || existingData?.roomNumber;
-      if (
-        parsedData.pickup &&
-        parsedData.destination &&
-        finalRoomNumber
-      ) {
-        callbacks.onSuccess(finalData);
-      } else {
-        // Partial data - show what was found
-        const found: string[] = [];
-        const missing: string[] = [];
-        if (parsedData.pickup) found.push("điểm đón"); else missing.push("điểm đón");
-        if (parsedData.destination) found.push("điểm đến"); else missing.push("điểm đến");
-        if (parsedData.roomNumber) found.push("số phòng"); else missing.push("số phòng");
-        if (parsedData.guestName) found.push("tên khách");
-
-        callbacks.onPartialSuccess(finalData, found, missing);
-      }
-
-      return finalData;
-    } else {
-      // Fallback to simple parsing if AI fails
-      const fallbackData = parseVoiceTranscript(normalizedText, locations);
-
-      if (fallbackData.pickup && fallbackData.destination) {
-        let roomNumber = fallbackData.roomNumber;
-        // If no room number, try to extract from pickup
-        if (!roomNumber && fallbackData.pickup) {
-          // First try to extract room number from pickup text
-          roomNumber = extractRoomNumber(fallbackData.pickup) || null;
-
-          // If pickup itself looks like a room number and is not a known location, use it directly
-          if (!roomNumber && !isLocationName(fallbackData.pickup, locations)) {
-            if (looksLikeRoomNumber(fallbackData.pickup)) {
-              roomNumber = fallbackData.pickup.trim().toUpperCase();
-            }
-          }
-
-          // If pickup is a known location that contains a room number, extract it
-          if (!roomNumber && isLocationName(fallbackData.pickup, locations)) {
-            const extracted = extractRoomNumber(fallbackData.pickup);
-            if (extracted) {
-              roomNumber = extracted;
-            }
-          }
-        }
-        // If still no room number, try from existing data
-        if (!roomNumber && existingData) {
-          roomNumber =
-            (existingData.pickup && extractRoomNumber(existingData.pickup)) ||
-            (existingData.pickup &&
-              looksLikeRoomNumber(existingData.pickup) &&
-              existingData.pickup.trim().toUpperCase()) ||
-            (existingData.roomNumber && existingData.roomNumber.trim()
-              ? existingData.roomNumber
-              : null) ||
-            null;
-        }
-
-        const finalData: ParsedVoiceData = {
-          roomNumber: roomNumber || existingData?.roomNumber,
-          pickup: fallbackData.pickup || existingData?.pickup,
-          destination: fallbackData.destination || existingData?.destination,
-          guestName: fallbackData.guestName || existingData?.guestName,
-          guestCount: fallbackData.guestCount || existingData?.guestCount || 1,
-          notes: fallbackData.notes || existingData?.notes,
-        };
-
-        const finalRoomNumber = roomNumber || existingData?.roomNumber;
-        if (
-          fallbackData.pickup &&
-          fallbackData.destination &&
-          finalRoomNumber
-        ) {
-          callbacks.onSuccess(finalData);
-        } else {
-          const found: string[] = [];
-          const missing: string[] = [];
-          if (fallbackData.pickup) found.push("điểm đón"); else missing.push("điểm đón");
-          if (fallbackData.destination) found.push("điểm đến"); else missing.push("điểm đến");
-          if (fallbackData.roomNumber) found.push("số phòng"); else missing.push("số phòng");
-          if (fallbackData.guestName) found.push("tên khách");
-
-          callbacks.onPartialSuccess(finalData, found, missing);
-        }
-
-        return finalData;
-      } else {
-        const missing: string[] = [];
-        if (!fallbackData.pickup && !parsedData?.pickup)
-          missing.push("điểm đón");
-        if (!fallbackData.destination && !parsedData?.destination)
-          missing.push("điểm đến");
-
-        callbacks.onError(
-          `Không tìm thấy ${missing.join(" và ")}. Vui lòng nói rõ ràng hơn, ví dụ: "đón phòng 101 đi hồ bơi" hoặc "from room 101 to pool".`
-        );
-        return null;
-      }
-    }
-  } catch (error) {
-    console.error("Voice parsing error:", error);
-
-    // Try fallback parsing
-    try {
-      const fallbackData = parseVoiceTranscript(normalizedText, locations);
-      if (fallbackData.pickup && fallbackData.destination) {
-        let roomNumber = fallbackData.roomNumber;
-        if (!roomNumber && fallbackData.pickup) {
-          roomNumber = extractRoomNumber(fallbackData.pickup) || null;
-          if (!roomNumber && !isLocationName(fallbackData.pickup, locations)) {
-            if (looksLikeRoomNumber(fallbackData.pickup)) {
-              roomNumber = fallbackData.pickup.trim().toUpperCase();
-            }
-          }
-          if (!roomNumber && isLocationName(fallbackData.pickup, locations)) {
-            const extracted = extractRoomNumber(fallbackData.pickup);
-            if (extracted) {
-              roomNumber = extracted;
-            }
-          }
-        }
-        if (!roomNumber && existingData) {
-          roomNumber =
-            (existingData.pickup && extractRoomNumber(existingData.pickup)) ||
-            (existingData.pickup &&
-              looksLikeRoomNumber(existingData.pickup) &&
-              existingData.pickup.trim().toUpperCase()) ||
-            (existingData.roomNumber && existingData.roomNumber.trim()
-              ? existingData.roomNumber
-              : null) ||
-            null;
-        }
-
-        const finalData: ParsedVoiceData = {
-          roomNumber: roomNumber || existingData?.roomNumber,
-          pickup: fallbackData.pickup || existingData?.pickup,
-          destination: fallbackData.destination || existingData?.destination,
-          guestName: fallbackData.guestName || existingData?.guestName,
-          guestCount: fallbackData.guestCount || existingData?.guestCount || 1,
-          notes: fallbackData.notes || existingData?.notes,
-        };
-
-        const finalRoomNumber = roomNumber || existingData?.roomNumber;
-        if (
-          fallbackData.pickup &&
-          fallbackData.destination &&
-          finalRoomNumber
-        ) {
-          callbacks.onSuccess(finalData);
-        } else {
-          const found: string[] = [];
-          const missing: string[] = [];
-          if (fallbackData.pickup) found.push("điểm đón"); else missing.push("điểm đón");
-          if (fallbackData.destination) found.push("điểm đến"); else missing.push("điểm đến");
-          if (fallbackData.roomNumber) found.push("số phòng"); else missing.push("số phòng");
-          if (fallbackData.guestName) found.push("tên khách");
-
-          callbacks.onPartialSuccess(finalData, found, missing);
-        }
-
-        return finalData;
-      } else {
-        callbacks.onError(
-          "Không thể phân tích yêu cầu. Vui lòng thử lại hoặc nhập thủ công."
-        );
-        return null;
-      }
-    } catch (fallbackError) {
-      console.error("Fallback parsing error:", fallbackError);
-      callbacks.onError(
-        "Lỗi xử lý giọng nói. Vui lòng thử lại hoặc nhập thủ công."
-      );
+    if (!parsedData || (parsedData.status === "invalid" && !parsedData.pickup && !parsedData.dropoff)) {
+      callbacks.onError("Không tìm thấy thông tin điểm đi hoặc điểm đến. Vui lòng nói lại rõ ràng hơn.");
       return null;
     }
+
+    // 3. Database Validation (Đối soát Database)
+    let finalRoomNumber = existingData?.roomNumber;
+
+    const findBestMatch = (term: string) => {
+      if (!term) return null;
+      const termUpper = term.toUpperCase().trim();
+
+      // Match by code (ACC, ICP) or exact name
+      const match = locations.find(l =>
+        l.name.toUpperCase() === termUpper ||
+        (l.name === "Asian Civic Center" && termUpper === "ACC") ||
+        (l.name === "International Convention Palace" && termUpper === "ICP") ||
+        l.id?.toUpperCase() === termUpper
+      );
+      if (match) return match.name;
+
+      // Match by room number pattern
+      if (looksLikeRoomNumber(term)) return termUpper;
+
+      return null;
+    };
+
+    const resolvedPickup = findBestMatch(parsedData.pickup);
+    const resolvedDropoff = findBestMatch(parsedData.dropoff);
+
+    // If pickup is a room number, update roomNumber field
+    if (resolvedPickup && looksLikeRoomNumber(resolvedPickup)) {
+      finalRoomNumber = resolvedPickup;
+    }
+
+    const finalData: ParsedVoiceData = {
+      roomNumber: finalRoomNumber,
+      pickup: resolvedPickup || parsedData.pickup,
+      destination: resolvedDropoff || parsedData.dropoff || parsedData.destination,
+      guestCount: parsedData.passengers || parsedData.guestCount || 1,
+      notes: parsedData.notes || existingData?.notes,
+    };
+
+    // Check if we have minimum required fields for "Action"
+    if (finalData.pickup && finalData.destination) {
+      callbacks.onSuccess(finalData);
+      return finalData;
+    } else {
+      const found: string[] = [];
+      const missing: string[] = [];
+      if (finalData.pickup) found.push("điểm đón"); else missing.push("điểm đón");
+      if (finalData.destination) found.push("điểm đến"); else missing.push("điểm đến");
+
+      callbacks.onPartialSuccess(finalData, found, missing);
+      return finalData;
+    }
+  } catch (e) {
+    console.error("Process Transcript Error:", e);
+    callbacks.onError("Có lỗi xảy ra khi xử lý yêu cầu. Vui lòng thử lại.");
+    return null;
   }
 };
 
