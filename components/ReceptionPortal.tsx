@@ -163,6 +163,29 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
   const [driverFilter, setDriverFilter] = useState<'ALL' | 'AVAILABLE' | 'BUSY'>('ALL');
 
+  // TTS Voice State
+  const [vietnameseVoice, setVietnameseVoice] = useState<SpeechSynthesisVoice | null>(null);
+
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      // Prioritize Google Vietnamese or Microsoft An if available, otherwise any 'vi' voice
+      const viVoice = voices.find(v => v.lang.includes('vi')) || null;
+      if (viVoice) {
+        console.log("Voice loaded:", viVoice.name);
+        setVietnameseVoice(viVoice);
+      }
+    };
+
+    loadVoices();
+    // Chrome requires this event listener
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
   // AI Assignment Modal State
   const [showAIAssignment, setShowAIAssignment] = useState(false);
   const [aiAssignmentData, setAIAssignmentData] = useState<{
@@ -459,6 +482,38 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     return canCombineRidesUtil(ride1, ride2);
   };
 
+  // TTS Helper: Uses Google Translate (unofficial) for natural voice
+  const speakFeedback = (text: string) => {
+    const cleanText = text.replace(/[⚠️✅]/g, '').trim();
+    if (!cleanText) return;
+
+    const browserSpeak = () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.lang = 'vi-VN';
+        if (vietnameseVoice) utterance.voice = vietnameseVoice;
+        window.speechSynthesis.speak(utterance);
+      }
+    };
+
+    // Try Google Translate TTS (Free, natural voice)
+    try {
+      if (cleanText.length < 200) {
+        const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=vi&q=${encodeURIComponent(cleanText)}`;
+        const audio = new Audio(url);
+        audio.play().catch((err) => {
+          console.warn("Google TTS failed, falling back", err);
+          browserSpeak();
+        });
+      } else {
+        browserSpeak();
+      }
+    } catch (e) {
+      browserSpeak();
+    }
+  };
+
   // Handle processing transcript using voice parsing service
   const handleProcessTranscript = async (text: string) => {
     console.log(`[ReceptionPortal] Processing transcript: "${text}" with ${locations.length} locations`);
@@ -497,10 +552,12 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
             if (!isPickupValid && data.pickup) invalidFields.push(`Điểm đón '${data.pickup}' không hợp lệ`);
             if (!isDestValid && data.destination) invalidFields.push(`Điểm đến '${data.destination}' không hợp lệ`);
 
+            const errorMsg = `⚠️ ${invalidFields.join(". ")}. Vui lòng chọn địa điểm có trong danh sách.`;
             setVoiceResult({
               status: "error",
-              message: `⚠️ ${invalidFields.join(". ")}. Vui lòng chọn địa điểm có trong danh sách.`,
+              message: errorMsg,
             });
+            speakFeedback(errorMsg);
             return;
           }
 
@@ -516,10 +573,12 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           }));
 
           // Show success message and start auto-confirm countdown
+          const successMsg = "✅ Đã nhận diện thành công! Tự động tạo ride sau 5 giây...";
           setVoiceResult({
             status: "success",
-            message: "✅ Đã nhận diện thành công! Tự động tạo ride sau 5 giây...",
+            message: successMsg,
           });
+          speakFeedback("Đã nhận diện thành công. Đang tự động tạo đơn."); // Speak a slightly shorter/natural version
 
           setIsAutoConfirming(true);
           setCountdown(5);
@@ -554,6 +613,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
             status: "error",
             message,
           });
+          speakFeedback(message);
         },
         onPartialSuccess: (data: ParsedVoiceData, foundFields: string[], missingFields: string[]) => {
           // Validate locations
@@ -591,6 +651,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
             status: "error",
             message: errorMsg,
           });
+          speakFeedback(errorMsg);
         },
       },
       newRideData
@@ -3263,8 +3324,16 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                         return (
                           <>
                             {pendingRides.map(({ ride, waitTime }, index) => {
-                              const waitMinutes = Math.floor(waitTime / 60);
-                              const waitSeconds = waitTime % 60;
+                              let waitTimeText = "";
+                              if (waitTime < 60) {
+                                waitTimeText = `${waitTime}s`;
+                              } else if (waitTime < 3600) {
+                                waitTimeText = `${Math.floor(waitTime / 60)}m ${waitTime % 60}s`;
+                              } else if (waitTime < 86400) {
+                                waitTimeText = `${Math.floor(waitTime / 3600)}h ${Math.floor((waitTime % 3600) / 60)}m`;
+                              } else {
+                                waitTimeText = `${Math.floor(waitTime / 86400)}d ${Math.floor((waitTime % 86400) / 3600)}h`;
+                              }
 
                               // Determine urgency level based on wait time
                               let urgencyLevel: "normal" | "warning" | "urgent" =
@@ -3316,7 +3385,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                     <span
                                       className={`text-[9px] md:text-[10px] px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${style.badge}`}
                                     >
-                                      {waitMinutes}m {waitSeconds}s
+                                      {waitTimeText}
                                     </span>
                                   </div>
 
@@ -5985,7 +6054,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           <button
             onClick={() => {
               setShowCreateRideModal(true);
-              handleToggleListening();
+              handleVoiceAssistantStart();
             }}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-full w-20 h-20 md:w-16 md:h-16 flex items-center justify-center transition-all z-50 touch-manipulation hover:scale-110 active:scale-95"
             style={{

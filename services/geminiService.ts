@@ -62,12 +62,8 @@ export const parseRideRequestWithContext = async (
     required: ["pickup", "destination"],
   };
 
-  // Build detailed location context
-  const locationContext = locations.map((loc, index) => {
-    let info = `${index + 1}. "${loc.name}"`;
-    if (loc.type) info += ` (Type: ${loc.type})`;
-    return info;
-  }).join("\n");
+  // Build detailed location context as JSON Array for stricter parsing
+  const locationContext = JSON.stringify(locations.map(l => l.name), null, 2);
 
   // Build driver context if available
   let driverContext = "";
@@ -78,7 +74,7 @@ export const parseRideRequestWithContext = async (
     ).join("\n")}`;
   }
 
-  const prompt = `You are an intelligent assistant for Furama Resort & Villas Da Nang. Extract ride request information from this Vietnamese or English text: "${input}"
+  const prompt = `You are an intelligent assistant for Furama Resort & Villas Da Nang. Strictly extract ride request information from this VIETNAMESE text: "${input}"
 
 VALID LOCATIONS (you MUST match locations exactly to these names - case-sensitive matching):
 ${locationContext}
@@ -113,6 +109,7 @@ CRITICAL EXTRACTION RULES (follow these precisely for >95% accuracy):
      * "villa" or "biệt thự" → match villa areas: "D1", "D2", "D3", "D4", "D5", "D6", "D7", "Villas"
      * "lobby" or "sảnh" or "reception" or "lễ tân" → match "Reception" or "Main Lobby"
      * "beach" or "bãi biển" or "biển" or "ra biển" → match "Beach Access" or "Beach"
+     * SHORT NAMES: If user says "B11" and list has "Villa B11", match to "Villa B11". If "Indochine", match "Cafe Indochine".
    - If multiple matches possible, choose the MOST COMMON/POPULAR one from the list
    - IMPORTANT: Return the EXACT name as it appears in the valid locations list (case-sensitive)
 
@@ -138,27 +135,14 @@ SPEECH RECOGNITION ERROR HANDLING & PHONETICS:
 - "acc" usually refers to "ACC" (Asian Civic Center / Restaurant). Matches to "ACC".
 - "lobby" refers to "Reception".
 - "về" often means going back to room or lobby.
+- "Khách" or "Người" means "Guest". "Năm khách" = "5 guests". Do NOT parse "Khách" or "KH" as a location unless it is in the exact locations list.
+- "Nam" or "Năm" usually means "5" (number), especially if followed by "khách". Do NOT parse as location "NAM" unless extracted from "Nam Tram" etc.
+- "ACB" often refers to "ACC" (Asian Civic Center).
+- "ICP" often refers to "ICP" (International Convention Palace).
+- "vi la" / "villa" -> match to valid Villa location.
 
-PHONETIC ENGLISH INTERPRETATION (Critical for Bilingual Support):
-   The user might speak English while the Speech-to-Text engine is set to Vietnamese. You MUST interpret these phonetic approximations:
-   - "niu rai" / "niu lai" / "nhiu lai" → "New Ride"
-   - "rum" / "rùm" / "rôm" → "Room"
-   - "oan" / "uân" / "quân" → "One" (1)
-   - "tu" / "tư" / "tờ" → "Two" (2) / "To"
-   - "tri" / "tờ ri" / "thờ ri" / "thuy" → "Three" (3)
-   - "for" / "pho" / "phò" → "Four" (4)
-   - "phai" / "phài" / "five" → "Five" (5)
-   - "xích" / "sích" → "Six" (6)
-   - "se vần" / "xe vần" → "Seven" (7)
-   - "gâu tu" / "gô tu" / "go to" → "Go To"
-   - "pic úp" / "bích úp" / "píc ắp" → "Pick Up" / "Pickup"
-   - "láp to" / "lốp by" / "lô bi" → "Lobby"
-   - "vui la" / "vi la" / "biệt thự" → "Villa"
-   - "biển" / "bít" / "bíc" → "Beach"
+- "vi la" / "villa" -> match to valid Villa location.
 
-   Example: "Niu rai rùm oan zia rô oan" → "New ride room 101"
-   Example: "Pic úp ất vi la đi thri" → "Pick up at Villa D3" ("đi" = D, "thri" = 3)
-   Example: "Cho xe từ sảnh về vi la đê ba" → "Pickup: Main Lobby, Destination: Villa D3"
 
 Return JSON with exact location names matching the valid locations list.`;
 

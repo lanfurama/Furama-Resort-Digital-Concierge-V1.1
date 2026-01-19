@@ -131,7 +131,46 @@ export interface ProcessTranscriptCallbacks {
  * Normalize transcript text - remove filler words and clean up
  */
 export const normalizeTranscript = (text: string): string => {
-  // Remove common filler words in Vietnamese and English
+  // Unicode normalization (Critical for Vietnamese)
+  let processedText = text.normalize("NFC").toLowerCase();
+
+  // Specific fix for "Nam/Năm/Em" -> 5 when referring to guests
+  processedText = processedText.replace(/(nam|năm|em|nằm|nâm)[\s\W]+(khách|người)/gi, "5 khách");
+
+  // ALGORITHMIC PRE-PROCESSING for STABILITY
+  // 1. Prevent "Khách" being seen as Location "KH" by mapping to "guest"
+  processedText = processedText.replace(/\bkhách\b/gi, "guest");
+  processedText = processedText.replace(/\bngười\b/gi, "guest");
+
+  // 2. Expand Short Location Codes (e.g. B11 -> Villa B11)
+  processedText = processedText.replace(/\b([b-d])\s*(\d{1,2})\b/gi, "Villa $1$2");
+  processedText = processedText.replace(/\bacc\b/gi, "ACC");
+
+  // Fix "mùi" -> "mươi" or "mười" (10/x0)
+  processedText = processedText.replace(/(mùi|mươi|mười)[\s\W]+(guest|khác)/gi, "10 guest");
+  processedText = processedText.replace(/(năm|nam)[\s\W]+(mùi|mươi|mười)/gi, "50"); // Năm mươi -> 50
+
+  // Fix "khác" -> "khách" (common STT error at end of sentence)
+  processedText = processedText.replace(/(\d+)\s+khác/gi, "$1 khách");
+
+  // Normalize other numbers with "khách"
+  processedText = processedText.replace(/một\s+(khách|người|khác)/gi, "1 khách");
+  processedText = processedText.replace(/hai\s+(khách|người|khác)/gi, "2 khách");
+  processedText = processedText.replace(/ba\s+(khách|người|khác)/gi, "3 khách");
+  processedText = processedText.replace(/bốn\s+(khách|người|khác)/gi, "4 khách");
+  processedText = processedText.replace(/sáu\s+(khách|người|khác)/gi, "6 khách");
+  processedText = processedText.replace(/bảy\s+(khách|người|khác)/gi, "7 khách");
+  processedText = processedText.replace(/tám\s+(khách|người|khác)/gi, "8 khách");
+  processedText = processedText.replace(/chín\s+(khách|người|khác)/gi, "9 khách");
+  processedText = processedText.replace(/mười\s+(khách|người|khác)/gi, "10 khách");
+
+  // Fix "resort" -> "Furama Resort" potential hallucinations
+  // Or simply remove "resort" if it's noise at end of sentence
+  if (processedText.endsWith("resort")) {
+    processedText = processedText.replace(/\s+resort$/, "");
+  }
+
+  // Remove common filler words in Vietnamese only (removed English fillers)
   const fillerWords = [
     "um",
     "uh",
@@ -604,6 +643,11 @@ export const processTranscript = async (
 
   // Normalize transcript first
   const normalizedText = normalizeTranscript(text);
+  console.log("[VoiceParsing] Original:", text);
+  console.log("[VoiceParsing] Normalized:", normalizedText);
+
+
+
 
   if (!normalizedText || normalizedText.length < 5) {
     callbacks.onError(
