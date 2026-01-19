@@ -49,6 +49,9 @@ export const useVoiceRecording = (
     const currentTranscriptRef = useRef<string>("");
     const audioLevelIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const noiseLevelsRef = useRef<number[]>([]);
+    const noiseFloorRef = useRef<number>(5); // Default baseline
+    const isCalibratingRef = useRef<boolean>(false);
 
     // Refs for AudioContext and audio analysis
     const audioContextRef = useRef<AudioContext | null>(null);
@@ -138,20 +141,22 @@ export const useVoiceRecording = (
                     const level = calculateAudioLevel(analyserRef.current);
                     setAudioLevel(level);
 
-                    // SMART SILENCE DETECTION:
-                    // If audio level is above threshold (speech detected), reset the silence timer.
-                    // This ensures we only stop recording when there is ACTUAL silence,
-                    // not just because the Speech API hasn't returned a result recently.
-                    if (level > 5) { // Threshold for speech (adjustable)
+                    // Reduce threshold margin for better sensitivity
+                    if (level > noiseFloorRef.current + 1.5) { // Adaptive threshold
                         lastSpeechTimeRef.current = Date.now();
                         hasSpeechStartedRef.current = true;
 
                         // Clear countdown if it was active, as user started speaking again
-                        // We use a ref check or state updater to avoid unnecessary re-renders would be ideal,
-                        // but React batched updates handle this reasonably well.
-                        // To be safe against render loops, we could check the ref approach but state is fine here.
                         setSilenceCountdown((prev) => (prev !== null ? null : prev));
                         setSilenceRemainingTime((prev) => (prev !== null ? null : prev));
+
+                        // If calibrating, collect noise data
+                        if (isCalibratingRef.current) {
+                            noiseLevelsRef.current.push(level);
+                        }
+                    } else if (isCalibratingRef.current) {
+                        // Even if below "speech" threshold, collect for noise floor calculation
+                        noiseLevelsRef.current.push(level);
                     }
 
                     animationFrameRef.current = requestAnimationFrame(monitorAudioLevel);
@@ -316,6 +321,25 @@ export const useVoiceRecording = (
                 setAudioLevel(0); // Start with 0, will be updated by real audio level
                 setSilenceCountdown(null); // Reset countdown
                 setSilenceRemainingTime(null); // Reset remaining time
+                noiseLevelsRef.current = [];
+                isCalibratingRef.current = true;
+
+                // Calibrate noise floor for the first 800ms
+                setTimeout(() => {
+                    if (noiseLevelsRef.current.length > 0) {
+                        const avg = noiseLevelsRef.current.reduce((a, b) => a + b, 0) / noiseLevelsRef.current.length;
+                        // If average is very high (> 12), user is likely speaking. Use a conservative default (5) instead of setting floor too high.
+                        // Otherwise, use the average but cap at 10 to avoid deafening the VAD.
+                        if (avg > 12) {
+                            noiseFloorRef.current = 5;
+                            console.log(`[VAD] High initial noise (${avg.toFixed(2)}), assuming speech. Defaulting floor to 5.`);
+                        } else {
+                            noiseFloorRef.current = Math.max(3, Math.min(10, avg));
+                            console.log(`[VAD] Noise floor calibrated to: ${noiseFloorRef.current.toFixed(2)}`);
+                        }
+                    }
+                    isCalibratingRef.current = false;
+                }, 800);
 
                 // Clear any existing timers
                 if (silenceTimerRef.current) {
@@ -339,10 +363,38 @@ export const useVoiceRecording = (
                     // Check if recognition is still active
                     if (recognitionRef.current) {
                         const timeSinceLastSpeech = Date.now() - lastSpeechTimeRef.current;
-                        // Use different timeouts:
-                        // 1. Initial timeout (waiting for user to speak): 5000ms
-                        // 2. Subsequent timeout (silence after speech): silenceTimeout (e.g., 1000ms)
-                        const activeSilenceTimeout = hasSpeechStartedRef.current ? silenceTimeout : 5000;
+
+                        // INTELLIGENT TIMEOUT CALCULATION
+                        let activeSilenceTimeout = hasSpeechStartedRef.current ? silenceTimeout : 5000;
+
+                        // If we have some transcript, check if it seems incomplete
+                        const currentText = currentTranscriptRef.current.toLowerCase().trim();
+                        if (currentText.length > 0) {
+                            // Check for "connective" words or numbers at the end (indicates user might be thinking)
+                            const incompletePatterns = [
+                                /phòng\s*$/i,
+                                /đi\s*$/i,
+                                /đến\s*$/i,
+                                /tại\s*$/i,
+                                /số\s*$/i,
+                                /\d+$/ // Ends with a number
+                            ];
+
+                            const isIncomplete = incompletePatterns.some(p => p.test(currentText));
+                            if (isIncomplete && hasSpeechStartedRef.current) {
+                                // Extend timeout by 2 seconds if current sentence seems incomplete
+                                activeSilenceTimeout += 2000;
+                            }
+
+                            // FAST FINISH: If user says finishing words, we could trigger earlier, 
+                            // but usually it's better to stay safe.
+                            const fastFinishPatterns = [/xong\s*$/i, /hết\s*$/i, /được rồi\s*$/i, /đó\s*$/i];
+                            if (fastFinishPatterns.some(p => p.test(currentText)) && timeSinceLastSpeech > 800) {
+                                // If user said "finished", stop after a short buffer
+                                stopRecording();
+                                return;
+                            }
+                        }
 
                         const remainingTime = activeSilenceTimeout - timeSinceLastSpeech;
 
@@ -350,22 +402,18 @@ export const useVoiceRecording = (
                         if (remainingTime <= 5000 && remainingTime > 0) {
                             const secondsRemaining = Math.ceil(remainingTime / 1000);
                             setSilenceCountdown(secondsRemaining);
-                            setSilenceRemainingTime(remainingTime); // Store remaining time for accurate progress bar
+                            setSilenceRemainingTime(remainingTime);
                         } else if (remainingTime <= 0) {
-                            // Timeout reached, stop recording
-                            console.log(
-                                `${activeSilenceTimeout / 1000} seconds of silence detected (${hasSpeechStartedRef.current ? 'post-speech' : 'initial'}), stopping recording...`
-                            );
+                            console.log(`[VAD] Timeout reached (${activeSilenceTimeout}ms), stopping...`);
                             setSilenceCountdown(null);
                             setSilenceRemainingTime(null);
                             stopRecording();
                         } else {
-                            // Still within timeout, no countdown needed
                             setSilenceCountdown(null);
                             setSilenceRemainingTime(null);
                         }
                     }
-                }, 100); // Check every 100ms for smoother updates
+                }, 100);
             };
 
             recognitionRef.current.onresult = (event: any) => {
