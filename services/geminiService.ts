@@ -71,7 +71,16 @@ export const parseRideRequestWithContext = async (
     return `- ${l.name}${desc !== l.name ? ` [Code: ${desc.match(/\[Code: (.*?)\]/)?.[1] || desc.match(/\((.*?)\)/)?.[1]}]` : ""}`;
   }).join("\n");
 
-  const prompt = `Bạn là trợ lý điều phối cho ứng dụng Buggy tại Furama Resort Đà Nẵng.
+  const prompt = `HƯỚNG DẪN XỬ LÝ LỖI PHÁT ÂM (Phonetic Corrections):
+- "nằm", "năm", "em", "lăm" -> Hiểu là số 5.
+- "B 1 1", "B 11", "bê mười một" -> Hiểu là "B11" (Villa).
+- "A C C", "a xê xê" -> Hiểu là "ACC" (Sảnh/Nhà hàng).
+- "I C P", "ai si pi" -> Hiểu là "ICP" (Hội nghị).
+- "D 1", "đê một" -> Hiểu là "D01" hoặc "D1".
+- "P 1", "pê một", "B 1" (nếu ngữ cảnh là phòng) -> Hiểu là "P1" hoặc "B1".
+
+Lưu ý: Hotline có thể nói nhiều cách:
+Bạn là trợ lý điều phối cho ứng dụng Buggy tại Furama Resort Đà Nẵng.
 Nhiệm vụ: Trích xuất thông tin từ câu lệnh điều phối viên thành JSON.
 
 ***QUAN TRỌNG: CẤU TRÚC BẮT BUỘC***
