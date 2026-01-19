@@ -48,6 +48,7 @@ import {
   updateRide,
   cancelRide,
   setDriverOnlineFor10Hours,
+  markDriverOffline,
   checkDriverAvailability,
   getHistoricalRideReports,
   getReportStatistics,
@@ -133,7 +134,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   const [showFleetSettings, setShowFleetSettings] = useState(false);
   const [fleetConfig, setFleetConfig] = useState({
     maxWaitTimeBeforeAutoAssign: 300, // seconds
-    autoAssignEnabled: false, // Default OFF - manual control only
+    autoAssignEnabled: true, // Default ON - auto AI assignment
   });
 
   // Driver View Mode State
@@ -350,7 +351,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   const [adminAuthError, setAdminAuthError] = useState("");
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  // Handle admin authentication and set driver online
+  // Handle admin authentication and toggle driver status
   const handleAdminAuth = async () => {
     if (!selectedDriverForOnline || !adminUsername || !adminPassword) {
       return;
@@ -372,15 +373,25 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       // Check if user is admin
       if (adminUser.role !== UserRole.ADMIN) {
         setAdminAuthError(
-          "Access denied. Only admin users can set drivers online.",
+          "Access denied. Only admin users can manage driver status.",
         );
         setIsAuthenticating(false);
         return;
       }
 
-      // Set driver online for 10 hours
+      // Check current status
+      const isOnline =
+        selectedDriverForOnline.updatedAt &&
+        Date.now() - selectedDriverForOnline.updatedAt < 30000;
+
       if (selectedDriverForOnline.id) {
-        await setDriverOnlineFor10Hours(selectedDriverForOnline.id);
+        if (isOnline) {
+          // Set Offline
+          await markDriverOffline(selectedDriverForOnline.id);
+        } else {
+          // Set Online (10 hours)
+          await setDriverOnlineFor10Hours(selectedDriverForOnline.id);
+        }
 
         // Refresh users list
         const refreshedUsers = await getUsers().catch(() => getUsersSync());
@@ -3739,21 +3750,30 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                           )}
                                           <span>{style.text}</span>
                                         </span>
-                                        {driverStatus === "OFFLINE" && (
-                                          <button
-                                            onClick={() => {
-                                              setSelectedDriverForOnline(driver);
-                                              setShowAdminAuthModal(true);
-                                              setAdminUsername("");
-                                              setAdminPassword("");
-                                              setAdminAuthError("");
-                                            }}
-                                            className="text-[8px] md:text-[9px] px-1.5 md:px-2 py-0.5 rounded font-medium bg-emerald-500 hover:bg-emerald-600 text-white transition-colors min-h-[28px] md:min-h-0 touch-manipulation"
-                                            title="Set driver online (Admin required)"
-                                          >
-                                            Set Online
-                                          </button>
-                                        )}
+                                        {/* Toggle Status Button */}
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedDriverForOnline(driver);
+                                            setShowAdminAuthModal(true);
+                                            setAdminUsername("");
+                                            setAdminPassword("");
+                                            setAdminAuthError("");
+                                          }}
+                                          className={`text-[8px] md:text-[9px] px-1.5 md:px-2 py-0.5 rounded font-medium text-white transition-colors min-h-[28px] md:min-h-0 touch-manipulation ${driverStatus === "OFFLINE"
+                                            ? "bg-emerald-500 hover:bg-emerald-600"
+                                            : "bg-red-500 hover:bg-red-600"
+                                            }`}
+                                          title={
+                                            driverStatus === "OFFLINE"
+                                              ? "Set driver online (Admin required)"
+                                              : "Set driver offline (Admin required)"
+                                          }
+                                        >
+                                          {driverStatus === "OFFLINE"
+                                            ? "Set Online"
+                                            : "Set Offline"}
+                                        </button>
                                       </div>
                                     </div>
 
@@ -4843,7 +4863,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
                 <div className="bg-white border-b border-gray-200 p-3 flex justify-between items-center z-10 rounded-t-2xl">
                   <h3 className="font-bold text-base md:text-lg text-gray-900">
-                    Create New Ride
+                    Tạo Chuyến Mới
                   </h3>
                   <button
                     onClick={() => setShowCreateRideModal(false)}
@@ -4853,20 +4873,38 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   </button>
                 </div>
 
-                <div className="p-3 md:p-4 flex flex-col items-center bg-gray-50 border-b border-gray-200">
+                <div className="relative p-6 flex flex-col items-center bg-gradient-to-b from-blue-50/80 to-white border-b border-blue-100 overflow-hidden">
+                  {/* Glowing background effect */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-blue-400/20 rounded-full blur-2xl animate-pulse pointer-events-none"></div>
+
                   <button
                     type="button"
                     onClick={handleVoiceAssistantStart}
-                    className="relative w-16 h-16 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 text-white shadow-xl shadow-blue-500/30 flex items-center justify-center hover:scale-105 transition-transform duration-300"
+                    className="group relative w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-2xl shadow-blue-600/30 flex items-center justify-center hover:scale-110 transition-all duration-300 ring-4 ring-white z-10"
                   >
-                    <Mic size={28} className="md:w-9 md:h-9" />
+                    {/* Inner highlight */}
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+
+                    <Mic size={32} className="md:w-10 md:h-10 drop-shadow-sm group-hover:drop-shadow-md transition-all" />
+
                     {isListening && (
-                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white rounded-full animate-pulse"></span>
+                      <>
+                        <span className="absolute inset-0 rounded-full border-4 border-red-400/50 animate-ping"></span>
+                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 border-2 border-white rounded-full flex items-center justify-center shadow-sm">
+                          <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                        </span>
+                      </>
                     )}
                   </button>
-                  <p className="mt-3 text-gray-500 font-medium text-center text-xs md:text-sm">
-                    Tap to use Voice Assistant
-                  </p>
+
+                  <div className="mt-4 text-center z-10 relative">
+                    <h4 className="font-bold text-gray-900 text-sm md:text-base mb-1 tracking-tight">
+                      Trợ Lý Giọng Nói AI
+                    </h4>
+                    <p className="text-blue-600 font-medium text-xs md:text-sm bg-blue-50 px-3 py-1 rounded-full border border-blue-100 inline-block">
+                      Chạm vào micro để nói
+                    </p>
+                  </div>
                 </div>
 
                 {/* Form Section - Compact layout to avoid scroll */}
@@ -4875,67 +4913,72 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                     {/* Row 1: Room + Guest Name */}
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
-                        Room
+                        Phòng
                       </label>
                       <input
-                        type="text"
+                        type="tel"
+                        inputMode="numeric"
                         value={newRideData.roomNumber}
-                        placeholder="e.g. 101"
+                        placeholder="VD: 101"
                         onChange={(e) =>
                           setNewRideData((p) => ({
                             ...p,
                             roomNumber: e.target.value,
                           }))
                         }
-                        className="w-full px-2.5 py-2 border rounded-md bg-gray-100 text-gray-500 cursor-not-allowed placeholder:text-gray-400 text-sm min-h-[40px]"
-                        disabled
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            setLocationModal({ isOpen: true, type: "pickup" });
+                            setLocationFilterType("ALL");
+                            setPickupSearchQuery("");
+                          }
+                        }}
+                        className="w-full px-2.5 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base shadow-sm min-h-[44px] transition-colors"
                       />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
-                        Guest Name <span className="text-gray-400 font-normal normal-case">(optional)</span>
+                        Tên Khách <span className="text-gray-400 font-normal normal-case">(tùy chọn)</span>
                       </label>
                       <input
                         type="text"
                         value={newRideData.guestName}
-                        placeholder="Name"
+                        placeholder="Tên khách"
                         onChange={(e) =>
                           setNewRideData((p) => ({
                             ...p,
                             guestName: e.target.value,
                           }))
                         }
-                        className="w-full px-2.5 py-2 border rounded-md bg-gray-100 text-gray-500 cursor-not-allowed placeholder:text-gray-400 text-sm min-h-[40px]"
-                        disabled
+                        className="w-full px-2.5 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base shadow-sm min-h-[44px] transition-colors"
                       />
                     </div>
                     {/* Row 2: Pickup + Destination */}
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
-                        Pickup
+                        Điểm Đón
                       </label>
                       <input
                         type="text"
                         value={newRideData.pickup}
-                        placeholder="Select pickup"
+                        placeholder="Chọn điểm đón"
                         readOnly
                         onClick={() => {
                           setLocationModal({ isOpen: true, type: "pickup" });
                           setLocationFilterType("ALL");
                           setPickupSearchQuery("");
                         }}
-                        className="w-full px-2.5 py-2 border rounded-md bg-gray-100 text-gray-500 cursor-not-allowed placeholder:text-gray-400 text-sm min-h-[40px] touch-manipulation"
-                        disabled
+                        className="w-full px-2.5 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 hover:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer placeholder:text-gray-400 text-base shadow-sm min-h-[44px] touch-manipulation transition-colors"
                       />
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
-                        Destination
+                        Điểm Đến
                       </label>
                       <input
                         type="text"
                         value={newRideData.destination}
-                        placeholder="Select destination"
+                        placeholder="Chọn điểm đến"
                         readOnly
                         onClick={() => {
                           setLocationModal({
@@ -4945,47 +4988,49 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                           setLocationFilterType("ALL");
                           setDestinationSearchQuery("");
                         }}
-                        className="w-full px-2.5 py-2 border rounded-md bg-gray-100 text-gray-500 cursor-not-allowed placeholder:text-gray-400 text-sm min-h-[40px] touch-manipulation"
-                        disabled
+                        className="w-full px-2.5 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 hover:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer placeholder:text-gray-400 text-base shadow-sm min-h-[44px] touch-manipulation transition-colors"
                       />
                     </div>
                     {/* Row 3: Guest Count + Notes (compact) */}
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
-                        Guests
+                        Số Khách
                       </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="7"
-                        value={newRideData.guestCount || 1}
-                        placeholder="1-7"
-                        onChange={(e) =>
-                          setNewRideData((p) => ({
-                            ...p,
-                            guestCount: parseInt(e.target.value) || 1,
-                          }))
-                        }
-                        className="w-full px-2.5 py-2 border rounded-md bg-gray-100 text-gray-500 cursor-not-allowed placeholder:text-gray-400 text-sm min-h-[40px]"
-                        disabled
-                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setNewRideData(p => ({ ...p, guestCount: Math.max(1, (p.guestCount || 1) - 1) }))}
+                          className="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-gray-200 border-2 border-gray-300 flex items-center justify-center text-gray-700 hover:bg-gray-300 active:bg-gray-400 touch-manipulation font-bold text-xl transition-colors"
+                        >
+                          -
+                        </button>
+                        <div className="flex-1 text-center font-bold text-gray-900 text-lg md:text-xl py-2 bg-gray-50 border-2 border-gray-300 rounded-lg min-h-[44px] flex items-center justify-center">
+                          {newRideData.guestCount || 1}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setNewRideData(p => ({ ...p, guestCount: Math.min(7, (p.guestCount || 1) + 1) }))}
+                          className="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-gray-200 border-2 border-gray-300 flex items-center justify-center text-gray-700 hover:bg-gray-300 active:bg-gray-400 touch-manipulation font-bold text-xl transition-colors"
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
-                        Notes
+                        Ghi Chú
                       </label>
                       <input
                         type="text"
                         value={newRideData.notes}
-                        placeholder="Optional notes"
+                        placeholder="Ghi chú (tùy chọn)"
                         onChange={(e) =>
                           setNewRideData((p) => ({
                             ...p,
                             notes: e.target.value,
                           }))
                         }
-                        className="w-full px-2.5 py-2 border rounded-md bg-gray-100 text-gray-500 cursor-not-allowed placeholder:text-gray-400 text-sm min-h-[40px]"
-                        disabled
+                        className="w-full px-2.5 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base shadow-sm min-h-[44px] transition-colors"
                       />
                     </div>
                   </div>
@@ -4998,7 +5043,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                     className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors min-h-[44px] md:min-h-0"
                     disabled={isCreatingRide}
                   >
-                    Cancel
+                    Hủy
                   </button>
                   <button
                     onClick={handleCreateRide}
@@ -5008,12 +5053,12 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                     {isCreatingRide ? (
                       <>
                         <Loader2 size={18} className="animate-spin" />
-                        Creating...
+                        Đang tạo...
                       </>
                     ) : (
                       <>
                         <Plus size={18} />
-                        Create Ride
+                        Tạo Chuyến
                       </>
                     )}
                   </button>
@@ -5110,17 +5155,18 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                 ...p,
                                 pickup: loc.name,
                               }));
+                              // Auto-advance to Destination
+                              setLocationModal({ isOpen: true, type: "destination" });
+                              setLocationFilterType("ALL");
+                              setPickupSearchQuery(""); // Clear pickup query
+                              setDestinationSearchQuery(""); // Ensure dest query is empty
                             } else {
                               setNewRideData((p) => ({
                                 ...p,
                                 destination: loc.name,
                               }));
-                            }
-                            setLocationModal({ isOpen: false, type: null });
-                            setLocationFilterType("ALL");
-                            if (locationModal.type === "pickup") {
-                              setPickupSearchQuery("");
-                            } else {
+                              setLocationModal({ isOpen: false, type: null });
+                              setLocationFilterType("ALL");
                               setDestinationSearchQuery("");
                             }
                           }}
@@ -5979,11 +6025,16 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               <div className="p-4 md:p-6 space-y-4">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm text-blue-800">
-                    <strong>Setting driver online:</strong>{" "}
+                    <strong>
+                      {selectedDriverForOnline?.updatedAt &&
+                        Date.now() - selectedDriverForOnline.updatedAt < 30000
+                        ? "Setting driver OFFLINE:"
+                        : "Setting driver ONLINE:"}
+                    </strong>{" "}
                     {selectedDriverForOnline?.lastName || "Unknown"}
                   </p>
                   <p className="text-xs text-blue-600 mt-1">
-                    Admin credentials required to set driver online status.
+                    Admin credentials required to update driver status.
                   </p>
                 </div>
 
@@ -6059,7 +6110,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       Authenticating...
                     </>
                   ) : (
-                    "Authenticate & Set Online"
+                    "Authenticate & Update Status"
                   )}
                 </button>
               </div>
@@ -6074,7 +6125,6 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           <button
             onClick={() => {
               setShowCreateRideModal(true);
-              handleVoiceAssistantStart();
             }}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-full w-20 h-20 md:w-16 md:h-16 flex items-center justify-center transition-all z-50 touch-manipulation hover:scale-110 active:scale-95"
             style={{

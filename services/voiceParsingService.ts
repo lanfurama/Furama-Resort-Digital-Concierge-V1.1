@@ -52,23 +52,27 @@ function similarityScore(str1: string, str2: string): number {
 
 const PHONETIC_MAPPINGS: Record<string, string> = {
   "niu rai": "new ride", "niu lai": "new ride", "nhiu lai": "new ride",
-  "rum": "room", "rùm": "room", "rôm": "room",
-  "oan": "1", "uân": "1", "quân": "1",
+  "tạo rai": "new ride", "tạo ride": "new ride", "tạo chuyến": "new ride",
+  "rum": "room", "rùm": "room", "rôm": "room", "phòng": "room",
+  "oan": "1", "uân": "1", "quân": "1", "oăn": "1",
   "tu": "2", "tư": "4",
-  "tri": "3", "tờ ri": "3", "thờ ri": "3",
-  "for": "4", "pho": "4", "phò": "4",
-  "phai": "5", "phài": "5",
-  "xích": "6", "sích": "6",
-  "se vần": "7", "xe vần": "7",
-  "gâu tu": "go to", "gô tu": "go to",
-  "pic úp": "pick up", "bích úp": "pick up", "píc ắp": "pick up",
-  "láp to": "lobby", "lốp by": "lobby", "lô bi": "lobby",
-  "vui la": "villa", "vi la": "villa", "biệt thự": "villa",
-  "bích": "beach", "bít": "beach", "bãi biển": "beach", "ra biển": "to beach",
-  "ăn sáng": "restaurant", "ăn tối": "restaurant", "đi ăn": "eat",
-  "nhà hàng ý": "italian restaurant",
-  "tập gym": "gym", "tập thể dục": "gym",
-  "lễ tân": "lobby", "sảnh": "lobby",
+  "tri": "3", "tờ ri": "3", "thờ ri": "3", "ba": "3",
+  "for": "4", "pho": "4", "phò": "4", "bốn": "4",
+  "phai": "5", "phài": "5", "năm": "5",
+  "xích": "6", "sích": "6", "sáu": "6",
+  "se vần": "7", "xe vần": "7", "bảy": "7",
+  "gâu tu": "go to", "gô tu": "go to", "đi": "go to", "đến": "go to", "tới": "go to", "ra": "go to", "về": "go to",
+  "pic úp": "pick up", "bích úp": "pick up", "píc ắp": "pick up", "đón": "pick up", "lấy": "pick up", "tại": "pick up",
+  "láp to": "lobby", "lốp by": "lobby", "lô bi": "lobby", "sảnh": "lobby", "lễ tân": "lobby", "reception": "lobby",
+  "vui la": "villa", "vi la": "villa", "biệt thự": "villa", "v": "villa",
+  "bích": "beach", "bít": "beach", "bãi biển": "beach", "biển": "beach", "bờ biển": "beach",
+  "ăn sáng": "restaurant", "ăn tối": "restaurant", "đi ăn": "restaurant", "nhà hàng": "restaurant",
+  "nhà hàng ý": "italian restaurant", "ý": "italian restaurant",
+  "tập gym": "gym", "tập thể dục": "gym", "phòng tập": "gym",
+  "hồ bơi": "pool", "bể bơi": "pool", "pua": "pool", "bơi": "pool",
+  "xì pa": "spa", "spa": "spa", "mát xa": "spa",
+  "hành lý": "luggage", "vali": "luggage", "đồ": "luggage",
+  "gấp": "urgent", "nhanh": "urgent", "khẩn cấp": "urgent",
 };
 
 const VN_DIGITS: Record<string, string> = {
@@ -87,7 +91,11 @@ const VN_DIGITS: Record<string, string> = {
 };
 
 const VN_LETTERS: Record<string, string> = {
-  "a": "A", "bê": "B", "xê": "C", "xi": "C", "đê": "D", "đi": "D",
+  "a": "A", "bê": "B", "xê": "C", "xi": "C", "đê": "D", "đi": "D", "dê": "D",
+  "e": "E", "ép": "F", "phờ": "F", "gờ": "G", "hát": "H", "hắc": "H", "y": "I", "i": "I",
+  "ca": "K", "ki": "K", "lờ": "L", "em mờ": "M", "en nờ": "N", "o": "O", "pê": "P",
+  "quy": "Q", "qu": "Q", "quờ": "Q", "ét": "S", "sờ": "S", "xờ": "S", "tê": "T", "ti": "T",
+  "u": "U", "vê": "V", "vi": "V", "x": "X", "ích xì": "X", "y dài": "Y",
 };
 
 // Convert "một linh một" -> "101", "đê ba" -> "D3"
