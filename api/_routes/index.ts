@@ -14,6 +14,7 @@ import roomRoutes from './roomRoutes';
 import notificationRoutes from './notificationRoutes';
 import hotelReviewRoutes from './hotelReviewRoutes';
 import driverScheduleRoutes from './driverScheduleRoutes';
+import locationMatchRoutes from './locationMatchRoutes';
 
 const router = Router();
 
@@ -32,6 +33,7 @@ router.use('/rooms', roomRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/hotel-reviews', hotelReviewRoutes);
 router.use('/driver-schedules', driverScheduleRoutes);
+router.use('/locations/match', locationMatchRoutes); // Conversational AI location matching
 
 export default router;
 

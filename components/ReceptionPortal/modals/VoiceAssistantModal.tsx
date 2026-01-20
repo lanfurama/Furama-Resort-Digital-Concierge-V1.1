@@ -1,43 +1,65 @@
 
-import React from 'react';
-import { Mic, X, Loader2, CheckCircle, AlertCircle, Sparkles, Languages } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Mic, X, Loader2, CheckCircle, AlertCircle, Sparkles, ArrowLeft, Languages, ArrowRight } from 'lucide-react';
 import { ParsedVoiceData } from '../../../services/voiceParsingService';
+import { ConversationState, ConversationStep } from '../../../services/conversationStateService';
 
-interface VoiceAssistantModalProps {
+interface ConversationalVoiceAssistantModalProps {
     isOpen: boolean;
     onClose: () => void;
     isListening: boolean;
     transcript: string;
-    voiceResult: { status: string | null; message: string };
     audioLevel: number;
-    processing: boolean;
-    parsedData: ParsedVoiceData;
+    conversationState: ConversationState;
+    currentPrompt: string;
+    progressPercentage: number;
+    stepInfo: { current: number; total: number };
+    isProcessing: boolean;
+    onStartListening: () => void;
+    onGoBack: () => void;
     onConfirm: () => void;
-    onRetry: () => void;
     silenceCountdown: number | null;
     silenceRemainingTime: number | null;
 }
 
-const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
+const ConversationalVoiceAssistantModal: React.FC<ConversationalVoiceAssistantModalProps> = ({
     isOpen,
     onClose,
     isListening,
     transcript,
-    voiceResult,
     audioLevel,
-    processing,
-    parsedData,
+    conversationState,
+    currentPrompt,
+    progressPercentage,
+    stepInfo,
+    isProcessing,
+    onStartListening,
+    onGoBack,
     onConfirm,
-    onRetry,
     silenceCountdown,
     silenceRemainingTime,
 }) => {
     if (!isOpen) return null;
 
-    // Determine current state for UI
-    const isSuccess = voiceResult.status === 'success';
-    const isError = voiceResult.status === 'error';
-    const showResultCard = isSuccess && parsedData.pickup && parsedData.destination;
+    const { step, data, suggestions } = conversationState;
+
+    // Determine UI state
+    const showConfirmation = step === 'CONFIRMING';
+    const isCompleted = step === 'COMPLETED';
+    const canGoBack = step !== 'IDLE' && step !== 'ASKING_PICKUP' && step !== 'COMPLETED';
+
+    // Step icon mapping
+    const getStepIcon = (currentStep: ConversationStep) => {
+        if (isProcessing) return <Loader2 size={40} className="text-white animate-spin" />;
+        if (isCompleted) return <CheckCircle size={40} className="text-white" />;
+        return <Mic size={40} className={`text-white ${isListening ? 'animate-bounce' : ''}`} />;
+    };
+
+    // Get confirmation summary
+    const getConfirmationSummary = () => {
+        if (!data.pickup || !data.destination) return null;
+        return `${data.guestCount || 1} khách đi từ ${data.pickup} đến ${data.destination}${data.notes ? `, ${data.notes}` : ''}`;
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -50,28 +72,43 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
             {/* Main Content */}
             <div className="relative w-full max-w-lg z-10 flex flex-col items-center justify-between min-h-[60vh] max-h-[90vh]">
 
-                {/* Header / Close */}
-                <div className="absolute top-0 right-0 p-4">
+                {/* Header - Close & Progress */}
+                <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between">
+                    {/* Progress Indicator */}
+                    {!isCompleted && stepInfo.current > 0 && (
+                        <div className="flex items-center gap-2 text-blue-200 text-sm font-medium">
+                            <span>Bước {stepInfo.current}/{stepInfo.total}</span>
+                            <div className="w-24 h-2 bg-white/20 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-gradient-to-r from-blue-400 to-cyan-400 transition-all duration-300"
+                                    style={{ width: `${progressPercentage}%` }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Close Button */}
                     <button
                         onClick={onClose}
-                        className="text-white/50 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
+                        className="ml-auto text-white/50 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
                     >
                         <X size={24} />
                     </button>
                 </div>
 
                 {/* Visualizer Area (Center) */}
-                <div className="flex-1 flex flex-col items-center justify-center w-full space-y-8">
+                <div className="flex-1 flex flex-col items-center justify-center w-full space-y-8 mt-16">
 
-                    {/* Ambient Title */}
-                    {!isListening && !processing && !isSuccess && !isError && (
-                        <div className="text-center space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                            <h2 className="text-3xl font-bold text-white tracking-tight">
-                                Trợ Lý Furama
-                            </h2>
-                            <p className="text-blue-200/80">Chạm vào micro để bắt đầu</p>
+                    {/* AI Prompt */}
+                    <div className="text-center space-y-2 px-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <div className="flex items-center justify-center gap-2 text-blue-300 mb-2">
+                            <Sparkles size={16} className="animate-pulse" />
+                            <span className="text-xs uppercase tracking-wider">Trợ Lý AI</span>
                         </div>
-                    )}
+                        <h2 className="text-2xl font-bold text-white tracking-tight max-w-md">
+                            {currentPrompt}
+                        </h2>
+                    </div>
 
                     {/* Animated Orb / Mic Button */}
                     <div className="relative group">
@@ -90,25 +127,16 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                         )}
 
                         <button
-                            onClick={isListening ? () => { } : onRetry}
-                            disabled={isListening || processing}
+                            onClick={isListening ? () => { } : onStartListening}
+                            disabled={isListening || isProcessing || isCompleted}
                             className={`relative z-10 w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 shadow-2xl
                 ${isListening ? 'bg-gradient-to-br from-red-500 to-pink-600 scale-110 ring-4 ring-red-500/30' :
-                                    processing ? 'bg-gradient-to-br from-blue-600 to-indigo-700 scale-95 animate-pulse' :
-                                        isSuccess ? 'bg-gradient-to-br from-emerald-500 to-green-600' :
-                                            isError ? 'bg-gradient-to-br from-orange-500 to-red-500' :
-                                                'bg-gradient-to-br from-blue-500 to-cyan-500 hover:scale-105 hover:shadow-cyan-500/50'
+                                    isProcessing ? 'bg-gradient-to-br from-blue-600 to-indigo-700 scale-95 animate-pulse' :
+                                        isCompleted ? 'bg-gradient-to-br from-emerald-500 to-green-600' :
+                                            'bg-gradient-to-br from-blue-500 to-cyan-500 hover:scale-105 hover:shadow-cyan-500/50'
                                 }`}
                         >
-                            {processing ? (
-                                <Loader2 size={40} className="text-white animate-spin" />
-                            ) : isSuccess ? (
-                                <CheckCircle size={40} className="text-white" />
-                            ) : isError ? (
-                                <AlertCircle size={40} className="text-white" />
-                            ) : (
-                                <Mic size={40} className={`text-white ${isListening ? 'animate-bounce' : ''}`} />
-                            )}
+                            {getStepIcon(step)}
                         </button>
                     </div>
 
@@ -123,17 +151,15 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                                     </span>
                                 )}
                             </span>
-                        ) : processing ? (
+                        ) : isProcessing ? (
                             <span className="text-indigo-300 font-medium tracking-wide flex items-center gap-2 justify-center">
                                 <Sparkles size={16} className="animate-pulse" />
-                                Đang xử lý...
+                                Đang xử lý với AI...
                             </span>
-                        ) : isSuccess ? (
-                            <span className="text-emerald-300 font-medium tracking-wide">Thành công</span>
-                        ) : isError ? (
-                            <span className="text-orange-300 font-medium tracking-wide">Thử lại</span>
+                        ) : isCompleted ? (
+                            <span className="text-emerald-300 font-medium tracking-wide">Hoàn tất!</span>
                         ) : (
-                            <span className="text-white/40 text-sm">Sẵn sàng</span>
+                            <span className="text-white/40 text-sm">Chạm micro để trả lời</span>
                         )}
                     </div>
                 </div>
@@ -148,72 +174,113 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                                 "{transcript}"
                             </p>
                         ) : (
-                            <div className="text-white/60 text-center space-y-2">
-                                <p className="italic">
-                                    "5 khách đi từ D1 đến ACC, có trẻ em"
-                                </p>
-                                <p className="text-xs text-white/40 uppercase tracking-widest border-t border-white/10 pt-2 mt-2">
-                                    Cấu trúc: [Số khách] + [Điểm đón] + [Điểm đến] + [Ghi chú]
-                                </p>
+                            <div className="text-white/60 text-center text-sm italic">
+                                Chờ bạn trả lời...
                             </div>
                         )}
                     </div>
 
-                    {/* Parsing Result Card */}
-                    {showResultCard && (
-                        <div className="bg-white/90 rounded-xl p-4 shadow-lg mb-6 animate-in zoom-in-50 duration-300">
-                            <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
-                                <div className="flex items-center gap-2 text-emerald-700 font-bold">
-                                    <Sparkles size={16} />
-                                    <span>Thông Tin Chuyến Xe</span>
+                    {/* Collected Data Summary (Progressive Disclosure) */}
+                    {(data.pickup || data.destination || data.guestCount) && !showConfirmation && (
+                        <div className="mb-4 space-y-2">
+                            {data.pickup && (
+                                <div className="flex items-center gap-2 text-sm">
+                                    <CheckCircle size={14} className="text-emerald-400" />
+                                    <span className="text-white/70">Điểm đón:</span>
+                                    <span className="text-white font-semibold">{data.pickup}</span>
                                 </div>
-                                <span className="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-1 rounded">
-                                    Đã xác thực
-                                </span>
-                            </div>
+                            )}
+                            {data.destination && (
+                                <div className="flex items-center gap-2 text-sm">
+                                    <CheckCircle size={14} className="text-emerald-400" />
+                                    <span className="text-white/70">Điểm đến:</span>
+                                    <span className="text-white font-semibold">{data.destination}</span>
+                                </div>
+                            )}
+                            {data.guestCount && (
+                                <div className="flex items-center gap-2 text-sm">
+                                    <CheckCircle size={14} className="text-emerald-400" />
+                                    <span className="text-white/70">Số khách:</span>
+                                    <span className="text-white font-semibold">{data.guestCount} người</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
-                            <div className="space-y-3">
-                                <div className="grid grid-cols-[100px_1fr] items-center gap-2">
-                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Điểm đón</span>
-                                    <span className="font-semibold text-gray-800 text-lg truncate">{parsedData.pickup}</span>
-                                </div>
-                                <div className="grid grid-cols-[100px_1fr] items-center gap-2">
-                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Điểm đến</span>
-                                    <span className="font-semibold text-gray-800 text-lg truncate">{parsedData.destination}</span>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4 mt-2 pt-2 border-t border-gray-100">
-                                    <div>
-                                        <span className="block text-xs font-bold text-gray-500 uppercase">Số phòng</span>
-                                        <span className="font-medium text-gray-800">{parsedData.roomNumber || '---'}</span>
+                    {/* Suggestions (Real-time) */}
+                    {suggestions.length > 0 && !showConfirmation && (
+                        <div className="mb-6 space-y-2">
+                            <p className="text-xs text-white/50 uppercase tracking-wider">Gợi ý:</p>
+                            <div className="flex flex-wrap gap-2">
+                                {suggestions.slice(0, 3).map((suggestion, idx) => (
+                                    <div
+                                        key={idx}
+                                        className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white text-sm transition-colors cursor-pointer border border-white/10"
+                                    >
+                                        {suggestion}
                                     </div>
-                                    <div>
-                                        <span className="block text-xs font-bold text-gray-500 uppercase">Số khách</span>
-                                        <span className="font-medium text-gray-800">{parsedData.guestCount || 1} {parsedData.guestName ? `(${parsedData.guestName})` : ''}</span>
-                                    </div>
-                                </div>
+                                ))}
                             </div>
                         </div>
                     )}
 
-                    {/* Error Message */}
-                    {isError && (
-                        <div className="bg-red-500/20 border border-red-500/50 rounded-xl p-4 mb-6 text-center animate-in shake">
-                            <p className="text-red-200 font-medium">
-                                {voiceResult.message}
-                            </p>
+                    {/* Confirmation Card */}
+                    {showConfirmation && (
+                        <div className="bg-white/90 rounded-xl p-4 shadow-lg mb-6 animate-in zoom-in-50 duration-300">
+                            <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
+                                <div className="flex items-center gap-2 text-emerald-700 font-bold">
+                                    <CheckCircle size={16} />
+                                    <span>Xác Nhận Thông Tin</span>
+                                </div>
+                            </div>
+
+                            <div className="text-gray-800 text-sm mb-4 text-center font-medium">
+                                {getConfirmationSummary()}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 text-xs">
+                                <div>
+                                    <span className="block font-bold text-gray-500 uppercase mb-1">Điểm đón</span>
+                                    <span className="font-semibold text-gray-800">{data.pickup}</span>
+                                </div>
+                                <div>
+                                    <span className="block font-bold text-gray-500 uppercase mb-1">Điểm đến</span>
+                                    <span className="font-semibold text-gray-800">{data.destination}</span>
+                                </div>
+                                <div>
+                                    <span className="block font-bold text-gray-500 uppercase mb-1">Số khách</span>
+                                    <span className="font-semibold text-gray-800">{data.guestCount || 1} người</span>
+                                </div>
+                                {data.notes && (
+                                    <div>
+                                        <span className="block font-bold text-gray-500 uppercase mb-1">Ghi chú</span>
+                                        <span className="font-semibold text-gray-800">{data.notes}</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
 
                     {/* Actions */}
                     <div className="grid grid-cols-2 gap-3">
-                        <button
-                            onClick={onClose}
-                            className="px-4 py-3 rounded-xl font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors border border-white/10"
-                        >
-                            Hủy
-                        </button>
+                        {canGoBack ? (
+                            <button
+                                onClick={onGoBack}
+                                className="px-4 py-3 rounded-xl font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors border border-white/10 flex items-center justify-center gap-2"
+                            >
+                                <ArrowLeft size={18} />
+                                Quay lại
+                            </button>
+                        ) : (
+                            <button
+                                onClick={onClose}
+                                className="px-4 py-3 rounded-xl font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors border border-white/10"
+                            >
+                                Hủy
+                            </button>
+                        )}
 
-                        {showResultCard ? (
+                        {showConfirmation ? (
                             <button
                                 onClick={onConfirm}
                                 className="px-4 py-3 rounded-xl font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition-colors shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2"
@@ -222,11 +289,11 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                             </button>
                         ) : (
                             <button
-                                onClick={onRetry}
-                                disabled={isListening || processing}
+                                onClick={onStartListening}
+                                disabled={isListening || isProcessing}
                                 className="px-4 py-3 rounded-xl font-semibold bg-white text-gray-900 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
-                                {isListening ? 'Đang nghe...' : <><Mic size={18} /> Chạm để nói</>}
+                                {isListening ? 'Đang nghe...' : <><Mic size={18} /> Nói</>}
                             </button>
                         )}
                     </div>
@@ -243,7 +310,4 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     );
 };
 
-// Helper for icon (used in button above)
-import { ArrowRight } from 'lucide-react';
-
-export default VoiceAssistantModal;
+export default ConversationalVoiceAssistantModal;

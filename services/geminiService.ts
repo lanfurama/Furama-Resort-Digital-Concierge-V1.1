@@ -129,6 +129,244 @@ Lệnh thực tế: "${input}"`;
   }
 };
 
+/**
+ * CONVERSATIONAL AI FUNCTIONS FOR MULTI-TURN RIDE CREATION
+ */
+
+/**
+ * Parse user response for a specific conversation step
+ * Returns structured data for that step only
+ */
+export const parseStepResponse = async (
+  transcript: string,
+  step: "pickup" | "destination" | "guestCount" | "notes",
+  locations: Location[],
+  context?: { pickup?: string; destination?: string }
+): Promise<any> => {
+  const model = "gemini-2.0-flash";
+
+  if (!ai) {
+    console.error("Gemini AI is not initialized.");
+    return null;
+  }
+
+  let schema: Schema;
+  let prompt: string;
+
+  switch (step) {
+    case "pickup":
+    case "destination":
+      // Location parsing
+      schema = {
+        type: Type.OBJECT,
+        properties: {
+          locationName: {
+            type: Type.STRING,
+            description: "The location name or code mentioned by user",
+          },
+          confidence: {
+            type: Type.STRING,
+            enum: ["high", "medium", "low"],
+            description: "How confident is the detection",
+          },
+        },
+        required: ["locationName"],
+      };
+
+      const locationList = locations
+        .map((l) => {
+          let desc = l.name;
+          if (l.id) desc += ` (Code: ${l.id})`;
+          return `- ${desc}`;
+        })
+        .join("\n");
+
+      prompt = `User is specifying a ${step === "pickup" ? "pickup location" : "destination"}.
+
+Available locations:
+${locationList}
+
+Common codes:
+- ACC = Asian Civic Center
+- ICP = International Convention Palace  
+- Lobby / Lễ tân = Main Lobby
+- Hồ bơi / Pool = Lagoon Pool
+
+Phonetic corrections:
+- "a xê xê", "A C C" → ACC
+- "ai si pi", "I C P" → ICP
+- "hô bơi", "hồ bơi" → Lagoon Pool
+- "lể tân", "sảnh" → Main Lobby
+
+User said: "${transcript}"
+
+Extract the location name or code. If user mentions a room number (like D1, B11, 101), that IS a valid location.`;
+      break;
+
+    case "guestCount":
+      // Guest count parsing
+      schema = {
+        type: Type.OBJECT,
+        properties: {
+          count: {
+            type: Type.NUMBER,
+            description: "Number of guests/passengers",
+          },
+        },
+        required: ["count"],
+      };
+
+      prompt = `Extract the number of guests from this Vietnamese voice input.
+
+Phonetic number corrections:
+- "năm", "nằm", "em", "lăm" → 5
+- "một" → 1
+- "hai" → 2  
+- "ba" → 3
+- "bốn" → 4
+- "sáu" → 6
+- "bảy" → 7
+
+User said: "${transcript}"
+
+Return the guest count as a number (1-7). Default to 1 if unclear.`;
+      break;
+
+    case "notes":
+      // Notes extraction
+      schema = {
+        type: Type.OBJECT,
+        properties: {
+          notes: {
+            type: Type.STRING,
+            description: "Special notes or requests",
+          },
+          hasNotes: {
+            type: Type.BOOLEAN,
+            description: "Whether user provided any notes",
+          },
+        },
+        required: ["hasNotes"],
+      };
+
+      prompt = `User is providing optional notes for a ride request.
+
+Common notes:
+- "có hành lý" / "luggage" → has luggage
+- "có trẻ em" / "children" → has children  
+- "cần gấp" / "urgent" → urgent ride
+- "không" / "no" / "nothing" → no special notes
+
+User said: "${transcript}"
+
+Extract any special requests. If user says "không" or similar, return hasNotes: false.`;
+      break;
+
+    default:
+      return null;
+  }
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: schema,
+      },
+    });
+
+    return JSON.parse(response.text || "{}");
+  } catch (e) {
+    console.error(`AI Parse Error (Step: ${step})`, e);
+    return null;
+  }
+};
+
+/**
+ * Match location using AI when database matching fails
+ * Returns best match with confidence
+ */
+export const matchLocationWithAI = async (
+  userInput: string,
+  candidateLocations: Location[]
+): Promise<{ bestMatch: Location | null; confidence: number; reasoning: string }> => {
+  const model = "gemini-2.0-flash";
+
+  if (!ai) {
+    console.error("Gemini AI is not initialized.");
+    return { bestMatch: null, confidence: 0, reasoning: "AI not available" };
+  }
+
+  const locationList = candidateLocations
+    .map((l, idx) => `${idx + 1}. ${l.name}${l.id ? ` (${l.id})` : ""}`)
+    .join("\n");
+
+  const schema: Schema = {
+    type: Type.OBJECT,
+    properties: {
+      matchIndex: {
+        type: Type.NUMBER,
+        description: "Index of best matching location (1-based), or 0 if no match",
+      },
+      confidence: {
+        type: Type.NUMBER,
+        description: "Confidence score 0-100",
+      },
+      reasoning: {
+        type: Type.STRING,
+        description: "Why this location was chosen",
+      },
+    },
+    required: ["matchIndex", "confidence"],
+  };
+
+  const prompt = `Match the user's input to one of these locations:
+
+${locationList}
+
+User said: "${userInput}"
+
+Consider:
+- Exact name matches
+- Phonetic similarities (Vietnamese)
+- Code abbreviations (ACC, ICP, etc.)
+- Common synonyms (hồ bơi = pool, nhà hàng = restaurant)
+
+Return the best match index (1-based) and confidence (0-100). Return 0 if no reasonable match.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: schema,
+      },
+    });
+
+    const result = JSON.parse(response.text || "{}");
+    const matchIndex = result.matchIndex || 0;
+
+    if (matchIndex > 0 && matchIndex <= candidateLocations.length) {
+      return {
+        bestMatch: candidateLocations[matchIndex - 1],
+        confidence: result.confidence || 0,
+        reasoning: result.reasoning || "AI matched",
+      };
+    }
+
+    return {
+      bestMatch: null,
+      confidence: 0,
+      reasoning: result.reasoning || "No match found",
+    };
+  } catch (e) {
+    console.error("AI Location Matching Error", e);
+    return { bestMatch: null, confidence: 0, reasoning: "Error occurred" };
+  }
+};
+
 // Fallback parser using Regex and string matching (Robust offline support)
 export const parseRideRequestFallback = (
   input: string,

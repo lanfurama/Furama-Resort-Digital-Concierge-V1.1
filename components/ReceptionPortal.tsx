@@ -69,6 +69,7 @@ import {
   processTranscript,
   ParsedVoiceData,
 } from "../services/voiceParsingService";
+import { useConversationState } from "../hooks/useConversationState";
 import {
   User,
   UserRole,
@@ -100,7 +101,7 @@ import {
   getConfirmedServiceRequestsCount as getConfirmedServiceRequestsCountUtil,
   getDepartmentForServiceType as getDepartmentForServiceTypeUtil,
 } from "./ReceptionPortal/utils/rideHelpers";
-import VoiceAssistantModal from "./ReceptionPortal/modals/VoiceAssistantModal";
+import ConversationalVoiceAssistantModal from "./ReceptionPortal/modals/VoiceAssistantModal";
 import {
   getDriverLocation as getDriverLocationUtil,
   resolveDriverCoordinates as resolveDriverCoordinatesUtil,
@@ -176,11 +177,27 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
-      // Prioritize Google Vietnamese or Microsoft An if available, otherwise any 'vi' voice
-      const viVoice = voices.find(v => v.lang.includes('vi')) || null;
-      if (viVoice) {
-        console.log("Voice loaded:", viVoice.name);
-        setVietnameseVoice(viVoice);
+      console.log("[TTS] Available voices:", voices.map(v => `${v.name} (${v.lang})`));
+
+      // Priority order for Vietnamese voices:
+      // 1. Google Vietnamese (vi-VN) - Best quality, natural
+      // 2. Microsoft An (vi-VN) - Good quality
+      // 3. Any other Vietnamese voice
+      const googleVi = voices.find(v =>
+        v.lang === 'vi-VN' && v.name.toLowerCase().includes('google')
+      );
+      const microsoftAn = voices.find(v =>
+        v.lang === 'vi-VN' && (v.name.toLowerCase().includes('an') || v.name.toLowerCase().includes('microsoft'))
+      );
+      const anyViVoice = voices.find(v => v.lang.startsWith('vi'));
+
+      const selectedVoice = googleVi || microsoftAn || anyViVoice || null;
+
+      if (selectedVoice) {
+        console.log("[TTS] ✅ Selected voice:", selectedVoice.name, `(${selectedVoice.lang})`);
+        setVietnameseVoice(selectedVoice);
+      } else {
+        console.warn("[TTS] ⚠️ No Vietnamese voice found!");
       }
     };
 
@@ -307,6 +324,51 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
     message: string;
   }>({ status: null, message: "" });
 
+  // Conversational Voice State
+  const conversation = useConversationState({
+    locations,
+    onComplete: (data: ParsedVoiceData) => {
+      console.log("[ReceptionPortal] Conversation completed with data:", data);
+      // Auto-fill form with parsed data
+      setNewRideData((prev) => ({
+        ...prev,
+        roomNumber: data.roomNumber || prev.roomNumber,
+        pickup: data.pickup || prev.pickup,
+        destination: data.destination || prev.destination,
+        guestCount: data.guestCount || prev.guestCount || 1,
+        notes: data.notes || prev.notes,
+      }));
+
+      // Close voice overlay
+      setShowVoiceOverlay(false);
+
+      // Show success message
+      setVoiceResult({
+        status: "success",
+        message: "✅ Đã nhận diện thành công! Đang tạo chuyến...",
+      });
+      speakFeedback("Đã nhận diện thành công. Đang tạo chuyến.");
+
+      // Auto-create ride after 1 second
+      setTimeout(() => {
+        handleCreateRide();
+      }, 1000);
+    },
+    onCancel: () => {
+      console.log("[ReceptionPortal] Conversation cancelled");
+      setShowVoiceOverlay(false);
+      setVoiceResult({ status: null, message: "" });
+    },
+    onError: (message: string) => {
+      console.error("[ReceptionPortal] Conversation error:", message);
+      setVoiceResult({
+        status: "error",
+        message,
+      });
+      speakFeedback(message);
+    },
+  });
+
   // Use voice recording hook
   const {
     isListening,
@@ -319,10 +381,11 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
   } = useVoiceRecording({
     language: "vi-VN",
     onTranscriptReady: async (finalTranscript: string) => {
-      // Process transcript when recording stops
-      await handleProcessTranscript(finalTranscript);
+      // NEW: Pass to conversation handler instead of old processTranscript
+      console.log("[ReceptionPortal] Voice transcript ready:", finalTranscript);
+      await conversation.processUserResponse(finalTranscript);
     },
-    silenceTimeout: 3000,
+    silenceTimeout: 3000, // 3 seconds for conversational flow
     t, // Pass translation function for multilingual error messages
   });
 
@@ -469,7 +532,17 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.lang = 'vi-VN';
-        if (vietnameseVoice) utterance.voice = vietnameseVoice;
+        utterance.rate = 0.9; // Slightly slower for clarity
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+
+        if (vietnameseVoice) {
+          utterance.voice = vietnameseVoice;
+          console.log(`[TTS] Speaking with: ${vietnameseVoice.name}`);
+        } else {
+          console.warn("[TTS] No Vietnamese voice set, using default");
+        }
+
         window.speechSynthesis.speak(utterance);
       }
     };
@@ -5913,28 +5986,21 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           </button>
         )
       }
-      {/* Voice Assistant Overlay */}
-      <VoiceAssistantModal
+      {/* Conversational Voice Assistant Overlay */}
+      <ConversationalVoiceAssistantModal
         isOpen={showVoiceOverlay}
         onClose={handleVoiceAssistantClose}
         isListening={isListening}
         transcript={transcript}
-        voiceResult={voiceResult}
         audioLevel={audioLevel}
-        processing={isProcessing}
-        parsedData={{
-          roomNumber: newRideData.roomNumber,
-          pickup: newRideData.pickup,
-          destination: newRideData.destination,
-          guestCount: newRideData.guestCount,
-          guestName: newRideData.guestName,
-          notes: newRideData.notes,
-        }}
-        onConfirm={() => handleCreateRide()}
-        onRetry={() => {
-          setVoiceResult({ status: null, message: "" });
-          if (!isListening) handleToggleListening();
-        }}
+        conversationState={conversation.state}
+        currentPrompt={conversation.currentPrompt}
+        progressPercentage={conversation.progressPercentage}
+        stepInfo={conversation.stepInfo}
+        isProcessing={conversation.isProcessing}
+        onStartListening={handleToggleListening}
+        onGoBack={conversation.goBack}
+        onConfirm={conversation.confirm}
         silenceCountdown={silenceCountdown}
         silenceRemainingTime={silenceRemainingTime}
       />
