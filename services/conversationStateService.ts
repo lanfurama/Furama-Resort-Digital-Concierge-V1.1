@@ -7,6 +7,7 @@ import { Location } from "../types";
 
 export type ConversationStep =
     | "IDLE"
+    | "LISTENING_INITIAL"
     | "ASKING_PICKUP"
     | "ASKING_DESTINATION"
     | "ASKING_GUEST_COUNT"
@@ -59,7 +60,7 @@ const MAX_RETRY_COUNT = 3;
 export const initConversation = (): ConversationState => {
     return {
         ...INITIAL_STATE,
-        step: "ASKING_PICKUP",
+        step: "LISTENING_INITIAL",
         history: [
             {
                 step: "IDLE",
@@ -82,11 +83,15 @@ export const getPromptForStep = (
     const isRetry = retryCount > 0;
 
     switch (step) {
+        case "LISTENING_INITIAL":
+            return "Xin chào! Bạn muốn đặt xe đi đâu? (Ví dụ: 5 khách từ Lobby đến Hồ Bơi)";
+
         case "ASKING_PICKUP":
             if (isRetry) {
                 return "Xin lỗi, tôi không nghe rõ. Bạn có thể nói lại điểm đón khách không? Ví dụ: ACC, Lobby, hoặc số phòng như D1, B11.";
             }
-            return "Xin chào! Điểm đón khách ở đâu ạ? Bạn có thể nói tên địa điểm hoặc số phòng.";
+            // If we fell back to this step, acknowledge what we might have missed
+            return "Tôi chưa rõ điểm đón. Khách đang ở đâu ạ?";
 
         case "ASKING_DESTINATION":
             if (isRetry) {
@@ -127,6 +132,10 @@ export const validateStep = (
     locations: Location[]
 ): StepValidationResult => {
     switch (step) {
+        case "LISTENING_INITIAL":
+            // Always valid, we parse whatever we get
+            return { isValid: true };
+
         case "ASKING_PICKUP":
             if (!data.pickup || data.pickup.trim().length === 0) {
                 return {
@@ -202,6 +211,7 @@ export const getNextStep = (
 ): ConversationStep => {
     const stepOrder: ConversationStep[] = [
         "IDLE",
+        "LISTENING_INITIAL",
         "ASKING_PICKUP",
         "ASKING_DESTINATION",
         "ASKING_GUEST_COUNT",
@@ -226,6 +236,7 @@ export const getPreviousStep = (
 ): ConversationStep => {
     const stepOrder: ConversationStep[] = [
         "IDLE",
+        "LISTENING_INITIAL",
         "ASKING_PICKUP",
         "ASKING_DESTINATION",
         "ASKING_GUEST_COUNT",
@@ -351,6 +362,7 @@ export const isRetryLimitExceeded = (state: ConversationState): boolean => {
 export const getProgressPercentage = (step: ConversationStep): number => {
     const stepProgress: Record<ConversationStep, number> = {
         IDLE: 0,
+        LISTENING_INITIAL: 10,
         ASKING_PICKUP: 20,
         ASKING_DESTINATION: 40,
         ASKING_GUEST_COUNT: 60,
@@ -370,16 +382,17 @@ export const getStepInfo = (
 ): { current: number; total: number } => {
     const stepMap: Record<ConversationStep, number> = {
         IDLE: 0,
-        ASKING_PICKUP: 1,
-        ASKING_DESTINATION: 2,
-        ASKING_GUEST_COUNT: 3,
-        ASKING_NOTES: 4,
-        CONFIRMING: 5,
-        COMPLETED: 5,
+        LISTENING_INITIAL: 1,
+        ASKING_PICKUP: 2,
+        ASKING_DESTINATION: 3,
+        ASKING_GUEST_COUNT: 4,
+        ASKING_NOTES: 5,
+        CONFIRMING: 6,
+        COMPLETED: 6,
     };
 
     return {
         current: stepMap[step] || 0,
-        total: 5,
+        total: 6,
     };
 };

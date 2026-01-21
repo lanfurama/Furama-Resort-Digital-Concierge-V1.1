@@ -1468,13 +1468,16 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     return (
         <div className="min-h-screen bg-gray-100 flex flex-col font-sans">
             <header className="bg-emerald-900 text-white p-4 flex justify-between items-center shadow-lg sticky top-0 z-20">
-                <div>
-                    <h1 className="text-xl font-serif font-bold">Furama Admin CMS</h1>
-                    <div className="flex items-center space-x-2">
-                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${user.role === UserRole.SUPERVISOR ? 'bg-amber-500 text-white' : 'bg-emerald-700 text-emerald-100'}`}>
-                            {user.role === UserRole.SUPERVISOR ? 'Supervisor (Restricted)' : user.role}
-                        </span>
-                        <p className="text-xs text-emerald-300">System Management</p>
+                <div className="flex items-center gap-3">
+                    <img src="/logo.png" alt="Furama Logo" className="w-12 h-12 object-contain bg-white/90 rounded-full p-1 shadow-md" />
+                    <div>
+                        <h1 className="text-xl font-serif font-bold">Furama Admin CMS</h1>
+                        <div className="flex items-center space-x-2">
+                            <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${user.role === UserRole.SUPERVISOR ? 'bg-amber-500 text-white' : 'bg-emerald-700 text-emerald-100'}`}>
+                                {user.role === UserRole.SUPERVISOR ? 'Supervisor (Restricted)' : user.role}
+                            </span>
+                            <p className="text-xs text-emerald-300">System Management</p>
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">

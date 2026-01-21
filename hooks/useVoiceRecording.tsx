@@ -24,7 +24,7 @@ export const useVoiceRecording = (
     const {
         language = "vi-VN",
         onTranscriptReady,
-        silenceTimeout = 5000, // 5 seconds default
+        silenceTimeout = 2500, // Reduced from 5000ms to 2500ms for faster response
         onError,
         t,
     } = options;
@@ -142,7 +142,9 @@ export const useVoiceRecording = (
                     setAudioLevel(level);
 
                     // Reduce threshold margin for better sensitivity
-                    if (level > noiseFloorRef.current + 1.5) { // Adaptive threshold
+                    // INCREASED THRESHOLD: Was 1.5, now 4.0 to prevent background noise from keeping it alive
+                    if (level > noiseFloorRef.current + 4.0) { // Adaptive threshold
+                        // console.log(`[VAD] Speech detected (Level: ${level.toFixed(1)} > Floor: ${noiseFloorRef.current.toFixed(1)} + 4.0)`);
                         lastSpeechTimeRef.current = Date.now();
                         hasSpeechStartedRef.current = true;
 
@@ -173,7 +175,24 @@ export const useVoiceRecording = (
         } catch (error: any) {
             console.error("Failed to access microphone for audio level:", error);
 
-            // Notify error callback
+            // If error is NotReadableError (likely contention with Speech API), we don't want to kill the experience.
+            // Just fallback to simulated audio level or silence.
+            if (error.name === 'NotReadableError' || error.name === 'TrackStartError' || error.name === 'NotAllowedError') {
+                console.warn("Microphone visualization disabled due to access restriction (likely in use by Speech API). Falling back to simulated levels.");
+                // Start simulated noise monitoring to keep the UI alive
+                if (audioLevelIntervalRef.current) {
+                    clearInterval(audioLevelIntervalRef.current);
+                }
+                audioLevelIntervalRef.current = setInterval(() => {
+                    // Simulate some random "listening" noise if we think we are listening
+                    if (isListening) {
+                        setAudioLevel(Math.random() * 10 + 5);
+                    }
+                }, 100);
+                return; // Exit without triggering global onError
+            }
+
+            // Notify error callback for other fatal errors
             if (onError) {
                 onError({
                     type: 'microphone',
@@ -181,8 +200,10 @@ export const useVoiceRecording = (
                 });
             } else {
                 // Fallback to alert if no error callback provided
-                alert(getMicrophoneErrorMessage(error));
+                console.warn(getMicrophoneErrorMessage(error));
             }
+
+            // Fallback to gradual decrease if microphone access fails
 
             // Fallback to gradual decrease if microphone access fails
             if (audioLevelIntervalRef.current) {
@@ -356,7 +377,10 @@ export const useVoiceRecording = (
                 }
 
                 // Start audio level monitoring with real microphone data
-                await startAudioLevelMonitoring();
+                // Add a small delay to avoid race conditions with SpeechRecognition engine claiming the mic
+                setTimeout(async () => {
+                    await startAudioLevelMonitoring();
+                }, 500);
 
                 // Start silence check interval - check every 100ms for smoother countdown and progress bar
                 silenceCheckIntervalRef.current = setInterval(() => {

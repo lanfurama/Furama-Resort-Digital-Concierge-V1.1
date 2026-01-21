@@ -83,6 +83,7 @@ import { apiClient } from "../services/apiClient";
 import BuggyNotificationBell from "./BuggyNotificationBell";
 import { useTranslation } from "../contexts/LanguageContext";
 import { RESORT_CENTER } from "../constants";
+import VoiceInputOverlay from "./VoiceInputOverlay";
 
 // Import extracted utilities
 import {
@@ -2434,6 +2435,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
           className="bg-emerald-900 text-white py-2 md:py-3 px-3 md:px-4 flex justify-between items-center shadow-lg sticky top-0 z-20"
         >
           <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+            <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain bg-white/90 rounded-full p-0.5 shadow-md flex-shrink-0" />
             <div
               className={`w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${viewMode === "BUGGY" ? "bg-emerald-700" :
                 viewMode === "REPORTS" ? "bg-purple-600" :
@@ -5987,22 +5989,26 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         )
       }
       {/* Conversational Voice Assistant Overlay */}
-      <ConversationalVoiceAssistantModal
+      {/* Conversational Voice Assistant Overlay */}
+      <VoiceInputOverlay
         isOpen={showVoiceOverlay}
         onClose={handleVoiceAssistantClose}
         isListening={isListening}
-        transcript={transcript}
         audioLevel={audioLevel}
-        conversationState={conversation.state}
+        silenceCountdown={silenceCountdown}
+        silenceRemainingTime={silenceRemainingTime}
+        transcript={transcript}
+        onToggleListening={handleToggleListening}
+        currentStep={conversation.state.step}
         currentPrompt={conversation.currentPrompt}
         progressPercentage={conversation.progressPercentage}
         stepInfo={conversation.stepInfo}
         isProcessing={conversation.isProcessing}
-        onStartListening={handleToggleListening}
+        collectedData={conversation.state.data}
         onGoBack={conversation.goBack}
         onConfirm={conversation.confirm}
-        silenceCountdown={silenceCountdown}
-        silenceRemainingTime={silenceRemainingTime}
+        onCancel={conversation.cancel}
+        voiceResult={voiceResult}
       />
     </div >
   );

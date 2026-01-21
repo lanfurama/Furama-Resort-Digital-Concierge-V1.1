@@ -15,7 +15,7 @@ import {
     getProgressPercentage,
     getStepInfo,
 } from "../services/conversationStateService";
-import { parseStepResponse } from "../services/geminiService";
+import { parseRideRequestWithContext, parseStepResponse } from "../services/geminiService";
 import { apiClient } from "../services/apiClient";
 
 interface UseConversationStateOptions {

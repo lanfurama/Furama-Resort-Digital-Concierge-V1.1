@@ -110,8 +110,37 @@ const ConversationalVoiceAssistantModal: React.FC<ConversationalVoiceAssistantMo
                         </h2>
                     </div>
 
-                    {/* Animated Orb / Mic Button */}
+                    {/* Animated Orb / Mic Button with Waveform */}
                     <div className="relative group">
+                        {/* Countdown Progress Ring */}
+                        {isListening && silenceRemainingTime !== null && (
+                            <svg
+                                className="absolute -inset-2 w-[calc(100%+16px)] h-[calc(100%+16px)] -rotate-90"
+                                viewBox="0 0 108 108"
+                            >
+                                <circle
+                                    cx="54"
+                                    cy="54"
+                                    r="50"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="3"
+                                    className="text-white/20"
+                                />
+                                <circle
+                                    cx="54"
+                                    cy="54"
+                                    r="50"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="4"
+                                    strokeDasharray={`${Math.max(0, (silenceRemainingTime / 5000)) * 314} 314`}
+                                    strokeLinecap="round"
+                                    className="text-cyan-400 transition-all duration-100"
+                                />
+                            </svg>
+                        )}
+
                         {/* Ripple Effects when listening */}
                         {isListening && (
                             <>
@@ -136,8 +165,32 @@ const ConversationalVoiceAssistantModal: React.FC<ConversationalVoiceAssistantMo
                                             'bg-gradient-to-br from-blue-500 to-cyan-500 hover:scale-105 hover:shadow-cyan-500/50'
                                 }`}
                         >
-                            {getStepIcon(step)}
+                            {/* Dynamic content based on state */}
+                            {isListening ? (
+                                // Waveform visualization
+                                <div className="flex items-end gap-1 h-10">
+                                    {[0.7, 1, 0.8, 0.9, 0.75].map((scale, i) => (
+                                        <div
+                                            key={i}
+                                            className="w-2 bg-white rounded-full transition-all duration-75"
+                                            style={{
+                                                height: `${Math.max(8, (audioLevel * scale * 0.4))}px`,
+                                                opacity: 0.7 + (audioLevel / 300)
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                getStepIcon(step)
+                            )}
                         </button>
+
+                        {/* Countdown Badge */}
+                        {isListening && silenceCountdown !== null && silenceCountdown <= 5 && (
+                            <div className="absolute -top-1 -right-1 w-7 h-7 bg-orange-500 text-white text-sm font-bold rounded-full flex items-center justify-center shadow-lg animate-bounce z-20">
+                                {silenceCountdown}
+                            </div>
+                        )}
                     </div>
 
                     {/* Status Label */}

@@ -13,7 +13,7 @@ import {
   getKnowledgeBase,
   getRoomTypes,
 } from "./dataService";
-import { ContentTranslation } from "../types";
+import { ContentTranslation, Location } from "../types";
 
 const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' && process.env ? process.env.VITE_GEMINI_API_KEY : undefined);
 if (!apiKey) {
@@ -27,7 +27,7 @@ const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 // Enhanced function to parse ride requests with full context from database
 export const parseRideRequestWithContext = async (
   input: string,
-  locations: Array<{ id?: string; name: string; type?: string; lat?: number; lng?: number }>,
+  locations: Location[],
 ) => {
   const model = "gemini-2.0-flash"; // Use the latest flash model available
 
