@@ -25,7 +25,15 @@ export default defineConfig(({ mode }) => {
                 input: {
                     main: './index.html',
                 },
+                output: {
+                    manualChunks: {
+                        'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+                        'vendor-ui': ['lucide-react'],
+                        'vendor-ai': ['@google/genai'],
+                    },
+                },
             },
+            chunkSizeWarningLimit: 1000,
         },
     };
 });

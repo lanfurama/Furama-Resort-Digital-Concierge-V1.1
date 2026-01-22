@@ -1,11 +1,13 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getMenu, addServiceRequest } from '../services/dataService';
 import { User, MenuItem } from '../types';
-import { ArrowLeft, ShoppingBag, Plus, Sparkles, Utensils, Waves, User as UserIcon, Search, ArrowUpDown, Filter } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, Plus, Sparkles, Utensils, Waves, User as UserIcon, Search, ArrowUpDown, Filter, X, Clock } from 'lucide-react';
 import ServiceChat from './ServiceChat';
 import Loading from './Loading';
+import { SkeletonList } from './Skeleton';
 import { useTranslation } from '../contexts/LanguageContext';
+import { fuzzyMatch, getSearchSuggestions, saveSearchHistory, getSearchHistory, clearSearchHistory } from '../utils/fuzzySearch';
 
 interface ServiceBookingProps {
     type: 'DINING' | 'SPA' | 'POOL' | 'BUTLER';
@@ -20,91 +22,166 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
     const [items, setItems] = useState<MenuItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState<string>('');
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [searchHistory, setSearchHistory] = useState<string[]>([]);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const suggestionsRef = useRef<HTMLDivElement>(null);
     const [priceFilter, setPriceFilter] = useState<'ALL' | 'UNDER_100K' | '100K_300K' | '300K_500K' | 'OVER_500K'>('ALL');
     const [dietaryFilter, setDietaryFilter] = useState<'ALL' | 'VEGETARIAN' | 'VEGAN'>('ALL');
     const [durationFilter, setDurationFilter] = useState<'ALL' | '15_MIN' | '30_MIN' | '1_HOUR' | '2_HOURS' | '4_HOURS'>('ALL');
     const [sortBy, setSortBy] = useState<'NAME' | 'PRICE_LOW' | 'PRICE_HIGH'>('NAME');
-    
+
+    // Popular searches based on service type
+    const popularSearches = useMemo(() => {
+        switch (type) {
+            case 'DINING':
+                return language === 'Vietnamese' 
+                    ? ['Phở', 'Bún bò', 'Gà nướng', 'Salad', 'Pizza']
+                    : ['Pho', 'Beef noodle', 'Grilled chicken', 'Salad', 'Pizza'];
+            case 'SPA':
+                return language === 'Vietnamese'
+                    ? ['Massage', 'Facial', 'Body treatment', 'Relaxation', 'Aromatherapy']
+                    : ['Massage', 'Facial', 'Body treatment', 'Relaxation', 'Aromatherapy'];
+            case 'POOL':
+                return language === 'Vietnamese'
+                    ? ['Cocktail', 'Nước ép', 'Bia', 'Nước dừa', 'Smoothie']
+                    : ['Cocktail', 'Juice', 'Beer', 'Coconut water', 'Smoothie'];
+            default:
+                return [];
+        }
+    }, [type, language]);
+
+    // Load search history on mount
+    useEffect(() => {
+        setSearchHistory(getSearchHistory(type));
+    }, [type]);
+
+    // Get suggestions
+    const suggestions = useMemo(() => {
+        return getSearchSuggestions(searchQuery, searchHistory, popularSearches, 5);
+    }, [searchQuery, searchHistory, popularSearches]);
+
+    // Handle search query change
+    const handleSearchChange = (value: string) => {
+        setSearchQuery(value);
+        setShowSuggestions(value.length > 0 || suggestions.length > 0);
+    };
+
+    // Handle suggestion click
+    const handleSuggestionClick = (suggestion: string) => {
+        setSearchQuery(suggestion);
+        setShowSuggestions(false);
+        saveSearchHistory(suggestion, type);
+        setSearchHistory(getSearchHistory(type));
+        searchInputRef.current?.focus();
+    };
+
+    // Handle search submit
+    const handleSearchSubmit = () => {
+        if (searchQuery.trim()) {
+            saveSearchHistory(searchQuery.trim(), type);
+            setSearchHistory(getSearchHistory(type));
+            setShowSuggestions(false);
+        }
+    };
+
+    // Close suggestions when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (
+                suggestionsRef.current &&
+                !suggestionsRef.current.contains(event.target as Node) &&
+                searchInputRef.current &&
+                !searchInputRef.current.contains(event.target as Node)
+            ) {
+                setShowSuggestions(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     // Helper function to detect dietary restrictions from name/description
     const isVegetarian = (item: MenuItem): boolean => {
         const tr = item.translations?.[language];
         const name = (tr?.name || item.name).toLowerCase();
         const desc = (tr?.description || item.description || '').toLowerCase();
         const text = `${name} ${desc}`;
-        
+
         const vegetarianKeywords = ['vegetarian', 'chay', 'rau', 'vegetable', 'salad', 'fruit', 'tofu', 'đậu'];
         const meatKeywords = ['beef', 'pork', 'chicken', 'meat', 'bò', 'heo', 'gà', 'thịt', 'burger', 'steak', 'fish', 'cá', 'seafood', 'hải sản'];
-        
+
         // Check for meat keywords first
         if (meatKeywords.some(keyword => text.includes(keyword))) {
             return false;
         }
-        
+
         // Check for vegetarian keywords
         return vegetarianKeywords.some(keyword => text.includes(keyword));
     };
-    
+
     const isVegan = (item: MenuItem): boolean => {
         const tr = item.translations?.[language];
         const name = (tr?.name || item.name).toLowerCase();
         const desc = (tr?.description || item.description || '').toLowerCase();
         const text = `${name} ${desc}`;
-        
+
         const veganKeywords = ['vegan', 'thuần chay', 'plant-based', 'không sữa', 'no dairy', 'no egg', 'không trứng'];
         const nonVeganKeywords = ['milk', 'cheese', 'butter', 'egg', 'sữa', 'phô mai', 'bơ', 'trứng', 'cream', 'kem'];
-        
+
         // Must be vegetarian first
         if (!isVegetarian(item)) return false;
-        
+
         // Check for non-vegan keywords
         if (nonVeganKeywords.some(keyword => text.includes(keyword))) {
             return false;
         }
-        
+
         // Check for vegan keywords
         return veganKeywords.some(keyword => text.includes(keyword));
     };
-    
+
     // Helper function to detect duration from name/description
     const getDuration = (item: MenuItem): '15_MIN' | '30_MIN' | '1_HOUR' | '2_HOURS' | '4_HOURS' | null => {
         const tr = item.translations?.[language];
         const name = (tr?.name || item.name).toLowerCase();
         const desc = (tr?.description || item.description || '').toLowerCase();
         const text = `${name} ${desc}`;
-        
+
         // Check for 15 minutes / 15 phút
         if (text.includes('15 phút') || text.includes('15 minutes') || text.includes('15분') || text.includes('15分') || text.includes('15分钟')) {
             return '15_MIN';
         }
-        
+
         // Check for 30 minutes / 30 phút / 1/2 hour / nửa giờ
-        if (text.includes('30 phút') || text.includes('30 minutes') || text.includes('30분') || text.includes('30分') || 
+        if (text.includes('30 phút') || text.includes('30 minutes') || text.includes('30분') || text.includes('30分') ||
             text.includes('30分钟') || text.includes('1/2 hour') || text.includes('nửa giờ') || text.includes('half hour') ||
             text.includes('半時間') || text.includes('半小时')) {
             return '30_MIN';
         }
-        
+
         // Check for 1 hour / 1 giờ
-        if (text.includes('1 giờ') || text.includes('1 hour') || text.includes('1시간') || text.includes('1時間') || 
+        if (text.includes('1 giờ') || text.includes('1 hour') || text.includes('1시간') || text.includes('1時間') ||
             text.includes('1小时') || text.includes('une heure') || text.includes('1 час')) {
             return '1_HOUR';
         }
-        
+
         // Check for 2 hours / 2 giờ
-        if (text.includes('2 giờ') || text.includes('2 hours') || text.includes('2시간') || text.includes('2時間') || 
+        if (text.includes('2 giờ') || text.includes('2 hours') || text.includes('2시간') || text.includes('2時間') ||
             text.includes('2小时') || text.includes('2 heures') || text.includes('2 часа')) {
             return '2_HOURS';
         }
-        
+
         // Check for 4 hours / 4 giờ
-        if (text.includes('4 giờ') || text.includes('4 hours') || text.includes('4시간') || text.includes('4時間') || 
+        if (text.includes('4 giờ') || text.includes('4 hours') || text.includes('4시간') || text.includes('4時間') ||
             text.includes('4小时') || text.includes('4 heures') || text.includes('4 часа')) {
             return '4_HOURS';
         }
-        
+
         return null;
     };
-    
+
     // Filter menu by type
     let categoryFilter: 'Dining' | 'Spa' | 'Pool' | 'Butler' = 'Dining';
     if (type === 'SPA') categoryFilter = 'Spa';
@@ -126,7 +203,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
 
     const handlePlaceOrder = async () => {
         if (cart.length === 0) return;
-        
+
         const details = cart.map(i => i.name).join(', ');
         try {
             const result = await addServiceRequest({
@@ -138,7 +215,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                 roomNumber: user.roomNumber,
                 timestamp: Date.now()
             });
-            
+
             setIsOrderPlaced(true);
             setTimeout(() => {
                 onBack();
@@ -158,31 +235,33 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
             const tr = item.translations?.[language];
             const name = tr?.name || item.name;
             const desc = tr?.description || item.description || '';
-            
-            // Search filter
-            const matchesSearch = !searchQuery || 
+
+            // Search filter with fuzzy matching
+            const matchesSearch = !searchQuery ||
                 name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                desc.toLowerCase().includes(searchQuery.toLowerCase());
-            
+                desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                fuzzyMatch(searchQuery, name) ||
+                fuzzyMatch(searchQuery, desc);
+
             // Price filter
             const matchesPrice = priceFilter === 'ALL' ||
                 (priceFilter === 'UNDER_100K' && item.price < 100000) ||
                 (priceFilter === '100K_300K' && item.price >= 100000 && item.price < 300000) ||
                 (priceFilter === '300K_500K' && item.price >= 300000 && item.price < 500000) ||
                 (priceFilter === 'OVER_500K' && item.price >= 500000);
-            
+
             // Dietary filter - Only apply for DINING
             const matchesDietary = type !== 'DINING' || dietaryFilter === 'ALL' ||
                 (dietaryFilter === 'VEGETARIAN' && isVegetarian(item)) ||
                 (dietaryFilter === 'VEGAN' && isVegan(item));
-            
+
             // Duration filter - Only apply for POOL
-            const matchesDuration = type !== 'POOL' || durationFilter === 'ALL' || 
+            const matchesDuration = type !== 'POOL' || durationFilter === 'ALL' ||
                 (durationFilter !== 'ALL' && getDuration(item) === durationFilter);
-            
+
             return matchesSearch && matchesPrice && matchesDietary && matchesDuration;
         });
-        
+
         // Sort
         filtered.sort((a, b) => {
             if (sortBy === 'PRICE_LOW') return a.price - b.price;
@@ -192,67 +271,67 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
             const bName = b.translations?.[language]?.name || b.name;
             return aName.localeCompare(bName);
         });
-        
+
         return filtered;
     }, [items, searchQuery, priceFilter, dietaryFilter, durationFilter, sortBy, language, type]);
 
     // Configuration based on Type
     const getConfig = () => {
         switch (type) {
-            case 'DINING': return { 
+            case 'DINING': return {
                 gradient: 'from-orange-600 via-orange-700 to-red-600',
                 btnGradient: 'from-orange-500 to-red-600',
                 lightBg: 'bg-orange-50',
                 textColor: 'text-orange-600',
                 borderColor: 'border-orange-200',
                 shadowColor: 'shadow-orange-300/50',
-                title: t('dining'), 
+                title: t('dining'),
                 subtitle: 'Delicious meals delivered',
-                icon: <Utensils /> 
+                icon: <Utensils />
             };
-            case 'SPA': return { 
+            case 'SPA': return {
                 gradient: 'from-purple-600 via-purple-700 to-pink-600',
                 btnGradient: 'from-purple-500 to-pink-600',
                 lightBg: 'bg-purple-50',
                 textColor: 'text-purple-600',
                 borderColor: 'border-purple-200',
                 shadowColor: 'shadow-purple-300/50',
-                title: t('spa'), 
+                title: t('spa'),
                 subtitle: 'Relax & Rejuvenate',
-                icon: <Sparkles /> 
+                icon: <Sparkles />
             };
-            case 'POOL': return { 
+            case 'POOL': return {
                 gradient: 'from-blue-600 via-cyan-600 to-teal-600',
                 btnGradient: 'from-blue-500 to-teal-600',
                 lightBg: 'bg-blue-50',
                 textColor: 'text-blue-600',
                 borderColor: 'border-blue-200',
                 shadowColor: 'shadow-blue-300/50',
-                title: t('pool'), 
+                title: t('pool'),
                 subtitle: 'Drinks, towels & suncare',
-                icon: <Waves /> 
+                icon: <Waves />
             };
-            case 'BUTLER': return { 
+            case 'BUTLER': return {
                 gradient: 'from-slate-600 via-slate-700 to-gray-700',
                 btnGradient: 'from-slate-600 to-gray-700',
                 lightBg: 'bg-slate-50',
                 textColor: 'text-slate-600',
                 borderColor: 'border-slate-200',
                 shadowColor: 'shadow-slate-300/50',
-                title: t('butler'), 
+                title: t('butler'),
                 subtitle: 'Personalized assistance',
-                icon: <UserIcon /> 
+                icon: <UserIcon />
             };
-            default: return { 
+            default: return {
                 gradient: 'from-emerald-600 via-emerald-700 to-teal-700',
                 btnGradient: 'from-emerald-600 to-teal-600',
                 lightBg: 'bg-emerald-50',
                 textColor: 'text-emerald-600',
                 borderColor: 'border-emerald-200',
                 shadowColor: 'shadow-emerald-300/50',
-                title: 'Service', 
+                title: 'Service',
                 subtitle: '',
-                icon: <Sparkles /> 
+                icon: <Sparkles />
             };
         }
     };
@@ -276,11 +355,11 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
 
     return (
         <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative overflow-x-hidden">
-             {/* Header with gradient and glassmorphism */}
+            {/* Header with gradient and glassmorphism */}
             <div className={`p-2 text-white shadow-lg backdrop-blur-md bg-gradient-to-r ${config.gradient} flex items-center justify-between z-10 border-b border-white/20 overflow-x-hidden`}>
                 <div className="flex items-center flex-1 min-w-0">
-                    <button 
-                        onClick={onBack} 
+                    <button
+                        onClick={onBack}
                         className="mr-3 text-white/90 hover:text-white hover:bg-white/10 rounded-full p-2 transition-all duration-300 flex-shrink-0"
                     >
                         <ArrowLeft className="w-5 h-5" />
@@ -305,23 +384,83 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
             {/* Content */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 pb-32">
                 {isLoading ? (
-                    <Loading message={t('loading') || 'Loading menu...'} />
+                    <SkeletonList count={4} variant="menu-item" />
                 ) : (
                     <>
                         {/* Filters Section */}
                         <div className="mb-4 space-y-2.5">
-                            {/* Search Bar */}
+                            {/* Search Bar with Suggestions */}
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 z-10" />
                                 <input
+                                    ref={searchInputRef}
                                     type="text"
-                                    placeholder={t('search_locations') || 'Search items...'}
+                                    placeholder={(() => {
+                                        // Dynamic placeholder based on service type
+                                        switch (type) {
+                                            case 'DINING': return language === 'Vietnamese' ? 'Tìm kiếm món ăn...' : 'Search food...';
+                                            case 'SPA': return language === 'Vietnamese' ? 'Tìm kiếm dịch vụ...' : 'Search spa services...';
+                                            case 'POOL': return language === 'Vietnamese' ? 'Tìm kiếm đồ uống...' : 'Search drinks...';
+                                            case 'BUTLER': return language === 'Vietnamese' ? 'Tìm kiếm yêu cầu...' : 'Search requests...';
+                                            default: return t('search_locations') || 'Search items...';
+                                        }
+                                    })()}
                                     value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-10 pr-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                    onChange={(e) => handleSearchChange(e.target.value)}
+                                    onFocus={() => setShowSuggestions(true)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            handleSearchSubmit();
+                                        }
+                                    }}
+                                    className="w-full pl-10 pr-10 py-2 text-sm text-gray-900 placeholder:text-gray-400 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                                 />
+                                {searchQuery && (
+                                    <button
+                                        onClick={() => {
+                                            setSearchQuery('');
+                                            setShowSuggestions(false);
+                                        }}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                )}
+                                
+                                {/* Suggestions Dropdown */}
+                                {showSuggestions && suggestions.length > 0 && (
+                                    <div
+                                        ref={suggestionsRef}
+                                        className="absolute top-full left-0 right-0 mt-1 bg-white border-2 border-gray-200 rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto"
+                                    >
+                                        {suggestions.map((suggestion, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => handleSuggestionClick(suggestion)}
+                                                className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-emerald-50 transition-colors flex items-center gap-2 border-b border-gray-100 last:border-b-0"
+                                            >
+                                                <Clock size={14} className="text-gray-400 flex-shrink-0" />
+                                                <span className="flex-1 truncate">{suggestion}</span>
+                                            </button>
+                                        ))}
+                                        {searchHistory.length > 0 && (
+                                            <div className="px-4 py-2 border-t border-gray-200">
+                                                <button
+                                                    onClick={() => {
+                                                        clearSearchHistory(type);
+                                                        setSearchHistory([]);
+                                                        setShowSuggestions(false);
+                                                    }}
+                                                    className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                                                >
+                                                    {language === 'Vietnamese' ? 'Xóa lịch sử' : 'Clear history'}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                            
+
                             {/* Filter Dropdowns Row */}
                             <div className="flex flex-wrap items-center gap-2 overflow-x-hidden">
                                 {/* Dietary Filter Dropdown - Only for DINING */}
@@ -339,7 +478,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                         </select>
                                     </div>
                                 )}
-                                
+
                                 {/* Duration Filter Dropdown - Only for POOL */}
                                 {type === 'POOL' && (
                                     <div className="flex items-center gap-1.5 flex-1 min-w-0 basis-[calc(50%-4px)]">
@@ -358,7 +497,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                         </select>
                                     </div>
                                 )}
-                                
+
                                 {/* Price Filter Dropdown */}
                                 <div className={`flex items-center gap-1.5 flex-1 min-w-0 ${type === 'DINING' || type === 'POOL' ? 'basis-[calc(50%-4px)]' : 'basis-[calc(50%-4px)]'}`}>
                                     <Filter className="w-4 h-4 text-gray-500 flex-shrink-0" />
@@ -374,7 +513,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                         <option value="OVER_500K">{t('filter_price_over_500k')}</option>
                                     </select>
                                 </div>
-                                
+
                                 {/* Sort Dropdown */}
                                 <div className={`flex items-center gap-1.5 flex-1 min-w-0 ${type === 'DINING' || type === 'POOL' ? 'basis-full' : 'basis-[calc(50%-4px)]'}`}>
                                     <ArrowUpDown className="w-4 h-4 text-gray-500 flex-shrink-0" />
@@ -390,40 +529,40 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div className="grid gap-3">
                             {filteredAndSortedItems.map(item => {
-                        const tr = item.translations?.[language];
-                        const name = tr?.name || item.name;
-                        const desc = tr?.description || item.description;
+                                const tr = item.translations?.[language];
+                                const name = tr?.name || item.name;
+                                const desc = tr?.description || item.description;
 
-                        return (
-                        <div 
-                            key={item.id} 
-                            className="bg-white/95 backdrop-blur-sm p-4 rounded-2xl shadow-lg border-2 border-gray-100/60 flex justify-between items-start gap-3 transition-all hover:shadow-xl hover:border-gray-200 overflow-hidden"
-                            style={{
-                                boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1)'
-                            }}
-                        >
-                            <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-gray-900 text-base mb-1.5 leading-snug" style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"' }}>{name}</h3>
-                                <p className="text-sm text-gray-500 line-clamp-2 mb-2 leading-relaxed">{desc}</p>
-                                <div className={`inline-flex items-center px-3 py-1 rounded-full font-bold text-sm ${config.lightBg} ${config.textColor} border ${config.borderColor}`}>
-                                    {item.price > 0 ? `${item.price.toLocaleString('vi-VN')} VND` : 'Complimentary'}
-                                </div>
-                            </div>
-                            <button 
-                                onClick={() => addToCart(item)}
-                                className={`flex-shrink-0 p-3 rounded-xl transition-all duration-300 ${config.lightBg} ${config.textColor} hover:shadow-lg border-2 ${config.borderColor}`}
-                                style={{
-                                    boxShadow: `0 4px 12px -2px rgba(0,0,0,0.1)`
-                                }}
-                            >
-                                <Plus size={20} className="font-bold" />
-                            </button>
-                        </div>
-                        );
-                        })}
+                                return (
+                                    <div
+                                        key={item.id}
+                                        className="bg-white/95 backdrop-blur-sm p-4 rounded-2xl shadow-lg border-2 border-gray-100/60 flex justify-between items-start gap-3 transition-all hover:shadow-xl hover:border-gray-200 overflow-hidden"
+                                        style={{
+                                            boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1)'
+                                        }}
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-semibold text-gray-900 text-base mb-1.5 leading-snug" style={{ fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"' }}>{name}</h3>
+                                            <p className="text-sm text-gray-500 line-clamp-2 mb-2 leading-relaxed">{desc}</p>
+                                            <div className={`inline-flex items-center px-3 py-1 rounded-full font-bold text-sm ${config.lightBg} ${config.textColor} border ${config.borderColor}`}>
+                                                {item.price > 0 ? `${item.price.toLocaleString('vi-VN')} VND` : 'Complimentary'}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => addToCart(item)}
+                                            className={`flex-shrink-0 p-3 rounded-xl transition-all duration-300 ${config.lightBg} ${config.textColor} hover:shadow-lg border-2 ${config.borderColor}`}
+                                            style={{
+                                                boxShadow: `0 4px 12px -2px rgba(0,0,0,0.1)`
+                                            }}
+                                        >
+                                            <Plus size={20} className="font-bold" />
+                                        </button>
+                                    </div>
+                                );
+                            })}
                             {filteredAndSortedItems.length === 0 && (
                                 <div className="text-center py-16 px-4">
                                     <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -431,7 +570,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                     </div>
                                     <p className="text-gray-500 font-medium text-base">
                                         {searchQuery || priceFilter !== 'ALL' || durationFilter !== 'ALL' || dietaryFilter !== 'ALL'
-                                            ? 'No items found' 
+                                            ? 'No items found'
                                             : 'No items available'}
                                     </p>
                                     <p className="text-gray-400 text-sm mt-1">
@@ -448,10 +587,10 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
 
             {/* Cart Summary - Modern fixed footer */}
             {cart.length > 0 && (
-                <div 
+                <div
                     className="fixed left-1/2 -translate-x-1/2 backdrop-blur-lg bg-white/95 border-t-2 border-gray-200/60 p-4 shadow-2xl z-30 max-w-md w-full"
                     style={{
-                        bottom: '5rem', // 80px for bottom nav (h-20)
+                        bottom: 'calc(5rem + 0.75rem)', // 80px nav + 12px gap for safety
                         boxShadow: '0 -10px 40px -10px rgba(0,0,0,0.2)',
                         paddingBottom: 'max(1rem, calc(1rem + env(safe-area-inset-bottom)))'
                     }}
@@ -461,9 +600,9 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                             <div className="flex items-center gap-2">
                                 <div className={`w-2 h-2 rounded-full ${config.textColor} animate-pulse`} style={{
                                     backgroundColor: config.textColor.includes('orange') ? '#ea580c' :
-                                                   config.textColor.includes('purple') ? '#9333ea' :
-                                                   config.textColor.includes('blue') ? '#2563eb' :
-                                                   config.textColor.includes('slate') ? '#475569' : '#10b981'
+                                        config.textColor.includes('purple') ? '#9333ea' :
+                                            config.textColor.includes('blue') ? '#2563eb' :
+                                                config.textColor.includes('slate') ? '#475569' : '#10b981'
                                 }}></div>
                                 <span className="text-gray-700 font-semibold text-sm">
                                     {cart.length} {t('items')}
@@ -474,7 +613,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                 <span className="text-xs text-gray-500">VND</span>
                             </div>
                         </div>
-                        <button 
+                        <button
                             onClick={handlePlaceOrder}
                             className={`group relative w-full py-4 rounded-2xl font-bold text-base text-white shadow-2xl transition-all duration-300 overflow-hidden bg-gradient-to-r ${config.btnGradient} hover:shadow-2xl`}
                             style={{
@@ -493,7 +632,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
             )}
 
             {/* Chat Widget: Connected to specific service type */}
-            <ServiceChat 
+            <ServiceChat
                 serviceType={type}
                 roomNumber={user.roomNumber}
                 label={chatLabel}

@@ -1,525 +1,59 @@
-
 import React, { useState, useEffect } from 'react';
-import { User, ServiceRequest, HotelReview, UserRole } from '../types';
-import { getCompletedGuestOrders, updateUserNotes, rateServiceRequest, submitHotelReview, getHotelReview, updateUserLanguage, updateUser, addServiceRequest, updateRideNotes, getRideById, getUsers, sendNotification } from '../services/dataService';
-import { Clock, ShoppingBag, Car, Utensils, Sparkles, Waves, User as UserIcon, Save, Star, Hotel, ThumbsUp, Globe, ArrowLeft, Filter, Edit2, Lock, Eye, EyeOff, Calendar, X, Copy, Check, AlertCircle } from 'lucide-react';
+import { User, ServiceRequest } from '../types';
+import { getCompletedGuestOrders, addServiceRequest } from '../services/dataService';
+import { ArrowLeft, Calendar, X } from 'lucide-react';
 import Loading from './Loading';
 import { useTranslation } from '../contexts/LanguageContext';
+import { useToast } from '../hooks/useToast';
 import PullToRefresh from './PullToRefresh';
+import { ProfileCard } from './ProfileCard';
+import { ServiceHistory } from './ServiceHistory';
+import { HotelReviewComponent } from './HotelReview';
 
 interface GuestAccountProps {
     user: User;
     onBack: () => void;
 }
 
-const REVIEW_CATEGORIES = [
-    { id: 'reception', label: 'Reception & Front Desk' },
-    { id: 'hygiene', label: 'Room Cleanliness (Hygiene)' },
-    { id: 'fb', label: 'Food & Beverage (F&B)' },
-    { id: 'buggy', label: 'Buggy Service' },
-    { id: 'facilities', label: 'Pool & Spa Facilities' },
-    { id: 'overall', label: 'Overall Satisfaction' },
-];
-
-const SUPPORTED_LANGUAGES = [
-    'English',
-    'Vietnamese',
-    'Korean',
-    'Japanese',
-    'Chinese',
-    'French',
-    'Russian'
-];
 
 const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
-    const { t, language, setLanguage: setContextLanguage } = useTranslation();
+    const { t } = useTranslation();
+    const toast = useToast();
 
-    // Only fetch Completed orders for Account History
     const [history, setHistory] = useState<ServiceRequest[]>([]);
-    const [existingReview, setExistingReview] = useState<HotelReview | undefined>(undefined);
-    const [notes, setNotes] = useState(user.notes || '');
-    const [isSaving, setIsSaving] = useState(false);
     const [isLoadingHistory, setIsLoadingHistory] = useState(true);
-    const [isLoadingReview, setIsLoadingReview] = useState(true);
-    const [serviceFilter, setServiceFilter] = useState<'ALL' | 'DINING' | 'SPA' | 'POOL' | 'BUGGY' | 'BUTLER'>('ALL');
-
-    // Profile Edit State
-    const [isEditingProfile, setIsEditingProfile] = useState(false);
-    const [profileName, setProfileName] = useState(user.lastName || '');
-    const [currentPassword, setCurrentPassword] = useState('');
-    const [newPassword, setNewPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-    const [showNewPassword, setShowNewPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [isSavingProfile, setIsSavingProfile] = useState(false);
-
-    // Check-in Code State
-    const [savedCheckInCode, setSavedCheckInCode] = useState<string | null>(null);
-    const [codeCopied, setCodeCopied] = useState(false);
-
-    // Load saved check-in code from localStorage
-    useEffect(() => {
-        const savedCode = localStorage.getItem('guest_check_in_code');
-        const savedRoom = localStorage.getItem('guest_room_number');
-        // Only show code if it matches current user's room
-        if (savedCode && savedRoom === user.roomNumber) {
-            setSavedCheckInCode(savedCode);
-        }
-    }, [user.roomNumber]);
-
-    const handleCopyCode = async () => {
-        if (savedCheckInCode) {
-            try {
-                await navigator.clipboard.writeText(savedCheckInCode);
-                setCodeCopied(true);
-                setTimeout(() => setCodeCopied(false), 2000);
-            } catch (error) {
-                console.error('Failed to copy code:', error);
-                alert('Failed to copy code. Please try again.');
-            }
-        }
-    };
+    const [currentUser, setCurrentUser] = useState<User>(user);
 
     // Extend Stay State
     const [showExtendStayModal, setShowExtendStayModal] = useState(false);
-
-    // Lost Item State
-    const [showLostItemModal, setShowLostItemModal] = useState(false);
-    const [lostItemRideId, setLostItemRideId] = useState<string | null>(null);
-    const [lostItemDescription, setLostItemDescription] = useState('');
-    const [isSubmittingLostItem, setIsSubmittingLostItem] = useState(false);
     const [newCheckOutDate, setNewCheckOutDate] = useState('');
     const [extendStayReason, setExtendStayReason] = useState('');
     const [isSubmittingExtend, setIsSubmittingExtend] = useState(false);
 
-    // Load history and hotel review on mount
+    // Load history on mount
     useEffect(() => {
         setIsLoadingHistory(true);
-        setIsLoadingReview(true);
-
-        // Load completed orders
         getCompletedGuestOrders(user.roomNumber)
             .then(setHistory)
             .catch(console.error)
             .finally(() => setIsLoadingHistory(false));
-
-        // Load hotel review from API
-        getHotelReview(user.roomNumber)
-            .then(review => {
-                setExistingReview(review);
-                if (review) {
-                    const initialRatings = REVIEW_CATEGORIES.map(cat => {
-                        const existing = review.categoryRatings?.find(r => r.category === cat.label);
-                        return {
-                            id: cat.id,
-                            label: cat.label,
-                            value: existing ? existing.rating : 5
-                        };
-                    });
-                    setRatings(initialRatings);
-                    setHotelComment(review.comment);
-                    setIsHotelReviewSubmitted(true);
-                }
-            })
-            .catch(console.error)
-            .finally(() => setIsLoadingReview(false));
     }, [user.roomNumber]);
 
-    // Language State - Load from database on mount
-    const [selectedLang, setSelectedLang] = useState(user.language || 'English');
-    const [isLangSaving, setIsLangSaving] = useState(false);
-    const [isLoadingUserData, setIsLoadingUserData] = useState(true);
-
-    // Sync language and notes from database when component mounts
-    useEffect(() => {
-        const loadUserDataFromDB = async () => {
-            setIsLoadingUserData(true);
-            try {
-                const { apiClient } = await import('../services/apiClient');
-                const dbUser = await apiClient.get<any>(`/users/room/${user.roomNumber}`).catch(() => null);
-                if (dbUser) {
-                    // Update language if exists in database
-                    if (dbUser.language) {
-                        console.log('Loaded language from database:', dbUser.language);
-                        setSelectedLang(dbUser.language);
-                        // Update localStorage
-                        const savedUser = localStorage.getItem('furama_user');
-                        if (savedUser) {
-                            const parsedUser = JSON.parse(savedUser);
-                            parsedUser.language = dbUser.language;
-                            localStorage.setItem('furama_user', JSON.stringify(parsedUser));
-                        }
-                        // Update context
-                        setContextLanguage(dbUser.language as any);
-                    }
-
-                    // Update notes if exists in database
-                    if (dbUser.notes !== undefined && dbUser.notes !== null) {
-                        setNotes(dbUser.notes);
-                        // Update localStorage
-                        const savedUser = localStorage.getItem('furama_user');
-                        if (savedUser) {
-                            const parsedUser = JSON.parse(savedUser);
-                            parsedUser.notes = dbUser.notes;
-                            localStorage.setItem('furama_user', JSON.stringify(parsedUser));
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to load user data from database:', error);
-            } finally {
-                setIsLoadingUserData(false);
-            }
-        };
-        loadUserDataFromDB();
-    }, [user.roomNumber, setContextLanguage]);
-
-    // Service Rating State
-    const [activeRatingId, setActiveRatingId] = useState<string | null>(null);
-    const [serviceRatingValue, setServiceRatingValue] = useState(5);
-    const [serviceCommentValue, setServiceCommentValue] = useState('');
-    const [isSubmittingRating, setIsSubmittingRating] = useState(false);
-
-    // Hotel Review State
-    const [showHotelReview, setShowHotelReview] = useState(false);
-    const [isSubmittingReview, setIsSubmittingReview] = useState(false);
-
-    // Initialize detailed ratings from default to 5 (will be updated when review loads)
-    const initialRatings = REVIEW_CATEGORIES.map(cat => ({
-        id: cat.id,
-        label: cat.label,
-        value: 5
-    }));
-
-    const [ratings, setRatings] = useState(initialRatings);
-    const [hotelComment, setHotelComment] = useState('');
-    const [isHotelReviewSubmitted, setIsHotelReviewSubmitted] = useState(false);
-
-    const handleSaveNotes = async () => {
-        setIsSaving(true);
-        try {
-            await updateUserNotes(user.roomNumber, notes);
-            // Update user in localStorage
-            const savedUser = localStorage.getItem('furama_user');
-            if (savedUser) {
-                const parsedUser = JSON.parse(savedUser);
-                parsedUser.notes = notes;
-                localStorage.setItem('furama_user', JSON.stringify(parsedUser));
-            }
-        } catch (error) {
-            console.error('Failed to save notes:', error);
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleSaveProfile = async () => {
-        if (!user.id) {
-            alert(t('error_user_id_not_found') || 'User ID not found');
-            return;
-        }
-
-        // Validate password if changing
-        if (newPassword || confirmPassword) {
-            if (!currentPassword) {
-                alert('Please enter your current password to change password');
-                return;
-            }
-            if (newPassword.length < 4) {
-                alert('New password must be at least 4 characters');
-                return;
-            }
-            if (newPassword !== confirmPassword) {
-                alert('New passwords do not match');
-                return;
-            }
-        }
-
-        setIsSavingProfile(true);
-        try {
-            const updateData: Partial<User> = {};
-
-            // Update name if changed
-            if (profileName !== user.lastName) {
-                updateData.lastName = profileName;
-            }
-
-            // Update password if provided
-            if (newPassword) {
-                updateData.password = newPassword;
-            }
-
-            await updateUser(user.id, updateData);
-
-            // Update user in localStorage
-            const savedUser = localStorage.getItem('furama_user');
-            if (savedUser) {
-                const parsedUser = JSON.parse(savedUser);
-                if (updateData.lastName) parsedUser.lastName = profileName;
-                if (updateData.password) parsedUser.password = newPassword;
-                localStorage.setItem('furama_user', JSON.stringify(parsedUser));
-            }
-
-            // Reset form
-            setCurrentPassword('');
-            setNewPassword('');
-            setConfirmPassword('');
-            setIsEditingProfile(false);
-            alert('Profile updated successfully!');
-        } catch (error: any) {
-            console.error('Failed to save profile:', error);
-            const baseMessage = t('error_update_profile_failed') || 'Failed to update profile.';
-            alert(`${baseMessage} ${error.message ? `(${error.message})` : ''}`);
-        } finally {
-            setIsSavingProfile(false);
-        }
-    };
-
-    const handleLanguageChange = async (newLang: string) => {
-        setSelectedLang(newLang);
-        setIsLangSaving(true);
-
-        try {
-            await updateUserLanguage(user.roomNumber, newLang);
-
-            // Update user in localStorage
-            const savedUser = localStorage.getItem('furama_user');
-            if (savedUser) {
-                const parsedUser = JSON.parse(savedUser);
-                parsedUser.language = newLang;
-                localStorage.setItem('furama_user', JSON.stringify(parsedUser));
-            }
-
-            // Update Context Immediately
-            setContextLanguage(newLang as any);
-        } catch (error: any) {
-            console.error('Failed to update language:', error);
-            console.error('Error message:', error.message);
-            console.error('Error stack:', error.stack);
-
-            // Revert selectedLang on error
-            setSelectedLang(selectedLang);
-
-            const baseMessage = t('error_update_language_failed') || 'Failed to update language.';
-            alert(`${baseMessage} ${error.message ? `(${error.message})` : ''}\n\nPlease check:\n1. Database has 'language' column\n2. Backend server is running\n3. Check browser console for details`);
-        } finally {
-            setIsLangSaving(false);
-            console.log('=== handleLanguageChange END ===');
-        }
-    };
-
-    const handleSubmitServiceRating = async (id: string, requestType?: string) => {
-        if (isSubmittingRating) return;
-
-        setIsSubmittingRating(true);
-        try {
-            await rateServiceRequest(id, serviceRatingValue, serviceCommentValue, requestType);
-            setActiveRatingId(null);
-            setServiceRatingValue(5);
-            setServiceCommentValue('');
-            // Refresh history to show updated rating
-            const updatedHistory = await getCompletedGuestOrders(user.roomNumber);
-            setHistory(updatedHistory);
-        } catch (error: any) {
-            console.error('Failed to submit rating:', error);
-            alert(t('error_submit_rating') || `Failed to submit rating: ${error.message || 'Please try again.'}`);
-        } finally {
-            setIsSubmittingRating(false);
-        }
-    };
-
-    const handleSubmitLostItem = async () => {
-        if (!lostItemRideId || !lostItemDescription.trim() || isSubmittingLostItem) return;
-
-        setIsSubmittingLostItem(true);
-        try {
-            // Get existing ride to retrieve current notes
-            const ride = await getRideById(lostItemRideId);
-            if (!ride) {
-                throw new Error('Ride not found');
-            }
-
-            const existingNotes = ride.notes || '';
-
-            // Append lost item info to notes
-            const timestamp = new Date().toLocaleString();
-            const lostItemNote = `[Lost Item Report - ${timestamp}] ${lostItemDescription.trim()}`;
-            const updatedNotes = existingNotes ? `${existingNotes}\n${lostItemNote}` : lostItemNote;
-
-            await updateRideNotes(lostItemRideId, updatedNotes);
-
-            // Send notifications to reception, admin, and driver
-            try {
-                const allUsers = await getUsers();
-                const receptionAdmins = allUsers.filter(u =>
-                    u.role === UserRole.RECEPTION || u.role === UserRole.ADMIN || u.role === UserRole.SUPERVISOR
-                );
-                const drivers = allUsers.filter(u => u.role === UserRole.DRIVER);
-
-                const notificationMessage = `Room ${ride.roomNumber} (${ride.guestName}) reported a lost item on buggy ride from ${ride.pickup} to ${ride.destination}: ${lostItemDescription.trim()}`;
-
-                // Notify reception, admin, supervisor
-                for (const staff of receptionAdmins) {
-                    await sendNotification(
-                        staff.roomNumber,
-                        'Lost Item Report - Buggy Service',
-                        notificationMessage,
-                        'WARNING'
-                    );
-                }
-
-                // Notify driver (if ride has driver assigned)
-                if (ride.driverId) {
-                    const assignedDriver = drivers.find(d => d.id === ride.driverId);
-                    if (assignedDriver) {
-                        await sendNotification(
-                            assignedDriver.roomNumber,
-                            'Lost Item Report - Your Buggy Ride',
-                            notificationMessage,
-                            'WARNING'
-                        );
-                    }
-                } else {
-                    // Notify all drivers if no specific driver assigned
-                    for (const driver of drivers) {
-                        await sendNotification(
-                            driver.roomNumber,
-                            'Lost Item Report - Buggy Service',
-                            notificationMessage,
-                            'WARNING'
-                        );
-                    }
-                }
-
-                console.log(`Sent lost item notifications: ${receptionAdmins.length} staff, ${drivers.length} drivers`);
-            } catch (notifError: any) {
-                // Log error but don't fail the lost item report
-                console.error('Failed to send notifications for lost item:', notifError);
-            }
-
-            // Close modal and reset
-            setShowLostItemModal(false);
-            setLostItemRideId(null);
-            setLostItemDescription('');
-
-            // Refresh history
-            const updatedHistory = await getCompletedGuestOrders(user.roomNumber);
-            setHistory(updatedHistory);
-
-            alert('Lost item reported successfully! Our staff will contact you soon.');
-        } catch (error: any) {
-            console.error('Failed to submit lost item:', error);
-            alert(`Failed to report lost item: ${error.message || 'Please try again.'}`);
-        } finally {
-            setIsSubmittingLostItem(false);
-        }
-    };
-
-    const handleCategoryRate = (id: string, stars: number) => {
-        setRatings(prev => prev.map(r => r.id === id ? { ...r, value: stars } : r));
-    };
-
-    const handleSubmitHotelReview = async () => {
-        if (isSubmittingReview) return;
-
-        setIsSubmittingReview(true);
-        try {
-            // Calculate Average
-            const sum = ratings.reduce((acc, curr) => acc + curr.value, 0);
-            const avg = parseFloat((sum / ratings.length).toFixed(1));
-
-            const review = {
-                id: existingReview?.id || Date.now().toString(),
-                roomNumber: user.roomNumber,
-                guestName: user.lastName,
-                categoryRatings: ratings.map(r => ({ category: r.label, rating: r.value })),
-                averageRating: avg,
-                comment: hotelComment,
-                timestamp: existingReview?.timestamp || Date.now()
-            };
-
-            // If there's an existing review, update it; otherwise create new
-            const reviewId = existingReview?.id;
-            await submitHotelReview(review, reviewId);
-
-            // Reload review from API to get updated data
-            const updatedReview = await getHotelReview(user.roomNumber);
-            if (updatedReview) {
-                setExistingReview(updatedReview);
-            } else {
-                setExistingReview(review);
-            }
-
-            setIsHotelReviewSubmitted(true);
-            setShowHotelReview(false);
-        } catch (error: any) {
-            console.error('Failed to submit hotel review:', error);
-            alert(t('error_submit_review') || `Failed to submit review: ${error.message || 'Please try again.'}`);
-        } finally {
-            setIsSubmittingReview(false);
-        }
-    };
-
-    const getIcon = (type: string) => {
-        switch (type) {
-            case 'DINING': return <Utensils size={16} />;
-            case 'SPA': return <Sparkles size={16} />;
-            case 'BUGGY': return <Car size={16} />;
-            case 'POOL': return <Waves size={16} />;
-            case 'BUTLER': return <UserIcon size={16} />;
-            default: return <ShoppingBag size={16} />;
-        }
-    };
-
-    const getColor = (status: string) => {
-        if (status === 'COMPLETED') return 'bg-green-100 text-green-700 border-green-200';
-        return 'bg-gray-100 text-gray-700 border-gray-200';
-    };
-
-    const getTranslatedDetails = (req: ServiceRequest) => {
-        if (req.items && req.items.length > 0) {
-            return req.items.map(item => {
-                const tr = item.translations?.[language];
-                return tr?.name || item.name;
-            }).join(', ');
-        }
-        return req.details;
-    };
-
-    const averageRatingDisplay = existingReview ? existingReview.averageRating : (ratings.reduce((a, b) => a + b.value, 0) / ratings.length).toFixed(1);
-
     const handleRefresh = async () => {
-        // Refresh history and review data
         setIsLoadingHistory(true);
         try {
-            const [orders, review] = await Promise.all([
-                getCompletedGuestOrders(user.roomNumber),
-                getHotelReview(user.roomNumber)
-            ]);
-
+            const orders = await getCompletedGuestOrders(user.roomNumber);
             setHistory(orders);
-
-            if (review) {
-                setExistingReview(review);
-                // Also update ratings if review exists
-                const newRatings = REVIEW_CATEGORIES.map(cat => {
-                    const existing = review.categoryRatings?.find(r => r.category === cat.label);
-                    return {
-                        id: cat.id,
-                        label: cat.label,
-                        value: existing ? existing.rating : 5
-                    };
-                });
-                setRatings(newRatings);
-                setHotelComment(review.comment);
-                setIsHotelReviewSubmitted(true);
-            }
         } catch (error) {
             console.error('Failed to refresh account data:', error);
         } finally {
             setIsLoadingHistory(false);
         }
+    };
+
+    const handleHistoryUpdate = async () => {
+        const orders = await getCompletedGuestOrders(user.roomNumber);
+        setHistory(orders);
     };
 
     return (
@@ -544,695 +78,45 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
 
             <PullToRefresh onRefresh={handleRefresh}>
                 <div className="flex-1 px-3 py-4 space-y-4 -mt-1 relative z-20 pb-24 min-h-full">
-                    {(isLoadingHistory || isLoadingReview || isLoadingUserData) && (
+                    {isLoadingHistory && (
                         <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
                             <Loading size="md" message={t('loading') || 'Loading account data...'} />
                         </div>
                     )}
 
-                    {/* Profile Edit Card - Modern Design */}
-                    <div className="backdrop-blur-lg bg-white/95 p-3 rounded-3xl shadow-xl border border-white/60"
-                        style={{
-                            boxShadow: '0 10px 40px -10px rgba(0,0,0,0.15)'
-                        }}
-                    >
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                                <div className="w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-600 rounded-full"></div>
-                                <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Profile Settings</h4>
-                            </div>
-                            {!isEditingProfile && (
-                                <button
-                                    onClick={() => setIsEditingProfile(true)}
-                                    className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all"
-                                >
-                                    <Edit2 size={16} strokeWidth={2.5} />
-                                </button>
-                            )}
-                        </div>
+                    {/* Profile Card */}
+                    <ProfileCard user={currentUser} onUserUpdate={setCurrentUser} />
 
-                        {isEditingProfile ? (
-                            <div className="space-y-3">
-                                {/* Name Field */}
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Name</label>
-                                    <input
-                                        type="text"
-                                        value={profileName}
-                                        onChange={(e) => setProfileName(e.target.value)}
-                                        placeholder="Enter your name"
-                                        className="w-full px-3 py-2 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
-                                        style={{ color: '#111827' }}
-                                    />
-                                </div>
-
-                                {/* Current Password Field */}
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Current Password</label>
-                                    <div className="relative">
-                                        <input
-                                            type={showCurrentPassword ? "text" : "password"}
-                                            value={currentPassword}
-                                            onChange={(e) => setCurrentPassword(e.target.value)}
-                                            placeholder="Enter current password"
-                                            className="w-full px-3 py-2 pr-10 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
-                                            style={{ color: '#111827' }}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                        >
-                                            {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* New Password Field */}
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">New Password</label>
-                                    <div className="relative">
-                                        <input
-                                            type={showNewPassword ? "text" : "password"}
-                                            value={newPassword}
-                                            onChange={(e) => setNewPassword(e.target.value)}
-                                            placeholder="Enter new password (min 4 chars)"
-                                            className="w-full px-3 py-2 pr-10 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
-                                            style={{ color: '#111827' }}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowNewPassword(!showNewPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                        >
-                                            {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Confirm Password Field */}
-                                <div>
-                                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Confirm New Password</label>
-                                    <div className="relative">
-                                        <input
-                                            type={showConfirmPassword ? "text" : "password"}
-                                            value={confirmPassword}
-                                            onChange={(e) => setConfirmPassword(e.target.value)}
-                                            placeholder="Confirm new password"
-                                            className="w-full px-3 py-2 pr-10 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
-                                            style={{ color: '#111827' }}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                        >
-                                            {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="flex gap-2 pt-2">
-                                    <button
-                                        onClick={() => {
-                                            setIsEditingProfile(false);
-                                            setProfileName(user.lastName || '');
-                                            setCurrentPassword('');
-                                            setNewPassword('');
-                                            setConfirmPassword('');
-                                        }}
-                                        disabled={isSavingProfile}
-                                        className="flex-1 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl border-2 border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                    >
-                                        {t('cancel')}
-                                    </button>
-                                    <button
-                                        onClick={handleSaveProfile}
-                                        disabled={isSavingProfile}
-                                        className="flex-1 py-2 text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5 shadow-lg"
-                                    >
-                                        {isSavingProfile ? (
-                                            <>
-                                                <span className="animate-spin">⏳</span>
-                                                Saving...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Save size={14} />
-                                                {t('save')}
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between py-2">
-                                    <span className="text-xs font-semibold text-gray-600">Name</span>
-                                    <span className="text-sm font-bold text-gray-800">{user.lastName || 'Not set'}</span>
-                                </div>
-                                <div className="flex items-center justify-between py-2 border-t border-gray-100">
-                                    <span className="text-xs font-semibold text-gray-600 flex items-center gap-1">
-                                        <Lock size={12} />
-                                        Password
-                                    </span>
-                                    <span className="text-sm font-bold text-gray-800">••••••</span>
-                                </div>
-                                {savedCheckInCode && (
-                                    <div className="flex items-center justify-between py-2 border-t border-gray-100">
-                                        <span className="text-xs font-semibold text-gray-600">Check-in Code</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-bold text-emerald-700 font-mono tracking-wider">{savedCheckInCode}</span>
-                                            <button
-                                                onClick={handleCopyCode}
-                                                className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all"
-                                                title="Copy code"
-                                            >
-                                                {codeCopied ? (
-                                                    <Check size={14} className="text-emerald-600" />
-                                                ) : (
-                                                    <Copy size={14} />
-                                                )}
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Reservation Details Card - Modern Design */}
-                    <div className="backdrop-blur-lg bg-white/95 p-3 rounded-3xl shadow-xl border border-white/60"
-                        style={{
-                            boxShadow: '0 10px 40px -10px rgba(0,0,0,0.15)'
-                        }}
-                    >
-                        <div className="flex items-center gap-2 mb-3">
-                            <div className="w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-600 rounded-full"></div>
-                            <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{t('reservation_details')}</h4>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-2.5 rounded-xl border border-blue-100">
-                                <p className="text-xs text-gray-600 font-medium mb-1">{t('villa_type')}</p>
-                                <p className="font-bold text-gray-800 text-sm">{user.villaType || 'Standard Room'}</p>
-                            </div>
-                            <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-2.5 rounded-xl border border-purple-100">
-                                <p className="text-xs text-gray-600 font-medium mb-1">{t('stay_duration')}</p>
-                                <p className="font-bold text-gray-800 text-sm">
-                                    {user.checkIn && user.checkOut ? (
-                                        <>
-                                            {new Date(user.checkIn).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} - {new Date(user.checkOut).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </>
-                                    ) : user.checkIn ? (
-                                        <>
-                                            {new Date(user.checkIn).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} - N/A
-                                        </>
-                                    ) : user.checkOut ? (
-                                        <>
-                                            N/A - {new Date(user.checkOut).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </>
-                                    ) : (
-                                        'N/A - N/A'
-                                    )}
-                                </p>
-                            </div>
-
-                            {/* Extend Stay Button */}
-                            {user.checkOut && (
-                                <div className="col-span-2 mt-3">
-                                    <button
-                                        onClick={() => {
-                                            const currentCheckOut = new Date(user.checkOut!);
-                                            const minDate = new Date(currentCheckOut);
-                                            minDate.setDate(minDate.getDate() + 1); // At least 1 day after current check-out
-                                            setNewCheckOutDate(minDate.toISOString().split('T')[0]);
-                                            setShowExtendStayModal(true);
-                                        }}
-                                        className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2"
-                                    >
-                                        <Calendar size={18} />
-                                        <span>Request to Extend Stay</span>
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Language Selector */}
-                            <div className="col-span-2 mt-2 pt-3 border-t-2 border-gray-100">
-                                <div className="flex justify-between items-center mb-3">
-                                    <p className="text-xs text-gray-600 font-semibold flex items-center gap-1.5">
-                                        <Globe size={14} className="text-emerald-600" />
-                                        {t('app_language')}
-                                    </p>
-                                    {isLangSaving && (
-                                        <span className="text-[10px] text-emerald-600 font-bold animate-pulse bg-emerald-50 px-2 py-1 rounded-full">
-                                            Updating...
-                                        </span>
-                                    )}
-                                </div>
-                                <select
-                                    value={selectedLang}
-                                    onChange={(e) => handleLanguageChange(e.target.value)}
-                                    className="w-full bg-white border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all appearance-none cursor-pointer"
-                                    style={{
-                                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23374151' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
-                                        backgroundRepeat: 'no-repeat',
-                                        backgroundPosition: 'right 12px center',
-                                        paddingRight: '40px',
-                                        backgroundColor: '#ffffff'
-                                    }}
-                                >
-                                    {SUPPORTED_LANGUAGES.map(lang => (
-                                        <option
-                                            key={lang}
-                                            value={lang}
-                                            style={{ backgroundColor: '#ffffff', color: '#111827' }}
-                                        >
-                                            {lang}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Hotel Rating Card - Modern Design */}
-                    <div className="backdrop-blur-lg bg-gradient-to-br from-emerald-50 via-teal-50 to-white p-5 rounded-3xl shadow-xl border-2 border-emerald-100/60"
-                        style={{
-                            boxShadow: '0 10px 40px -10px rgba(16, 185, 129, 0.2)'
-                        }}
-                    >
-                        <div className="flex justify-between items-center mb-4">
-                            <div className="flex items-center gap-2">
-                                <div className="w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-600 rounded-full"></div>
-                                <h4 className="text-sm font-bold text-emerald-800 uppercase tracking-wide flex items-center gap-2">
-                                    <Hotel size={16} className="text-emerald-600" />
-                                    {t('experience_feedback')}
-                                </h4>
-                            </div>
-                            {isHotelReviewSubmitted && !isLoadingReview && (
-                                <div className="flex items-center bg-gradient-to-r from-amber-50 to-yellow-50 px-3 py-1.5 rounded-xl border-2 border-amber-200 shadow-md">
-                                    <Star size={14} className="fill-amber-400 text-amber-400 mr-1.5" />
-                                    <span className="text-sm font-black text-gray-800">{averageRatingDisplay}</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {isLoadingReview ? (
-                            <Loading size="sm" message={t('loading') || 'Loading review...'} />
-                        ) : !showHotelReview && !isHotelReviewSubmitted ? (
+                    {/* Extend Stay Button - Add to ProfileCard later */}
+                    {currentUser.checkOut && (
+                        <div className="backdrop-blur-lg bg-white/95 p-3 rounded-3xl shadow-xl border border-white/60">
                             <button
-                                onClick={() => setShowHotelReview(true)}
-                                className="group relative w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden"
+                                onClick={() => {
+                                    const currentCheckOut = new Date(currentUser.checkOut!);
+                                    const minDate = new Date(currentCheckOut);
+                                    minDate.setDate(minDate.getDate() + 1);
+                                    setNewCheckOutDate(minDate.toISOString().split('T')[0]);
+                                    setShowExtendStayModal(true);
+                                }}
+                                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2"
                             >
-                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-                                <span className="relative z-10 flex items-center justify-center gap-2">
-                                    <Star className="w-5 h-5" />
-                                    {t('rate_stay')}
-                                </span>
+                                <Calendar size={18} />
+                                <span>Request to Extend Stay</span>
                             </button>
-                        ) : showHotelReview ? (
-                            <div className="animate-in fade-in slide-in-from-top-2">
-                                <p className="text-xs text-gray-500 mb-3 text-center">Please rate us on the following categories:</p>
-
-                                <div className="space-y-3 mb-4">
-                                    {ratings.map((item) => (
-                                        <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white/80 backdrop-blur-sm p-3 rounded-xl border-2 border-gray-100 shadow-md hover:shadow-lg transition-all">
-                                            <span className="text-xs font-bold text-gray-800 mb-2 sm:mb-0">{item.label}</span>
-                                            <div className="flex space-x-1.5">
-                                                {[1, 2, 3, 4, 5].map(star => (
-                                                    <button
-                                                        key={star}
-                                                        onClick={() => handleCategoryRate(item.id, star)}
-                                                        className="focus:outline-none transition-all duration-200 hover:scale-110"
-                                                    >
-                                                        <Star
-                                                            size={22}
-                                                            className={`transition-all ${star <= item.value ? 'fill-amber-400 text-amber-400 drop-shadow-sm' : 'text-gray-200'}`}
-                                                        />
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <textarea
-                                    className="w-full bg-white border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-900 placeholder:text-gray-400 mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all caret-emerald-600"
-                                    style={{ caretColor: '#10b981' }}
-                                    rows={3}
-                                    placeholder="Any additional comments or suggestions?"
-                                    value={hotelComment}
-                                    onChange={(e) => setHotelComment(e.target.value)}
-                                ></textarea>
-
-                                <div className="flex space-x-2">
-                                    <button
-                                        onClick={() => setShowHotelReview(false)}
-                                        disabled={isSubmittingReview}
-                                        className="flex-1 py-3 text-gray-600 text-xs font-bold hover:bg-gray-100 rounded-xl border-2 border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                                    >
-                                        {t('cancel')}
-                                    </button>
-                                    <button
-                                        onClick={handleSubmitHotelReview}
-                                        disabled={isSubmittingReview}
-                                        className="group relative flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all overflow-hidden flex items-center justify-center"
-                                    >
-                                        {isSubmittingReview ? (
-                                            <>
-                                                <span className="animate-spin mr-2">⏳</span>
-                                                {t('submitting') || 'Submitting...'}
-                                            </>
-                                        ) : (
-                                            <>
-                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-                                                <span className="relative z-10">{t('submit')}</span>
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="bg-gradient-to-br from-white/80 to-emerald-50/50 rounded-2xl p-4 border-2 border-emerald-100 shadow-md">
-                                <div className="text-center mb-4">
-                                    <p className="text-sm text-gray-700 italic font-medium leading-relaxed">"{hotelComment || existingReview?.comment || 'Thank you for your valuable feedback!'}"</p>
-                                </div>
-                                {/* Mini Breakdown Display */}
-                                <div className="grid grid-cols-2 gap-2 mb-3">
-                                    {existingReview?.categoryRatings.map((cat, idx) => (
-                                        <div key={idx} className="flex justify-between items-center bg-white/60 backdrop-blur-sm px-2 py-1.5 rounded-lg border border-gray-200">
-                                            <span className="truncate mr-1 text-[10px] font-semibold text-gray-700">{cat.category}</span>
-                                            <span className="flex items-center font-bold text-amber-600 gap-0.5">
-                                                {cat.rating} <Star size={10} className="fill-current" />
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        setShowHotelReview(true);
-                                        // Load existing review data into form
-                                        if (existingReview) {
-                                            const initialRatings = REVIEW_CATEGORIES.map(cat => {
-                                                const existing = existingReview.categoryRatings?.find(r => r.category === cat.label);
-                                                return {
-                                                    id: cat.id,
-                                                    label: cat.label,
-                                                    value: existing ? existing.rating : 5
-                                                };
-                                            });
-                                            setRatings(initialRatings);
-                                            setHotelComment(existingReview.comment || '');
-                                        }
-                                    }}
-                                    className="w-full text-center text-xs text-emerald-700 font-bold bg-emerald-50 hover:bg-emerald-100 py-2 rounded-xl border border-emerald-200 transition-all"
-                                >
-                                    Edit Review
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Personal Notes - Modern Design */}
-                    <div className="backdrop-blur-lg bg-white/95 p-5 rounded-3xl shadow-xl border border-white/60"
-                        style={{
-                            boxShadow: '0 10px 40px -10px rgba(0,0,0,0.15)'
-                        }}
-                    >
-                        <div className="flex justify-between items-center mb-3">
-                            <div className="flex items-center gap-2">
-                                <div className="w-1 h-6 bg-gradient-to-b from-amber-500 to-orange-600 rounded-full"></div>
-                                <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{t('personal_notes')}</h4>
-                            </div>
-                            {isSaving && (
-                                <span className="text-xs text-emerald-600 font-bold animate-pulse bg-emerald-50 px-2 py-1 rounded-full">
-                                    Saved!
-                                </span>
-                            )}
                         </div>
-                        <textarea
-                            className="w-full bg-gradient-to-br from-yellow-50 to-amber-50 border-2 border-yellow-200 rounded-xl p-3 text-sm text-gray-900 placeholder:text-gray-500 focus:ring-2 focus:ring-yellow-400 focus:outline-none resize-none transition-all caret-yellow-600"
-                            style={{ caretColor: '#d97706' }}
-                            rows={3}
-                            placeholder="e.g. Extra pillows, No nuts in food..."
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                        ></textarea>
-                        <button
-                            onClick={handleSaveNotes}
-                            className="group relative mt-3 w-full py-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 font-bold text-xs rounded-xl hover:from-emerald-100 hover:to-teal-100 transition-all border-2 border-emerald-200 hover:border-emerald-300 flex items-center justify-center shadow-md"
-                        >
-                            <Save size={14} className="mr-1.5" />
-                            {t('save_notes')}
-                        </button>
-                    </div>
+                    )}
 
-                    {/* Completed Order History */}
-                    <div>
-                        <div className="flex items-center justify-between mb-3 px-2">
-                            <div className="flex items-center gap-2">
-                                <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-cyan-600 rounded-full"></div>
-                                <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{t('completed_orders')}</h4>
-                            </div>
-                            {/* Service Filter Dropdown */}
-                            <div className="flex items-center gap-1.5">
-                                <Filter className="w-3.5 h-3.5 text-gray-500" />
-                                <select
-                                    value={serviceFilter}
-                                    onChange={(e) => setServiceFilter(e.target.value as 'ALL' | 'DINING' | 'SPA' | 'POOL' | 'BUGGY' | 'BUTLER')}
-                                    className="text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
-                                >
-                                    <option value="ALL">All</option>
-                                    <option value="BUGGY">{t('buggy')}</option>
-                                    <option value="DINING">{t('dining')}</option>
-                                    <option value="SPA">{t('spa')}</option>
-                                    <option value="POOL">{t('pool')}</option>
-                                    <option value="BUTLER">{t('butler')}</option>
-                                </select>
-                            </div>
-                        </div>
-                        {isLoadingHistory ? (
-                            <Loading size="sm" message={t('loading') || 'Loading history...'} />
-                        ) : history.length === 0 ? (
-                            <div className="text-center py-12 px-4">
-                                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                                    <ShoppingBag className="w-8 h-8 text-gray-400" />
-                                </div>
-                                <p className="text-gray-500 font-medium text-sm">No completed orders yet</p>
-                            </div>
-                        ) : (() => {
-                            const filteredHistory = serviceFilter === 'ALL'
-                                ? history
-                                : history.filter(req => req.type === serviceFilter);
+                    {/* Hotel Review */}
+                    <HotelReviewComponent user={currentUser} />
 
-                            return filteredHistory.length === 0 ? (
-                                <div className="text-center py-12 px-4">
-                                    <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                                        <ShoppingBag className="w-8 h-8 text-gray-400" />
-                                    </div>
-                                    <p className="text-gray-500 font-medium text-sm">
-                                        {serviceFilter === 'ALL'
-                                            ? 'No completed orders yet'
-                                            : `No ${t(serviceFilter.toLowerCase())} orders yet`}
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {filteredHistory.map((req, i) => (
-                                        <div key={i} className="backdrop-blur-sm bg-white/95 p-3 rounded-2xl shadow-lg border-2 border-gray-100/60 flex flex-col transition-all hover:shadow-xl"
-                                            style={{
-                                                boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1)'
-                                            }}
-                                        >
-                                            <div className="flex items-start gap-3">
-                                                <div className={`p-2.5 rounded-xl flex-shrink-0 shadow-md border-2 ${req.type === 'DINING' ? 'bg-gradient-to-br from-orange-100 to-red-100 text-orange-600 border-orange-200' :
-                                                    req.type === 'SPA' ? 'bg-gradient-to-br from-purple-100 to-pink-100 text-purple-600 border-purple-200' :
-                                                        req.type === 'BUGGY' ? 'bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-600 border-emerald-200' :
-                                                            'bg-gradient-to-br from-blue-100 to-cyan-100 text-blue-600 border-blue-200'
-                                                    }`}>
-                                                    {getIcon(req.type)}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex justify-between items-start mb-1">
-                                                        <p className="font-bold text-gray-800 text-sm">{req.type === 'BUGGY' ? t('buggy') : t(req.type.toLowerCase())}</p>
-                                                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full border-2 ${getColor(req.status)} shadow-sm`}>
-                                                            {t(req.status)}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-xs text-gray-600 mt-1 line-clamp-1 font-medium">{getTranslatedDetails(req)}</p>
+                    {/* Service History */}
+                    <ServiceHistory
+                        user={currentUser}
+                        history={history}
+                        isLoading={isLoadingHistory}
+                        onHistoryUpdate={handleHistoryUpdate}
+                    />
 
-                                                    {/* Guest Count and Notes (Only for BUGGY) */}
-                                                    {req.type === 'BUGGY' && (() => {
-                                                        // Parse notes to separate lost item reports from regular notes
-                                                        const notes = req.notes || '';
-                                                        const lostItemReports: string[] = [];
-                                                        let regularNotes = '';
-
-                                                        if (notes && notes.trim()) {
-                                                            const lines = notes.split('\n');
-                                                            lines.forEach(line => {
-                                                                const trimmedLine = line.trim();
-                                                                if (trimmedLine.startsWith('[Lost Item Report -')) {
-                                                                    // Extract description from [Lost Item Report - timestamp] description
-                                                                    const match = trimmedLine.match(/\[Lost Item Report - .+?\] (.+)/);
-                                                                    if (match && match[1]) {
-                                                                        lostItemReports.push(match[1].trim());
-                                                                    } else {
-                                                                        // Fallback: remove the prefix and use the rest
-                                                                        const withoutPrefix = trimmedLine.replace(/\[Lost Item Report - .+?\]\s*/, '');
-                                                                        if (withoutPrefix.trim()) {
-                                                                            lostItemReports.push(withoutPrefix.trim());
-                                                                        }
-                                                                    }
-                                                                } else if (trimmedLine) {
-                                                                    regularNotes += (regularNotes ? '\n' : '') + trimmedLine;
-                                                                }
-                                                            });
-                                                        }
-
-                                                        return (
-                                                            <div className="mt-1.5 space-y-1.5">
-                                                                {req.guestCount && (
-                                                                    <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                                                                        <span className="font-semibold">👥</span>
-                                                                        <span>{req.guestCount} {req.guestCount === 1 ? 'guest' : 'guests'}</span>
-                                                                    </div>
-                                                                )}
-
-                                                                {/* Regular Notes */}
-                                                                {regularNotes && regularNotes.trim() && (
-                                                                    <div className="flex items-start gap-1.5 text-xs text-gray-700 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
-                                                                        <span className="font-semibold text-amber-600 flex-shrink-0 mt-0.5">📝</span>
-                                                                        <span className="flex-1 line-clamp-2">{regularNotes}</span>
-                                                                    </div>
-                                                                )}
-
-                                                                {/* Lost Item Reports */}
-                                                                {lostItemReports.length > 0 && (
-                                                                    <div className="space-y-1">
-                                                                        {lostItemReports.map((report, idx) => (
-                                                                            <div key={idx} className="flex items-start gap-1.5 text-xs text-red-700 bg-red-50 px-2 py-1 rounded-lg border border-red-200">
-                                                                                <AlertCircle size={12} className="text-red-600 flex-shrink-0 mt-0.5" />
-                                                                                <span className="flex-1 font-medium">Lost Item: {report}</span>
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                )}
-
-                                                                {/* Debug: Show raw notes if exists (remove in production) */}
-                                                                {notes && notes.trim() && !regularNotes && lostItemReports.length === 0 && (
-                                                                    <div className="flex items-start gap-1.5 text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded-lg border border-gray-200">
-                                                                        <span className="font-semibold text-gray-400 flex-shrink-0 mt-0.5">📝</span>
-                                                                        <span className="flex-1 line-clamp-2">{notes}</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })()}
-
-                                                    <p className="text-[10px] text-gray-500 mt-2 flex items-center gap-1">
-                                                        <Clock size={11} className="text-gray-400" />
-                                                        {new Date(req.timestamp).toLocaleString()}
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            {/* RATING AREA (Only for Completed Orders) */}
-                                            {req.status === 'COMPLETED' && (
-                                                <div className="mt-3 pt-3 border-t-2 border-gray-100 space-y-2">
-                                                    {req.rating ? (
-                                                        <div className="flex items-center justify-between bg-gradient-to-r from-amber-50 to-yellow-50 p-2 rounded-xl border border-amber-200">
-                                                            <div className="flex text-amber-400 gap-0.5">
-                                                                {[...Array(req.rating)].map((_, i) => <Star key={i} size={14} fill="currentColor" className="drop-shadow-sm" />)}
-                                                            </div>
-                                                            {req.feedback && <span className="text-xs text-gray-600 italic font-medium">"{req.feedback}"</span>}
-                                                        </div>
-                                                    ) : (
-                                                        activeRatingId === req.id ? (
-                                                            <div className="animate-in fade-in bg-gradient-to-br from-gray-50 to-blue-50 p-3 rounded-xl border-2 border-gray-200">
-                                                                <div className="flex items-center justify-center space-x-2 mb-3">
-                                                                    {[1, 2, 3, 4, 5].map(star => (
-                                                                        <button key={star} onClick={() => setServiceRatingValue(star)} className="transition-all hover:scale-110">
-                                                                            <Star size={22} className={`${star <= serviceRatingValue ? 'fill-amber-400 text-amber-400 drop-shadow-sm' : 'text-gray-200'}`} />
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder="Comments (optional)..."
-                                                                    className="w-full text-xs bg-white border-2 border-gray-200 rounded-xl p-2.5 mb-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all caret-emerald-600"
-                                                                    style={{ caretColor: '#10b981' }}
-                                                                    value={serviceCommentValue}
-                                                                    onChange={(e) => setServiceCommentValue(e.target.value)}
-                                                                />
-                                                                <div className="flex space-x-2">
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setActiveRatingId(null);
-                                                                            setServiceRatingValue(5);
-                                                                            setServiceCommentValue('');
-                                                                        }}
-                                                                        disabled={isSubmittingRating}
-                                                                        className="flex-1 py-2 text-xs text-gray-600 hover:bg-gray-100 rounded-xl border-2 border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold"
-                                                                    >
-                                                                        {t('cancel')}
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleSubmitServiceRating(req.id, req.type)}
-                                                                        disabled={isSubmittingRating}
-                                                                        className="group relative flex-1 py-2 text-xs bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center shadow-lg overflow-hidden"
-                                                                    >
-                                                                        {isSubmittingRating ? (
-                                                                            <>
-                                                                                <span className="animate-spin mr-1">⏳</span>
-                                                                                {t('submitting') || 'Submitting...'}
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-                                                                                <span className="relative z-10">{t('submit')}</span>
-                                                                            </>
-                                                                        )}
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex gap-2">
-                                                                <button
-                                                                    onClick={() => setActiveRatingId(req.id)}
-                                                                    className="flex-1 py-2 flex items-center justify-center text-xs text-emerald-700 font-bold bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 rounded-xl transition-all border-2 border-emerald-200 hover:border-emerald-300 shadow-md"
-                                                                >
-                                                                    <ThumbsUp size={14} className="mr-1.5" />
-                                                                    {t('rate_service')}
-                                                                </button>
-
-                                                                {/* Lost Item Report Button (Only for BUGGY) */}
-                                                                {req.type === 'BUGGY' && (
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            setLostItemRideId(req.id);
-                                                                            setLostItemDescription('');
-                                                                            setShowLostItemModal(true);
-                                                                        }}
-                                                                        className="flex-1 py-2 flex items-center justify-center text-xs text-amber-700 font-bold bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 rounded-xl transition-all border-2 border-amber-200 hover:border-amber-300 shadow-md"
-                                                                    >
-                                                                        <AlertCircle size={14} className="mr-1.5" />
-                                                                        Report Lost Item
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        )
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            );
-                        })()}
-                    </div>
                 </div>
 
                 {/* Extend Stay Modal */}
@@ -1308,7 +192,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                     <button
                                         onClick={async () => {
                                             if (!newCheckOutDate) {
-                                                alert('Please select a new check-out date');
+                                                toast.warning('Please select a new check-out date');
                                                 return;
                                             }
 
@@ -1318,7 +202,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                                 const currentDate = user.checkOut ? new Date(user.checkOut) : new Date();
 
                                                 if (newDate <= currentDate) {
-                                                    alert('New check-out date must be after current check-out date');
+                                                    toast.warning('New check-out date must be after current check-out date');
                                                     setIsSubmittingExtend(false);
                                                     return;
                                                 }
@@ -1337,13 +221,13 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                                     newCheckOutDate: newDate.toISOString()
                                                 });
 
-                                                alert('Your extend stay request has been submitted. Reception will review and confirm shortly.');
+                                                toast.success('Your extend stay request has been submitted. Reception will review and confirm shortly.');
                                                 setShowExtendStayModal(false);
                                                 setNewCheckOutDate('');
                                                 setExtendStayReason('');
                                             } catch (error: any) {
                                                 console.error('Failed to submit extend stay request:', error);
-                                                alert(error.message || 'Failed to submit request. Please try again.');
+                                                toast.error(error.message || 'Failed to submit request. Please try again.');
                                             } finally {
                                                 setIsSubmittingExtend(false);
                                             }
@@ -1369,81 +253,6 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                     </div>
                 )}
 
-                {/* Lost Item Modal */}
-                {showLostItemModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                                    <AlertCircle className="text-amber-600" size={24} />
-                                    Report Lost Item
-                                </h3>
-                                <button
-                                    onClick={() => {
-                                        setShowLostItemModal(false);
-                                        setLostItemRideId(null);
-                                        setLostItemDescription('');
-                                    }}
-                                    className="text-gray-400 hover:text-gray-600 transition"
-                                    disabled={isSubmittingLostItem}
-                                >
-                                    <X size={24} />
-                                </button>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                        Describe the lost item
-                                    </label>
-                                    <textarea
-                                        value={lostItemDescription}
-                                        onChange={(e) => setLostItemDescription(e.target.value)}
-                                        placeholder="E.g., iPhone 14 Pro, black wallet, blue backpack..."
-                                        rows={4}
-                                        maxLength={500}
-                                        className="w-full px-3 py-2 text-sm bg-white border-2 border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-all resize-none"
-                                        disabled={isSubmittingLostItem}
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Please provide as much detail as possible (color, brand, model, etc.)
-                                    </p>
-                                </div>
-
-                                <div className="flex space-x-2">
-                                    <button
-                                        onClick={() => {
-                                            setShowLostItemModal(false);
-                                            setLostItemRideId(null);
-                                            setLostItemDescription('');
-                                        }}
-                                        disabled={isSubmittingLostItem}
-                                        className="flex-1 py-2.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg border-2 border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={handleSubmitLostItem}
-                                        disabled={isSubmittingLostItem || !lostItemDescription.trim()}
-                                        className="flex-1 py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-lg shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                    >
-                                        {isSubmittingLostItem ? (
-                                            <>
-                                                <span className="animate-spin">⏳</span>
-                                                Submitting...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <AlertCircle size={18} />
-                                                Submit Report
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </PullToRefresh>
         </div>
     );

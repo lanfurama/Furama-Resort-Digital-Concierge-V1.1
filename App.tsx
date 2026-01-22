@@ -1,34 +1,35 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AppView, User, UserRole } from './types';
-import BuggyBooking from './components/BuggyBooking';
-import ConciergeChat from './components/ConciergeChat';
 import ServiceMenu from './components/ServiceMenu';
-import ServiceBooking from './components/ServiceBooking';
-import EventsList from './components/EventsList';
-import AdminPortal from './components/AdminPortal';
-import DriverPortal from './components/DriverPortal';
-import StaffPortal from './components/StaffPortal';
-import ReceptionPortal from './components/ReceptionPortal';
-import GuestAccount from './components/GuestAccount';
-import ActiveOrders from './components/ActiveOrders';
 import NotificationBell from './components/NotificationBell';
-import SupervisorDashboard from './components/SupervisorDashboard';
-import { LoginTypeSelection } from './components/login/LoginTypeSelection';
-import { RoleSelection } from './components/login/RoleSelection';
+import Loading from './components/Loading';
 import GuestLoginPage from './pages/GuestLoginPage';
 import AdminLoginPage from './pages/AdminLoginPage';
-import Loading from './components/Loading';
 import StaffLoginPage from './pages/StaffLoginPage';
 import DriverLoginPage from './pages/DriverLoginPage';
 import ReceptionLoginPage from './pages/ReceptionLoginPage';
 import SupervisorLoginPage from './pages/SupervisorLoginPage';
 import CollectionLoginPage from './pages/CollectionLoginPage';
+
+// Lazy load large components
+const BuggyBooking = lazy(() => import('./components/BuggyBooking'));
+const ConciergeChat = lazy(() => import('./components/ConciergeChat'));
+const ServiceBooking = lazy(() => import('./components/ServiceBooking'));
+const EventsList = lazy(() => import('./components/EventsList'));
+const AdminPortal = lazy(() => import('./components/AdminPortal'));
+const DriverPortal = lazy(() => import('./components/DriverPortal'));
+const StaffPortal = lazy(() => import('./components/StaffPortal'));
+const ReceptionPortal = lazy(() => import('./components/ReceptionPortal'));
+const GuestAccount = lazy(() => import('./components/GuestAccount'));
+const ActiveOrders = lazy(() => import('./components/ActiveOrders'));
+const SupervisorDashboard = lazy(() => import('./components/SupervisorDashboard'));
 import { getPromotions, getActiveGuestOrders } from './services/dataService';
 import { BuggyStatus } from './types';
 import { User as UserIcon, LogOut, MessageSquare, Car, Percent, ShoppingCart, Home } from 'lucide-react';
 import { LanguageProvider, useTranslation } from './contexts/LanguageContext';
 import { BuggyStatusProvider, useBuggyStatus } from './contexts/BuggyStatusContext';
+import { ToastProvider } from './hooks/useToast';
 import PullToRefresh from './components/PullToRefresh';
 
 // Protected Route Component
@@ -269,16 +270,24 @@ const AppContent: React.FC = () => {
             <button onClick={onLogout} className="text-sm font-semibold text-gray-500">Logout</button>
           </header>
           <div className="p-6">
-            <SupervisorDashboard />
+            <Suspense fallback={<Loading size="md" message="Loading..." />}>
+              <SupervisorDashboard />
+            </Suspense>
           </div>
           <div className="p-6 pt-0">
-            <AdminPortal user={currentUser} onLogout={onLogout} />
+            <Suspense fallback={<Loading size="md" message="Loading..." />}>
+              <AdminPortal user={currentUser} onLogout={onLogout} />
+            </Suspense>
           </div>
         </div>
       );
     }
 
-    return <AdminPortal user={currentUser} onLogout={onLogout} />;
+    return (
+      <Suspense fallback={<Loading size="md" message="Loading..." />}>
+        <AdminPortal user={currentUser} onLogout={onLogout} />
+      </Suspense>
+    );
   };
 
   const StaffDashboardWrapper: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
@@ -302,7 +311,11 @@ const AppContent: React.FC = () => {
     }, []);
 
     if (!currentUser) return null;
-    return <StaffPortal user={currentUser} onLogout={onLogout} />;
+    return (
+      <Suspense fallback={<Loading size="md" message="Loading..." />}>
+        <StaffPortal user={currentUser} onLogout={onLogout} />
+      </Suspense>
+    );
   };
 
   const ReceptionDashboardWrapper: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
@@ -326,7 +339,11 @@ const AppContent: React.FC = () => {
     }, []);
 
     if (!currentUser) return null;
-    return <ReceptionPortal user={currentUser} onLogout={onLogout} />;
+    return (
+      <Suspense fallback={<Loading size="md" message="Loading..." />}>
+        <ReceptionPortal user={currentUser} onLogout={onLogout} />
+      </Suspense>
+    );
   };
 
   const GuestHomeWrapper: React.FC = () => {
@@ -402,6 +419,8 @@ const AppContent: React.FC = () => {
                     src="https://furamavietnam.com/wp-content/uploads/2025/10/furama-resort-danang.jpg"
                     className="absolute inset-0 w-full h-full object-cover"
                     alt="Furama Resort Danang"
+                    loading="lazy"
+                    decoding="async"
                     onError={(e) => {
                       const img = e.target as HTMLImageElement;
                       if (img.src.includes('furama-resort-danang.jpg')) {
@@ -470,17 +489,53 @@ const AppContent: React.FC = () => {
               </div>
             )}
 
-            {/* Sub-Views */}
-            {view === AppView.BUGGY && user && <BuggyBooking user={user} onBack={() => setView(AppView.HOME)} />}
-            {view === AppView.CHAT && <ConciergeChat onClose={() => setView(AppView.HOME)} />}
-            {view === AppView.ACTIVE_ORDERS && user && <ActiveOrders user={user} onBack={() => setView(AppView.HOME)} />}
-            {view === AppView.ACCOUNT && user && <GuestAccount user={user} onBack={() => setView(AppView.HOME)} />}
+            {/* Sub-Views with Lazy Loading */}
+            {view === AppView.BUGGY && user && (
+              <Suspense fallback={<Loading size="md" message={t('loading') || 'Loading...'} />}>
+                <BuggyBooking user={user} onBack={() => setView(AppView.HOME)} />
+              </Suspense>
+            )}
+            {view === AppView.CHAT && (
+              <Suspense fallback={<Loading size="md" message={t('loading') || 'Loading...'} />}>
+                <ConciergeChat onClose={() => setView(AppView.HOME)} />
+              </Suspense>
+            )}
+            {view === AppView.ACTIVE_ORDERS && user && (
+              <Suspense fallback={<Loading size="md" message={t('loading') || 'Loading...'} />}>
+                <ActiveOrders user={user} onBack={() => setView(AppView.HOME)} />
+              </Suspense>
+            )}
+            {view === AppView.ACCOUNT && user && (
+              <Suspense fallback={<Loading size="md" message={t('loading') || 'Loading...'} />}>
+                <GuestAccount user={user} onBack={() => setView(AppView.HOME)} />
+              </Suspense>
+            )}
 
-            {view === AppView.DINING_ORDER && user && <ServiceBooking type="DINING" user={user} onBack={() => setView(AppView.HOME)} />}
-            {view === AppView.SPA_BOOKING && user && <ServiceBooking type="SPA" user={user} onBack={() => setView(AppView.HOME)} />}
-            {view === AppView.POOL_ORDER && user && <ServiceBooking type="POOL" user={user} onBack={() => setView(AppView.HOME)} />}
-            {view === AppView.BUTLER_REQUEST && user && <ServiceBooking type="BUTLER" user={user} onBack={() => setView(AppView.HOME)} />}
-            {view === AppView.EVENTS && <EventsList onBack={() => setView(AppView.HOME)} />}
+            {view === AppView.DINING_ORDER && user && (
+              <Suspense fallback={<Loading size="md" message={t('loading') || 'Loading...'} />}>
+                <ServiceBooking type="DINING" user={user} onBack={() => setView(AppView.HOME)} />
+              </Suspense>
+            )}
+            {view === AppView.SPA_BOOKING && user && (
+              <Suspense fallback={<Loading size="md" message={t('loading') || 'Loading...'} />}>
+                <ServiceBooking type="SPA" user={user} onBack={() => setView(AppView.HOME)} />
+              </Suspense>
+            )}
+            {view === AppView.POOL_ORDER && user && (
+              <Suspense fallback={<Loading size="md" message={t('loading') || 'Loading...'} />}>
+                <ServiceBooking type="POOL" user={user} onBack={() => setView(AppView.HOME)} />
+              </Suspense>
+            )}
+            {view === AppView.BUTLER_REQUEST && user && (
+              <Suspense fallback={<Loading size="md" message={t('loading') || 'Loading...'} />}>
+                <ServiceBooking type="BUTLER" user={user} onBack={() => setView(AppView.HOME)} />
+              </Suspense>
+            )}
+            {view === AppView.EVENTS && (
+              <Suspense fallback={<Loading size="md" message={t('loading') || 'Loading...'} />}>
+                <EventsList onBack={() => setView(AppView.HOME)} />
+              </Suspense>
+            )}
           </div>
         </PullToRefresh>
 
@@ -703,7 +758,9 @@ const AppContent: React.FC = () => {
           path="/driver"
           element={
             <ProtectedRoute allowedRoles={[UserRole.DRIVER]} redirectTo="/driver/login">
-              <DriverPortal onLogout={handleLogout} />
+              <Suspense fallback={<Loading fullScreen={true} message="Loading..." />}>
+                <DriverPortal onLogout={handleLogout} />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -747,7 +804,9 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <LanguageProvider>
-      <AppContent />
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </LanguageProvider>
   );
 };

@@ -3870,6 +3870,8 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                         <>
                           <img
                             src="https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Map-768x552.jpg"
+                            loading="lazy"
+                            decoding="async"
                             alt="Map"
                             className="absolute inset-0 w-full h-full object-cover opacity-80"
                           />

@@ -683,7 +683,7 @@ const BuggyFleetManager: React.FC = () => {
                         <div className="flex-1 relative bg-emerald-50 overflow-hidden min-h-[300px]">
                             {mapError ? (
                                 <>
-                                    <img src="https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Map-768x552.jpg" alt="Map" className="absolute inset-0 w-full h-full object-cover opacity-80" />
+                                    <img src="https://furamavietnam.com/wp-content/uploads/2018/07/Furama-Resort-Danang-Map-768x552.jpg" alt="Map" className="absolute inset-0 w-full h-full object-cover opacity-80" loading="lazy" decoding="async" />
                                     {drivers
                                         .filter(d => {
                                             if (d.status === 'OFFLINE') return false;
