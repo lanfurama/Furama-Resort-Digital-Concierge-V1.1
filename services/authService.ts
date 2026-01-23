@@ -1,5 +1,6 @@
 import { User } from '../types';
 import { apiClient } from './apiClient';
+import { logger } from '../utils/logger';
 
 // Guest Login by Check-in Code - Calls API (new secure method)
 export const authenticateUserByCode = async (checkInCode: string): Promise<User | null> => {

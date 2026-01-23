@@ -1,5 +1,5 @@
-import React from 'react';
-import { Car, XCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Car, XCircle, MessageCircle } from 'lucide-react';
 import { BuggyStatus, RideRequest } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
 
@@ -10,6 +10,10 @@ interface RideStatusCardProps {
   sharedRidesInfo: { totalGuests: number; sharedCount: number } | null;
   canCancel: boolean;
   onCancel: () => void;
+  driverName?: string;
+  roomNumber?: string;
+  onChatToggle?: (isOpen: boolean) => void;
+  isChatOpen?: boolean;
 }
 
 const MAX_WAIT_TIME = 10 * 60; // 10 minutes
@@ -34,13 +38,23 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
   arrivingElapsedTime,
   sharedRidesInfo,
   canCancel,
-  onCancel
+  onCancel,
+  driverName,
+  roomNumber,
+  onChatToggle,
+  isChatOpen = false
 }) => {
   const { t } = useTranslation();
 
+  const handleChatClick = () => {
+    if (onChatToggle) {
+      onChatToggle(!isChatOpen);
+    }
+  };
+
   return (
     <div
-      className={`mx-3 mt-3 mb-32 rounded-2xl shadow-xl backdrop-blur-lg bg-white/90 border flex-shrink-0 p-3.5 overflow-hidden transition-all duration-500 ${
+      className={`mx-3 mt-3 mb-4 rounded-2xl shadow-xl backdrop-blur-lg bg-white/90 border flex-shrink-0 p-3.5 overflow-hidden transition-all duration-500 ${
         activeRide.status === BuggyStatus.SEARCHING && elapsedTime >= MAX_WAIT_TIME
           ? 'border-red-400 border-2 animate-pulse ring-4 ring-red-200'
           : 'border-white/60'
@@ -53,34 +67,51 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
       <div className="flex flex-col space-y-2.5">
         {/* Status & ETA */}
         <div className="flex items-center justify-between gap-2.5">
-          {/* Status Badge */}
-          <div
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all duration-500 ${
-              activeRide.status === BuggyStatus.SEARCHING
-                ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                : activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING
-                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                : activeRide.status === BuggyStatus.ON_TRIP
-                ? 'bg-purple-100 text-purple-700 border border-purple-200'
-                : 'bg-green-100 text-green-700 border border-green-200'
-            }`}
-          >
+          {/* Status Badge with Chat Button */}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             <div
-              className={`w-2 h-2 rounded-full transition-all duration-300 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all duration-500 ${
                 activeRide.status === BuggyStatus.SEARCHING
-                  ? 'bg-blue-500 animate-ping'
+                  ? 'bg-blue-100 text-blue-700 border border-blue-200'
                   : activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING
-                  ? 'bg-emerald-500 animate-pulse'
+                  ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
                   : activeRide.status === BuggyStatus.ON_TRIP
-                  ? 'bg-purple-500'
-                  : 'bg-green-500'
+                  ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                  : 'bg-green-100 text-green-700 border border-green-200'
               }`}
-            ></div>
-            {activeRide.status === BuggyStatus.SEARCHING && <span>{t('finding_driver')}</span>}
-            {activeRide.status === BuggyStatus.ASSIGNED && <span>{t('driver_assigned')}</span>}
-            {activeRide.status === BuggyStatus.ARRIVING && <span>{t('driver_arriving')}</span>}
-            {activeRide.status === BuggyStatus.ON_TRIP && <span>{t('en_route')}</span>}
-            {activeRide.status === BuggyStatus.COMPLETED && <span>{t('arrived')}</span>}
+            >
+              <div
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                  activeRide.status === BuggyStatus.SEARCHING
+                    ? 'bg-blue-500 animate-ping'
+                    : activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING
+                    ? 'bg-emerald-500 animate-pulse'
+                    : activeRide.status === BuggyStatus.ON_TRIP
+                    ? 'bg-purple-500'
+                    : 'bg-green-500'
+                }`}
+              ></div>
+              {activeRide.status === BuggyStatus.SEARCHING && <span>{t('finding_driver')}</span>}
+              {activeRide.status === BuggyStatus.ASSIGNED && <span>{t('driver_assigned')}</span>}
+              {activeRide.status === BuggyStatus.ARRIVING && <span>{t('driver_arriving')}</span>}
+              {activeRide.status === BuggyStatus.ON_TRIP && <span>{t('en_route')}</span>}
+              {activeRide.status === BuggyStatus.COMPLETED && <span>{t('arrived')}</span>}
+            </div>
+            
+            {/* Chat Button - Only show when driver is assigned */}
+            {activeRide.status !== BuggyStatus.SEARCHING && driverName && (
+              <button
+                onClick={handleChatClick}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                  isChatOpen
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                }`}
+              >
+                <MessageCircle size={14} />
+                <span>Chat</span>
+              </button>
+            )}
           </div>
 
           {/* ETA */}
@@ -303,6 +334,9 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
               ((activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) &&
                 arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME)
                 ? 'bg-gradient-to-r from-red-500 via-red-600 to-pink-600 text-white hover:from-red-600 hover:via-red-700 hover:to-pink-700'
+                : (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) &&
+                  arrivingElapsedTime >= ARRIVING_WARNING_TIME
+                ? 'bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 text-white hover:from-orange-600 hover:via-orange-700 hover:to-red-700'
                 : 'bg-gradient-to-r from-red-50 to-pink-50 text-red-600 hover:from-red-100 hover:to-pink-100 border-2 border-red-200'
             }`}
           >
@@ -313,6 +347,9 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
                 : (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) &&
                   arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME
                 ? `${t('cancel_request')} (Driver delayed)`
+                : (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) &&
+                  arrivingElapsedTime >= ARRIVING_WARNING_TIME
+                ? `${t('cancel_request')} (Over 5 min)`
                 : t('cancel_request')}
             </span>
           </button>

@@ -13,6 +13,9 @@ interface ServiceChatProps {
     autoOpen?: boolean;
     userRole?: 'user' | 'staff'; // Determines who is 'Me' and who is 'Other'
     onClose?: () => void;
+    hideFloatingButton?: boolean; // Hide the floating toggle button
+    isOpen?: boolean; // Control open state from parent
+    onToggle?: (isOpen: boolean) => void; // Callback when chat is toggled
 }
 
 const SUPPORTED_LANGUAGES = [
@@ -32,10 +35,14 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
     label = "Staff", 
     autoOpen = false, 
     userRole = 'user',
-    onClose
+    onClose,
+    hideFloatingButton = false,
+    isOpen: controlledIsOpen,
+    onToggle
 }) => {
     const { language } = useTranslation();
-    const [isOpen, setIsOpen] = useState(autoOpen);
+    const [internalIsOpen, setInternalIsOpen] = useState(autoOpen);
+    const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -62,38 +69,67 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
     const [showLangSelector, setShowLangSelector] = useState(false);
     const [translatedCache, setTranslatedCache] = useState<Record<string, string>>({});
     const [userManuallyChangedLang, setUserManuallyChangedLang] = useState(false);
+    const [guestLanguage, setGuestLanguage] = useState<string | null>(null);
     
     // Fetch guest language from database when userRole is 'user' (guest)
+    // This runs whenever roomNumber changes to ensure we get the latest guest language
     useEffect(() => {
         const fetchGuestLanguage = async () => {
-            if (userRole === 'user' && roomNumber && !userManuallyChangedLang) {
+            if (userRole === 'user' && roomNumber) {
                 try {
                     const users = await getUsers();
                     const guest = users.find(u => u.roomNumber === roomNumber && u.role === 'GUEST');
                     if (guest && guest.language) {
-                        const guestLangMapped = mapAppLangToTranslateLang(guest.language);
-                        setTargetLang(guestLangMapped);
-                        // Clear cache when language changes
-                        setTranslatedCache({});
+                        const guestLang = guest.language;
+                        setGuestLanguage(guestLang);
+                        // Only auto-set targetLang if user hasn't manually changed it
+                        if (!userManuallyChangedLang) {
+                            const guestLangMapped = mapAppLangToTranslateLang(guestLang);
+                            setTargetLang(guestLangMapped);
+                            // Clear cache when language changes
+                            setTranslatedCache({});
+                            console.log(`[ServiceChat] Auto-set target language to ${guestLangMapped} based on guest language: ${guestLang}`);
+                        }
+                    } else {
+                        // If guest not found or no language set, use app language
+                        setGuestLanguage(null);
+                        if (!userManuallyChangedLang) {
+                            const appLangMapped = mapAppLangToTranslateLang(language);
+                            setTargetLang(appLangMapped);
+                            setTranslatedCache({});
+                            console.log(`[ServiceChat] Guest language not found, using app language: ${appLangMapped}`);
+                        }
                     }
                 } catch (error) {
                     console.error('[ServiceChat] Failed to fetch guest language:', error);
+                    // Fallback to app language on error
+                    if (!userManuallyChangedLang) {
+                        const appLangMapped = mapAppLangToTranslateLang(language);
+                        setTargetLang(appLangMapped);
+                    }
+                }
+            } else if (userRole === 'staff') {
+                // For staff, always use app language (staff can see original or translate to guest's language)
+                if (!userManuallyChangedLang) {
+                    const appLangMapped = mapAppLangToTranslateLang(language);
+                    setTargetLang(appLangMapped);
                 }
             }
         };
         
         fetchGuestLanguage();
-    }, [userRole, roomNumber, userManuallyChangedLang]);
+    }, [userRole, roomNumber, userManuallyChangedLang, language]);
     
     // Auto-update targetLang when app language changes (unless user manually changed it)
+    // This is a fallback if guest language is not available
     useEffect(() => {
-        if (!userManuallyChangedLang) {
+        if (!userManuallyChangedLang && !guestLanguage && userRole === 'user') {
             const appLangMapped = mapAppLangToTranslateLang(language);
             setTargetLang(appLangMapped);
             // Clear cache when language changes
             setTranslatedCache({});
         }
-    }, [language, userManuallyChangedLang]);
+    }, [language, userManuallyChangedLang, guestLanguage, userRole]);
 
     // Poll for new messages (simulating real-time)
     useEffect(() => {
@@ -128,7 +164,12 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                     // Only auto-open when unread count increases from a known value (indicating new message)
                     if (!isFirstFetchRef.current && prevCount >= 0 && count > prevCount) {
                         console.log(`[ServiceChat] New message detected, auto-opening chat for ${serviceType} in room ${roomNumber}`);
-                        setIsOpen(true);
+                        if (controlledIsOpen === undefined) {
+                            setInternalIsOpen(true);
+                        }
+                        if (onToggle) {
+                            onToggle(true);
+                        }
                     }
                     
                     setUnreadCount(count);
@@ -161,7 +202,8 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
             // Find messages that need translation (from the other person and not in cache)
             const msgsToTranslate = messages.filter(msg => 
                 msg.role !== userRole && // Only translate other person's messages
-                !translatedCache[msg.id] // Not yet translated
+                !translatedCache[msg.id] && // Not yet translated
+                msg.text && msg.text.trim() // Has valid text
             );
 
             if (msgsToTranslate.length === 0) return;
@@ -173,8 +215,11 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
             await Promise.all(msgsToTranslate.map(async (msg) => {
                 try {
                     const translated = await translateText(msg.text, targetLang);
-                    if (translated && translated !== msg.text) {
+                    if (translated && translated !== msg.text && translated.trim()) {
                         newTranslations[msg.id] = translated;
+                        console.log(`[ServiceChat] Translated message ${msg.id}: "${msg.text.substring(0, 50)}..." -> "${translated.substring(0, 50)}..."`);
+                    } else {
+                        console.warn(`[ServiceChat] Translation returned same text or empty for message ${msg.id}`);
                     }
                 } catch (error) {
                     console.error(`[ServiceChat] Failed to translate message ${msg.id}:`, error);
@@ -183,6 +228,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
 
             if (Object.keys(newTranslations).length > 0) {
                 setTranslatedCache(prev => ({ ...prev, ...newTranslations }));
+                console.log(`[ServiceChat] Updated translation cache with ${Object.keys(newTranslations).length} new translations`);
             }
         };
 
@@ -217,7 +263,12 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
     };
 
     const handleClose = async () => {
-        setIsOpen(false);
+        if (controlledIsOpen === undefined) {
+            setInternalIsOpen(false);
+        }
+        if (onToggle) {
+            onToggle(false);
+        }
         // Mark messages as read when closing chat (user has seen them)
         if (messages.length > 0) {
             const lastMessage = messages[messages.length - 1];
@@ -230,7 +281,12 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
 
     const toggleOpen = async () => {
         const newState = !isOpen;
-        setIsOpen(newState);
+        if (controlledIsOpen === undefined) {
+            setInternalIsOpen(newState);
+        }
+        if (onToggle) {
+            onToggle(newState);
+        }
         
         // Mark messages as read when opening chat
         if (newState && messages.length > 0) {
@@ -244,38 +300,77 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
         if (!newState && onClose) onClose();
     }
 
+    // Sync internal state with controlled state
+    useEffect(() => {
+        if (controlledIsOpen !== undefined) {
+            setInternalIsOpen(controlledIsOpen);
+        }
+    }, [controlledIsOpen]);
+
     return (
-        <div className="fixed bottom-24 right-4 md:right-6 z-50 flex flex-col items-end pointer-events-none">
-            {/* Chat Window */}
+        <>
+            {/* Overlay Backdrop */}
             {isOpen && (
-                <div className="bg-white w-80 h-96 rounded-2xl shadow-2xl border border-gray-200 flex flex-col mb-4 overflow-hidden pointer-events-auto animate-in slide-in-from-bottom-5">
+                <div 
+                    className="fixed inset-0 bg-black/50 pointer-events-auto"
+                    style={{ zIndex: 99998 }}
+                    onClick={handleClose}
+                />
+            )}
+            
+            {/* Chat Window Container */}
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 flex items-center justify-center pointer-events-none"
+                    style={{ 
+                        zIndex: 99999,
+                        paddingTop: '20px', // Giảm thêm padding-top để đưa lên trên
+                        paddingBottom: '100px', // Space for bottom nav (80px + padding)
+                        paddingLeft: '1rem',
+                        paddingRight: '1rem'
+                    }}
+                >
+                    {/* Chat Window */}
+                    <div 
+                        className="bg-white w-full max-w-md rounded-2xl shadow-2xl border-2 border-emerald-200 flex flex-col overflow-hidden pointer-events-auto animate-in zoom-in-95 fade-in"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ 
+                            zIndex: 100000,
+                            maxHeight: 'calc(100vh - 180px)', // Viewport height - header (70px) - bottom nav (100px) - margin
+                            height: 'auto',
+                            minHeight: '400px'
+                        }}
+                    >
                     {/* Header */}
-                    <div className="bg-emerald-900 text-white p-3 flex justify-between items-center shadow-md relative">
-                        <div className="flex items-center space-x-2">
-                             <div className="p-1.5 bg-white/10 rounded-full">
+                    <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white p-3 flex justify-between items-center shadow-lg relative flex-shrink-0">
+                        <div className="flex items-center space-x-2 flex-1 min-w-0">
+                             <div className="p-1.5 bg-white/20 rounded-full flex-shrink-0">
                                 {userRole === 'user' ? <Shield size={16} /> : <User size={16} />}
                              </div>
-                             <div>
-                                 <h3 className="font-bold text-sm">Chat with {label}</h3>
-                                 <p className="text-[10px] opacity-70 flex items-center"><span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1"></span> Online</p>
+                             <div className="min-w-0 flex-1">
+                                 <h3 className="font-bold text-sm truncate">Chat with {label}</h3>
+                                 <p className="text-[10px] opacity-90 flex items-center"><span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1 animate-pulse"></span> Online</p>
                              </div>
                         </div>
                         
-                        <div className="flex items-center space-x-1">
+                        <div className="flex items-center space-x-1 flex-shrink-0">
                             {/* Language Selector Toggle */}
                             <button 
                                 onClick={() => setShowLangSelector(!showLangSelector)}
-                                className={`p-1.5 rounded-full hover:bg-white/10 transition ${targetLang !== 'Original' ? 'text-amber-300' : 'text-white'}`}
+                                className={`p-1.5 rounded-full hover:bg-white/20 transition ${targetLang !== 'Original' ? 'text-amber-300' : 'text-white'}`}
                                 title="Translate Chat"
                             >
                                 <Globe size={16} />
                             </button>
-                            <button onClick={handleClose} className="hover:text-emerald-300 p-1"><X size={18}/></button>
+                            <button onClick={handleClose} className="hover:bg-white/20 p-1.5 rounded-full transition"><X size={18}/></button>
                         </div>
 
                         {/* Language Dropdown */}
                         {showLangSelector && (
-                            <div className="absolute top-12 right-2 bg-white text-gray-800 rounded-lg shadow-xl border border-gray-100 py-2 w-32 z-50 animate-in fade-in zoom-in-95">
+                            <div 
+                                className="absolute top-full mt-2 right-0 bg-white text-gray-800 rounded-lg shadow-xl border border-gray-200 py-2 w-40 animate-in fade-in zoom-in-95"
+                                style={{ zIndex: 100000 }}
+                            >
                                 <p className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase">Translate to</p>
                                 {SUPPORTED_LANGUAGES.map(lang => (
                                     <button 
@@ -295,7 +390,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                     </div>
 
                     {/* Messages */}
-                    <div className="flex-1 overflow-y-auto p-3 bg-gray-50 space-y-3">
+                    <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-gray-50 to-white space-y-3 scrollbar-thin scrollbar-thumb-emerald-300 scrollbar-track-gray-100">
                         {messages.length === 0 && (
                              <div className="text-center text-gray-400 text-xs mt-10">
                                  <p>Start a conversation with {userRole === 'user' ? `the ${label.toLowerCase()}` : `Guest Room ${roomNumber}`}.</p>
@@ -312,8 +407,8 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
 
                             return (
                                 <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm ${
-                                        isMe ? 'bg-emerald-600 text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'
+                                    <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-md ${
+                                        isMe ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-br-sm' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-sm'
                                     }`}>
                                         <p>{displayText}</p>
                                         
@@ -336,43 +431,27 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                     </div>
 
                     {/* Input */}
-                    <div className="p-3 bg-white border-t border-gray-100 flex items-center gap-2">
+                    <div className="p-3 bg-white border-t border-gray-200 flex items-center gap-2 flex-shrink-0">
                         <input 
                             type="text" 
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                             placeholder={`Type a message${targetLang !== 'Original' ? ' (Auto-translating for ' + (userRole === 'user' ? 'Staff' : 'Guest') + ')' : ''}...`}
-                            className="flex-1 bg-gray-100 rounded-full px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            className="flex-1 bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
                         />
                         <button 
                             onClick={handleSend}
                             disabled={!input.trim()}
-                            className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition disabled:opacity-50"
+                            className="p-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-full hover:from-emerald-700 hover:to-emerald-800 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                         >
                             <Send size={16} />
                         </button>
                     </div>
+                    </div>
                 </div>
             )}
-
-            {/* Toggle Button (Only show if not auto-open or if role is user to avoid clutter on staff screen) */}
-            {!autoOpen && (
-                <button 
-                    onClick={toggleOpen}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-full shadow-lg transition transform hover:scale-105 active:scale-95 pointer-events-auto flex items-center justify-center relative"
-                    style={{ marginBottom: '0' }}
-                >
-                    {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
-                    {/* Unread Badge */}
-                    {!isOpen && unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center border-2 border-white animate-pulse shadow-lg">
-                            {unreadCount > 9 ? '9+' : unreadCount}
-                        </span>
-                    )}
-                </button>
-            )}
-        </div>
+        </>
     );
 };
 

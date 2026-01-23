@@ -410,7 +410,15 @@ const AppContent: React.FC = () => {
 
         {/* Main Content */}
         <PullToRefresh onRefresh={handleRefresh}>
-          <div className="flex-1 pb-20 relative bg-gray-50 scrollbar-hide min-h-full">
+          <div 
+            className={`flex-1 pb-20 relative bg-gray-50 scrollbar-hide ${view === AppView.BUGGY ? 'overflow-hidden h-full' : 'min-h-full'}`}
+            style={view === AppView.BUGGY ? {
+              overflow: 'hidden',
+              height: '100%',
+              maxHeight: '100%',
+              position: 'relative'
+            } : {}}
+          >
             {view === AppView.HOME && (
               <div className="flex flex-col min-h-full">
                 {/* Hero Banner */}

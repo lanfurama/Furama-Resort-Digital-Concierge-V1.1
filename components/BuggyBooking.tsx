@@ -23,6 +23,7 @@ interface BuggyBookingProps {
 const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const { t } = useTranslation();
   const [pickup, setPickup] = useState<string>(`Villa ${user.roomNumber}`);
+  const [showChat, setShowChat] = useState(false);
   const [destination, setDestination] = useState<string>('');
   const [guestCount, setGuestCount] = useState<number>(1);
   const [notes, setNotes] = useState<string>('');
@@ -232,8 +233,11 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       return;
     }
     if (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) {
-      if (arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME) {
-        const confirmMessage = t('driver_delayed_cancel');
+      // Allow cancel after 5 minutes (ARRIVING_WARNING_TIME)
+      if (arrivingElapsedTime >= ARRIVING_WARNING_TIME) {
+        const confirmMessage = arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME
+          ? t('driver_delayed_cancel')
+          : t('confirm_cancel_ride');
         if (window.confirm(confirmMessage)) {
           try {
             const cancelled = await cancelRideRequest(activeRide.id);
@@ -268,9 +272,13 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     }
   };
 
+  // Allow cancel:
+  // 1. When SEARCHING (always)
+  // 2. When ASSIGNED/ARRIVING and waiting over 5 minutes (ARRIVING_WARNING_TIME) - user can cancel if driver is delayed
+  const ARRIVING_WARNING_TIME = 5 * 60; // 5 minutes
   const canCancel = activeRide && (
     activeRide.status === BuggyStatus.SEARCHING ||
-    ((activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME)
+    ((activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime >= ARRIVING_WARNING_TIME)
   );
 
   const destinationToShow = activeRide?.destination || destination;
@@ -303,8 +311,122 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     return `${mins}m ${secs}s`;
   };
 
+  // Prevent body scroll when component mounts
+  useEffect(() => {
+    const originalBodyOverflow = window.getComputedStyle(document.body).overflow;
+    const originalHtmlOverflow = window.getComputedStyle(document.documentElement).overflow;
+    const originalBodyPosition = window.getComputedStyle(document.body).position;
+    const originalBodyWidth = window.getComputedStyle(document.body).width;
+    const originalBodyHeight = window.getComputedStyle(document.body).height;
+    
+    // Lock body scroll
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.height = '100%';
+    document.body.style.top = '0';
+    document.body.style.left = '0';
+    
+    // Add CSS to hide scrollbars globally
+    const style = document.createElement('style');
+    style.id = 'buggy-no-scroll';
+    style.textContent = `
+      body::-webkit-scrollbar,
+      html::-webkit-scrollbar,
+      *::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+      }
+      body {
+        -ms-overflow-style: none !important;
+        scrollbar-width: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      document.body.style.position = originalBodyPosition;
+      document.body.style.width = originalBodyWidth;
+      document.body.style.height = originalBodyHeight;
+      document.body.style.top = '';
+      document.body.style.left = '';
+      
+      // Remove the style
+      const styleElement = document.getElementById('buggy-no-scroll');
+      if (styleElement) {
+        styleElement.remove();
+      }
+    };
+  }, []);
+
+  // Prevent scroll on wheel and touch events
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const preventScroll = (e: WheelEvent | TouchEvent) => {
+      const target = e.target as HTMLElement;
+      // Allow scroll only inside scrollable areas (like message area in chat)
+      const scrollableArea = target.closest('.overflow-y-auto');
+      if (!scrollableArea) {
+        e.preventDefault();
+      }
+    };
+
+    container.addEventListener('wheel', preventScroll, { passive: false });
+    container.addEventListener('touchmove', preventScroll, { passive: false });
+
+    return () => {
+      container.removeEventListener('wheel', preventScroll);
+      container.removeEventListener('touchmove', preventScroll);
+    };
+  }, []);
+
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative z-0" style={{ paddingBottom: 'max(5rem, calc(5rem + env(safe-area-inset-bottom)))' }}>
+    <div 
+      ref={containerRef}
+      className="flex flex-col bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20"
+      style={{ 
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: '100%',
+        maxHeight: '100%',
+        overflow: 'hidden',
+        overflowY: 'hidden',
+        overflowX: 'hidden',
+        zIndex: 1,
+        touchAction: 'none',
+        WebkitOverflowScrolling: 'touch',
+        // Hide scrollbar completely
+        scrollbarWidth: 'none', // Firefox
+        msOverflowStyle: 'none' // IE and Edge
+      } as React.CSSProperties}
+      onWheel={(e) => {
+        const target = e.target as HTMLElement;
+        const scrollableArea = target.closest('.overflow-y-auto');
+        if (!scrollableArea) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
+      onTouchMove={(e) => {
+        const target = e.target as HTMLElement;
+        const scrollableArea = target.closest('.overflow-y-auto');
+        if (!scrollableArea) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
+    >
 
       {/* New Header with light blue gradient */}
       <div className="bg-gradient-to-b from-blue-100 via-blue-50 to-white flex-shrink-0 relative overflow-hidden">
@@ -326,14 +448,22 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
       {/* Status card section */}
       {activeRide && (
-        <RideStatusCard
-          activeRide={activeRide}
-          elapsedTime={elapsedTime}
-          arrivingElapsedTime={arrivingElapsedTime}
-          sharedRidesInfo={sharedRidesInfo}
-          canCancel={canCancel}
-          onCancel={handleCancel}
-        />
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0" style={{ maxHeight: 'calc(100% - 80px)' }}>
+          <div className="flex-1 overflow-y-auto px-3 py-3" style={{ maxHeight: '100%', overflowX: 'hidden' }}>
+            <RideStatusCard
+              activeRide={activeRide}
+              elapsedTime={elapsedTime}
+              arrivingElapsedTime={arrivingElapsedTime}
+              sharedRidesInfo={sharedRidesInfo}
+              canCancel={canCancel}
+              onCancel={handleCancel}
+              driverName={driverName}
+              roomNumber={user.roomNumber}
+              onChatToggle={setShowChat}
+              isChatOpen={showChat}
+            />
+          </div>
+        </div>
       )}
 
       {/* Old status card - replaced by RideStatusCard component */}
@@ -607,7 +737,10 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
       {/* Booking Form - New Design */}
       {!activeRide && !isLoadingRide && !isLoadingLocations && (
-        <div className="flex-1 overflow-y-auto px-4 pb-24">
+        <div 
+          className="flex-1 overflow-y-auto px-4 py-3 min-h-0"
+          style={{ maxHeight: 'calc(100% - 80px)', overflowX: 'hidden' }}
+        >
 
           {/* Recent Locations Section */}
           {recentLocations.length > 0 && (
@@ -1113,11 +1246,14 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       )}
 
       {/* Chat Widget: Connected to 'BUGGY' service - Only show when driver has accepted */}
-      {activeRide && activeRide.status !== BuggyStatus.SEARCHING && (
+      {activeRide && activeRide.status !== BuggyStatus.SEARCHING && showChat && (
         <ServiceChat
           serviceType="BUGGY"
           roomNumber={user.roomNumber}
           label={driverName}
+          hideFloatingButton={true}
+          isOpen={showChat}
+          onToggle={setShowChat}
         />
       )}
 
