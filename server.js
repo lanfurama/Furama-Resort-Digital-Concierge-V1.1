@@ -6,14 +6,13 @@ import http from 'http';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { createServer as createViteServer } from 'vite';
+import getPort from 'get-port';
 import routes from './api/_routes/index.ts';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-// Nếu HTTPS_PORT không được set, sử dụng PORT (3000) cho HTTPS
-const HTTPS_PORT = process.env.HTTPS_PORT || PORT;
+const DEFAULT_PORT = parseInt(process.env.PORT || '3000', 10);
 const isDev = process.env.NODE_ENV !== 'production';
 
 // HTTPS Configuration
@@ -142,21 +141,30 @@ export default app;
 // Start server only if not in Vercel environment
 if (process.env.VERCEL !== '1') {
   setupVite()
-    .then(() => {
+    .then(async () => {
+      // Find available port
+      const PORT = await getPort({ port: DEFAULT_PORT });
+      const HTTPS_PORT = await getPort({ port: parseInt(process.env.HTTPS_PORT || String(PORT), 10) });
+
+      if (PORT !== DEFAULT_PORT) {
+        console.log(`⚠️  Port ${DEFAULT_PORT} is in use, using port ${PORT} instead`);
+      }
+
       if (ENABLE_HTTPS && httpsOptions) {
         // Create HTTPS server
         const httpsServer = https.createServer(httpsOptions, app);
 
         // Optional: Create HTTP server to redirect to HTTPS
         if (process.env.HTTPS_REDIRECT === 'true') {
+          const redirectPort = await getPort({ port: DEFAULT_PORT });
           const httpServer = http.createServer((req, res) => {
-            const httpsUrl = `https://${req.headers.host?.replace(`:${PORT}`, `:${HTTPS_PORT}`)}${req.url}`;
+            const httpsUrl = `https://${req.headers.host?.replace(`:${redirectPort}`, `:${HTTPS_PORT}`)}${req.url}`;
             res.writeHead(301, { Location: httpsUrl });
             res.end();
           });
 
-          httpServer.listen(PORT, () => {
-            console.log(`🔄 HTTP redirect server running on http://localhost:${PORT}`);
+          httpServer.listen(redirectPort, () => {
+            console.log(`🔄 HTTP redirect server running on http://localhost:${redirectPort}`);
             console.log(`   Redirecting to https://localhost:${HTTPS_PORT}`);
           });
         }

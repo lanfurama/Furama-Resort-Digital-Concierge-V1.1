@@ -38,6 +38,12 @@ HTTPS_REDIRECT=false
 # Use 'production' for production, 'development' for development
 NODE_ENV=production
 
+# Logging Configuration
+# Log level: 'debug', 'info', 'warn', 'error' (default: 'info' for production, 'debug' for development)
+LOG_LEVEL=info
+# Frontend log level (for browser console)
+VITE_LOG_LEVEL=info
+
 # Email Configuration (for notifications)
 # Gmail SMTP settings
 EMAIL_HOST=smtp.gmail.com

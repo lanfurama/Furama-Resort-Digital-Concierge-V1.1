@@ -4,6 +4,7 @@ import { notificationModel } from '../_models/notificationModel.js';
 import { userModel } from '../_models/userModel.js';
 import { sendBuggyRequestEmail, sendBuggyRequestEmailToDriver } from '../_services/emailService.js';
 import { getUserFriendlyError } from '../_utils/errorUtils.js';
+import logger from '../_utils/logger.js';
 
 export const rideRequestController = {
   async getAll(req: Request, res: Response) {
@@ -84,8 +85,7 @@ export const rideRequestController = {
           // Notification message
           const message = `New buggy request: Room ${ride.room_number} (${ride.guest_name}) from ${ride.pickup} to ${ride.destination}`;
 
-          console.log(`[RideRequestController] Found ${adminsSupervisorsReception.length} staff (Admin/Reception/Supervisor) to notify`);
-          console.log(`[RideRequestController] Found ${onlineDrivers.length} online drivers to notify`);
+          logger.debug({ staffCount: adminsSupervisorsReception.length, driverCount: onlineDrivers.length }, `[RideRequestController] Found staff and drivers to notify`);
 
           const notificationsToCreate = [];
 
@@ -109,12 +109,12 @@ export const rideRequestController = {
                   ride.pickup,
                   ride.destination
                 );
-                console.log(`[RideRequestController] ✅ Email sent to ${staff.role} ${staff.room_number} (${staff.email})`);
+                logger.info({ role: staff.role, roomNumber: staff.room_number, email: staff.email }, `[RideRequestController] ✅ Email sent`);
               } catch (emailError: any) {
-                console.error(`[RideRequestController] Failed to send email to ${staff.room_number}:`, emailError);
+                logger.error({ err: emailError, roomNumber: staff.room_number }, `[RideRequestController] Failed to send email`);
               }
             } else {
-              console.log(`[RideRequestController] Skipping email for ${staff.role} ${staff.room_number} (no email address)`);
+              logger.debug({ role: staff.role, roomNumber: staff.room_number }, `[RideRequestController] Skipping email (no email address)`);
             }
           }
 
@@ -138,12 +138,12 @@ export const rideRequestController = {
                   ride.pickup,
                   ride.destination
                 );
-                console.log(`[RideRequestController] ✅ Email sent to driver ${driver.room_number} (${driver.email})`);
+                logger.info({ roomNumber: driver.room_number, email: driver.email }, `[RideRequestController] ✅ Email sent to driver`);
               } catch (emailError: any) {
-                console.error(`[RideRequestController] Failed to send email to driver ${driver.room_number}:`, emailError);
+                logger.error({ err: emailError, roomNumber: driver.room_number }, `[RideRequestController] Failed to send email to driver`);
               }
             } else {
-              console.log(`[RideRequestController] Skipping email for driver ${driver.room_number} (no email address)`);
+              logger.debug({ roomNumber: driver.room_number }, `[RideRequestController] Skipping email for driver (no email address)`);
             }
           }
 
@@ -152,10 +152,10 @@ export const rideRequestController = {
             await notificationModel.createMany(notificationsToCreate as any);
           }
 
-          console.log(`[RideRequestController] Sent notifications: ${adminsSupervisorsReception.length} admins/supervisors/reception, ${onlineDrivers.length} online drivers`);
+          logger.info({ staffCount: adminsSupervisorsReception.length, driverCount: onlineDrivers.length }, `[RideRequestController] Sent notifications`);
         } catch (notifError: any) {
           // Log error but don't fail the ride creation
-          console.error('[RideRequestController] Error sending notifications:', notifError);
+          logger.error({ err: notifError }, '[RideRequestController] Error sending notifications');
         }
       }
 
@@ -168,29 +168,18 @@ export const rideRequestController = {
   async update(req: Request, res: Response) {
     try {
       const id = parseInt(req.params.id);
-      console.log(`[RideRequestController] UPDATE request received:`, {
-        id,
-        rideId: req.params.id,
-        body: req.body,
-        method: req.method,
-        url: req.url,
-        originalUrl: req.originalUrl
-      });
+      logger.debug({ id, rideId: req.params.id, body: req.body, method: req.method, url: req.url, originalUrl: req.originalUrl }, `[RideRequestController] UPDATE request received`);
 
       const ride = await rideRequestModel.update(id, req.body);
       if (!ride) {
-        console.log(`[RideRequestController] Ride ${id} not found`);
+        logger.warn({ rideId: id }, `[RideRequestController] Ride ${id} not found`);
         return res.status(404).json({ error: 'Ride request not found' });
       }
 
-      console.log(`[RideRequestController] Ride ${id} updated successfully:`, ride);
+      logger.info({ rideId: id, ride }, `[RideRequestController] Ride ${id} updated successfully`);
       res.json(ride);
     } catch (error: any) {
-      console.error(`[RideRequestController] Error updating ride:`, {
-        id: req.params.id,
-        error: error.message,
-        stack: error.stack
-      });
+      logger.error({ err: error, rideId: req.params.id }, `[RideRequestController] Error updating ride`);
       res.status(400).json({ error: getUserFriendlyError(error, 'ride', 'update') });
     }
   },
@@ -242,7 +231,7 @@ export const rideRequestController = {
       const rides = await rideRequestModel.getHistoricalReports(params);
       res.json(rides);
     } catch (error: any) {
-      console.error('Error fetching historical reports:', error);
+      logger.error({ err: error, query: req.query }, 'Error fetching historical reports');
       res.status(500).json({ error: getUserFriendlyError(error, 'ride') });
     }
   },
@@ -290,7 +279,7 @@ export const rideRequestController = {
 
       res.json(stats);
     } catch (error: any) {
-      console.error('Error fetching report statistics:', error);
+      logger.error({ err: error, query: req.query }, 'Error fetching report statistics');
       res.status(500).json({ error: getUserFriendlyError(error, 'ride') });
     }
   },
@@ -325,7 +314,7 @@ export const rideRequestController = {
       const stats = await rideRequestModel.getDriverPerformanceStats(params);
       res.json(stats);
     } catch (error: any) {
-      console.error('Error fetching driver performance stats:', error);
+      logger.error({ err: error, query: req.query }, 'Error fetching driver performance stats');
       res.status(500).json({ error: getUserFriendlyError(error, 'ride') });
     }
   },

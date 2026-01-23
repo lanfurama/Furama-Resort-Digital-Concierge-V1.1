@@ -1,6 +1,7 @@
 import { userModel } from '../_models/userModel.js';
 import { notificationModel } from '../_models/notificationModel.js';
 import { sendEmail } from './emailService.js';
+import logger from '../_utils/logger.js';
 
 // Configuration: Reminder times before check-out (in minutes)
 const REMINDER_TIMES = [60, 30]; // 1 hour and 30 minutes before check-out
@@ -11,13 +12,13 @@ const REMINDER_TIMES = [60, 30]; // 1 hour and 30 minutes before check-out
  */
 export const checkAndSendCheckoutReminders = async (): Promise<void> => {
   try {
-    console.log('[CheckoutReminder] Checking for guests approaching check-out...');
+    logger.debug('[CheckoutReminder] Checking for guests approaching check-out...');
     
     const allUsers = await userModel.getAll();
     const guests = allUsers.filter(u => u.role === 'GUEST' && u.check_out);
     
     if (guests.length === 0) {
-      console.log('[CheckoutReminder] No guests with check-out dates found');
+      logger.debug('[CheckoutReminder] No guests with check-out dates found');
       return;
     }
     
@@ -78,13 +79,13 @@ export const checkAndSendCheckoutReminders = async (): Promise<void> => {
                   guest.room_number,
                   checkOutDate
                 );
-                console.log(`[CheckoutReminder] Email sent to ${guest.room_number} (${guest.email})`);
+                logger.info({ roomNumber: guest.room_number, email: guest.email }, `[CheckoutReminder] Email sent to ${guest.room_number}`);
               } catch (emailError: any) {
-                console.error(`[CheckoutReminder] Failed to send email to ${guest.room_number}:`, emailError);
+                logger.error({ err: emailError, roomNumber: guest.room_number }, `[CheckoutReminder] Failed to send email`);
               }
             }
             
-            console.log(`[CheckoutReminder] ✅ Reminder sent to ${guest.room_number} (${timeText} before check-out)`);
+            logger.info({ roomNumber: guest.room_number, timeText }, `[CheckoutReminder] ✅ Reminder sent to ${guest.room_number}`);
             remindersSent++;
           }
         }
@@ -92,12 +93,12 @@ export const checkAndSendCheckoutReminders = async (): Promise<void> => {
     }
     
     if (remindersSent > 0) {
-      console.log(`[CheckoutReminder] Sent ${remindersSent} checkout reminder(s)`);
+      logger.info({ count: remindersSent }, `[CheckoutReminder] Sent ${remindersSent} checkout reminder(s)`);
     } else {
-      console.log('[CheckoutReminder] No reminders needed at this time');
+      logger.debug('[CheckoutReminder] No reminders needed at this time');
     }
   } catch (error: any) {
-    console.error('[CheckoutReminder] Error checking checkout reminders:', error);
+    logger.error({ err: error }, '[CheckoutReminder] Error checking checkout reminders');
   }
 };
 

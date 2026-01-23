@@ -1,24 +1,26 @@
 import { Router } from 'express';
 import { authController } from '../_controllers/authController';
+import logger from '../_utils/logger.js';
 
 const router = Router();
 
-console.log('⚡ Defining auth routes...');
-console.log('   authController is:', authController ? 'DEFINED' : 'UNDEFINED');
-console.log('   authController keys:', authController ? Object.keys(authController) : 'N/A');
+logger.debug({ 
+  authControllerDefined: !!authController,
+  authControllerKeys: authController ? Object.keys(authController) : []
+}, '⚡ Defining auth routes...');
 
 router.post('/guest', (req, res, next) => {
-    console.log('📥 POST /guest hit');
+    logger.debug('📥 POST /guest hit');
     authController.loginGuest(req, res).catch(next);
 }); // Legacy: Room Number + Last Name
 
 router.post('/guest/code', (req, res, next) => {
-    console.log('📥 POST /guest/code hit');
+    logger.debug('📥 POST /guest/code hit');
     authController.loginGuestByCode(req, res).catch(next);
 }); // New: Check-in Code
 
 router.post('/staff', (req, res, next) => {
-    console.log('📥 POST /staff hit');
+    logger.debug('📥 POST /staff hit');
     authController.loginStaff(req, res).catch(next);
 });
 

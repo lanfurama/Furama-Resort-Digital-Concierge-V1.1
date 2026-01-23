@@ -25,6 +25,7 @@ import {
   MOCK_ROOMS,
 } from "../constants";
 import { apiClient } from "./apiClient";
+import logger from "../utils/logger.js";
 
 // Initial Mock Data
 let locations: Location[] = [...MOCK_LOCATIONS];
@@ -405,7 +406,7 @@ export const getNotifications = async (
       isRead: n.is_read,
     }));
   } catch (error) {
-    console.error("Failed to fetch notifications from API:", error);
+    logger.error("Failed to fetch notifications from API", { error });
     // Fallback to local mock data
     return notifications
       .filter((n) => n.recipientId === recipientId)
@@ -421,7 +422,7 @@ export const markNotificationRead = async (id: string): Promise<void> => {
       n.id === id ? { ...n, isRead: true } : n,
     );
   } catch (error) {
-    console.error("Failed to mark notification as read:", error);
+    logger.error("Failed to mark notification as read", { error });
     // Fallback to local state
     notifications = notifications.map((n) =>
       n.id === id ? { ...n, isRead: true } : n,
@@ -456,7 +457,7 @@ export const sendNotification = async (
     };
     notifications = [notif, ...notifications];
   } catch (error) {
-    console.error("Failed to send notification via API:", error);
+    logger.error("Failed to send notification via API", { error });
     // Fallback to local state
     const notif: AppNotification = {
       id: Date.now().toString() + Math.random(),
@@ -526,7 +527,7 @@ export const getUsers = async (): Promise<User[]> => {
     users = mapped;
     return mapped;
   } catch (error) {
-    console.error("Failed to fetch users from API:", error);
+    logger.error("Failed to fetch users from API", { error });
     console.warn(
       "Falling back to mock users. This means users are NOT loaded from database!",
     );
@@ -586,12 +587,14 @@ export const addUser = async (user: User): Promise<void> => {
 
     users = [...users, mappedUser];
   } catch (error: any) {
-    console.error("Failed to add user via API:", error);
-    console.error("Error details:", {
-      message: error?.message,
-      response: error?.response,
-      status: error?.response?.status,
-      body: error?.response?.body,
+    logger.error("Failed to add user via API", {
+      error,
+      details: {
+        message: error?.message,
+        response: error?.response,
+        status: error?.response?.status,
+        body: error?.response?.body,
+      }
     });
     console.warn(
       "Falling back to local mock data. User will NOT be saved to database!",
@@ -747,12 +750,14 @@ export const updateUser = async (
 
     return updatedUser;
   } catch (error: any) {
-    console.error("Failed to update user via API:", error);
-    console.error("Error details:", {
-      message: error?.message,
-      response: error?.response,
-      status: error?.response?.status,
-      body: error?.response?.body,
+    logger.error("Failed to update user via API", {
+      error,
+      details: {
+        message: error?.message,
+        response: error?.response,
+        status: error?.response?.status,
+        body: error?.response?.body,
+      }
     });
     throw error;
   }
@@ -766,12 +771,14 @@ export const deleteUser = async (id: string): Promise<void> => {
     users = users.filter((u) => u.id !== id);
     console.log("User removed from local cache");
   } catch (error: any) {
-    console.error("Failed to delete user via API:", error);
-    console.error("Error details:", {
-      message: error?.message,
-      response: error?.response,
-      status: error?.response?.status,
-      body: error?.response?.body,
+    logger.error("Failed to delete user via API", {
+      error,
+      details: {
+        message: error?.message,
+        response: error?.response,
+        status: error?.response?.status,
+        body: error?.response?.body,
+      }
     });
     console.warn(
       "Falling back to local mock data. User will NOT be deleted from database!",
@@ -796,12 +803,14 @@ export const resetUserPassword = async (
     );
     console.log("User password updated in local cache");
   } catch (error: any) {
-    console.error("Failed to reset user password via API:", error);
-    console.error("Error details:", {
-      message: error?.message,
-      response: error?.response,
-      status: error?.response?.status,
-      body: error?.response?.body,
+    logger.error("Failed to reset user password via API", {
+      error,
+      details: {
+        message: error?.message,
+        response: error?.response,
+        status: error?.response?.status,
+        body: error?.response?.body,
+      }
     });
     console.warn(
       "Falling back to local mock data. Password will NOT be updated in database!",
@@ -846,7 +855,7 @@ export const generateCheckInCode = async (
     }
     throw new Error("Failed to generate check-in code");
   } catch (error: any) {
-    console.error("Failed to generate check-in code:", error);
+    logger.error("Failed to generate check-in code", { error });
     throw error;
   }
 };
@@ -909,7 +918,7 @@ export const updateDriverHeartbeat = async (userId: string): Promise<void> => {
     );
     // Empty body will just update updated_at timestamp
   } catch (error) {
-    console.error("[Heartbeat] Failed to update driver heartbeat:", error);
+    logger.error("[Heartbeat] Failed to update driver heartbeat", { error, userId });
     // Silently fail - heartbeat is not critical
   }
 };
@@ -921,7 +930,7 @@ export const markDriverOffline = async (userId: string): Promise<void> => {
     await apiClient.post(`/users/${userId}/offline`, {});
     console.log("[Logout] Driver marked offline successfully");
   } catch (error) {
-    console.error("[Logout] Failed to mark driver offline:", error);
+    logger.error("[Logout] Failed to mark driver offline", { error, userId });
     // Silently fail - logout should still proceed even if this fails
   }
 };
@@ -1003,7 +1012,7 @@ export const getDriversWithLocations = async (): Promise<User[]> => {
       vehicleType: user.vehicle_type || undefined, // Map vehicle_type
     }));
   } catch (error) {
-    console.error("Failed to fetch drivers with locations:", error);
+    logger.error("Failed to fetch drivers with locations", { error });
     // Fallback to regular getUsers and filter
     const allUsers = await getUsers();
     return allUsers.filter((u) => u.role === UserRole.DRIVER);
@@ -1216,7 +1225,7 @@ export const importGuestsFromCSV = async (
     users = refreshedUsers;
     console.log("Users refreshed after CSV import");
   } catch (error) {
-    console.error("Failed to refresh users after CSV import:", error);
+    logger.error("Failed to refresh users after CSV import", { error });
   }
 
   return count;
@@ -1250,7 +1259,7 @@ export const getLocations = async (): Promise<Location[]> => {
     // console.log("Mapped locations:", mappedLocations);
     return mappedLocations;
   } catch (error) {
-    console.error("Failed to fetch locations from API:", error);
+    logger.error("Failed to fetch locations from API", { error });
     console.warn(
       "Falling back to mock locations. This may cause location ID mismatches with room types from database!",
     );
@@ -1282,7 +1291,7 @@ export const addLocation = async (loc: Location): Promise<void> => {
       },
     ];
   } catch (error) {
-    console.error("Failed to add location:", error);
+    logger.error("Failed to add location", { error });
     // Fallback to local state
     locations = [...locations, { ...loc, id: Date.now().toString() }];
     throw error;
@@ -1329,7 +1338,7 @@ export const updateLocation = async (
     console.log("Location updated in local cache:", updatedLocation);
     return updatedLocation;
   } catch (error) {
-    console.error("Failed to update location:", error);
+    logger.error("Failed to update location", { error });
     throw error;
   }
 };
@@ -1473,7 +1482,7 @@ export const getRoomTypes = async (): Promise<RoomType[]> => {
     console.log("Mapped room types:", mapped);
     return mapped;
   } catch (error) {
-    console.error("Failed to fetch room types from API:", error);
+    logger.error("Failed to fetch room types from API", { error });
     console.warn(
       "Falling back to mock room types. This means room types are NOT loaded from database!",
     );
@@ -1520,7 +1529,7 @@ export const addRoomType = async (rt: RoomType): Promise<RoomType> => {
     console.log("Mapped room type result:", result);
     return result;
   } catch (error: any) {
-    console.error("Failed to add room type via API:", error);
+    logger.error("Failed to add room type via API", { error });
     console.error("Error details:", {
       message: error?.message,
       response: error?.response,
@@ -1595,7 +1604,7 @@ export const updateRoomType = async (
     console.log("updateRoomType - Mapped Result:", result);
     return result;
   } catch (error: any) {
-    console.error("Failed to update room type:", error);
+    logger.error("Failed to update room type", { error });
     console.error("Error details:", {
       message: error?.message,
       response: error?.response,
@@ -1619,7 +1628,7 @@ export const deleteRoomType = async (id: string): Promise<void> => {
     await apiClient.delete(`/room-types/${id}`);
     console.log("Room type deleted successfully");
   } catch (error) {
-    console.error("Failed to delete room type via API:", error);
+    logger.error("Failed to delete room type via API", { error });
     console.warn(
       "Falling back to local mock data. Room type will NOT be deleted from database!",
     );
@@ -1640,7 +1649,7 @@ export const getRooms = async (): Promise<Room[]> => {
       status: r.status as "Available" | "Occupied" | "Maintenance",
     }));
   } catch (error) {
-    console.error("Failed to fetch rooms:", error);
+    logger.error("Failed to fetch rooms", { error });
     return rooms; // Fallback to mock data
   }
 };
@@ -1661,7 +1670,7 @@ export const addRoom = async (r: Room): Promise<Room> => {
       managementType: dbRoom.management_type || undefined,
     };
   } catch (error) {
-    console.error("Failed to add room:", error);
+    logger.error("Failed to add room", { error });
     // Fallback to local
     const newRoom = { ...r, id: r.id || Date.now().toString() };
     rooms = [...rooms, newRoom];
@@ -1702,7 +1711,7 @@ export const updateRoom = async (
 
     return result;
   } catch (error: any) {
-    console.error("Failed to update room:", error);
+    logger.error("Failed to update room", { error });
     // Fallback to local
     const existing = rooms.find((room) => room.id === id);
     if (existing) {
@@ -1720,7 +1729,7 @@ export const deleteRoom = async (id: string): Promise<void> => {
     // Update local cache
     rooms = rooms.filter((r) => r.id !== id);
   } catch (error) {
-    console.error("Failed to delete room:", error);
+    logger.error("Failed to delete room", { error });
     // Fallback to local
     rooms = rooms.filter((r) => r.id !== id);
   }
@@ -1775,7 +1784,7 @@ const getCurrentLanguage = (): string => {
       return parsedUser.language || "English";
     }
   } catch (error) {
-    console.error("Failed to get user language from localStorage:", error);
+    logger.error("Failed to get user language from localStorage", { error });
   }
   return "English";
 };
@@ -2006,12 +2015,11 @@ export const addEvent = async (event: ResortEvent): Promise<void> => {
       language: language,
     };
 
-    console.log("Adding event via API - Input:", event);
-    console.log("Adding event via API - Request Body:", requestBody);
+    logger.debug("Adding event via API", { event, requestBody });
 
     const dbEvent = await apiClient.post<any>("/resort-events", requestBody);
 
-    console.log("Event added successfully - API Response:", dbEvent);
+    logger.info("Event added successfully", { dbEvent });
 
     // Update local cache
     const mappedEvent = {
@@ -2024,43 +2032,92 @@ export const addEvent = async (event: ResortEvent): Promise<void> => {
     };
 
     events = [...events, mappedEvent];
-    console.log("Event added to local cache:", mappedEvent);
+    logger.debug("Event added to local cache", { mappedEvent });
   } catch (error: any) {
-    console.error("Failed to add event via API:", error);
-    console.error("Error details:", {
-      message: error?.message,
-      response: error?.response,
-      status: error?.response?.status,
-      body: error?.response?.body,
+    logger.error("Failed to add event via API", {
+      error,
+      details: {
+        message: error?.message,
+        response: error?.response,
+        status: error?.response?.status,
+        body: error?.response?.body,
+      }
     });
-    console.warn(
-      "Falling back to local mock data. Event will NOT be saved to database!",
-    );
+    logger.warn("Falling back to local mock data. Event will NOT be saved to database!");
     // Fallback to local state
     events = [...events, { ...event, id: Date.now().toString() }];
     throw error;
   }
 };
 
+export const updateEvent = async (
+  id: string,
+  event: Partial<ResortEvent>,
+): Promise<ResortEvent> => {
+  try {
+    const language = getCurrentLanguage();
+    const requestBody: any = {};
+
+    if (event.title !== undefined) requestBody.title = event.title;
+    if (event.date !== undefined) requestBody.date = event.date;
+    if (event.time !== undefined) requestBody.time = event.time;
+    if (event.location !== undefined) requestBody.location = event.location;
+    if (event.description !== undefined) requestBody.description = event.description || null;
+    requestBody.language = language;
+
+    logger.info("Updating event via API", { id, requestBody });
+
+    const dbEvent = await apiClient.put<any>(`/resort-events/${id}`, requestBody);
+
+    logger.info("Event updated successfully", { dbEvent });
+
+    // Update local cache
+    const mappedEvent: ResortEvent = {
+      id: dbEvent.id.toString(),
+      title: dbEvent.title,
+      date: dbEvent.date,
+      time: dbEvent.time,
+      location: dbEvent.location,
+      description: dbEvent.description || undefined,
+    };
+
+    events = events.map((e) => (e.id === id ? mappedEvent : e));
+    logger.debug("Event updated in local cache", { mappedEvent });
+
+    return mappedEvent;
+  } catch (error: any) {
+    logger.error("Failed to update event via API", {
+      error,
+      details: {
+        message: error?.message,
+        response: error?.response,
+        status: error?.response?.status,
+        body: error?.response?.body,
+      }
+    });
+    throw error;
+  }
+};
+
 export const deleteEvent = async (id: string): Promise<void> => {
   try {
-    console.log("Deleting event via API:", id);
+    logger.info("Deleting event via API", { id });
     await apiClient.delete(`/resort-events/${id}`);
-    console.log("Event deleted successfully from database");
+    logger.info("Event deleted successfully from database");
     // Update local cache
     events = events.filter((e) => e.id !== id);
-    console.log("Event removed from local cache");
+    logger.debug("Event removed from local cache");
   } catch (error: any) {
-    console.error("Failed to delete event via API:", error);
-    console.error("Error details:", {
-      message: error?.message,
-      response: error?.response,
-      status: error?.response?.status,
-      body: error?.response?.body,
+    logger.error("Failed to delete event via API", {
+      error,
+      details: {
+        message: error?.message,
+        response: error?.response,
+        status: error?.response?.status,
+        body: error?.response?.body,
+      }
     });
-    console.warn(
-      "Falling back to local mock data. Event will NOT be deleted from database!",
-    );
+    logger.warn("Falling back to local mock data. Event will NOT be deleted from database!");
     // Fallback to local state
     events = events.filter((e) => e.id !== id);
     throw error; // Re-throw để component có thể handle error
@@ -2294,18 +2351,14 @@ export const addKnowledgeItem = async (item: KnowledgeItem): Promise<void> => {
       answer: item.answer,
     };
 
-    console.log("Adding knowledge item via API - Input:", item);
-    console.log("Adding knowledge item via API - Request Body:", requestBody);
+    logger.debug("Adding knowledge item via API", { item, requestBody });
 
     const dbKnowledgeItem = await apiClient.post<any>(
       "/knowledge-items",
       requestBody,
     );
 
-    console.log(
-      "Knowledge item added successfully - API Response:",
-      dbKnowledgeItem,
-    );
+    logger.info("Knowledge item added successfully", { dbKnowledgeItem });
 
     // Update local cache
     const mappedItem = {
@@ -2315,43 +2368,87 @@ export const addKnowledgeItem = async (item: KnowledgeItem): Promise<void> => {
     };
 
     knowledgeBase = [...knowledgeBase, mappedItem];
-    console.log("Knowledge item added to local cache:", mappedItem);
+    logger.debug("Knowledge item added to local cache", { mappedItem });
   } catch (error: any) {
-    console.error("Failed to add knowledge item via API:", error);
-    console.error("Error details:", {
-      message: error?.message,
-      response: error?.response,
-      status: error?.response?.status,
-      body: error?.response?.body,
+    logger.error("Failed to add knowledge item via API", {
+      error,
+      details: {
+        message: error?.message,
+        response: error?.response,
+        status: error?.response?.status,
+        body: error?.response?.body,
+      }
     });
-    console.warn(
-      "Falling back to local mock data. Knowledge item will NOT be saved to database!",
-    );
+    logger.warn("Falling back to local mock data. Knowledge item will NOT be saved to database!");
     // Fallback to local state
     knowledgeBase = [...knowledgeBase, { ...item, id: Date.now().toString() }];
     throw error;
   }
 };
 
+export const updateKnowledgeItem = async (
+  id: string,
+  item: Partial<KnowledgeItem>,
+): Promise<KnowledgeItem> => {
+  try {
+    const requestBody: any = {};
+
+    if (item.question !== undefined) requestBody.question = item.question;
+    if (item.answer !== undefined) requestBody.answer = item.answer;
+
+    logger.info("Updating knowledge item via API", { id, requestBody });
+
+    const dbKnowledgeItem = await apiClient.put<any>(
+      `/knowledge-items/${id}`,
+      requestBody,
+    );
+
+    logger.info("Knowledge item updated successfully", { dbKnowledgeItem });
+
+    // Update local cache
+    const mappedItem: KnowledgeItem = {
+      id: dbKnowledgeItem.id.toString(),
+      question: dbKnowledgeItem.question,
+      answer: dbKnowledgeItem.answer,
+    };
+
+    knowledgeBase = knowledgeBase.map((k) => (k.id === id ? mappedItem : k));
+    logger.debug("Knowledge item updated in local cache", { mappedItem });
+
+    return mappedItem;
+  } catch (error: any) {
+    logger.error("Failed to update knowledge item via API", {
+      error,
+      details: {
+        message: error?.message,
+        response: error?.response,
+        status: error?.response?.status,
+        body: error?.response?.body,
+      }
+    });
+    throw error;
+  }
+};
+
 export const deleteKnowledgeItem = async (id: string): Promise<void> => {
   try {
-    console.log("Deleting knowledge item via API:", id);
+    logger.info("Deleting knowledge item via API", { id });
     await apiClient.delete(`/knowledge-items/${id}`);
-    console.log("Knowledge item deleted successfully from database");
+    logger.info("Knowledge item deleted successfully from database");
     // Update local cache
     knowledgeBase = knowledgeBase.filter((k) => k.id !== id);
-    console.log("Knowledge item removed from local cache");
+    logger.debug("Knowledge item removed from local cache");
   } catch (error: any) {
-    console.error("Failed to delete knowledge item via API:", error);
-    console.error("Error details:", {
-      message: error?.message,
-      response: error?.response,
-      status: error?.response?.status,
-      body: error?.response?.body,
+    logger.error("Failed to delete knowledge item via API", {
+      error,
+      details: {
+        message: error?.message,
+        response: error?.response,
+        status: error?.response?.status,
+        body: error?.response?.body,
+      }
     });
-    console.warn(
-      "Falling back to local mock data. Knowledge item will NOT be deleted from database!",
-    );
+    logger.warn("Falling back to local mock data. Knowledge item will NOT be deleted from database!");
     // Fallback to local state
     knowledgeBase = knowledgeBase.filter((k) => k.id !== id);
     throw error; // Re-throw để component có thể handle error
@@ -4501,13 +4598,15 @@ export const updateDriverSchedule = async (
   schedule: Omit<DriverSchedule, 'id' | 'driver_id' | 'created_at' | 'updated_at'>
 ): Promise<DriverSchedule> => {
   try {
+    logger.info("Updating driver schedule via API", { driverId, schedule });
     const result = await apiClient.put<DriverSchedule>(
       `/driver-schedules/driver/${driverId}`,
       schedule
     );
+    logger.info("Driver schedule updated successfully", { result });
     return result;
   } catch (error) {
-    console.error("Failed to update driver schedule:", error);
+    logger.error("Failed to update driver schedule", { error, driverId, schedule });
     throw error;
   }
 };
@@ -4515,9 +4614,11 @@ export const updateDriverSchedule = async (
 // Delete a schedule
 export const deleteDriverSchedule = async (driverId: string, date: string): Promise<void> => {
   try {
+    logger.info("Deleting driver schedule via API", { driverId, date });
     await apiClient.delete(`/driver-schedules/driver/${driverId}?date=${date}`);
+    logger.info("Driver schedule deleted successfully");
   } catch (error) {
-    console.error("Failed to delete driver schedule:", error);
+    logger.error("Failed to delete driver schedule", { error, driverId, date });
     throw error;
   }
 };

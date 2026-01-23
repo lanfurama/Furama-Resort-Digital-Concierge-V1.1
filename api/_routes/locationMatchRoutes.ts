@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { smartMatchLocation, getDefaultSuggestions } from "../_services/locationMatchingService";
 import { getLocations } from "../../services/dataService";
+import logger from "../_utils/logger.js";
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.post("/smart-match", async (req, res) => {
             ...matchResult,
         });
     } catch (error: any) {
-        console.error("Smart match error:", error);
+        logger.error({ err: error, userInput, context }, "Smart match error");
         return res.status(500).json({
             error: "Failed to match location",
             message: error.message,
@@ -62,7 +63,7 @@ router.get("/suggestions", async (req, res) => {
             suggestions,
         });
     } catch (error: any) {
-        console.error("Get suggestions error:", error);
+        logger.error({ err: error, currentStep, previousPickup }, "Get suggestions error");
         return res.status(500).json({
             error: "Failed to get suggestions",
             message: error.message,

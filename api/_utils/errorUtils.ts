@@ -5,6 +5,8 @@
  * into user-friendly messages suitable for display in the frontend.
  */
 
+import logger from './logger.js';
+
 // PostgreSQL error codes mapping
 // Reference: https://www.postgresql.org/docs/current/errcodes-appendix.html
 const PG_ERROR_CODES: Record<string, string> = {
@@ -211,8 +213,13 @@ export function createErrorResponse(
     const friendlyMessage = getUserFriendlyError(error, context, operation);
 
     // Log the original error for debugging (server-side only)
-    console.error(`[ErrorUtils] Original error:`, error?.message || error);
-    console.error(`[ErrorUtils] Friendly message:`, friendlyMessage);
+    logger.error({ 
+      originalError: error?.message || error,
+      errorCode: error?.code,
+      friendlyMessage,
+      context,
+      operation
+    }, 'Error transformed to user-friendly message');
 
     return {
         error: friendlyMessage,

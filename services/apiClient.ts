@@ -1,6 +1,7 @@
 // API Client helper for making API calls
 // API and frontend run on the same port (3000), so we use relative paths
 // API endpoints are prefixed with /api/v1
+import logger from '../utils/logger.js';
 let API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api/v1';
 if (typeof process !== 'undefined' && process.env && process.env.VITE_API_URL) {
   API_BASE_URL = process.env.VITE_API_URL;
@@ -67,7 +68,7 @@ async function apiRequest<T>(
 
     // Only log actual errors (not 404 on room lookup which is expected)
     if (!is404OnRoomLookup) {
-      console.error('API Error:', errorData);
+      logger.error('API Error', { endpoint, status: response.status, errorData });
     }
     // Prioritize message field, then error field, then default message
     const errorMessage = errorData.message || errorData.error || `HTTP error! status: ${response.status}`;
@@ -98,7 +99,7 @@ async function apiRequest<T>(
     // console.log('API Response Data:', data);
     return data;
   } catch (parseError) {
-    console.warn('API Response: Failed to parse JSON, returning null', parseError);
+    logger.warn('API Response: Failed to parse JSON, returning null', { parseError, endpoint });
     return null as T;
   }
 }

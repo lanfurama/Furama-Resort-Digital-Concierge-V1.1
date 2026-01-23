@@ -1,4 +1,5 @@
 import pool from '../_config/database.js';
+import logger from '../_utils/logger.js';
 
 export interface Promotion {
   id: number;
@@ -152,7 +153,7 @@ export const promotionModel = {
         const placeholders = promoIds.map((_: any, i: number) => `$${sharedParamCount + i}`).join(',');
         const updateQuery = `UPDATE promotions SET ${sharedFields.join(', ')} WHERE id IN (${placeholders})`;
         await pool.query(updateQuery, [...sharedValues, ...promoIds]);
-        console.log(`Updated ${allPromos.rows.length} promotion(s) across all languages with shared fields`);
+        logger.info({ count: allPromos.rows.length }, `Updated ${allPromos.rows.length} promotion(s) across all languages with shared fields`);
       }
     }
 

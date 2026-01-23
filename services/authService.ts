@@ -19,7 +19,7 @@ export const authenticateUserByCode = async (checkInCode: string): Promise<User 
     
     return null;
   } catch (error: any) {
-    console.error('Guest authentication by code failed:', error);
+    logger.error('Guest authentication by code failed', { error });
     // Re-throw error so frontend can display the message
     if (error.message) {
       throw error;
@@ -47,7 +47,7 @@ export const authenticateUser = async (lastName: string, roomNumber: string): Pr
     
     return null;
   } catch (error: any) {
-    console.error('Guest authentication failed:', error);
+    logger.error('Guest authentication failed', { error });
     // Re-throw error so frontend can display the message
     if (error.message) {
       throw error;
@@ -69,7 +69,7 @@ export const authenticateStaff = async (username: string, password: string): Pro
     }
     return null;
   } catch (error) {
-    console.error('Staff authentication failed:', error);
+    logger.error('Staff authentication failed', { error });
     return null;
   }
 };

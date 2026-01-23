@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { userModel } from '../_models/userModel.js';
 import { getUserFriendlyError } from '../_utils/errorUtils.js';
+import logger from '../_utils/logger.js';
 
 export const userController = {
   async getAll(req: Request, res: Response) {
@@ -50,20 +51,16 @@ export const userController = {
   async update(req: Request, res: Response) {
     try {
       const id = parseInt(req.params.id);
-      console.log('Updating user:', { id, body: req.body });
-      console.log('Request body keys:', Object.keys(req.body));
-      console.log('Language value:', req.body.language);
+      logger.debug({ id, bodyKeys: Object.keys(req.body), language: req.body.language }, 'Updating user');
 
       const user = await userModel.update(id, req.body);
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
-      console.log('User updated successfully:', user);
-      console.log('Updated user language:', user.language);
+      logger.info({ userId: id, language: user.language }, 'User updated successfully');
       res.json(user);
     } catch (error: any) {
-      console.error('Error updating user:', error);
-      console.error('Error stack:', error.stack);
+      logger.error({ err: error, userId: id }, 'Error updating user');
       res.status(400).json({ error: getUserFriendlyError(error, 'user', 'update') });
     }
   },
@@ -90,7 +87,7 @@ export const userController = {
       }
       res.json(user);
     } catch (error: any) {
-      console.error('Error marking driver offline:', error);
+      logger.error({ err: error, userId: id }, 'Error marking driver offline');
       res.status(500).json({ error: getUserFriendlyError(error, 'user', 'update') });
     }
   },
@@ -114,7 +111,7 @@ export const userController = {
       }
       res.json(user);
     } catch (error: any) {
-      console.error('Error updating driver location:', error);
+      logger.error({ err: error, userId: id, lat, lng }, 'Error updating driver location');
       res.status(500).json({ error: getUserFriendlyError(error, 'user', 'update') });
     }
   },
@@ -124,7 +121,7 @@ export const userController = {
       const drivers = await userModel.getDriversWithLocations();
       res.json(drivers);
     } catch (error: any) {
-      console.error('Error fetching drivers with locations:', error);
+      logger.error({ err: error }, 'Error fetching drivers with locations');
       res.status(500).json({ error: getUserFriendlyError(error, 'user') });
     }
   },
@@ -178,7 +175,7 @@ export const userController = {
         user: updatedUser
       });
     } catch (error: any) {
-      console.error('Error generating check-in code:', error);
+      logger.error({ err: error, userId }, 'Error generating check-in code');
       res.status(500).json({ error: getUserFriendlyError(error, 'user', 'update') });
     }
   },
@@ -187,17 +184,16 @@ export const userController = {
   async setOnlineFor10Hours(req: Request, res: Response) {
     try {
       const id = parseInt(req.params.id);
-      console.log('[userController.setOnlineFor10Hours] Received request for driver ID:', id);
+      logger.debug({ driverId: id }, 'Received request to set driver online for 10 hours');
       const user = await userModel.setOnlineFor10Hours(id);
       if (!user) {
-        console.log('[userController.setOnlineFor10Hours] User not found:', id);
+        logger.warn({ driverId: id }, 'User not found when setting online for 10 hours');
         return res.status(404).json({ error: 'User not found' });
       }
-      console.log('[userController.setOnlineFor10Hours] Successfully set driver online for 10 hours:', id, 'updated_at:', user.updated_at);
+      logger.info({ driverId: id, updatedAt: user.updated_at }, 'Successfully set driver online for 10 hours');
       res.json(user);
     } catch (error: any) {
-      console.error('[userController.setOnlineFor10Hours] Error setting driver online for 10 hours:', error);
-      console.error('[userController.setOnlineFor10Hours] Error stack:', error.stack);
+      logger.error({ err: error, driverId: id }, 'Error setting driver online for 10 hours');
       res.status(500).json({ error: getUserFriendlyError(error, 'user', 'update') });
     }
   },

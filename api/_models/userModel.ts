@@ -1,4 +1,5 @@
 import pool from '../_config/database.js';
+import logger from '../_utils/logger.js';
 
 export interface User {
   id: number;
@@ -74,7 +75,7 @@ export const userModel = {
     const values: any[] = [];
     let paramCount = 1;
 
-    console.log('userModel.update called with:', { id, user });
+    logger.debug({ id, user }, 'userModel.update called');
 
     if (user.last_name !== undefined) {
       fields.push(`last_name = $${paramCount++}`);
@@ -101,14 +102,14 @@ export const userModel = {
       values.push(user.email || null);
     }
     if (user.language !== undefined && user.language !== null) {
-      console.log('Adding language to update:', user.language);
+      logger.debug({ language: user.language }, 'Adding language to update');
       fields.push(`language = $${paramCount++}`);
       values.push(user.language);
     } else {
-      console.log('Language is undefined or null, skipping update');
+      logger.debug('Language is undefined or null, skipping update');
     }
     if (user.notes !== undefined) {
-      console.log('Adding notes to update:', user.notes);
+      logger.debug({ notes: user.notes }, 'Adding notes to update');
       fields.push(`notes = $${paramCount++}`);
       values.push(user.notes || null);
     }
@@ -150,9 +151,7 @@ export const userModel = {
         await pool.query('ALTER TABLE users DISABLE TRIGGER update_users_updated_at');
         
         const query = `UPDATE users SET updated_at = NOW() WHERE id = $1 RETURNING *`;
-        console.log('[userModel.update] Heartbeat query:', query);
-        console.log('[userModel.update] Driver ID:', id);
-        console.log('[userModel.update] Current timestamp:', new Date().toISOString());
+        logger.debug({ query, driverId: id, timestamp: new Date().toISOString() }, '[userModel.update] Heartbeat query');
         
         const result = await pool.query(query, [id]);
         const updatedUser = result.rows[0];
@@ -160,22 +159,21 @@ export const userModel = {
         // Re-enable trigger
         await pool.query('ALTER TABLE users ENABLE TRIGGER update_users_updated_at');
         
-        console.log('[userModel.update] Heartbeat result updated_at:', updatedUser?.updated_at);
-        console.log('[userModel.update] Heartbeat result full:', updatedUser);
+        logger.debug({ updated_at: updatedUser?.updated_at, user: updatedUser }, '[userModel.update] Heartbeat result');
         
         // Verify the timestamp is recent (within last minute)
         if (updatedUser?.updated_at) {
           const dbTime = new Date(updatedUser.updated_at);
           const now = new Date();
           const diffMs = now.getTime() - dbTime.getTime();
-          console.log('[userModel.update] Time difference:', diffMs, 'ms');
+          logger.debug({ diffMs }, '[userModel.update] Time difference');
           if (diffMs > 60000) {
-            console.warn('[userModel.update] WARNING: updated_at is more than 1 minute old!');
+            logger.warn({ diffMs }, '[userModel.update] WARNING: updated_at is more than 1 minute old!');
           } else {
-            console.log('[userModel.update] ✅ updated_at is fresh!');
+            logger.debug('[userModel.update] ✅ updated_at is fresh!');
           }
         } else {
-          console.error('[userModel.update] ERROR: updated_at is missing from result!');
+          logger.error('[userModel.update] ERROR: updated_at is missing from result!');
         }
         
         return updatedUser || null;
@@ -184,7 +182,7 @@ export const userModel = {
         try {
           await pool.query('ALTER TABLE users ENABLE TRIGGER update_users_updated_at');
         } catch (e) {
-          console.error('[userModel.update] Failed to re-enable trigger:', e);
+          logger.error({ err: e }, '[userModel.update] Failed to re-enable trigger');
         }
         throw error;
       }
@@ -193,14 +191,11 @@ export const userModel = {
     // Normal update with fields
     values.push(id);
     const query = `UPDATE users SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${paramCount} RETURNING *`;
-    console.log('[userModel.update] Executing query:', query);
-    console.log('[userModel.update] Query values:', values);
-    console.log('[userModel.update] Current timestamp:', new Date().toISOString());
+    logger.debug({ query, values, timestamp: new Date().toISOString() }, '[userModel.update] Executing query');
     
     const result = await pool.query(query, values);
     const updatedUser = result.rows[0];
-    console.log('[userModel.update] Query result updated_at:', updatedUser?.updated_at);
-    console.log('[userModel.update] Query result full:', updatedUser);
+    logger.debug({ updated_at: updatedUser?.updated_at, user: updatedUser }, '[userModel.update] Query result');
     return updatedUser || null;
   },
 
@@ -218,7 +213,7 @@ export const userModel = {
       
       // Set updated_at to 3 minutes ago to ensure driver is considered offline
       const query = `UPDATE users SET updated_at = NOW() - INTERVAL '3 minutes' WHERE id = $1 RETURNING *`;
-      console.log('[userModel.markOffline] Marking driver offline:', id);
+      logger.debug({ driverId: id }, '[userModel.markOffline] Marking driver offline');
       
       const result = await pool.query(query, [id]);
       const updatedUser = result.rows[0];
@@ -226,15 +221,15 @@ export const userModel = {
       // Re-enable trigger
       await pool.query('ALTER TABLE users ENABLE TRIGGER update_users_updated_at');
       
-      console.log('[userModel.markOffline] Driver marked offline, updated_at:', updatedUser?.updated_at);
+      logger.info({ driverId: id, updated_at: updatedUser?.updated_at }, '[userModel.markOffline] Driver marked offline');
       return updatedUser || null;
     } catch (error) {
       // Make sure to re-enable trigger even if there's an error
       try {
         await pool.query('ALTER TABLE users ENABLE TRIGGER update_users_updated_at');
-      } catch (e) {
-        console.error('[userModel.markOffline] Failed to re-enable trigger:', e);
-      }
+        } catch (e) {
+          logger.error({ err: e }, '[userModel.markOffline] Failed to re-enable trigger');
+        }
       throw error;
     }
   },
@@ -251,14 +246,14 @@ export const userModel = {
       );
       
       if (result.rows.length === 0) {
-        console.warn(`[userModel.updateLocation] User ${id} not found or not a driver`);
+        logger.warn({ userId: id }, `[userModel.updateLocation] User ${id} not found or not a driver`);
         return null;
       }
       
-      console.log(`[userModel.updateLocation] Updated location for driver ${id}:`, { lat, lng });
+      logger.info({ driverId: id, lat, lng }, `[userModel.updateLocation] Updated location for driver ${id}`);
       return result.rows[0];
     } catch (error) {
-      console.error('[userModel.updateLocation] Error updating driver location:', error);
+      logger.error({ err: error, driverId: id }, '[userModel.updateLocation] Error updating driver location');
       throw error;
     }
   },
@@ -271,7 +266,7 @@ export const userModel = {
       );
       return result.rows;
     } catch (error) {
-      console.error('[userModel.getDriversWithLocations] Error fetching drivers:', error);
+      logger.error({ err: error }, '[userModel.getDriversWithLocations] Error fetching drivers');
       throw error;
     }
   },
@@ -284,7 +279,7 @@ export const userModel = {
       
       // Set updated_at to 10 hours from now
       const query = `UPDATE users SET updated_at = NOW() + INTERVAL '10 hours' WHERE id = $1 RETURNING *`;
-      console.log('[userModel.setOnlineFor10Hours] Setting driver online for 10 hours:', id);
+      logger.debug({ driverId: id }, '[userModel.setOnlineFor10Hours] Setting driver online for 10 hours');
       
       const result = await pool.query(query, [id]);
       const updatedUser = result.rows[0];
@@ -292,15 +287,15 @@ export const userModel = {
       // Re-enable trigger
       await pool.query('ALTER TABLE users ENABLE TRIGGER update_users_updated_at');
       
-      console.log('[userModel.setOnlineFor10Hours] Driver set online for 10 hours, updated_at:', updatedUser?.updated_at);
+      logger.info({ driverId: id, updated_at: updatedUser?.updated_at }, '[userModel.setOnlineFor10Hours] Driver set online for 10 hours');
       return updatedUser || null;
     } catch (error) {
       // Make sure to re-enable trigger even if there's an error
       try {
         await pool.query('ALTER TABLE users ENABLE TRIGGER update_users_updated_at');
-      } catch (e) {
-        console.error('[userModel.setOnlineFor10Hours] Failed to re-enable trigger:', e);
-      }
+        } catch (e) {
+          logger.error({ err: e }, '[userModel.setOnlineFor10Hours] Failed to re-enable trigger');
+        }
       throw error;
     }
   },

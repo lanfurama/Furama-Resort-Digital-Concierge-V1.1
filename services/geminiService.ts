@@ -14,11 +14,12 @@ import {
   getRoomTypes,
 } from "./dataService";
 import { ContentTranslation, Location } from "../types";
+import logger from "../utils/logger.js";
 
 const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' && process.env ? process.env.VITE_GEMINI_API_KEY : undefined);
 if (!apiKey) {
-  console.error("VITE_GEMINI_API_KEY is not set. Please check your .env file.");
-  console.error("AI features will not work without a valid API key.");
+  logger.error("VITE_GEMINI_API_KEY is not set. Please check your .env file.");
+  logger.error("AI features will not work without a valid API key.");
 }
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
@@ -108,7 +109,7 @@ MÃ ĐỊA ĐIỂM THƯỜNG GẶP (Mapping):
 Lệnh thực tế: "${input}"`;
 
   if (!ai) {
-    console.error("Gemini AI is not initialized.");
+    logger.error("Gemini AI is not initialized.");
     return null;
   }
 
@@ -124,7 +125,7 @@ Lệnh thực tế: "${input}"`;
 
     return JSON.parse(response.text || "{}");
   } catch (e) {
-    console.error("AI Parse Error (Ride Request)", e);
+    logger.error("AI Parse Error (Ride Request)", { error: e });
     return null;
   }
 };
@@ -146,7 +147,7 @@ export const parseStepResponse = async (
   const model = "gemini-2.0-flash";
 
   if (!ai) {
-    console.error("Gemini AI is not initialized.");
+    logger.error("Gemini AI is not initialized.");
     return null;
   }
 
@@ -278,7 +279,7 @@ Extract any special requests. If user says "không" or similar, return hasNotes:
 
     return JSON.parse(response.text || "{}");
   } catch (e) {
-    console.error(`AI Parse Error (Step: ${step})`, e);
+    logger.error(`AI Parse Error (Step: ${step})`, { step, error: e });
     return null;
   }
 };
@@ -294,7 +295,7 @@ export const matchLocationWithAI = async (
   const model = "gemini-2.0-flash";
 
   if (!ai) {
-    console.error("Gemini AI is not initialized.");
+    logger.error("Gemini AI is not initialized.");
     return { bestMatch: null, confidence: 0, reasoning: "AI not available" };
   }
 
@@ -362,7 +363,7 @@ Return the best match index (1-based) and confidence (0-100). Return 0 if no rea
       reasoning: result.reasoning || "No match found",
     };
   } catch (e) {
-    console.error("AI Location Matching Error", e);
+    logger.error("AI Location Matching Error", { error: e });
     return { bestMatch: null, confidence: 0, reasoning: "Error occurred" };
   }
 };
@@ -461,7 +462,7 @@ export const parseRideRequestFallback = (
     result.guestCount = parseInt(guestMatch[1]);
   }
 
-  console.log("[AI Parse] Fallback result:", result);
+  logger.debug("[AI Parse] Fallback result", { result });
   return result;
 };
 
@@ -575,7 +576,7 @@ function findClosestLocation(
   if (!searchTerm || !locations || locations.length === 0) return null;
 
   const lowerSearch = searchTerm.toLowerCase().trim();
-  console.log(`[FindClosestLocation] Searching for: "${lowerSearch}" amongst ${locations.length} locations`);
+  logger.debug(`[FindClosestLocation] Searching for: "${lowerSearch}" amongst ${locations.length} locations`);
 
   // 0. Explicit Synonym Map (Robust Fallback)
   const synonymMap: Record<string, string> = {
@@ -606,11 +607,11 @@ function findClosestLocation(
 
     // Fuzzy match against synonym key (handle minor typos like "nhà h ng" instead of "nhà hàng")
     if (similarityScore(lowerSearch, key) > 0.85) {
-      console.log(`[FindClosestLocation] Fuzzy synonym match: "${lowerSearch}" ~= "${key}" -> "${target}"`);
+      logger.debug(`[FindClosestLocation] Fuzzy synonym match: "${lowerSearch}" ~= "${key}" -> "${target}"`);
       const match = locations.find(l => l.name === target);
       if (match) return match;
 
-      console.warn(`[FindClosestLocation] Target "${target}" not found in locations! Ignoring synonym.`);
+      logger.warn(`[FindClosestLocation] Target "${target}" not found in locations! Ignoring synonym.`);
       // STRICT MODE: Do not return partial match if not in DB
     }
   }
@@ -874,7 +875,7 @@ export const parseAdminInput = async (
                   For Room Inventory, match Room Type names closely.`;
 
   if (!ai) {
-    console.error("Gemini AI is not initialized. Please check VITE_GEMINI_API_KEY in .env file.");
+    logger.error("Gemini AI is not initialized. Please check VITE_GEMINI_API_KEY in .env file.");
     return null;
   }
 
@@ -890,7 +891,7 @@ export const parseAdminInput = async (
 
     return JSON.parse(response.text || "{}");
   } catch (e) {
-    console.error("AI Parse Error", e);
+    logger.error("AI Parse Error", { error: e });
     return null;
   }
 };
@@ -948,7 +949,7 @@ export const createChatSession = async () => {
       },
     });
   } catch (error: any) {
-    console.error("Error creating chat session:", error);
+    logger.error("Error creating chat session", { error });
     // Provide more helpful error messages
     if (
       error?.message?.includes("API key") ||
@@ -974,7 +975,7 @@ export const translateText = async (
   if (!text || !targetLanguage || targetLanguage === "Original") return text;
 
   if (!ai) {
-    console.error("Gemini AI is not initialized. Returning original text.");
+    logger.error("Gemini AI is not initialized. Returning original text.");
     return text;
   }
 
@@ -989,7 +990,7 @@ export const translateText = async (
     });
     return response.text?.trim() || text;
   } catch (e) {
-    console.error("Translation Error", e);
+    logger.error("Translation Error", { error: e });
     return text; // Fallback to original
   }
 };
@@ -999,7 +1000,7 @@ export const generateTranslations = async (
   content: Record<string, string>,
 ): Promise<ContentTranslation> => {
   if (!ai) {
-    console.error("Gemini AI is not initialized. Returning empty translations.");
+    logger.error("Gemini AI is not initialized. Returning empty translations.");
     return {};
   }
 
@@ -1027,7 +1028,7 @@ export const generateTranslations = async (
 
     return JSON.parse(response.text || "{}");
   } catch (e) {
-    console.error("Batch Translation Error", e);
+    logger.error("Batch Translation Error", { error: e });
     return {};
   }
 };
@@ -1041,7 +1042,7 @@ export const queryResortInfo = async (
   const longitude = userLocation?.lng ?? RESORT_CENTER.lng;
 
   if (!ai) {
-    console.error("Gemini AI is not initialized. Cannot query maps.");
+    logger.error("Gemini AI is not initialized. Cannot query maps.");
     return null;
   }
 
@@ -1063,7 +1064,7 @@ export const queryResortInfo = async (
     });
     return response;
   } catch (error) {
-    console.error("Maps query failed", error);
+    logger.error("Maps query failed", { error });
     return null;
   }
 };
@@ -1071,15 +1072,12 @@ export const queryResortInfo = async (
 // --- TTS (Gemini 2.5 Flash TTS) ---
 export const speakText = async (text: string): Promise<AudioBuffer | null> => {
   if (!ai) {
-    console.error("Gemini AI is not initialized. Cannot generate speech.");
+    logger.error("Gemini AI is not initialized. Cannot generate speech.");
     return null;
   }
 
   try {
-    console.log(
-      "TTS: Calling Gemini API with text:",
-      text.substring(0, 50) + "...",
-    );
+    logger.debug("TTS: Calling Gemini API", { textPreview: text.substring(0, 50) + "..." });
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text }] }],
@@ -1093,20 +1091,17 @@ export const speakText = async (text: string): Promise<AudioBuffer | null> => {
       },
     });
 
-    console.log("TTS: Response received", response);
+    logger.debug("TTS: Response received", { response });
     const base64Audio =
       response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
     if (!base64Audio) {
-      console.error("TTS: No audio data in response");
-      console.log(
-        "TTS: Response structure:",
-        JSON.stringify(response, null, 2),
-      );
+      logger.error("TTS: No audio data in response");
+      logger.debug("TTS: Response structure", { responseStructure: JSON.stringify(response, null, 2) });
       return null;
     }
 
-    console.log("TTS: Audio data found, length:", base64Audio.length);
+    logger.debug("TTS: Audio data found", { length: base64Audio.length });
 
     // Create a temporary AudioContext just for decoding
     const outputAudioContext = new (
@@ -1115,37 +1110,32 @@ export const speakText = async (text: string): Promise<AudioBuffer | null> => {
 
     // Resume context if suspended (required for autoplay policies)
     if (outputAudioContext.state === "suspended") {
-      console.log("TTS: Resuming suspended AudioContext");
+      logger.debug("TTS: Resuming suspended AudioContext");
       await outputAudioContext.resume();
     }
 
     // decodeAudioData requires ArrayBuffer
     const decodedBytes = decode(base64Audio);
-    console.log("TTS: Decoded bytes length:", decodedBytes.length);
+    logger.debug("TTS: Decoded bytes", { length: decodedBytes.length });
 
     try {
       const audioBuffer = await outputAudioContext.decodeAudioData(
         decodedBytes.buffer,
       );
-      console.log(
-        "TTS: Audio buffer decoded successfully, duration:",
-        audioBuffer.duration,
-        "sampleRate:",
-        audioBuffer.sampleRate,
-      );
+      logger.debug("TTS: Audio buffer decoded successfully", { duration: audioBuffer.duration, sampleRate: audioBuffer.sampleRate });
 
       // Don't close the context here - let the caller handle it
       // The context will be garbage collected or can be closed after playback
       return audioBuffer;
     } catch (decodeError) {
-      console.error("TTS: Error decoding audio data", decodeError);
+      logger.error("TTS: Error decoding audio data", { error: decodeError });
       outputAudioContext.close();
       return null;
     }
   } catch (error) {
-    console.error("TTS Error", error);
+    logger.error("TTS Error", { error });
     if (error instanceof Error) {
-      console.error("TTS Error details:", error.message, error.stack);
+      logger.error("TTS Error details", { message: error.message, stack: error.stack });
     }
     return null;
   }

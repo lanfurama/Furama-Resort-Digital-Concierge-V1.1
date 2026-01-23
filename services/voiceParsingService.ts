@@ -1,5 +1,6 @@
 import { Location } from "../types";
 import { parseRideRequestWithContext } from "./geminiService";
+import logger from "../utils/logger.js";
 
 export interface ParsedVoiceData {
   roomNumber?: string;
@@ -62,7 +63,7 @@ export const processTranscript = async (
 
   // 1. Basic Normalization
   const normalizedText = normalizeTranscript(text);
-  console.log("[VoiceParsing] Sending to Gemini:", normalizedText);
+  logger.debug("[VoiceParsing] Sending to Gemini", { normalizedText });
 
   try {
     // 2. AI Entity Extraction (Delegated entirely to Gemini)
@@ -128,7 +129,7 @@ export const processTranscript = async (
       return finalData;
     }
   } catch (e) {
-    console.error("Process Transcript Error:", e);
+    logger.error("Process Transcript Error", { error: e });
     callbacks.onError("Có lỗi xảy ra khi xử lý yêu cầu. Vui lòng thử lại.");
     return null;
   }

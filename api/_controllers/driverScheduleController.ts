@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { driverScheduleModel } from '../_models/driverScheduleModel.js';
 import { getUserFriendlyError } from '../_utils/errorUtils.js';
+import logger from '../_utils/logger.js';
 
 export const driverScheduleController = {
   // Get all schedules for a driver
@@ -14,7 +15,7 @@ export const driverScheduleController = {
       const schedules = await driverScheduleModel.getByDriverId(driverId);
       res.json(schedules);
     } catch (error: any) {
-      console.error('Error fetching driver schedules:', error);
+      logger.error({ err: error, driverId }, 'Error fetching driver schedules');
       res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
@@ -40,7 +41,7 @@ export const driverScheduleController = {
 
       res.json(schedule);
     } catch (error: any) {
-      console.error('Error fetching driver schedule:', error);
+      logger.error({ err: error, driverId, date }, 'Error fetching driver schedule');
       res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
@@ -66,7 +67,7 @@ export const driverScheduleController = {
       );
       res.json(schedules);
     } catch (error: any) {
-      console.error('Error fetching driver schedules:', error);
+      logger.error({ err: error, driverId }, 'Error fetching driver schedules');
       res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
@@ -83,7 +84,7 @@ export const driverScheduleController = {
       const schedules = await driverScheduleModel.getByDateRange(startDate, endDate);
       res.json(schedules);
     } catch (error: any) {
-      console.error('Error fetching all driver schedules:', error);
+      logger.error({ err: error, startDate, endDate }, 'Error fetching all driver schedules');
       res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
@@ -109,7 +110,7 @@ export const driverScheduleController = {
       );
       res.json({ isAvailable });
     } catch (error: any) {
-      console.error('Error checking driver availability:', error);
+      logger.error({ err: error, driverId, date, time }, 'Error checking driver availability');
       res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
@@ -139,7 +140,7 @@ export const driverScheduleController = {
 
       res.json(schedule);
     } catch (error: any) {
-      console.error('Error upserting driver schedule:', error);
+      logger.error({ err: error, driverId, date }, 'Error upserting driver schedule');
       res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },
@@ -165,7 +166,7 @@ export const driverScheduleController = {
 
       res.json({ message: 'Schedule deleted successfully' });
     } catch (error: any) {
-      console.error('Error deleting driver schedule:', error);
+      logger.error({ err: error, driverId, date }, 'Error deleting driver schedule');
       res.status(500).json({ error: getUserFriendlyError(error) });
     }
   },

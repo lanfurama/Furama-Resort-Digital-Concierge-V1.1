@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import logger from '../_utils/logger.js';
 
 dotenv.config();
 
@@ -31,13 +32,13 @@ if (hasEmailConfig && emailConfig) {
   // Verify transporter configuration
   transporter.verify((error, success) => {
     if (error) {
-      console.error('❌ Email service configuration error:', error);
+      logger.error({ err: error }, '❌ Email service configuration error');
     } else {
-      console.log('✅ Email service is ready to send emails');
+      logger.info('✅ Email service is ready to send emails');
     }
   });
 } else {
-  console.warn('⚠️ Email service not configured. EMAIL_HOST_USER and EMAIL_HOST_PASSWORD are required.');
+  logger.warn('⚠️ Email service not configured. EMAIL_HOST_USER and EMAIL_HOST_PASSWORD are required.');
 }
 
 export interface EmailOptions {
@@ -56,7 +57,7 @@ export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
   try {
     // Check if email config is available
     if (!transporter || !hasEmailConfig) {
-      console.warn('⚠️ Email service not configured. Skipping email send.');
+      logger.warn('⚠️ Email service not configured. Skipping email send.');
       return false;
     }
 
@@ -69,10 +70,10 @@ export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Email sent successfully:', info.messageId);
+    logger.info({ messageId: info.messageId, to: options.to }, '✅ Email sent successfully');
     return true;
   } catch (error: any) {
-    console.error('❌ Error sending email:', error);
+    logger.error({ err: error, to: options.to }, '❌ Error sending email');
     return false;
   }
 };

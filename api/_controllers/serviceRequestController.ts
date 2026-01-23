@@ -4,6 +4,7 @@ import { userModel } from '../_models/userModel.js';
 import { notificationModel } from '../_models/notificationModel.js';
 import { sendEmail } from '../_services/emailService.js';
 import { getUserFriendlyError } from '../_utils/errorUtils.js';
+import logger from '../_utils/logger.js';
 
 export const serviceRequestController = {
   async getAll(req: Request, res: Response) {
@@ -129,9 +130,9 @@ export const serviceRequestController = {
                     </html>
                   `
                 });
-                console.log(`[ServiceRequestController] Email sent to ${staff.role} ${staff.room_number} (${staff.email})`);
+                logger.info({ role: staff.role, roomNumber: staff.room_number, email: staff.email }, `[ServiceRequestController] Email sent`);
               } catch (emailError: any) {
-                console.error(`[ServiceRequestController] Failed to send email:`, emailError);
+                logger.error({ err: emailError, role: staff.role, roomNumber: staff.room_number }, `[ServiceRequestController] Failed to send email`);
               }
             }
           }
@@ -140,9 +141,9 @@ export const serviceRequestController = {
             await notificationModel.createMany(notificationsToCreate as any);
           }
 
-          console.log(`[ServiceRequestController] Sent extend stay notifications to ${receptionAndAdmins.length} staff members`);
+          logger.info({ count: receptionAndAdmins.length }, `[ServiceRequestController] Sent extend stay notifications to ${receptionAndAdmins.length} staff members`);
         } catch (notifError: any) {
-          console.error('[ServiceRequestController] Error sending extend stay notifications:', notifError);
+          logger.error({ err: notifError }, '[ServiceRequestController] Error sending extend stay notifications');
         }
       }
 
@@ -243,17 +244,17 @@ export const serviceRequestController = {
                       </html>
                     `
                   });
-                  console.log(`[ServiceRequestController] Email sent to ${service.room_number} (${user.email})`);
+                  logger.info({ roomNumber: service.room_number, email: user.email }, `[ServiceRequestController] Email sent`);
                 } catch (emailError: any) {
-                  console.error(`[ServiceRequestController] Failed to send email:`, emailError);
+                  logger.error({ err: emailError, roomNumber: service.room_number }, `[ServiceRequestController] Failed to send email`);
                 }
               }
 
-              console.log(`[ServiceRequestController] ✅ Extended stay for Room ${service.room_number} to ${newCheckOutDate.toLocaleDateString()}`);
+              logger.info({ roomNumber: service.room_number, newCheckOutDate: newCheckOutDate.toLocaleDateString() }, `[ServiceRequestController] ✅ Extended stay for Room ${service.room_number}`);
             }
           }
         } catch (extendError: any) {
-          console.error('[ServiceRequestController] Error processing extend stay:', extendError);
+          logger.error({ err: extendError }, '[ServiceRequestController] Error processing extend stay');
           // Don't fail the update, just log the error
         }
       }

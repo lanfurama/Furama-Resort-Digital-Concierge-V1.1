@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import routes from './_routes/index.js';
 import { checkAndSendCheckoutReminders } from './_services/checkoutReminderService.js';
+import logger from './_utils/logger.js';
 
 dotenv.config();
 
@@ -29,7 +30,7 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
+  logger.error({ err, req: { method: req.method, url: req.url } }, 'Request error');
   res.status(err.status || 500).json({
     error: err.message || 'Internal server error',
   });
@@ -37,15 +38,15 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server is running on http://localhost:${PORT}`);
-  console.log(`📡 API endpoints available at http://localhost:${PORT}/api/v1`);
+  logger.info(`🚀 Server is running on http://localhost:${PORT}`);
+  logger.info(`📡 API endpoints available at http://localhost:${PORT}/api/v1`);
 
   // Start checkout reminder service (check every 5 minutes)
-  console.log('⏰ Starting checkout reminder service...');
+  logger.info('⏰ Starting checkout reminder service...');
   checkAndSendCheckoutReminders(); // Run immediately on startup
   setInterval(() => {
     checkAndSendCheckoutReminders();
   }, 5 * 60 * 1000); // Check every 5 minutes
-  console.log('✅ Checkout reminder service started (checks every 5 minutes)');
+  logger.info('✅ Checkout reminder service started (checks every 5 minutes)');
 });
 

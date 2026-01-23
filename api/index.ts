@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import routes from './_routes/index.js';
+import logger from './_utils/logger.js';
 
 dotenv.config();
 
@@ -36,11 +37,13 @@ app.use('/v1', routes);
 
 // 404 handler for unmatched routes
 app.use((req, res) => {
-  console.error(`[404] Route not found: ${req.method} ${req.url}`, {
+  logger.warn({
+    method: req.method,
+    url: req.url,
     originalUrl: req.originalUrl,
     baseUrl: req.baseUrl,
     path: req.path
-  });
+  }, 'Route not found');
   res.status(404).json({
     error: 'Route not found',
     method: req.method,
@@ -51,7 +54,7 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
+  logger.error({ err, req: { method: req.method, url: req.url } }, 'Request error');
   res.status(err.status || 500).json({
     error: err.message || 'Internal server error',
   });
