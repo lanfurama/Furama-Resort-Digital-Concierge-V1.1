@@ -638,25 +638,6 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
           {/* Additional Booking Options */}
           <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 space-y-3">
-            {/* Destination location - moved inside card */}
-            <div className="relative group">
-              <label className="text-xs font-semibold text-gray-600 mb-1 block">{t('destination')}</label>
-              <button
-                onClick={() => setShowDestinationDropdown(true)}
-                className={`w-full relative flex items-center justify-between pl-10 pr-3 py-2.5 text-sm border-2 rounded-lg font-semibold hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all ${
-                  destination
-                    ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200 text-gray-900'
-                    : 'bg-gray-50 border-gray-200 text-gray-400'
-                }`}
-              >
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <MapPin className="absolute left-3 text-emerald-600 w-4 h-4 flex-shrink-0" />
-                  <span className="truncate">{destination || t('select_destination')}</span>
-                </div>
-                <ChevronDown className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-              </button>
-            </div>
-
             {/* Pickup location */}
             <div className="relative group" ref={pickupDropdownRef}>
               <label className="text-xs font-semibold text-gray-600 mb-1 block">{t('pickup_point')}</label>
@@ -682,6 +663,25 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                   <ChevronDown className={`w-4 h-4 text-blue-600 flex-shrink-0 transition-transform duration-200 ${showPickupDropdown ? 'rotate-180' : ''}`} />
                 </button>
               )}
+            </div>
+
+            {/* Destination location */}
+            <div className="relative group">
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">{t('destination')}</label>
+              <button
+                onClick={() => setShowDestinationDropdown(true)}
+                className={`w-full relative flex items-center justify-between pl-10 pr-3 py-2.5 text-sm border-2 rounded-lg font-semibold hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all ${
+                  destination
+                    ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200 text-gray-900'
+                    : 'bg-gray-50 border-gray-200 text-gray-400'
+                }`}
+              >
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <MapPin className="absolute left-3 text-emerald-600 w-4 h-4 flex-shrink-0" />
+                  <span className="truncate">{destination || t('select_destination')}</span>
+                </div>
+                <ChevronDown className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              </button>
             </div>
 
             {/* Guest Count & Notes */}
