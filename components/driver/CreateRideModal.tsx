@@ -1,0 +1,120 @@
+import React from 'react';
+import { X, Loader2 } from 'lucide-react';
+
+interface Location {
+    id: string;
+    name: string;
+}
+
+interface CreateRideModalProps {
+    isOpen: boolean;
+    isCreating: boolean;
+    rideData: {
+        roomNumber: string;
+        pickup: string;
+        destination: string;
+    };
+    locations: Location[];
+    onClose: () => void;
+    onDataChange: (data: { roomNumber: string; pickup: string; destination: string }) => void;
+    onSubmit: () => void;
+}
+
+export const CreateRideModal: React.FC<CreateRideModalProps> = ({
+    isOpen,
+    isCreating,
+    rideData,
+    locations,
+    onClose,
+    onDataChange,
+    onSubmit
+}) => {
+    if (!isOpen) return null;
+
+    const handleChange = (field: keyof typeof rideData, value: string) => {
+        onDataChange({ ...rideData, [field]: value });
+    };
+
+    const canSubmit = rideData.pickup && rideData.destination && !isCreating;
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in" onClick={() => !isCreating && onClose()}>
+            <div className="backdrop-blur-xl bg-white/95 rounded-3xl shadow-2xl w-full max-w-sm border-2 border-gray-200/60 max-h-[90vh] overflow-y-auto"
+                style={{
+                    boxShadow: '0 25px 70px -20px rgba(0,0,0,0.3)'
+                }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex justify-between items-center p-5 border-b-2 border-gray-200/60 sticky top-0 bg-white/95 backdrop-blur-sm z-10">
+                    <h3 className="font-bold text-lg md:text-xl text-gray-900">Create New Ride</h3>
+                    <button
+                        onClick={() => !isCreating && onClose()}
+                        disabled={isCreating}
+                        className="text-gray-400 hover:text-gray-600 p-2 rounded-xl hover:bg-gray-100 transition-all min-w-[44px] min-h-[44px] md:min-w-[36px] md:min-h-[36px] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <X size={20} className="md:w-5 md:h-5" strokeWidth={2.5} />
+                    </button>
+                </div>
+                <div className="p-5 md:p-6 space-y-4">
+                    <div>
+                        <label className="block text-xs md:text-sm uppercase text-gray-600 font-bold mb-2">Room Number (Optional)</label>
+                        <input
+                            type="text"
+                            value={rideData.roomNumber}
+                            onChange={(e) => handleChange('roomNumber', e.target.value)}
+                            placeholder="e.g. 101"
+                            disabled={isCreating}
+                            className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-3.5 md:p-3 text-gray-900 text-sm md:text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-h-[44px] transition-all caret-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{ caretColor: '#10b981' }}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs md:text-sm uppercase text-gray-600 font-bold mb-2">Pickup Location</label>
+                        <select
+                            value={rideData.pickup}
+                            onChange={(e) => handleChange('pickup', e.target.value)}
+                            disabled={isCreating}
+                            className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-3.5 md:p-3 text-gray-900 text-sm md:text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-h-[44px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <option value="">Select Pickup...</option>
+                            <option value="Current Location">Current Location</option>
+                            {locations.map(loc => (
+                                <option key={loc.id} value={loc.name}>{loc.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs md:text-sm uppercase text-gray-600 font-bold mb-2">Destination</label>
+                        <select
+                            value={rideData.destination}
+                            onChange={(e) => handleChange('destination', e.target.value)}
+                            disabled={isCreating}
+                            className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-3.5 md:p-3 text-gray-900 text-sm md:text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-h-[44px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <option value="">Select Destination...</option>
+                            {locations.map(loc => (
+                                <option key={loc.id} value={loc.name}>{loc.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <button
+                        onClick={onSubmit}
+                        disabled={!canSubmit}
+                        className="group relative w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold py-3.5 md:py-2 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed mt-4 text-base md:text-sm min-h-[56px] md:min-h-[48px] shadow-xl overflow-hidden transition-all flex items-center justify-center gap-2"
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                        {isCreating ? (
+                            <>
+                                <Loader2 size={20} className="animate-spin" />
+                                <span className="relative z-10">Creating Ride...</span>
+                            </>
+                        ) : (
+                            <span className="relative z-10">Start Trip</span>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};

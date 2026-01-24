@@ -1,0 +1,66 @@
+import React from 'react';
+import { Navigation, Clock, Loader2 } from 'lucide-react';
+import { RideRequest } from '../../types';
+import { formatTime, formatWaitingTime, getWaitingTimeColor, getPriorityInfo } from './utils/rideUtils';
+
+interface RideRequestCardProps {
+    ride: RideRequest;
+    currentTime: number;
+    loadingAction: string | null;
+    onAccept: (id: string) => void;
+}
+
+export const RideRequestCard: React.FC<RideRequestCardProps> = ({
+    ride,
+    currentTime,
+    loadingAction,
+    onAccept
+}) => {
+    const priorityInfo = getPriorityInfo(ride, currentTime);
+    const isAccepting = loadingAction === ride.id;
+    const isDisabled = loadingAction !== null;
+
+    return (
+        <div className="bg-white p-5 rounded-2xl border-2 border-gray-200 hover:border-emerald-400 hover:shadow-xl transition-all shadow-md">
+            <div className="flex items-start gap-4">
+                <div className="flex flex-col items-center min-w-[80px]">
+                    <div className="text-3xl font-black text-emerald-700 mb-1">#{ride.roomNumber}</div>
+                    <div className="text-sm text-gray-600 font-medium mb-2">{formatTime(ride.timestamp)}</div>
+                    {/* Priority Badge */}
+                    <div className={`${priorityInfo.color} ${priorityInfo.textColor} px-2 py-1 rounded-lg text-xs font-bold mb-2 ${priorityInfo.border ? `border ${priorityInfo.border}` : ''}`}>
+                        {priorityInfo.label}
+                    </div>
+                    {/* Waiting Time Display - Larger */}
+                    <div className={`text-sm mt-1 flex items-center gap-1.5 font-bold ${getWaitingTimeColor(ride.timestamp, currentTime)}`}>
+                        <Clock className="w-4 h-4" />
+                        <span>{formatWaitingTime(ride.timestamp, currentTime)}</span>
+                    </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="font-bold text-lg text-gray-900 mb-3">{ride.guestName}</div>
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-base text-gray-700">
+                            <div className="w-2 h-2 bg-gray-500 rounded-full flex-shrink-0"></div>
+                            <span className="font-medium">{ride.pickup}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-base text-emerald-700 font-bold">
+                            <Navigation className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                            <span>{ride.destination}</span>
+                        </div>
+                    </div>
+                </div>
+                <button
+                    onClick={() => onAccept(ride.id)}
+                    disabled={isAccepting || isDisabled}
+                    className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-6 py-4 rounded-xl font-bold text-base hover:from-emerald-700 hover:to-emerald-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg min-w-[120px] min-h-[56px] flex items-center justify-center"
+                >
+                    {isAccepting ? (
+                        <Loader2 size={20} className="animate-spin" />
+                    ) : (
+                        'Accept'
+                    )}
+                </button>
+            </div>
+        </div>
+    );
+};

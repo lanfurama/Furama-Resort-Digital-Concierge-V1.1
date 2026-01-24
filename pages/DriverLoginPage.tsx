@@ -1,5 +1,5 @@
 import React from 'react';
-import { StaffLogin } from '../components/login/StaffLogin';
+import { DriverLogin } from '../components/login/DriverLogin';
 import { UserRole } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
 import { setDriverOnlineFor10Hours } from '../services/dataService';
@@ -27,8 +27,7 @@ const DriverLoginPage: React.FC = () => {
   };
 
   return (
-    <StaffLogin
-      role={UserRole.DRIVER}
+    <DriverLogin
       onLoginSuccess={handleLoginSuccess}
       setLanguage={setLanguage}
     />
