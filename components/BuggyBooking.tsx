@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Car, Navigation, LocateFixed, CheckCircle, Loader2, ChevronDown, Map, Calendar, Clock } from 'lucide-react';
+import { MapPin, Car, Navigation, LocateFixed, CheckCircle, AlertCircle, Loader2, ChevronDown, Map, Calendar, Clock } from 'lucide-react';
 import { BuggyStatus, User, Location } from '../types';
 import { getLocations, getDriversWithLocations, updateRide } from '../services/dataService';
 import { calculateETAFromDriverToPickup, getDriverCoordinates } from '../services/locationService';
@@ -62,8 +62,8 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + duration);
-    } catch (error) {
-      console.error('Failed to play notification sound:', error);
+    } catch {
+      // Notification sound optional; fail silently
     }
   }, [soundEnabled]);
 
@@ -116,7 +116,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     setIsLoadingLocations(true);
     getLocations()
       .then(setLocations)
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => setIsLoadingLocations(false));
   }, []);
 
@@ -161,12 +161,12 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
               eta: eta
             });
             // ETA will be updated automatically by useRideStatus hook on next poll
-          } catch (error) {
-            console.error(`Failed to update ETA for ride ${activeRide.id}:`, error);
+          } catch {
+            // ETA update optional; skip on error
           }
         }
-      } catch (error) {
-        console.error('Failed to calculate ETA:', error);
+      } catch {
+        // ETA calculation optional; skip on error
       }
     };
 
@@ -220,8 +220,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     }
     try {
       await bookRide(pickup, destination, guestCount || 1, notes || undefined);
-    } catch (error) {
-      console.error('Failed to request ride:', error);
+    } catch {
       setNotification({ message: t('failed_to_request_ride'), type: 'warning' });
     }
   };
@@ -229,7 +228,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const handleCancel = async () => {
     if (!activeRide) return;
     if (activeRide.status === BuggyStatus.ON_TRIP || activeRide.status === BuggyStatus.COMPLETED) {
-      alert(t('cannot_cancel_picked_up'));
+      setNotification({ message: t('cannot_cancel_picked_up'), type: 'warning' });
       return;
     }
     if (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) {
@@ -244,13 +243,12 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
             if (cancelled) {
               setNotification({ message: `✅ ${t('ride_cancelled_success')}`, type: 'success' });
             }
-          } catch (error) {
-            console.error('Failed to cancel ride:', error);
-            alert(t('failed_to_cancel_ride'));
+          } catch {
+            setNotification({ message: t('failed_to_cancel_ride'), type: 'warning' });
           }
         }
       } else {
-        alert(t('cannot_cancel_assigned'));
+        setNotification({ message: t('cannot_cancel_assigned'), type: 'warning' });
       }
       return;
     }
@@ -264,9 +262,8 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
           if (cancelled) {
             setNotification({ message: `✅ ${t('ride_cancelled_success')}`, type: 'success' });
           }
-        } catch (error) {
-          console.error('Failed to cancel ride:', error);
-          alert(t('failed_to_cancel_ride'));
+        } catch {
+          setNotification({ message: t('failed_to_cancel_ride'), type: 'warning' });
         }
       }
     }
@@ -747,23 +744,27 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
             <div className="mb-4">
               <h3 className="text-sm font-bold text-gray-700 mb-2">{t('recent_locations')}</h3>
               <div className="space-y-2">
-                {recentLocations.map((loc, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSetDestination(loc)}
-                    className="w-full flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all text-left"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                      <Clock className="w-5 h-5 text-gray-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-gray-900 truncate">{loc}</div>
-                      <div className="text-xs text-gray-500 truncate">
-                        {locations.find(l => l.name === loc)?.address || loc}
+                {recentLocations.map((loc, index) => {
+                  const match = locations.find(l => l.name === loc);
+                  const typeLabel = match?.type === 'VILLA' ? t('location_type_villa') : match?.type === 'FACILITY' ? t('location_type_facility') : match?.type === 'RESTAURANT' ? t('location_type_restaurant') : null;
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => handleSetDestination(loc)}
+                      className="w-full flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all text-left active:scale-[0.99] touch-manipulation"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <Clock className="w-5 h-5 text-gray-500" />
                       </div>
-                    </div>
-                  </button>
-                ))}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-gray-900 truncate">{loc}</div>
+                        {typeLabel && (
+                          <div className="text-xs text-gray-500 truncate">{typeLabel}</div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1259,12 +1260,13 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
       {/* Notification Toast */}
       {notification && (
-        <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-5 ${notification.type === 'success' ? 'bg-emerald-500' :
+        <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-5 flex items-center gap-2.5 px-5 py-3 rounded-xl shadow-2xl max-w-sm ${
+          notification.type === 'success' ? 'bg-emerald-500' :
           notification.type === 'info' ? 'bg-blue-500' :
-            'bg-amber-500'
-          } text-white px-6 py-3 rounded-lg shadow-2xl flex items-center gap-2 max-w-sm`}>
-          <CheckCircle size={20} />
-          <span className="font-semibold">{notification.message}</span>
+          'bg-amber-500'
+        } text-white`}>
+          {notification.type === 'warning' ? <AlertCircle size={20} className="flex-shrink-0" /> : <CheckCircle size={20} className="flex-shrink-0" />}
+          <span className="font-semibold text-sm">{notification.message}</span>
         </div>
       )}
 
@@ -1273,11 +1275,9 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         isOpen={showGpsModal}
         onCancel={() => {
           setShowGpsModal(false);
-          setIsDetectingLocation(false);
         }}
         onManualSelect={() => {
           setShowGpsModal(false);
-          setIsDetectingLocation(false);
           setShowPickupDropdown(true);
         }}
       />

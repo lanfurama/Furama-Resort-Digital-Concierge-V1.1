@@ -230,13 +230,13 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
             <div className="flex items-center gap-1.5 text-xs text-gray-600">
               <span className="font-semibold">👥</span>
               <span>
-                {activeRide.guestCount || 1} {activeRide.guestCount === 1 ? 'guest' : 'guests'}
+                {activeRide.guestCount || 1} {activeRide.guestCount === 1 ? t('guest') : t('guests')}
               </span>
             </div>
             {sharedRidesInfo && sharedRidesInfo.sharedCount > 0 && (
               <div className="flex items-center gap-1.5 text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-lg border border-blue-200">
                 <span className="font-semibold">🔗</span>
-                <span>Shared ride ({sharedRidesInfo.totalGuests} total guests)</span>
+                <span>{t('shared_ride_total').replace('{count}', String(sharedRidesInfo.totalGuests))}</span>
               </div>
             )}
           </div>
@@ -310,18 +310,18 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
             }`}
           ></div>
           <p className="font-semibold flex-1">
-            {activeRide.status === BuggyStatus.ON_TRIP && `🎉 On the way to ${activeRide.destination}`}
+            {activeRide.status === BuggyStatus.ON_TRIP && `🎉 ${t('status_on_the_way_to')} ${activeRide.destination}`}
             {(activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) &&
               arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME &&
-              'Driver delayed over 15 min. You can cancel if needed.'}
+              t('status_driver_delayed')}
             {(activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) &&
               arrivingElapsedTime >= ARRIVING_WARNING_TIME &&
               arrivingElapsedTime < MAX_ARRIVING_WAIT_TIME &&
-              'Driver arriving for over 5 min. Please wait.'}
+              t('status_driver_arriving_wait')}
             {(activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) &&
               arrivingElapsedTime < ARRIVING_WARNING_TIME &&
-              `🚗 Driver ${activeRide.status === BuggyStatus.ASSIGNED ? 'on the way' : 'arriving'}${activeRide.eta ? ` (${activeRide.eta} min)` : ''}`}
-            {activeRide.status === BuggyStatus.SEARCHING && '⏳ Searching for available driver...'}
+              `🚗 ${t('driver_label')} ${activeRide.status === BuggyStatus.ASSIGNED ? t('status_driver_on_the_way') : t('status_driver_arriving')}${activeRide.eta ? ` (${activeRide.eta} min)` : ''}`}
+            {activeRide.status === BuggyStatus.SEARCHING && `⏳ ${t('status_searching')}`}
           </p>
         </div>
 

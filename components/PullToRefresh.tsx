@@ -161,7 +161,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({
             {/* Content Container */}
             <div
                 ref={contentRef}
-                className="flex-1 overflow-y-auto no-scrollbar scroll-smooth"
+                className="flex-1 min-h-0 overflow-y-auto no-scrollbar scroll-smooth"
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}

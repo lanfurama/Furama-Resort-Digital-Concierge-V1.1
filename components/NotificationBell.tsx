@@ -15,22 +15,30 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, variant = '
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [hasNewNotification, setHasNewNotification] = useState(false);
+    const prevUnreadCountRef = React.useRef(0);
 
     // Poll for notifications
     useEffect(() => {
         const fetch = async () => {
             try {
                 if (!userId) {
-                    console.warn('NotificationBell: userId is empty');
                     return;
                 }
-                console.log('NotificationBell: Fetching notifications for userId:', userId);
                 const list = await getNotifications(userId);
-                console.log('NotificationBell: Received notifications:', list);
+                const newUnreadCount = list.filter(n => !n.isRead).length;
+                
+                // Detect new notifications
+                if (newUnreadCount > prevUnreadCountRef.current && prevUnreadCountRef.current > 0) {
+                    setHasNewNotification(true);
+                    setTimeout(() => setHasNewNotification(false), 2000);
+                }
+                
                 setNotifications(list);
-                setUnreadCount(list.filter(n => !n.isRead).length);
+                setUnreadCount(newUnreadCount);
+                prevUnreadCountRef.current = newUnreadCount;
             } catch (error) {
-                console.error('NotificationBell: Error fetching notifications:', error);
+                // Error handled silently - notifications are non-critical
             }
         };
         
@@ -70,17 +78,18 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, variant = '
         <div className="relative z-[100]">
             <button 
                 onClick={toggleOpen}
-                className={`relative p-1.5 rounded-lg transition-all duration-300 ${
+                className={`relative p-1.5 sm:p-2 rounded-lg transition-all duration-200 touch-manipulation active:scale-95 ${
                     isLight 
                         ? 'hover:bg-gray-100 border border-transparent' 
                         : 'hover:bg-white/10 border border-white/10 hover:border-white/20 backdrop-blur-sm'
-                }`}
+                } ${hasNewNotification ? 'animate-bounce' : ''}`}
+                aria-label={`${t('notifications')}${unreadCount > 0 ? ` (${unreadCount} ${t('notifications')})` : ''}`}
             >
-                <Bell className={`w-5 h-5 ${isLight ? 'text-gray-600' : 'text-white/90'}`} strokeWidth={2.5} />
+                <Bell className={`w-5 h-5 sm:w-6 sm:h-6 ${isLight ? 'text-gray-600' : 'text-white/90'} transition-transform ${hasNewNotification ? 'shake-once' : ''}`} strokeWidth={2.5} />
                 {unreadCount > 0 && (
-                    <span className={`absolute -top-0.5 -right-0.5 w-5 h-5 bg-gradient-to-r from-red-500 to-pink-600 text-white text-[10px] font-black flex items-center justify-center rounded-full shadow-lg border-2 ${
+                    <span className={`absolute -top-0.5 -right-0.5 w-5 h-5 sm:w-6 sm:h-6 bg-gradient-to-r from-red-500 to-pink-600 text-white text-[10px] sm:text-xs font-black flex items-center justify-center rounded-full shadow-lg border-2 ${
                         isLight ? 'border-white' : 'border-emerald-800'
-                    } animate-pulse`}>
+                    } ${hasNewNotification ? 'animate-bounce scale-110' : 'animate-pulse'}`}>
                         {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                 )}

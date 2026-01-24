@@ -376,42 +376,47 @@ const AppContent: React.FC = () => {
 
     return (
       <div className="flex flex-col h-screen bg-gray-50 max-w-md mx-auto shadow-2xl overflow-hidden relative">
-        {/* Header */}
+        {/* Header - Improved UX */}
         <div
-          className="backdrop-blur-md bg-gradient-to-r from-emerald-700 via-emerald-800 to-teal-800 text-white pt-3 pb-3 px-4 flex justify-between items-center shadow-xl z-30 shrink-0 border-b border-white/10"
-          style={{ boxShadow: '0 4px 20px -5px rgba(0,0,0,0.3)' }}
+          className="backdrop-blur-md bg-gradient-to-r from-emerald-700 via-emerald-800 to-teal-800 text-white pt-safe pb-3 px-4 flex justify-between items-center shadow-xl z-30 shrink-0 border-b border-white/10"
+          style={{ 
+            boxShadow: '0 4px 20px -5px rgba(0,0,0,0.3)',
+            paddingTop: 'max(0.75rem, calc(0.75rem + env(safe-area-inset-top)))'
+          }}
         >
-          <div className="flex items-center space-x-2.5 flex-1 min-w-0">
+          <div className="flex items-center space-x-3 flex-1 min-w-0">
             <div className="relative flex-shrink-0">
-              <div className="w-10 h-10 bg-gradient-to-br from-white/20 to-white/10 rounded-xl flex items-center justify-center border-2 border-white/30 shadow-lg backdrop-blur-sm">
-                <span className="font-bold text-lg text-white">{user.lastName.charAt(0)}</span>
+              <div className="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-br from-white/20 to-white/10 rounded-xl flex items-center justify-center border-2 border-white/30 shadow-lg backdrop-blur-sm transition-transform active:scale-95">
+                <span className="font-bold text-lg sm:text-xl text-white">{user.lastName.charAt(0)}</span>
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-emerald-800 shadow-md"></div>
+              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-emerald-800 shadow-md animate-pulse"></div>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[9px] text-emerald-200 uppercase tracking-wider font-semibold mb-0.5">{t('welcome_back')}</p>
-              <h1 className="font-bold text-base leading-tight truncate text-white">{user.lastName}</h1>
+              <p className="text-[10px] sm:text-xs text-emerald-200 uppercase tracking-wider font-semibold mb-0.5 leading-tight">{t('welcome_back')}</p>
+              <h1 className="font-bold text-base sm:text-lg leading-tight truncate text-white">{user.lastName}</h1>
               {user.roomNumber && (
-                <p className="text-[10px] text-emerald-200/80 mt-0.5">Room {user.roomNumber}</p>
+                <p className="text-[11px] sm:text-xs text-emerald-200/90 mt-0.5 font-medium">{t('room')} {user.roomNumber}</p>
               )}
             </div>
           </div>
-          <div className="flex items-center space-x-1.5 flex-shrink-0 ml-2">
+          <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
             <NotificationBell userId={user.roomNumber} />
             <button
               onClick={handleLogout}
-              className="p-2 rounded-xl hover:bg-white/10 text-white/90 hover:text-white transition-all duration-300 border border-white/10 hover:border-white/20 backdrop-blur-sm"
-              title="Logout"
+              className="p-2 rounded-xl hover:bg-white/10 active:bg-white/15 text-white/90 hover:text-white transition-all duration-200 border border-white/10 hover:border-white/20 backdrop-blur-sm touch-manipulation"
+              title={t('logout') || 'Logout'}
+              aria-label={t('logout') || 'Logout'}
             >
-              <LogOut size={17} strokeWidth={2.5} />
+              <LogOut size={18} strokeWidth={2.5} />
             </button>
           </div>
         </div>
 
         {/* Main Content */}
-        <PullToRefresh onRefresh={handleRefresh}>
-          <div 
-            className={`flex-1 pb-20 relative bg-gray-50 scrollbar-hide ${view === AppView.BUGGY ? 'overflow-hidden h-full' : 'min-h-full'}`}
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <PullToRefresh onRefresh={handleRefresh}>
+            <div
+              className={`flex-1 pb-20 relative bg-gray-50 scrollbar-hide ${view === AppView.BUGGY ? 'overflow-hidden h-full' : 'min-h-full'}`}
             style={view === AppView.BUGGY ? {
               overflow: 'hidden',
               height: '100%',
@@ -545,7 +550,8 @@ const AppContent: React.FC = () => {
               </Suspense>
             )}
           </div>
-        </PullToRefresh>
+          </PullToRefresh>
+        </div>
 
         {/* Bottom Navigation */}
         <div
@@ -741,7 +747,8 @@ const AppContent: React.FC = () => {
 
   return (
     <BuggyStatusProvider user={user} currentView={view}>
-      <PWAInstallPrompt />
+      {/* PWA Install Prompt - Disabled */}
+      {/* <PWAInstallPrompt /> */}
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<GuestLoginPage />} />

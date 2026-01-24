@@ -125,13 +125,17 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
 
   return (
     <>
-      {/* Overlay */}
-      <div className="fixed inset-0 bg-black/50 z-[60] pointer-events-none" />
-      {/* Modal */}
-      <div className="fixed inset-0 z-[70] flex items-center justify-center px-4 pt-12 pb-24 pointer-events-none">
+      {/* Overlay (visual only; click-to-close via modal container) */}
+      <div className="fixed inset-0 bg-black/50 z-[60]" aria-hidden="true" />
+      {/* Modal - click backdrop to close */}
+      <div
+        className="fixed inset-0 z-[70] flex items-center justify-center px-4 pt-12 pb-24"
+        onClick={onClose}
+      >
         <div
           ref={modalRef}
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[calc(100vh-14rem)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 pointer-events-auto"
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[calc(100vh-14rem)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+          onClick={(e) => e.stopPropagation()}
         >
           {/* Modal Header */}
           <div className={`flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r ${gradientFrom} flex-shrink-0`}>
