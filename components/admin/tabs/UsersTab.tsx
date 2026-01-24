@@ -331,17 +331,48 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                     {selectedDriverForSchedule && (
                         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                             <div className="p-4 border-b border-gray-200 bg-gray-50">
-                                <h3 className="font-bold text-lg text-gray-800">Driver Schedules</h3>
-                                <p className="text-sm text-gray-500 mt-1">Manage work shifts and days off for drivers</p>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h3 className="font-bold text-lg text-gray-800">Driver Schedules</h3>
+                                        <p className="text-sm text-gray-500 mt-1">Manage work shifts and days off for drivers</p>
+                                    </div>
+                                    {editingSchedule && (
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-100 border border-amber-300 rounded-lg">
+                                            <Pencil size={14} className="text-amber-700" />
+                                            <span className="text-sm font-semibold text-amber-800">Editing Schedule</span>
+                                            <button
+                                                onClick={() => {
+                                                    setEditingSchedule(null);
+                                                    setNewSchedule({
+                                                        date: new Date().toISOString().split('T')[0],
+                                                        shift_start: '08:00:00',
+                                                        shift_end: '17:00:00',
+                                                        is_day_off: false,
+                                                        notes: null
+                                                    });
+                                                }}
+                                                className="ml-2 text-amber-700 hover:text-amber-900"
+                                                title="Cancel Edit"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                            <div className="p-4">
-                                <div className="space-y-4">
+                            <div className="p-4" data-schedule-form>
+                                <div className={`space-y-4 ${editingSchedule ? 'bg-amber-50/50 p-4 rounded-lg border-2 border-amber-200' : ''}`}>
+                                    {editingSchedule && (
+                                        <div className="mb-3 p-2 bg-amber-100 border border-amber-300 rounded text-sm text-amber-800">
+                                            <strong>Editing:</strong> Schedule for {editingSchedule.date} - Click "Update Schedule" to save changes or click X to cancel.
+                                        </div>
+                                    )}
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                         <div>
                                             <label className="block text-xs font-semibold text-gray-500 mb-1">Date</label>
                                             <input
                                                 type="date"
-                                                className="w-full border border-gray-300 rounded p-2 text-sm"
+                                                className={`w-full border rounded p-2 text-sm ${editingSchedule ? 'border-amber-400 bg-white' : 'border-gray-300'}`}
                                                 value={newSchedule.date}
                                                 onChange={(e) => setNewSchedule({ ...newSchedule, date: e.target.value })}
                                             />
@@ -350,7 +381,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                             <label className="block text-xs font-semibold text-gray-500 mb-1">Shift Start</label>
                                             <input
                                                 type="time"
-                                                className="w-full border border-gray-300 rounded p-2 text-sm"
+                                                className={`w-full border rounded p-2 text-sm ${editingSchedule ? 'border-amber-400 bg-white' : 'border-gray-300'}`}
                                                 value={newSchedule.shift_start}
                                                 onChange={(e) => setNewSchedule({ ...newSchedule, shift_start: e.target.value })}
                                             />
@@ -359,15 +390,19 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                             <label className="block text-xs font-semibold text-gray-500 mb-1">Shift End</label>
                                             <input
                                                 type="time"
-                                                className="w-full border border-gray-300 rounded p-2 text-sm"
+                                                className={`w-full border rounded p-2 text-sm ${editingSchedule ? 'border-amber-400 bg-white' : 'border-gray-300'}`}
                                                 value={newSchedule.shift_end}
                                                 onChange={(e) => setNewSchedule({ ...newSchedule, shift_end: e.target.value })}
                                             />
                                         </div>
-                                        <div className="flex items-end">
+                                        <div className="flex items-end gap-2">
                                             <button
                                                 onClick={saveSchedule}
-                                                className="w-full bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700"
+                                                className={`flex-1 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+                                                    editingSchedule 
+                                                        ? 'bg-amber-600 hover:bg-amber-700 text-white' 
+                                                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                                }`}
                                             >
                                                 {editingSchedule ? 'Update' : 'Add'} Schedule
                                             </button>
@@ -393,43 +428,81 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                         />
                                     </div>
                                 </div>
-                                <div className="mt-6 space-y-2">
-                                    {driverSchedules.filter(s => s.driver_id === selectedDriverForSchedule).map((schedule) => (
-                                        <div key={schedule.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                            <div className="flex items-center gap-4">
-                                                <Clock size={16} className="text-gray-400" />
-                                                <div>
-                                                    <div className="font-semibold text-sm">{schedule.date}</div>
-                                                    <div className="text-xs text-gray-500">
-                                                        {schedule.is_day_off ? 'Day Off' : `${schedule.shift_start} - ${schedule.shift_end}`}
+                                <div className="mt-6">
+                                    <h4 className="text-sm font-bold text-gray-700 mb-3">Existing Schedules:</h4>
+                                    {driverSchedules.filter(s => s.driver_id === selectedDriverForSchedule).length === 0 ? (
+                                        <div className="text-center py-8 text-gray-500 text-sm">
+                                            No schedules found for this driver in the selected date range.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {driverSchedules.filter(s => s.driver_id === selectedDriverForSchedule).map((schedule) => (
+                                                <div 
+                                                    key={schedule.id} 
+                                                    className={`flex items-center justify-between p-3 rounded-lg transition-all ${
+                                                        editingSchedule?.id === schedule.id 
+                                                            ? 'bg-amber-100 border-2 border-amber-400 shadow-md' 
+                                                            : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-4">
+                                                        <Clock size={16} className={editingSchedule?.id === schedule.id ? 'text-amber-600' : 'text-gray-400'} />
+                                                        <div>
+                                                            <div className={`font-semibold text-sm ${editingSchedule?.id === schedule.id ? 'text-amber-900' : 'text-gray-800'}`}>
+                                                                {schedule.date}
+                                                            </div>
+                                                            <div className={`text-xs ${editingSchedule?.id === schedule.id ? 'text-amber-700' : 'text-gray-500'}`}>
+                                                                {schedule.is_day_off ? (
+                                                                    <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-semibold">Day Off</span>
+                                                                ) : (
+                                                                    `${schedule.shift_start.substring(0, 5)} - ${schedule.shift_end.substring(0, 5)}`
+                                                                )}
+                                                                {schedule.notes && (
+                                                                    <span className="ml-2 text-gray-400">• {schedule.notes}</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingSchedule(schedule);
+                                                                setNewSchedule({
+                                                                    date: schedule.date,
+                                                                    shift_start: schedule.shift_start,
+                                                                    shift_end: schedule.shift_end,
+                                                                    is_day_off: schedule.is_day_off,
+                                                                    notes: schedule.notes
+                                                                });
+                                                                // Scroll to form
+                                                                setTimeout(() => {
+                                                                    const formElement = document.querySelector('[data-schedule-form]');
+                                                                    if (formElement) {
+                                                                        formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                                    }
+                                                                }, 100);
+                                                            }}
+                                                            className={`p-1.5 rounded transition-colors ${
+                                                                editingSchedule?.id === schedule.id 
+                                                                    ? 'bg-amber-600 text-white hover:bg-amber-700' 
+                                                                    : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'
+                                                            }`}
+                                                            title="Edit Schedule"
+                                                        >
+                                                            <Pencil size={14} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => deleteSchedule(schedule.driver_id, schedule.date)}
+                                                            className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition-colors"
+                                                            title="Delete Schedule"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => {
-                                                        setEditingSchedule(schedule);
-                                                        setNewSchedule({
-                                                            date: schedule.date,
-                                                            shift_start: schedule.shift_start,
-                                                            shift_end: schedule.shift_end,
-                                                            is_day_off: schedule.is_day_off,
-                                                            notes: schedule.notes
-                                                        });
-                                                    }}
-                                                    className="text-emerald-600 hover:text-emerald-700 p-1"
-                                                >
-                                                    <Pencil size={14} />
-                                                </button>
-                                                <button
-                                                    onClick={() => deleteSchedule(schedule.driver_id, schedule.date)}
-                                                    className="text-red-500 hover:text-red-700 p-1"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
+                                            ))}
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             </div>
                         </div>
