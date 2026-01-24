@@ -54,9 +54,9 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
 
   return (
     <div
-      className={`mx-3 mt-3 mb-4 rounded-2xl shadow-xl backdrop-blur-lg bg-white/90 border flex-shrink-0 p-3.5 overflow-hidden transition-all duration-500 ${
+      className={`mx-3 mt-3 mb-4 rounded-2xl shadow-xl backdrop-blur-lg bg-white/90 border flex-shrink-0 p-3.5 overflow-hidden ${
         activeRide.status === BuggyStatus.SEARCHING && elapsedTime >= MAX_WAIT_TIME
-          ? 'border-red-400 border-2 animate-pulse ring-4 ring-red-200'
+          ? 'border-red-400 border-2 ring-4 ring-red-200'
           : 'border-white/60'
       }`}
       style={{
@@ -65,24 +65,11 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
       }}
     >
       <div className="flex flex-col space-y-2.5">
-        {/* Animated Buggy Icon Section - Optimized */}
+        {/* Buggy Icon Section */}
         <div className="flex justify-center items-center py-4 relative">
-          <div 
-            className={`relative will-change-transform ${
-              activeRide.status === BuggyStatus.SEARCHING 
-                ? 'animate-buggy-searching' 
-                : activeRide.status === BuggyStatus.ASSIGNED 
-                ? 'animate-buggy-assigned'
-                : activeRide.status === BuggyStatus.ARRIVING
-                ? 'animate-buggy-arriving'
-                : activeRide.status === BuggyStatus.ON_TRIP
-                ? 'animate-buggy-on-trip'
-                : 'animate-buggy-completed'
-            }`}
-            style={{ transform: 'translateZ(0)' }}
-          >
+          <div className="relative">
             {/* Buggy Icon with different colors per status */}
-            <div className={`p-4 rounded-2xl border-2 transition-colors duration-300 ${
+            <div className={`p-4 rounded-2xl border-2 ${
               activeRide.status === BuggyStatus.SEARCHING
                 ? 'bg-blue-100 border-blue-300'
                 : activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING
@@ -95,7 +82,7 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
             >
               <Car 
                 size={48} 
-                className={`transition-colors duration-300 ${
+                className={`${
                   activeRide.status === BuggyStatus.SEARCHING
                     ? 'text-blue-600'
                     : activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING
@@ -108,28 +95,9 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
               />
             </div>
             
-            {/* Status indicator rings - Optimized with will-change */}
-            {(activeRide.status === BuggyStatus.SEARCHING || activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && (
-              <div 
-                className={`absolute inset-0 rounded-2xl ${
-                  activeRide.status === BuggyStatus.SEARCHING
-                    ? 'bg-blue-400'
-                    : 'bg-emerald-400'
-                } opacity-20`}
-                style={{ 
-                  willChange: 'transform, opacity',
-                  transform: 'translateZ(0)',
-                  animation: 'buggy-ping-optimized 2s cubic-bezier(0, 0, 0.2, 1) infinite'
-                }}
-              ></div>
-            )}
-            
             {/* Checkmark for completed */}
             {activeRide.status === BuggyStatus.COMPLETED && (
-              <div 
-                className="absolute -top-1 -right-1 bg-green-500 rounded-full p-1 animate-buggy-checkmark"
-                style={{ transform: 'translateZ(0)' }}
-              >
+              <div className="absolute -top-1 -right-1 bg-green-500 rounded-full p-1">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
@@ -143,7 +111,7 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
           {/* Status Badge with Chat Button */}
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <div
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all duration-500 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 ${
                 activeRide.status === BuggyStatus.SEARCHING
                   ? 'bg-blue-100 text-blue-700 border border-blue-200'
                   : activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING
@@ -154,11 +122,11 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
               }`}
             >
               <div
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                className={`w-2 h-2 rounded-full ${
                   activeRide.status === BuggyStatus.SEARCHING
-                    ? 'bg-blue-500 animate-ping'
+                    ? 'bg-blue-500'
                     : activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING
-                    ? 'bg-emerald-500 animate-pulse'
+                    ? 'bg-emerald-500'
                     : activeRide.status === BuggyStatus.ON_TRIP
                     ? 'bg-purple-500'
                     : 'bg-green-500'
@@ -175,7 +143,7 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
             {activeRide.status !== BuggyStatus.SEARCHING && driverName && (
               <button
                 onClick={handleChatClick}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold ${
                   isChatOpen
                     ? 'bg-emerald-600 text-white shadow-md'
                     : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
@@ -238,23 +206,19 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
               }`}
             ></div>
 
-            {/* Animated Buggy - Coming to pickup - Optimized */}
+            {/* Buggy - Coming to pickup */}
             {(activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && (
               <div
                 className="absolute top-1/2 z-10"
                 style={{
                   left: `${Math.min(95, Math.max(5, 5 + (arrivingElapsedTime / Math.max(1, (activeRide.eta ? activeRide.eta * 60 : 300))) * 90))}%`,
-                  transform: 'translate(-50%, -50%) translateZ(0)',
-                  willChange: 'left',
-                  transition: 'left 0.5s ease-out'
+                  transform: 'translate(-50%, -50%)'
                 }}
               >
                 <div 
                   className="relative bg-emerald-600 p-1.5 rounded-lg border-2 border-white"
                   style={{
-                    transform: 'translateZ(0)',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                    animation: 'buggy-bounce-optimized 1s ease-in-out infinite'
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                   }}
                 >
                   <Car size={14} className="text-white" strokeWidth={2.5} />
@@ -262,7 +226,7 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
               </div>
             )}
 
-            {/* Animated Buggy - On trip - Optimized */}
+            {/* Buggy - On trip */}
             {activeRide.status === BuggyStatus.ON_TRIP && activeRide.pickedUpAt && (() => {
               const tripDuration = Math.floor((Date.now() - activeRide.pickedUpAt) / 1000);
               const estimatedTripTime = activeRide.eta ? activeRide.eta * 60 : 300;
@@ -272,17 +236,13 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
                   className="absolute top-1/2 z-10"
                   style={{
                     left: `${progress}%`,
-                    transform: 'translate(-50%, -50%) translateZ(0)',
-                    willChange: 'left',
-                    transition: 'left 0.5s ease-out'
+                    transform: 'translate(-50%, -50%)'
                   }}
                 >
                   <div 
                     className="relative bg-purple-600 p-1.5 rounded-lg border-2 border-white"
                     style={{
-                      transform: 'translateZ(0)',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                      animation: 'buggy-bounce-optimized 1s ease-in-out infinite'
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                     }}
                   >
                     <Car size={14} className="text-white" strokeWidth={2.5} />
@@ -306,9 +266,9 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
               <div
                 className={`w-2.5 h-2.5 rounded-full border-2 border-white ${
                   activeRide.status === BuggyStatus.ON_TRIP
-                    ? 'bg-purple-500 animate-pulse'
+                    ? 'bg-purple-500'
                     : activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING
-                    ? 'bg-emerald-500 animate-pulse'
+                    ? 'bg-emerald-500'
                     : 'bg-emerald-500'
                 }`}
               ></div>
@@ -342,16 +302,14 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
             </div>
           )}
 
-          {/* Progress Bar - Optimized */}
+          {/* Progress Bar */}
           {(activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && (
             <div className="mt-2.5 pt-2.5 border-t border-gray-200">
               <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
                 <div
-                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-500"
+                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full"
                   style={{
-                    width: `${Math.min(100, Math.max(15, 100 - (arrivingElapsedTime / Math.max(1, (activeRide.eta ? activeRide.eta * 60 : 300))) * 85))}%`,
-                    willChange: 'width',
-                    transform: 'translateZ(0)'
+                    width: `${Math.min(100, Math.max(15, 100 - (arrivingElapsedTime / Math.max(1, (activeRide.eta ? activeRide.eta * 60 : 300))) * 85))}%`
                   }}
                 ></div>
               </div>
@@ -366,11 +324,9 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
               <div className="mt-2.5 pt-2.5 border-t border-gray-200">
                 <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div
-                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full transition-all duration-500"
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full"
                     style={{ 
-                      width: `${progress}%`,
-                      willChange: 'width',
-                      transform: 'translateZ(0)'
+                      width: `${progress}%`
                     }}
                   ></div>
                 </div>
@@ -396,14 +352,14 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
           <div
             className={`w-2 h-2 rounded-full ${
               activeRide.status === BuggyStatus.ON_TRIP
-                ? 'bg-purple-500 animate-pulse'
+                ? 'bg-purple-500'
                 : activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING
                 ? arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME
-                  ? 'bg-red-600 animate-pulse'
+                  ? 'bg-red-600'
                   : arrivingElapsedTime >= ARRIVING_WARNING_TIME
                   ? 'bg-orange-500'
-                  : 'bg-emerald-500 animate-pulse'
-                : 'bg-blue-500 animate-pulse'
+                  : 'bg-emerald-500'
+                : 'bg-blue-500'
             }`}
           ></div>
           <p className="font-semibold flex-1">
@@ -426,7 +382,7 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
         {canCancel && (
           <button
             onClick={onCancel}
-            className={`group relative w-full py-3 font-bold rounded-xl transition-all duration-300 flex flex-row items-center justify-center gap-2 text-sm overflow-hidden touch-manipulation shadow-md hover:shadow-lg ${
+            className={`group relative w-full py-3 font-bold rounded-xl flex flex-row items-center justify-center gap-2 text-sm overflow-hidden touch-manipulation shadow-md ${
               (activeRide.status === BuggyStatus.SEARCHING && elapsedTime >= MAX_WAIT_TIME) ||
               ((activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) &&
                 arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME)
@@ -453,125 +409,6 @@ export const RideStatusCard: React.FC<RideStatusCardProps> = ({
         )}
       </div>
 
-      {/* Custom Animations - Optimized for Performance */}
-      <style>{`
-        @keyframes buggy-searching {
-          0%, 100% {
-            transform: translate3d(0, 0, 0) rotate(0deg);
-          }
-          25% {
-            transform: translate3d(0, -8px, 0) rotate(-3deg);
-          }
-          50% {
-            transform: translate3d(0, -10px, 0) rotate(0deg);
-          }
-          75% {
-            transform: translate3d(0, -8px, 0) rotate(3deg);
-          }
-        }
-        
-        @keyframes buggy-assigned {
-          0% {
-            transform: translate3d(0, 20px, 0) scale(0.9);
-            opacity: 0;
-          }
-          100% {
-            transform: translate3d(0, 0, 0) scale(1);
-            opacity: 1;
-          }
-        }
-        
-        @keyframes buggy-arriving {
-          0%, 100% {
-            transform: translate3d(0, 0, 0);
-          }
-          50% {
-            transform: translate3d(-3px, 0, 0);
-          }
-        }
-        
-        @keyframes buggy-on-trip {
-          0%, 100% {
-            transform: translate3d(0, 0, 0);
-          }
-          50% {
-            transform: translate3d(0, -3px, 0);
-          }
-        }
-        
-        @keyframes buggy-completed {
-          0%, 100% {
-            transform: translate3d(0, 0, 0) scale(1);
-          }
-          50% {
-            transform: translate3d(0, 0, 0) scale(1.05);
-          }
-        }
-        
-        @keyframes buggy-checkmark {
-          0% {
-            transform: translate3d(0, 0, 0) scale(0) rotate(-90deg);
-            opacity: 0;
-          }
-          100% {
-            transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
-            opacity: 1;
-          }
-        }
-        
-        @keyframes buggy-bounce-optimized {
-          0%, 100% {
-            transform: translate3d(0, 0, 0);
-          }
-          50% {
-            transform: translate3d(0, -2px, 0);
-          }
-        }
-        
-        @keyframes buggy-ping-optimized {
-          0% {
-            transform: translate3d(-50%, -50%, 0) scale(0.8);
-            opacity: 0.2;
-          }
-          50% {
-            opacity: 0.1;
-          }
-          100% {
-            transform: translate3d(-50%, -50%, 0) scale(1.5);
-            opacity: 0;
-          }
-        }
-        
-        .animate-buggy-searching {
-          animation: buggy-searching 2s ease-in-out infinite;
-          will-change: transform;
-        }
-        
-        .animate-buggy-assigned {
-          animation: buggy-assigned 0.4s ease-out forwards;
-          will-change: transform, opacity;
-        }
-        
-        .animate-buggy-arriving {
-          animation: buggy-arriving 1.2s ease-in-out infinite;
-          will-change: transform;
-        }
-        
-        .animate-buggy-on-trip {
-          animation: buggy-on-trip 1.5s ease-in-out infinite;
-          will-change: transform;
-        }
-        
-        .animate-buggy-completed {
-          animation: buggy-completed 0.4s ease-out;
-          will-change: transform;
-        }
-        
-        .animate-buggy-checkmark {
-          animation: buggy-checkmark 0.4s ease-out forwards;
-          will-change: transform, opacity;
-        }
-      `}</style>
     </div>
   );
 };

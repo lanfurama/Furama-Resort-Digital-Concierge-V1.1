@@ -429,7 +429,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         <div className="px-4 py-3 flex items-center justify-between relative z-10">
           <button
             onClick={onBack}
-            className="text-white hover:bg-white/20 rounded-full p-2 transition-all duration-300 transform hover:scale-110 active:scale-95 backdrop-blur-sm"
+            className="text-white hover:bg-white/20 rounded-full p-2 backdrop-blur-sm"
           >
             <Navigation className="w-5 h-5 rotate-180" />
           </button>
@@ -466,8 +466,8 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       {/* Old status card - replaced by RideStatusCard component */}
       {false && activeRide && (
         <div
-          className={`mx-3 mt-3 mb-32 rounded-2xl shadow-xl backdrop-blur-lg bg-white/90 border flex-shrink-0 p-3.5 overflow-hidden transition-all duration-500 ${activeRide.status === BuggyStatus.SEARCHING && elapsedTime >= MAX_WAIT_TIME
-            ? 'border-red-400 border-2 animate-pulse ring-4 ring-red-200'
+          className={`mx-3 mt-3 mb-32 rounded-2xl shadow-xl backdrop-blur-lg bg-white/90 border flex-shrink-0 p-3.5 overflow-hidden ${activeRide.status === BuggyStatus.SEARCHING && elapsedTime >= MAX_WAIT_TIME
+            ? 'border-red-400 border-2 ring-4 ring-red-200'
             : 'border-white/60'
             }`}
           style={{
@@ -479,7 +479,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
             {/* Status & ETA - Balanced Header */}
             <div className="flex items-center justify-between gap-2.5">
               {/* Status Badge */}
-              <div className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all duration-500 ${activeRide.status === BuggyStatus.SEARCHING
+              <div className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 ${activeRide.status === BuggyStatus.SEARCHING
                 ? 'bg-blue-100 text-blue-700 border border-blue-200'
                 : activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING
                   ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
@@ -487,8 +487,8 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                     ? 'bg-purple-100 text-purple-700 border border-purple-200'
                     : 'bg-green-100 text-green-700 border border-green-200'
                 }`}>
-                <div className={`w-2 h-2 rounded-full transition-all duration-300 ${activeRide.status === BuggyStatus.SEARCHING ? 'bg-blue-500 animate-ping' :
-                  activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING ? 'bg-emerald-500 animate-pulse' :
+                <div className={`w-2 h-2 rounded-full ${activeRide.status === BuggyStatus.SEARCHING ? 'bg-blue-500' :
+                  activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING ? 'bg-emerald-500' :
                     activeRide.status === BuggyStatus.ON_TRIP ? 'bg-purple-500' :
                       'bg-green-500'
                   }`}></div>
@@ -555,7 +555,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                 {/* Animated Buggy - Coming to pickup */}
                 {(activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && (
                   <div
-                    className="absolute top-1/2 -translate-y-1/2 z-10 transition-all duration-1000 ease-out"
+                    className="absolute top-1/2 -translate-y-1/2 z-10"
                     style={{
                       left: `${Math.min(95, Math.max(5, 5 + (arrivingElapsedTime / Math.max(1, (activeRide.eta ? activeRide.eta * 60 : 300))) * 90))}%`,
                       transform: 'translate(-50%, -50%)'
@@ -574,7 +574,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                   const progress = Math.min(95, Math.max(5, 5 + (tripDuration / estimatedTripTime) * 90));
                   return (
                     <div
-                      className="absolute top-1/2 -translate-y-1/2 z-10 transition-all duration-1000 ease-out"
+                      className="absolute top-1/2 -translate-y-1/2 z-10"
                       style={{
                         left: `${progress}%`,
                         transform: 'translate(-50%, -50%)'
@@ -597,9 +597,9 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                     : 'bg-white border-gray-200'
                   }`}>
                   <div className={`w-2.5 h-2.5 rounded-full border-2 border-white ${activeRide.status === BuggyStatus.ON_TRIP
-                    ? 'bg-purple-500 animate-pulse'
+                    ? 'bg-purple-500'
                     : (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING)
-                      ? 'bg-emerald-500 animate-pulse'
+                      ? 'bg-emerald-500'
                       : 'bg-emerald-500'
                     }`}></div>
                   <span className="text-sm font-bold text-gray-900 flex-1">{activeRide.destination}</span>
@@ -635,7 +635,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                 <div className="mt-2.5 pt-2.5 border-t border-gray-200">
                   <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div
-                      className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full transition-all duration-1000"
+                      className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full"
                       style={{
                         width: `${Math.min(100, Math.max(15, 100 - (arrivingElapsedTime / Math.max(1, (activeRide.eta ? activeRide.eta * 60 : 300))) * 85))}%`
                       }}
@@ -652,7 +652,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                   <div className="mt-2.5 pt-2.5 border-t border-gray-200">
                     <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
-                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full transition-all duration-1000"
+                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full"
                         style={{ width: `${progress}%` }}
                       ></div>
                     </div>
@@ -674,14 +674,14 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                   : 'bg-blue-50 border-blue-200 text-blue-700'
                 }`}>
                 <div className={`w-2 h-2 rounded-full ${activeRide.status === BuggyStatus.ON_TRIP
-                  ? 'bg-purple-500 animate-pulse'
+                  ? 'bg-purple-500'
                   : (activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING)
                     ? arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME
-                      ? 'bg-red-600 animate-pulse'
+                      ? 'bg-red-600'
                       : arrivingElapsedTime >= ARRIVING_WARNING_TIME
                         ? 'bg-orange-500'
-                        : 'bg-emerald-500 animate-pulse'
-                    : 'bg-blue-500 animate-pulse'
+                        : 'bg-emerald-500'
+                    : 'bg-blue-500'
                   }`}></div>
                 <p className="font-semibold flex-1">
                   {activeRide.status === BuggyStatus.ON_TRIP && `🎉 On the way to ${activeRide.destination}`}
@@ -704,7 +704,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
             {canCancel && (
               <button
                 onClick={handleCancel}
-                className={`group relative w-full py-3 font-bold rounded-xl transition-all duration-300 flex flex-row items-center justify-center gap-2 text-sm overflow-hidden touch-manipulation shadow-md hover:shadow-lg ${(activeRide.status === BuggyStatus.SEARCHING && elapsedTime >= MAX_WAIT_TIME) ||
+                className={`group relative w-full py-3 font-bold rounded-xl flex flex-row items-center justify-center gap-2 text-sm overflow-hidden touch-manipulation shadow-md ${(activeRide.status === BuggyStatus.SEARCHING && elapsedTime >= MAX_WAIT_TIME) ||
                   ((activeRide.status === BuggyStatus.ASSIGNED || activeRide.status === BuggyStatus.ARRIVING) && arrivingElapsedTime >= MAX_ARRIVING_WAIT_TIME)
                   ? 'bg-gradient-to-r from-red-500 via-red-600 to-pink-600 text-white hover:from-red-600 hover:via-red-700 hover:to-pink-700'
                   : 'bg-gradient-to-r from-red-50 to-pink-50 text-red-600 hover:from-red-100 hover:to-pink-100 border-2 border-red-200'
@@ -745,7 +745,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                 {/* Background connector lines */}
                 <div className="absolute top-5 left-[10%] right-[10%] h-0.5 bg-gray-200"></div>
                 <div 
-                  className="absolute top-5 h-0.5 bg-emerald-600 transition-all duration-500"
+                  className="absolute top-5 h-0.5 bg-emerald-600"
                   style={{
                     left: '10%',
                     width: destination ? '80%' : pickup ? '30%' : '0%'
@@ -755,7 +755,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                 {/* Progress line for details step */}
                 {destination && (
                   <div 
-                    className="absolute top-5 h-0.5 bg-emerald-600 transition-all duration-500"
+                    className="absolute top-5 h-0.5 bg-emerald-600"
                     style={{
                       left: '45%',
                       width: (guestCount > 1 || notes) ? '30%' : '15%'
@@ -765,9 +765,9 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
                 {/* Step 1: Pickup */}
                 <div className="flex flex-col items-center flex-1 relative z-10">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
                     pickup
-                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50 scale-110'
+                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50'
                       : 'bg-gray-100 border-gray-300 text-gray-400'
                   }`}>
                     {pickup ? (
@@ -776,16 +776,16 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                       <LocateFixed className="w-5 h-5" />
                     )}
                   </div>
-                  <span className={`text-[10px] font-semibold mt-1.5 text-center transition-colors duration-300 ${pickup ? 'text-emerald-700' : 'text-gray-500'}`}>
+                  <span className={`text-[10px] font-semibold mt-1.5 text-center ${pickup ? 'text-emerald-700' : 'text-gray-500'}`}>
                     {t('pickup_point') || 'Pickup'}
                   </span>
                 </div>
 
                 {/* Step 2: Destination */}
                 <div className="flex flex-col items-center flex-1 relative z-10">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
                     destination
-                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50 scale-110'
+                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50'
                       : pickup
                       ? 'bg-emerald-100 border-emerald-300 text-emerald-600'
                       : 'bg-gray-100 border-gray-300 text-gray-400'
@@ -796,7 +796,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                       <MapPin className="w-5 h-5" />
                     )}
                   </div>
-                  <span className={`text-[10px] font-semibold mt-1.5 text-center transition-colors duration-300 ${
+                  <span className={`text-[10px] font-semibold mt-1.5 text-center ${
                     destination ? 'text-emerald-700' : pickup ? 'text-emerald-600' : 'text-gray-500'
                   }`}>
                     {t('destination') || 'Destination'}
@@ -805,10 +805,10 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
                 {/* Step 3: Details (Optional) */}
                 <div className="flex flex-col items-center flex-1 relative z-10">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
                     destination
                       ? (guestCount > 1 || notes)
-                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50 scale-110'
+                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50'
                         : 'bg-emerald-100 border-emerald-300 text-emerald-600'
                       : 'bg-gray-100 border-gray-300 text-gray-400'
                   }`}>
@@ -818,7 +818,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                       <span className="text-lg">👥</span>
                     )}
                   </div>
-                  <span className={`text-[10px] font-semibold mt-1.5 text-center transition-colors duration-300 ${
+                  <span className={`text-[10px] font-semibold mt-1.5 text-center ${
                     destination
                       ? (guestCount > 1 || notes) ? 'text-emerald-700' : 'text-emerald-600'
                       : 'text-gray-500'
@@ -829,9 +829,9 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
                 {/* Step 4: Ready */}
                 <div className="flex flex-col items-center flex-1 relative z-10">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
                     destination
-                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50 scale-110'
+                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50'
                       : 'bg-gray-100 border-gray-300 text-gray-400'
                   }`}>
                     {destination ? (
@@ -840,7 +840,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                       <span className="text-lg opacity-50">✓</span>
                     )}
                   </div>
-                  <span className={`text-[10px] font-semibold mt-1.5 text-center transition-colors duration-300 ${
+                  <span className={`text-[10px] font-semibold mt-1.5 text-center ${
                     destination ? 'text-emerald-700' : 'text-gray-500'
                   }`}>
                     {t('ready') || 'Ready'}
@@ -857,25 +857,25 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
               <label className="text-xs font-bold text-gray-700 mb-1.5 block uppercase tracking-wide">{t('pickup_point')}</label>
               {isDetectingLocation ? (
                 <div className="relative">
-                  <LocateFixed className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 w-4 h-4" style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+                  <LocateFixed className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 w-4 h-4" />
                   <input
                     type="text"
                     value={t('detecting_location')}
                     readOnly
-                    className="w-full pl-10 pr-3 py-3 text-sm bg-gradient-to-r from-emerald-50 to-emerald-100/50 border-2 border-emerald-300 rounded-xl text-emerald-700 font-semibold focus:outline-none transition-colors cursor-default shadow-inner"
+                    className="w-full pl-10 pr-3 py-3 text-sm bg-gradient-to-r from-emerald-50 to-emerald-100/50 border-2 border-emerald-300 rounded-xl text-emerald-700 font-semibold focus:outline-none cursor-default shadow-inner"
                   />
                 </div>
               ) : (
                 <button
                   onClick={() => setShowPickupDropdown(!showPickupDropdown)}
-                  className="w-full relative flex items-center justify-between pl-10 pr-3 py-3 text-sm bg-gradient-to-r from-emerald-50 to-emerald-100/50 border-2 border-emerald-200 rounded-xl text-gray-900 font-semibold hover:border-emerald-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400 transition-colors duration-200 active:scale-[0.99]"
+                  className="w-full relative flex items-center justify-between pl-10 pr-3 py-3 text-sm bg-gradient-to-r from-emerald-50 to-emerald-100/50 border-2 border-emerald-200 rounded-xl text-gray-900 font-semibold hover:border-emerald-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400"
                   style={{ transform: 'translateZ(0)' }}
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <LocateFixed className="absolute left-3 text-emerald-600 w-4 h-4 flex-shrink-0" />
                     <span className="truncate">{pickup}</span>
                   </div>
-                  <ChevronDown className={`w-4 h-4 text-emerald-600 flex-shrink-0 transition-transform duration-300 ${showPickupDropdown ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 text-emerald-600 flex-shrink-0 ${showPickupDropdown ? 'rotate-180' : ''}`} />
                 </button>
               )}
             </div>
@@ -885,7 +885,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
               <label className="text-xs font-bold text-gray-700 mb-1.5 block uppercase tracking-wide">{t('destination')}</label>
               <button
                 onClick={() => setShowDestinationDropdown(true)}
-                className={`w-full relative flex items-center justify-between pl-10 pr-3 py-3 text-sm border-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400 transition-colors duration-200 active:scale-[0.99] ${
+                className={`w-full relative flex items-center justify-between pl-10 pr-3 py-3 text-sm border-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400 ${
                   destination
                     ? 'bg-gradient-to-r from-emerald-50 to-emerald-100/50 border-emerald-300 text-gray-900 hover:border-emerald-400 hover:shadow-md'
                     : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-emerald-300'
@@ -893,10 +893,10 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                 style={{ transform: 'translateZ(0)' }}
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <MapPin className={`absolute left-3 w-4 h-4 flex-shrink-0 transition-colors ${destination ? 'text-emerald-600' : 'text-gray-400'}`} />
+                  <MapPin className={`absolute left-3 w-4 h-4 flex-shrink-0 ${destination ? 'text-emerald-600' : 'text-gray-400'}`} />
                   <span className="truncate">{destination || t('select_destination')}</span>
                 </div>
-                <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-colors ${destination ? 'text-emerald-600' : 'text-gray-400'}`} />
+                <ChevronDown className={`w-4 h-4 flex-shrink-0 ${destination ? 'text-emerald-600' : 'text-gray-400'}`} />
               </button>
             </div>
 
@@ -913,7 +913,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                         setGuestCount(value);
                       }
                     }}
-                    className="w-full pl-9 pr-3 py-3 text-sm bg-white border-2 border-gray-200 rounded-xl text-gray-900 font-semibold hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400 transition-colors duration-200 appearance-none cursor-pointer shadow-sm hover:shadow-md"
+                    className="w-full pl-9 pr-3 py-3 text-sm bg-white border-2 border-gray-200 rounded-xl text-gray-900 font-semibold hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400 appearance-none cursor-pointer shadow-sm hover:shadow-md"
                   >
                     {[1, 2, 3, 4, 5, 6, 7].map((num) => (
                       <option key={num} value={num}>
@@ -937,7 +937,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={t('luggage_special_requests')}
                   maxLength={100}
-                  className="w-full px-3 py-3 text-sm bg-white border-2 border-gray-200 rounded-xl text-gray-900 font-medium hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400 transition-colors duration-200 shadow-sm hover:shadow-md"
+                  className="w-full px-3 py-3 text-sm bg-white border-2 border-gray-200 rounded-xl text-gray-900 font-medium hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400 shadow-sm hover:shadow-md"
                 />
               </div>
             </div>
@@ -957,19 +957,13 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
             <button
               onClick={handleBook}
               disabled={!destination || isBooking}
-              className={`w-full py-4 rounded-xl font-bold text-base shadow-xl transition-colors duration-200 flex items-center justify-center gap-2 relative overflow-hidden group ${
+              className={`w-full py-4 rounded-xl font-bold text-base shadow-xl flex items-center justify-center gap-2 relative overflow-hidden group ${
                 destination && !isBooking
                   ? 'bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 text-white hover:shadow-2xl hover:shadow-emerald-500/50 active:scale-[0.98] cursor-pointer'
                   : 'bg-gray-200 text-gray-500 cursor-not-allowed opacity-60'
               }`}
               style={{ transform: 'translateZ(0)' }}
             >
-              {destination && !isBooking && (
-                <div 
-                  className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"
-                  style={{ willChange: 'transform' }}
-                ></div>
-              )}
               <span className="relative z-10 flex items-center gap-2">
                 {isBooking ? (
                   <>
@@ -978,13 +972,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                   </>
                 ) : (
                   <>
-                    <Car 
-                      className="w-5 h-5 transition-transform duration-200" 
-                      style={{ 
-                        transform: destination && !isBooking ? 'translateZ(0)' : 'none',
-                        willChange: destination && !isBooking ? 'transform' : 'auto'
-                      }}
-                    />
+                    <Car className="w-5 h-5" />
                     <span>{t('request_buggy')}</span>
                   </>
                 )}
@@ -1368,7 +1356,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
       {/* Notification Toast */}
       {notification && (
-        <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-5 flex items-center gap-2.5 px-5 py-3 rounded-xl shadow-2xl max-w-sm ${
+        <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-2.5 px-5 py-3 rounded-xl shadow-2xl max-w-sm ${
           notification.type === 'success' ? 'bg-emerald-500' :
           notification.type === 'info' ? 'bg-blue-500' :
           'bg-amber-500'
@@ -1390,21 +1378,6 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         }}
       />
 
-      {/* Custom Animations - Optimized */}
-      <style>{`
-        @keyframes buggy-bounce-optimized {
-          0%, 100% {
-            transform: translate3d(0, 0, 0);
-          }
-          50% {
-            transform: translate3d(0, -2px, 0);
-          }
-        }
-        .animate-buggy-bounce-optimized {
-          animation: buggy-bounce-optimized 1.5s ease-in-out infinite;
-          will-change: transform;
-        }
-      `}</style>
     </div>
   );
 };
