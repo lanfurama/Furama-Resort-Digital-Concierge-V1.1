@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Car, Navigation, LocateFixed, CheckCircle, AlertCircle, Loader2, ChevronDown, Map, Calendar, Clock } from 'lucide-react';
+import { MapPin, Car, Navigation, LocateFixed, CheckCircle, AlertCircle, Loader2, ChevronDown, Map, Calendar, Clock, ArrowRight } from 'lucide-react';
 import { BuggyStatus, User, Location } from '../types';
 import { getLocations, getDriversWithLocations, updateRide } from '../services/dataService';
 import { calculateETAFromDriverToPickup, getDriverCoordinates } from '../services/locationService';
@@ -33,10 +33,6 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [showPickupDropdown, setShowPickupDropdown] = useState(false);
   const [showDestinationDropdown, setShowDestinationDropdown] = useState(false);
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'info' | 'warning' } | null>(null);
-  const [recentLocations, setRecentLocations] = useState<string[]>(() => {
-    const saved = localStorage.getItem('buggy_recent_locations');
-    return saved ? JSON.parse(saved) : [];
-  });
   const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   // Sound notification state
@@ -202,10 +198,6 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         return;
       }
       setDestination(dest);
-      // Save to recent locations
-      const updated = [dest, ...recentLocations.filter(loc => loc !== dest)].slice(0, 5);
-      setRecentLocations(updated);
-      localStorage.setItem('buggy_recent_locations', JSON.stringify(updated));
     }
   };
 
@@ -388,7 +380,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   return (
     <div 
       ref={containerRef}
-      className="flex flex-col bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20"
+      className="flex flex-col bg-gradient-to-br from-emerald-50 via-stone-50 to-amber-50/30 relative overflow-hidden"
       style={{ 
         position: 'absolute',
         top: 0,
@@ -403,9 +395,8 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         zIndex: 1,
         touchAction: 'none',
         WebkitOverflowScrolling: 'touch',
-        // Hide scrollbar completely
-        scrollbarWidth: 'none', // Firefox
-        msOverflowStyle: 'none' // IE and Edge
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none'
       } as React.CSSProperties}
       onWheel={(e) => {
         const target = e.target as HTMLElement;
@@ -425,20 +416,29 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       }}
     >
 
-      {/* New Header with light blue gradient */}
-      <div className="bg-gradient-to-b from-blue-100 via-blue-50 to-white flex-shrink-0 relative overflow-hidden">
+      {/* Decorative Background Elements - Optimized */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl pointer-events-none" style={{ willChange: 'auto' }}></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-amber-200/20 rounded-full blur-3xl pointer-events-none" style={{ willChange: 'auto' }}></div>
+
+      {/* Header with elegant gradient */}
+      <div className="bg-gradient-to-b from-emerald-900/95 via-emerald-800/90 to-emerald-900/95 backdrop-blur-sm flex-shrink-0 relative overflow-hidden shadow-lg">
+        {/* Subtle pattern overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+        
         {/* Navigation Bar */}
-        <div className="px-4 py-3 flex items-center justify-between">
+        <div className="px-4 py-3 flex items-center justify-between relative z-10">
           <button
             onClick={onBack}
-            className="text-gray-800 hover:bg-white/50 rounded-full p-1.5 transition-all duration-300"
+            className="text-white hover:bg-white/20 rounded-full p-2 transition-all duration-300 transform hover:scale-110 active:scale-95 backdrop-blur-sm"
           >
             <Navigation className="w-5 h-5 rotate-180" />
           </button>
-          <h2 className="text-lg font-bold text-gray-900">{t('buggy_service') || 'Di chuyển'}</h2>
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <Car className="w-5 h-5" />
+            {t('buggy_service') || 'Di chuyển'}
+          </h2>
           <div className="w-9"></div>
         </div>
-
       </div>
 
 
@@ -738,90 +738,172 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
           className="flex-1 overflow-y-auto px-4 py-3 min-h-0"
           style={{ maxHeight: 'calc(100% - 80px)', overflowX: 'hidden' }}
         >
+          {/* Booking Progress Stepper */}
+          <div className="mb-4">
+            <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-lg border border-emerald-100/50 p-4">
+              <div className="flex items-center justify-between relative">
+                {/* Background connector lines */}
+                <div className="absolute top-5 left-[10%] right-[10%] h-0.5 bg-gray-200"></div>
+                <div 
+                  className="absolute top-5 h-0.5 bg-emerald-600 transition-all duration-500"
+                  style={{
+                    left: '10%',
+                    width: destination ? '80%' : pickup ? '30%' : '0%'
+                  }}
+                ></div>
+                
+                {/* Progress line for details step */}
+                {destination && (
+                  <div 
+                    className="absolute top-5 h-0.5 bg-emerald-600 transition-all duration-500"
+                    style={{
+                      left: '45%',
+                      width: (guestCount > 1 || notes) ? '30%' : '15%'
+                    }}
+                  ></div>
+                )}
 
-          {/* Recent Locations Section */}
-          {recentLocations.length > 0 && (
-            <div className="mb-4">
-              <h3 className="text-sm font-bold text-gray-700 mb-2">{t('recent_locations')}</h3>
-              <div className="space-y-2">
-                {recentLocations.map((loc, index) => {
-                  const match = locations.find(l => l.name === loc);
-                  const typeLabel = match?.type === 'VILLA' ? t('location_type_villa') : match?.type === 'FACILITY' ? t('location_type_facility') : match?.type === 'RESTAURANT' ? t('location_type_restaurant') : null;
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => handleSetDestination(loc)}
-                      className="w-full flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all text-left active:scale-[0.99] touch-manipulation"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                        <Clock className="w-5 h-5 text-gray-500" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-gray-900 truncate">{loc}</div>
-                        {typeLabel && (
-                          <div className="text-xs text-gray-500 truncate">{typeLabel}</div>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
+                {/* Step 1: Pickup */}
+                <div className="flex flex-col items-center flex-1 relative z-10">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                    pickup
+                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50 scale-110'
+                      : 'bg-gray-100 border-gray-300 text-gray-400'
+                  }`}>
+                    {pickup ? (
+                      <CheckCircle className="w-6 h-6" />
+                    ) : (
+                      <LocateFixed className="w-5 h-5" />
+                    )}
+                  </div>
+                  <span className={`text-[10px] font-semibold mt-1.5 text-center transition-colors duration-300 ${pickup ? 'text-emerald-700' : 'text-gray-500'}`}>
+                    {t('pickup_point') || 'Pickup'}
+                  </span>
+                </div>
+
+                {/* Step 2: Destination */}
+                <div className="flex flex-col items-center flex-1 relative z-10">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                    destination
+                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50 scale-110'
+                      : pickup
+                      ? 'bg-emerald-100 border-emerald-300 text-emerald-600'
+                      : 'bg-gray-100 border-gray-300 text-gray-400'
+                  }`}>
+                    {destination ? (
+                      <CheckCircle className="w-6 h-6" />
+                    ) : (
+                      <MapPin className="w-5 h-5" />
+                    )}
+                  </div>
+                  <span className={`text-[10px] font-semibold mt-1.5 text-center transition-colors duration-300 ${
+                    destination ? 'text-emerald-700' : pickup ? 'text-emerald-600' : 'text-gray-500'
+                  }`}>
+                    {t('destination') || 'Destination'}
+                  </span>
+                </div>
+
+                {/* Step 3: Details (Optional) */}
+                <div className="flex flex-col items-center flex-1 relative z-10">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                    destination
+                      ? (guestCount > 1 || notes)
+                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50 scale-110'
+                        : 'bg-emerald-100 border-emerald-300 text-emerald-600'
+                      : 'bg-gray-100 border-gray-300 text-gray-400'
+                  }`}>
+                    {destination && (guestCount > 1 || notes) ? (
+                      <CheckCircle className="w-6 h-6" />
+                    ) : (
+                      <span className="text-lg">👥</span>
+                    )}
+                  </div>
+                  <span className={`text-[10px] font-semibold mt-1.5 text-center transition-colors duration-300 ${
+                    destination
+                      ? (guestCount > 1 || notes) ? 'text-emerald-700' : 'text-emerald-600'
+                      : 'text-gray-500'
+                  }`}>
+                    Details
+                  </span>
+                </div>
+
+                {/* Step 4: Ready */}
+                <div className="flex flex-col items-center flex-1 relative z-10">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                    destination
+                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50 scale-110'
+                      : 'bg-gray-100 border-gray-300 text-gray-400'
+                  }`}>
+                    {destination ? (
+                      <Car className="w-5 h-5" />
+                    ) : (
+                      <span className="text-lg opacity-50">✓</span>
+                    )}
+                  </div>
+                  <span className={`text-[10px] font-semibold mt-1.5 text-center transition-colors duration-300 ${
+                    destination ? 'text-emerald-700' : 'text-gray-500'
+                  }`}>
+                    {t('ready') || 'Ready'}
+                  </span>
+                </div>
               </div>
             </div>
-          )}
-
+          </div>
 
           {/* Additional Booking Options */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 space-y-3">
+          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-emerald-100/50 p-4 space-y-3">
             {/* Pickup location */}
             <div className="relative group" ref={pickupDropdownRef}>
-              <label className="text-xs font-semibold text-gray-600 mb-1 block">{t('pickup_point')}</label>
+              <label className="text-xs font-bold text-gray-700 mb-1.5 block uppercase tracking-wide">{t('pickup_point')}</label>
               {isDetectingLocation ? (
                 <div className="relative">
-                  <LocateFixed className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-600 w-4 h-4 animate-pulse" />
+                  <LocateFixed className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 w-4 h-4" style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
                   <input
                     type="text"
                     value={t('detecting_location')}
                     readOnly
-                    className="w-full pl-10 pr-3 py-2.5 text-sm bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg text-gray-600 font-semibold focus:outline-none transition-all cursor-default"
+                    className="w-full pl-10 pr-3 py-3 text-sm bg-gradient-to-r from-emerald-50 to-emerald-100/50 border-2 border-emerald-300 rounded-xl text-emerald-700 font-semibold focus:outline-none transition-colors cursor-default shadow-inner"
                   />
                 </div>
               ) : (
                 <button
                   onClick={() => setShowPickupDropdown(!showPickupDropdown)}
-                  className="w-full relative flex items-center justify-between pl-10 pr-3 py-2.5 text-sm bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg text-gray-900 font-semibold hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
+                  className="w-full relative flex items-center justify-between pl-10 pr-3 py-3 text-sm bg-gradient-to-r from-emerald-50 to-emerald-100/50 border-2 border-emerald-200 rounded-xl text-gray-900 font-semibold hover:border-emerald-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400 transition-colors duration-200 active:scale-[0.99]"
+                  style={{ transform: 'translateZ(0)' }}
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <LocateFixed className="absolute left-3 text-blue-600 w-4 h-4 flex-shrink-0" />
+                    <LocateFixed className="absolute left-3 text-emerald-600 w-4 h-4 flex-shrink-0" />
                     <span className="truncate">{pickup}</span>
                   </div>
-                  <ChevronDown className={`w-4 h-4 text-blue-600 flex-shrink-0 transition-transform duration-200 ${showPickupDropdown ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 text-emerald-600 flex-shrink-0 transition-transform duration-300 ${showPickupDropdown ? 'rotate-180' : ''}`} />
                 </button>
               )}
             </div>
 
             {/* Destination location */}
             <div className="relative group">
-              <label className="text-xs font-semibold text-gray-600 mb-1 block">{t('destination')}</label>
+              <label className="text-xs font-bold text-gray-700 mb-1.5 block uppercase tracking-wide">{t('destination')}</label>
               <button
                 onClick={() => setShowDestinationDropdown(true)}
-                className={`w-full relative flex items-center justify-between pl-10 pr-3 py-2.5 text-sm border-2 rounded-lg font-semibold hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all ${
+                className={`w-full relative flex items-center justify-between pl-10 pr-3 py-3 text-sm border-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400 transition-colors duration-200 active:scale-[0.99] ${
                   destination
-                    ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200 text-gray-900'
-                    : 'bg-gray-50 border-gray-200 text-gray-400'
+                    ? 'bg-gradient-to-r from-emerald-50 to-emerald-100/50 border-emerald-300 text-gray-900 hover:border-emerald-400 hover:shadow-md'
+                    : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-emerald-300'
                 }`}
+                style={{ transform: 'translateZ(0)' }}
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <MapPin className="absolute left-3 text-emerald-600 w-4 h-4 flex-shrink-0" />
+                  <MapPin className={`absolute left-3 w-4 h-4 flex-shrink-0 transition-colors ${destination ? 'text-emerald-600' : 'text-gray-400'}`} />
                   <span className="truncate">{destination || t('select_destination')}</span>
                 </div>
-                <ChevronDown className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-colors ${destination ? 'text-emerald-600' : 'text-gray-400'}`} />
               </button>
             </div>
 
             {/* Guest Count & Notes */}
             <div className="grid grid-cols-2 gap-3">
               <div className="relative group">
-                <label className="text-xs font-semibold text-gray-600 mb-1 block">{t('number_of_guests')}</label>
+                <label className="text-xs font-bold text-gray-700 mb-1.5 block uppercase tracking-wide">{t('number_of_guests')}</label>
                 <div className="relative">
                   <select
                     value={guestCount}
@@ -831,7 +913,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                         setGuestCount(value);
                       }
                     }}
-                    className="w-full pl-9 pr-3 py-2.5 text-sm bg-white border-2 border-gray-200 rounded-lg text-gray-900 font-semibold hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all appearance-none cursor-pointer"
+                    className="w-full pl-9 pr-3 py-3 text-sm bg-white border-2 border-gray-200 rounded-xl text-gray-900 font-semibold hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400 transition-colors duration-200 appearance-none cursor-pointer shadow-sm hover:shadow-md"
                   >
                     {[1, 2, 3, 4, 5, 6, 7].map((num) => (
                       <option key={num} value={num}>
@@ -839,7 +921,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                       </option>
                     ))}
                   </select>
-                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600 pointer-events-none">
                     <span className="text-sm">👥</span>
                   </div>
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
@@ -848,39 +930,65 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
                 </div>
               </div>
               <div className="relative group">
-                <label className="text-xs font-semibold text-gray-600 mb-1 block">{t('notes_optional')}</label>
+                <label className="text-xs font-bold text-gray-700 mb-1.5 block uppercase tracking-wide">{t('notes_optional')}</label>
                 <input
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={t('luggage_special_requests')}
                   maxLength={100}
-                  className="w-full px-3 py-2.5 text-sm bg-white border-2 border-gray-200 rounded-lg text-gray-900 font-medium hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
+                  className="w-full px-3 py-3 text-sm bg-white border-2 border-gray-200 rounded-xl text-gray-900 font-medium hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400 transition-colors duration-200 shadow-sm hover:shadow-md"
                 />
               </div>
             </div>
 
-            {/* Book Button */}
+            {/* Route Summary - Compact */}
+            {destination && (
+              <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-gray-700 truncate flex-1">{pickup}</span>
+                  <ArrowRight className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <span className="text-xs font-semibold text-gray-700 truncate flex-1 text-right">{destination}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Book Button with Buggy Animation - Optimized */}
             <button
               onClick={handleBook}
               disabled={!destination || isBooking}
-              className={`w-full py-3.5 rounded-xl font-bold text-base shadow-lg transition-all duration-300 flex items-center justify-center gap-2 ${
+              className={`w-full py-4 rounded-xl font-bold text-base shadow-xl transition-colors duration-200 flex items-center justify-center gap-2 relative overflow-hidden group ${
                 destination && !isBooking
-                  ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white hover:shadow-emerald-400/50 hover:scale-[1.02] active:scale-[0.98] cursor-pointer'
+                  ? 'bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 text-white hover:shadow-2xl hover:shadow-emerald-500/50 active:scale-[0.98] cursor-pointer'
                   : 'bg-gray-200 text-gray-500 cursor-not-allowed opacity-60'
               }`}
+              style={{ transform: 'translateZ(0)' }}
             >
-              {isBooking ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>{t('processing')}</span>
-                </>
-              ) : (
-                <>
-                  <Car className="w-5 h-5" />
-                  <span>{t('request_buggy')}</span>
-                </>
+              {destination && !isBooking && (
+                <div 
+                  className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"
+                  style={{ willChange: 'transform' }}
+                ></div>
               )}
+              <span className="relative z-10 flex items-center gap-2">
+                {isBooking ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>{t('processing')}</span>
+                  </>
+                ) : (
+                  <>
+                    <Car 
+                      className="w-5 h-5 transition-transform duration-200" 
+                      style={{ 
+                        transform: destination && !isBooking ? 'translateZ(0)' : 'none',
+                        willChange: destination && !isBooking ? 'transform' : 'auto'
+                      }}
+                    />
+                    <span>{t('request_buggy')}</span>
+                  </>
+                )}
+              </span>
             </button>
           </div>
         </div>
@@ -1282,6 +1390,21 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
         }}
       />
 
+      {/* Custom Animations - Optimized */}
+      <style>{`
+        @keyframes buggy-bounce-optimized {
+          0%, 100% {
+            transform: translate3d(0, 0, 0);
+          }
+          50% {
+            transform: translate3d(0, -2px, 0);
+          }
+        }
+        .animate-buggy-bounce-optimized {
+          animation: buggy-bounce-optimized 1.5s ease-in-out infinite;
+          will-change: transform;
+        }
+      `}</style>
     </div>
   );
 };

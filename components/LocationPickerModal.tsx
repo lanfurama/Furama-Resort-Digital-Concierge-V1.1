@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { MapPin, Search, Building2, Waves, Utensils, X, TrendingUp } from 'lucide-react';
+import { MapPin, Search, Building2, Waves, Utensils, X } from 'lucide-react';
 import { Location } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
 
@@ -53,27 +53,6 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     };
   }, [searchQuery]);
 
-  // Popular locations (most frequently used) - optimized with Set for O(1) lookup
-  const popularLocations = useMemo(() => {
-    const popularSet = new Set([
-      'main lobby', 'reception', 'beach', 'pool', 'restaurant', 
-      'spa', 'fitness center', 'gym', 'bar', 'lobby'
-    ]);
-    
-    // Filter to only include locations that exist in the list
-    const matches: Location[] = [];
-    for (const loc of locations) {
-      const locNameLower = loc.name.toLowerCase();
-      for (const pop of popularSet) {
-        if (locNameLower.includes(pop)) {
-          matches.push(loc);
-          break;
-        }
-      }
-      if (matches.length >= 6) break;
-    }
-    return matches;
-  }, [locations]);
 
   // Memoize search query lowercase to avoid repeated conversions
   const searchQueryLower = useMemo(() => debouncedSearchQuery.toLowerCase(), [debouncedSearchQuery]);
@@ -173,42 +152,6 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               />
             </div>
 
-            {/* Popular Locations Suggestions */}
-            {popularLocations.length > 0 && !debouncedSearchQuery && filterType === 'ALL' && (
-              <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center gap-2 text-xs font-bold text-gray-600">
-                  <TrendingUp className={`w-4 h-4 ${iconColor}`} />
-                  <span>{t('popular_locations')}</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {popularLocations.map((loc) => {
-                    const isExcluded = excludeLocation && loc.name === excludeLocation;
-                    const isSelected = selectedLocation === loc.name;
-                    return (
-                      <button
-                        key={loc.id || loc.name}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelect(loc);
-                        }}
-                        disabled={isExcluded}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-full flex items-center gap-1.5 ${
-                          isSelected
-                            ? `${selectedBg} text-white shadow-md`
-                            : isExcluded
-                            ? 'bg-red-50 text-red-600 opacity-60 cursor-not-allowed'
-                            : `bg-gradient-to-r ${isBlueTheme ? 'from-blue-50 to-indigo-50' : 'from-emerald-50 to-teal-50'} ${isBlueTheme ? 'text-blue-700 border border-blue-200' : 'text-emerald-700 border border-emerald-200'}`
-                        }`}
-                      >
-                        <MapPin className="w-3 h-3" />
-                        {loc.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             {/* Filter Buttons */}
             <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
               <button
@@ -271,7 +214,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             {/* Locations Grid */}
             <div className={`flex-1 min-h-0 overflow-y-auto rounded-xl border-2 ${borderColor} bg-gradient-to-br ${isBlueTheme ? 'from-blue-50/50 to-indigo-50/30' : 'from-emerald-50/50 to-teal-50/30'} p-4 scrollbar-thin ${isBlueTheme ? 'scrollbar-thumb-blue-300' : 'scrollbar-thumb-emerald-300'} scrollbar-track-gray-100`} onClick={(e) => e.stopPropagation()}>
               {filteredLocations.length > 0 ? (
-                <div className="grid grid-cols-5 gap-2.5">
+                <div className="grid grid-cols-4 gap-2.5">
                   {filteredLocations.map((loc) => {
                     const isExcluded = excludeLocation && loc.name === excludeLocation;
                     const isSelected = selectedLocation === loc.name;
