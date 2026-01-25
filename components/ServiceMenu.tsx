@@ -74,26 +74,26 @@ const ServiceMenu: React.FC<ServiceMenuProps> = ({ onSelect }) => {
                 <button
                     key={s.id}
                     onClick={() => onSelect(s.id)}
-                    className={`relative flex flex-col items-center justify-center p-4 bg-gradient-to-br ${s.lightBg} backdrop-blur-sm rounded-2xl border-2 ${s.borderColor} transition-all duration-300 active:scale-95 overflow-hidden`}
+                    className={`relative flex flex-col items-center justify-center p-5 bg-white/80 backdrop-blur-sm rounded-3xl border-2 ${s.borderColor} transition-transform active:scale-95 overflow-hidden`}
                     style={{
-                        boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1)'
+                        boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.5)'
                     }}
                 >
                     {/* Background Gradient */}
                     <div className={`absolute inset-0 bg-gradient-to-br ${s.lightBg} opacity-100`}></div>
 
-                    {/* Decorative Pattern */}
+                    {/* Decorative Pattern - Simplified */}
                     <div className="absolute inset-0 opacity-5">
                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(0,0,0,0.1)_1px,transparent_1px)] [background-size:16px_16px]"></div>
                     </div>
 
-                    {/* Icon Container - Smaller and more compact */}
-                    <div className={`relative z-10 p-3 rounded-xl mb-2 ${s.iconBg} border-2 ${s.borderColor} shadow-lg`}
+                    {/* Icon Container */}
+                    <div className={`relative z-10 p-4 rounded-2xl mb-3 ${s.iconBg} border-2 ${s.borderColor} shadow-lg`}
                         style={{
-                            boxShadow: `0 8px 24px -4px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.5)`
+                            boxShadow: `0 4px 16px -4px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.5)`
                         }}
                     >
-                        <s.icon size={24} className={s.iconColor} strokeWidth={2.5} />
+                        <s.icon size={26} className={s.iconColor} strokeWidth={2.5} />
                     </div>
 
                     {/* Service Name */}

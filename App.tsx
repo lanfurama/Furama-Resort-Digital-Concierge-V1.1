@@ -375,10 +375,21 @@ const AppContent: React.FC = () => {
     };
 
     return (
-      <div className="flex flex-col h-screen bg-gray-50 max-w-md mx-auto shadow-2xl overflow-hidden relative">
-        {/* Header - Improved UX */}
+      <div className="flex flex-col h-screen max-w-md mx-auto shadow-2xl overflow-hidden relative">
+        {/* Optimized Background - Simplified for Performance */}
+        <div 
+          className="absolute inset-0 z-0"
+          style={{
+            background: 'linear-gradient(180deg, #f0fdf4 0%, #dcfce7 50%, #bbf7d0 100%)'
+          }}
+        >
+          {/* Simple gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/30 to-transparent"></div>
+        </div>
+
+        {/* Header - Optimized */}
         <div
-          className="backdrop-blur-md bg-gradient-to-r from-emerald-700 via-emerald-800 to-teal-800 text-white pt-safe pb-3 px-4 flex justify-between items-center shadow-xl z-30 shrink-0 border-b border-white/10"
+          className="backdrop-blur-md bg-gradient-to-r from-emerald-900/95 via-emerald-800/95 to-teal-800/95 text-white pt-safe pb-3 px-4 flex justify-between items-center shadow-xl z-30 shrink-0 border-b border-white/20"
           style={{ 
             boxShadow: '0 4px 20px -5px rgba(0,0,0,0.3)',
             paddingTop: 'max(0.75rem, calc(0.75rem + env(safe-area-inset-top)))'
@@ -386,16 +397,16 @@ const AppContent: React.FC = () => {
         >
           <div className="flex items-center space-x-3 flex-1 min-w-0">
             <div className="relative flex-shrink-0">
-              <div className="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-br from-white/20 to-white/10 rounded-xl flex items-center justify-center border-2 border-white/30 shadow-lg backdrop-blur-sm transition-transform active:scale-95">
-                <span className="font-bold text-lg sm:text-xl text-white">{user.lastName.charAt(0)}</span>
+              <div className="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-br from-white/30 to-white/15 rounded-xl flex items-center justify-center border-2 border-white/40 shadow-lg backdrop-blur-sm transition-transform active:scale-95">
+                <span className="font-bold text-lg sm:text-xl text-white drop-shadow-lg">{user.lastName.charAt(0)}</span>
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-emerald-800 shadow-md animate-pulse"></div>
+              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-emerald-800 shadow-md"></div>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] sm:text-xs text-emerald-200 uppercase tracking-wider font-semibold mb-0.5 leading-tight">{t('welcome_back')}</p>
-              <h1 className="font-bold text-base sm:text-lg leading-tight truncate text-white">{user.lastName}</h1>
+              <p className="text-[10px] sm:text-xs text-emerald-100 uppercase tracking-wider font-semibold mb-0.5 leading-tight drop-shadow-md">{t('welcome_back')}</p>
+              <h1 className="font-bold text-base sm:text-lg leading-tight truncate text-white drop-shadow-lg">{user.lastName}</h1>
               {user.roomNumber && (
-                <p className="text-[11px] sm:text-xs text-emerald-200/90 mt-0.5 font-medium">{t('room')} {user.roomNumber}</p>
+                <p className="text-[11px] sm:text-xs text-emerald-100/90 mt-0.5 font-medium drop-shadow-md">{t('room')} {user.roomNumber}</p>
               )}
             </div>
           </div>
@@ -403,7 +414,7 @@ const AppContent: React.FC = () => {
             <NotificationBell userId={user.roomNumber} />
             <button
               onClick={handleLogout}
-              className="p-2 rounded-xl hover:bg-white/10 active:bg-white/15 text-white/90 hover:text-white transition-all duration-200 border border-white/10 hover:border-white/20 backdrop-blur-sm touch-manipulation"
+              className="p-2 rounded-xl hover:bg-white/15 active:bg-white/20 text-white/90 hover:text-white transition-colors duration-200 border border-white/20 backdrop-blur-sm touch-manipulation active:scale-95"
               title={t('logout') || 'Logout'}
               aria-label={t('logout') || 'Logout'}
             >
@@ -413,21 +424,26 @@ const AppContent: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col relative z-10">
           <PullToRefresh onRefresh={handleRefresh}>
             <div
-              className={`flex-1 pb-20 relative bg-gray-50 scrollbar-hide ${view === AppView.BUGGY ? 'overflow-hidden h-full' : 'min-h-full'}`}
+              className={`flex-1 relative scrollbar-hide ${view === AppView.BUGGY ? 'overflow-hidden h-full' : 'min-h-full'}`}
             style={view === AppView.BUGGY ? {
               overflow: 'hidden',
               height: '100%',
               maxHeight: '100%',
-              position: 'relative'
-            } : {}}
+              position: 'relative',
+              paddingBottom: 0
+            } : {
+              paddingBottom: 'calc(5rem + max(0.5rem, env(safe-area-inset-bottom)))'
+            }}
           >
             {view === AppView.HOME && (
-              <div className="flex flex-col min-h-full">
-                {/* Hero Banner */}
-                <div className="mx-4 mt-4 h-40 rounded-2xl overflow-hidden relative shadow-lg mb-6">
+              <div className="flex flex-col min-h-full relative">
+                {/* Content background overlay for readability - Removed to fix gray divs issue */}
+                <div className="relative z-10">
+                {/* Optimized Hero Banner */}
+                <div className="mx-4 mt-6 h-44 rounded-3xl overflow-hidden relative shadow-xl mb-6">
                   <img
                     src="https://furamavietnam.com/wp-content/uploads/2025/10/furama-resort-danang.jpg"
                     className="absolute inset-0 w-full h-full object-cover"
@@ -443,61 +459,81 @@ const AppContent: React.FC = () => {
                       }
                     }}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/85 via-emerald-900/70 to-transparent flex items-center p-6">
+                  {/* Gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/85 via-emerald-800/75 to-emerald-900/65"></div>
+                  <div className="absolute inset-0 flex items-center p-6 relative z-10">
                     <div>
-                      <h2 className="text-white font-serif text-2xl font-bold mb-1 drop-shadow-lg">Furama Danang</h2>
-                      <p className="text-emerald-100 text-xs drop-shadow-md">A Culinary Beach Resort</p>
+                      <div className="inline-block px-4 py-2 bg-white/10 backdrop-blur-sm rounded-xl mb-3 border border-white/20 shadow-md">
+                        <h2 className="text-white font-serif text-2xl sm:text-3xl font-bold mb-1 drop-shadow-lg">Furama Danang</h2>
+                      </div>
+                      <p className="text-emerald-100 text-sm font-medium drop-shadow-md mt-2">A Culinary Beach Resort</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Services Grid */}
                 <div className="px-4">
-                  <div className="flex justify-between items-center mb-2 px-1">
-                    <h3 className="font-bold text-gray-800 text-lg">{t('resort_services')}</h3>
+                  <div className="flex justify-between items-center mb-3 px-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1 h-6 bg-gradient-to-b from-emerald-600 to-emerald-400 rounded-full"></div>
+                      <h3 className="font-bold text-gray-800 text-lg">{t('resort_services')}</h3>
+                    </div>
                   </div>
                   <div className="-mx-4">
                     <ServiceMenu onSelect={handleServiceSelect} />
                   </div>
                 </div>
 
-                {/* Promotions Carousel */}
-                <div className="p-6 pt-2 pb-8">
-                  <h3 className="font-bold text-gray-800 text-lg mb-4 px-1">{t('exclusive_offers')}</h3>
-                  <div className="flex space-x-4 overflow-x-auto pb-4 snap-x scrollbar-hide">
-                    {promotions.map(promo => {
-                      const tr = promo.translations?.[language];
-                      const title = tr?.title || promo.title;
-                      const desc = tr?.description || promo.description;
-                      const discount = tr?.discount || promo.discount;
-                      return (
-                        <div
-                          key={promo.id}
-                          className={`min-w-[260px] p-5 rounded-2xl text-white shadow-lg snap-center relative overflow-hidden shrink-0 ${promo.imageUrl ? '' : (promo.imageColor || 'bg-emerald-500')
-                            }`}
-                          style={promo.imageUrl ? {
-                            backgroundImage: `url(${promo.imageUrl})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            backgroundRepeat: 'no-repeat'
-                          } : {}}
-                        >
-                          {promo.imageUrl && (
-                            <div className="absolute inset-0 bg-black/40 rounded-2xl shadow-lg"></div>
-                          )}
-                          <div className="relative z-10">
-                            <div className="bg-white/20 w-fit px-2 py-1 rounded text-[10px] font-bold mb-2 backdrop-blur-sm">{discount}</div>
-                            <h4 className="font-bold text-lg mb-1">{title}</h4>
-                            <p className="text-xs opacity-90 line-clamp-2">{desc}</p>
-                            <p className="text-[10px] mt-3 opacity-75">{promo.validUntil}</p>
-                          </div>
-                          <div className="absolute -bottom-4 -right-4 text-white/10">
-                            <Percent size={100} />
-                          </div>
-                        </div>
-                      );
-                    })}
+                {/* Promotions Carousel - Optimized */}
+                <div className="px-6 pt-4 pb-6">
+                  <div className="flex items-center gap-2 mb-4 px-1">
+                    <div className="w-1 h-6 bg-gradient-to-b from-amber-500 to-amber-400 rounded-full"></div>
+                    <h3 className="font-bold text-gray-800 text-lg">{t('exclusive_offers')}</h3>
                   </div>
+                  {promotions.length > 0 ? (
+                    <div className="flex space-x-4 overflow-x-auto pb-2 snap-x scrollbar-hide">
+                      {promotions
+                        .filter((promo) => promo && promo.id) // Filter out invalid promotions
+                        .map((promo) => {
+                          const tr = promo.translations?.[language];
+                          const title = tr?.title || promo.title;
+                          const desc = tr?.description || promo.description;
+                          const discount = tr?.discount || promo.discount;
+                          return (
+                            <div
+                              key={promo.id}
+                              className={`min-w-[280px] h-[200px] p-6 rounded-3xl text-white shadow-xl snap-center relative overflow-hidden shrink-0 transition-transform active:scale-95 flex flex-col ${
+                                promo.imageUrl ? '' : (promo.imageColor || 'bg-gradient-to-br from-emerald-500 to-emerald-600')
+                              }`}
+                              style={promo.imageUrl ? {
+                                backgroundImage: `url(${promo.imageUrl})`,
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center',
+                                backgroundRepeat: 'no-repeat'
+                              } : {}}
+                            >
+                              {promo.imageUrl && (
+                                <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-black/40 to-black/50 rounded-3xl"></div>
+                              )}
+                              <div className="relative z-10 h-full flex flex-col">
+                                <div className="bg-white/25 backdrop-blur-sm w-fit px-3 py-1.5 rounded-lg text-xs font-bold mb-3 border border-white/30 shadow-md">{discount}</div>
+                                <h4 className="font-bold text-xl mb-2 drop-shadow-md">{title}</h4>
+                                <p className="text-sm opacity-95 line-clamp-2 drop-shadow-sm mb-3 flex-1">{desc}</p>
+                                <p className="text-xs opacity-80 font-medium mt-auto">{promo.validUntil}</p>
+                              </div>
+                              <div className="absolute -bottom-6 -right-6 text-white/10">
+                                <Percent size={120} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 text-sm">
+                      {t('no_offers_available') || 'No offers available at the moment'}
+                    </div>
+                  )}
+                </div>
                 </div>
               </div>
             )}
@@ -553,18 +589,13 @@ const AppContent: React.FC = () => {
           </PullToRefresh>
         </div>
 
-        {/* Bottom Navigation */}
+        {/* Bottom Navigation - Optimized */}
         <div
-          className="backdrop-blur-xl bg-white/95 border-t-2 border-gray-200/60 h-20 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-50 flex justify-around items-center px-2 safe-area-bottom"
+          className="backdrop-blur-md bg-white/95 border-t border-gray-200/60 h-20 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-50 flex justify-around items-center px-2 safe-area-bottom"
           style={{
             paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
             position: 'fixed',
-            willChange: 'transform',
-            transform: 'translateZ(0)',
-            WebkitTransform: 'translateZ(0)',
-            backfaceVisibility: 'hidden',
-            WebkitBackfaceVisibility: 'hidden',
-            boxShadow: '0 -10px 40px -10px rgba(0,0,0,0.15)'
+            boxShadow: '0 -4px 20px -5px rgba(0,0,0,0.15)'
           }}
         >
           <NavButton
@@ -600,6 +631,18 @@ const AppContent: React.FC = () => {
             label={t('account')}
           />
         </div>
+
+        {/* Minimal CSS - Optimized for Performance */}
+        <style>{`
+          /* Reduce motion for accessibility - no animations by default for better performance */
+          @media (prefers-reduced-motion: reduce) {
+            * {
+              animation-duration: 0.01ms !important;
+              animation-iteration-count: 1 !important;
+              transition-duration: 0.01ms !important;
+            }
+          }
+        `}</style>
       </div >
     );
   };
