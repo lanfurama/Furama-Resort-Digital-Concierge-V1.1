@@ -26,7 +26,7 @@ const ActiveOrders = lazy(() => import('./components/ActiveOrders'));
 const SupervisorDashboard = lazy(() => import('./components/SupervisorDashboard'));
 import { getPromotions, getActiveGuestOrders } from './services/dataService';
 import { BuggyStatus } from './types';
-import { User as UserIcon, LogOut, MessageSquare, Car, Percent, ShoppingCart, Home } from 'lucide-react';
+import { User as UserIcon, LogOut, MessageSquare, Car, Percent, ShoppingCart, Home, Sparkles, Calendar, Tag } from 'lucide-react';
 import { LanguageProvider, useTranslation } from './contexts/LanguageContext';
 import { BuggyStatusProvider, useBuggyStatus } from './contexts/BuggyStatusContext';
 import { ToastProvider } from './hooks/useToast';
@@ -509,7 +509,7 @@ const AppContent: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Promotions Carousel - Optimized */}
+                {/* Exclusive Offers */}
                 <div className="px-6 pt-4 pb-6">
                   <div className="flex items-center gap-2 mb-4 px-1">
                     <div className="w-1 h-6 bg-gradient-to-b from-amber-500 to-amber-400 rounded-full"></div>
@@ -517,37 +517,53 @@ const AppContent: React.FC = () => {
                   </div>
                   {renderedPromotions.length > 0 ? (
                     <div className="flex space-x-4 overflow-x-auto pb-2 snap-x scrollbar-hide">
-                      {renderedPromotions.map((promo) => (
-                        <div
-                          key={promo.id}
-                          className={`min-w-[280px] h-[200px] p-6 rounded-3xl text-white shadow-xl snap-center relative overflow-hidden shrink-0 transition-transform active:scale-95 flex flex-col ${
-                            promo.imageUrl ? '' : (promo.imageColor || 'bg-gradient-to-br from-emerald-500 to-emerald-600')
-                          }`}
-                          style={promo.imageUrl ? {
-                            backgroundImage: `url(${promo.imageUrl})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            backgroundRepeat: 'no-repeat',
-                            transform: 'translateZ(0)', // GPU acceleration
-                            willChange: 'transform'
-                          } : {
-                            transform: 'translateZ(0)'
-                          }}
-                        >
-                          {promo.imageUrl && (
-                            <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-black/40 to-black/50 rounded-3xl"></div>
-                          )}
-                          <div className="relative z-10 h-full flex flex-col">
-                            <div className="bg-white/25 backdrop-blur-sm w-fit px-3 py-1.5 rounded-lg text-xs font-bold mb-3 border border-white/30 shadow-md">{promo.discount}</div>
-                            <h4 className="font-bold text-xl mb-2 drop-shadow-md">{promo.title}</h4>
-                            <p className="text-sm opacity-95 line-clamp-2 drop-shadow-sm mb-3 flex-1">{promo.desc}</p>
-                            <p className="text-xs opacity-80 font-medium mt-auto">{promo.validUntil}</p>
+                      {renderedPromotions.map((promo) => {
+                        const formatDate = (dateStr?: string) => {
+                          if (!dateStr) return '';
+                          try {
+                            const date = new Date(dateStr);
+                            if (!isNaN(date.getTime())) {
+                              return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            }
+                            return dateStr;
+                          } catch {
+                            return dateStr;
+                          }
+                        };
+
+                        return (
+                          <div
+                            key={promo.id}
+                            className={`min-w-[280px] h-[200px] rounded-3xl text-white shadow-xl snap-center relative overflow-hidden shrink-0 flex flex-col ${
+                              promo.imageUrl ? '' : (promo.imageColor || 'bg-gradient-to-br from-emerald-500 to-emerald-600')
+                            }`}
+                            style={promo.imageUrl ? {
+                              backgroundImage: `url(${promo.imageUrl})`,
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                              backgroundRepeat: 'no-repeat'
+                            } : {}}
+                          >
+                            {promo.imageUrl && (
+                              <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-black/40 to-black/50 rounded-3xl"></div>
+                            )}
+                            <div className="relative z-10 h-full flex flex-col p-6">
+                              {promo.discount && (
+                                <div className="bg-white/25 backdrop-blur-sm w-fit px-3 py-1.5 rounded-lg text-xs font-bold mb-3 border border-white/30 shadow-md">
+                                  {promo.discount}
+                                </div>
+                              )}
+                              <h4 className="font-bold text-xl mb-2 drop-shadow-md">{promo.title}</h4>
+                              {promo.desc && (
+                                <p className="text-sm opacity-95 line-clamp-2 drop-shadow-sm mb-3 flex-1">{promo.desc}</p>
+                              )}
+                              {promo.validUntil && (
+                                <p className="text-xs opacity-80 font-medium mt-auto">{formatDate(promo.validUntil) || promo.validUntil}</p>
+                              )}
+                            </div>
                           </div>
-                          <div className="absolute -bottom-6 -right-6 text-white/10">
-                            <Percent size={120} />
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500 text-sm">

@@ -1,6 +1,5 @@
 import React from 'react';
-import { StaffLogin } from '../components/login/StaffLogin';
-import { UserRole } from '../types';
+import { AdminLogin } from '../components/login/AdminLogin';
 import { useTranslation } from '../contexts/LanguageContext';
 
 const AdminLoginPage: React.FC = () => {
@@ -15,8 +14,7 @@ const AdminLoginPage: React.FC = () => {
   };
 
   return (
-    <StaffLogin
-      role={UserRole.ADMIN}
+    <AdminLogin
       onLoginSuccess={handleLoginSuccess}
       setLanguage={setLanguage}
     />

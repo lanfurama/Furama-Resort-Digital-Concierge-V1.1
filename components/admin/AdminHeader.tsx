@@ -25,20 +25,27 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
     onNavigate
 }) => {
     return (
-        <header className="bg-emerald-900 text-white p-4 flex justify-between items-center shadow-lg sticky top-0 z-20">
-            <div className="flex items-center gap-3">
-                <img src="/logo.png" alt="Furama Logo" className="w-12 h-12 object-contain bg-white/90 rounded-full p-1 shadow-md" />
+        <header className="bg-gradient-to-r from-emerald-800 via-emerald-900 to-teal-900 text-white p-4 md:p-5 flex justify-between items-center shadow-xl sticky top-0 z-30 border-b border-emerald-700/50 backdrop-blur-sm">
+            <div className="flex items-center gap-3 md:gap-4">
+                <div className="relative">
+                    <div className="absolute inset-0 bg-white/20 rounded-full blur-lg"></div>
+                    <img 
+                        src="/logo.png" 
+                        alt="Furama Logo" 
+                        className="relative w-12 h-12 md:w-14 md:h-14 object-contain bg-white/95 rounded-full p-1.5 shadow-lg ring-2 ring-white/30" 
+                    />
+                </div>
                 <div>
-                    <h1 className="text-xl font-serif font-bold">Furama Admin CMS</h1>
-                    <div className="flex items-center space-x-2">
-                        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${user.role === UserRole.SUPERVISOR ? 'bg-amber-500 text-white' : 'bg-emerald-700 text-emerald-100'}`}>
+                    <h1 className="text-lg md:text-xl font-serif font-bold tracking-tight">Furama Admin CMS</h1>
+                    <div className="flex items-center space-x-2 mt-0.5">
+                        <span className={`text-[10px] md:text-xs uppercase font-bold px-2 py-1 rounded-md shadow-sm transition-all ${user.role === UserRole.SUPERVISOR ? 'bg-amber-500/90 text-white ring-2 ring-amber-400/30' : 'bg-emerald-700/80 text-emerald-50 ring-2 ring-emerald-600/30'}`}>
                             {user.role === UserRole.SUPERVISOR ? 'Supervisor (Restricted)' : user.role}
                         </span>
-                        <p className="text-xs text-emerald-300">System Management</p>
+                        <p className="text-xs text-emerald-200/90 font-medium hidden sm:block">System Management</p>
                     </div>
                 </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
                 {/* Notification Bell - Only show when FLEET tab is active */}
                 {tab === 'FLEET' && (
                     <BuggyNotificationBell
@@ -56,7 +63,10 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                         showActive={true}
                     />
                 )}
-                <button onClick={onLogout} className="text-sm bg-emerald-800 px-3 py-1 rounded hover:bg-emerald-700 border border-emerald-700">
+                <button 
+                    onClick={onLogout} 
+                    className="text-sm font-semibold bg-white/10 hover:bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg hover:shadow-lg transition-all duration-200 border border-white/20 hover:border-white/30 hover:scale-105 active:scale-95"
+                >
                     Logout
                 </button>
             </div>

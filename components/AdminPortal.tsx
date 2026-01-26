@@ -64,7 +64,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100 flex flex-col font-sans">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-emerald-50/30 to-teal-50/30 flex flex-col font-sans">
             <AdminHeader
                 user={user}
                 onLogout={onLogout}
@@ -82,7 +82,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 userRole={user.role}
             />
 
-            <div className="flex-1 p-4 md:p-6 overflow-auto">
+            <div className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
                 {tab === 'LOCATIONS' && (
                     <LocationsTab
                         locations={locations}

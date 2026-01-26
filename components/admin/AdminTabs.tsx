@@ -11,71 +11,51 @@ interface AdminTabsProps {
 }
 
 export const AdminTabs: React.FC<AdminTabsProps> = ({ currentTab, onTabChange, userRole }) => {
+    const tabs = [
+        { id: 'LOCATIONS', icon: MapPin, label: 'Locs' },
+        { id: 'ROOMS', icon: Home, label: 'Rooms' },
+        { id: 'FLEET', icon: Car, label: 'Fleet' },
+        { id: 'MENU', icon: Utensils, label: 'Resort Services' },
+        { id: 'EVENTS', icon: Calendar, label: 'Events' },
+        { id: 'PROMOS', icon: Megaphone, label: 'Promo' },
+        { id: 'KNOWLEDGE', icon: BrainCircuit, label: 'AI' },
+        ...(userRole === UserRole.ADMIN ? [{ id: 'USERS', icon: Users, label: 'Staff' }] : []),
+        { id: 'GUESTS', icon: UserCheck, label: 'Guests' },
+        { id: 'HISTORY', icon: History, label: 'History' },
+    ];
+
     return (
-        <div className="flex bg-white shadow-sm border-b border-gray-200 overflow-x-auto">
-            <button
-                onClick={() => onTabChange('LOCATIONS')}
-                className={`flex-1 min-w-[80px] py-4 font-semibold flex flex-col md:flex-row items-center justify-center md:space-x-2 border-b-2 ${currentTab === 'LOCATIONS' ? 'border-emerald-600 text-emerald-800' : 'border-transparent text-gray-500'}`}
-            >
-                <MapPin size={18} /> <span className="text-xs md:text-sm">Locs</span>
-            </button>
-            <button
-                onClick={() => onTabChange('ROOMS')}
-                className={`flex-1 min-w-[80px] py-4 font-semibold flex flex-col md:flex-row items-center justify-center md:space-x-2 border-b-2 ${currentTab === 'ROOMS' ? 'border-emerald-600 text-emerald-800' : 'border-transparent text-gray-500'}`}
-            >
-                <Home size={18} /> <span className="text-xs md:text-sm">Rooms</span>
-            </button>
-            <button
-                onClick={() => onTabChange('FLEET')}
-                className={`flex-1 min-w-[80px] py-4 font-semibold flex flex-col md:flex-row items-center justify-center md:space-x-2 border-b-2 ${currentTab === 'FLEET' ? 'border-emerald-600 text-emerald-800' : 'border-transparent text-gray-500'}`}
-            >
-                <Car size={18} /> <span className="text-xs md:text-sm">Fleet</span>
-            </button>
-            <button
-                onClick={() => onTabChange('MENU')}
-                className={`flex-1 min-w-[80px] py-4 font-semibold flex flex-col md:flex-row items-center justify-center md:space-x-2 border-b-2 ${currentTab === 'MENU' ? 'border-emerald-600 text-emerald-800' : 'border-transparent text-gray-500'}`}
-            >
-                <Utensils size={18} /> <span className="text-xs md:text-sm">Resort Services</span>
-            </button>
-            <button
-                onClick={() => onTabChange('EVENTS')}
-                className={`flex-1 min-w-[80px] py-4 font-semibold flex flex-col md:flex-row items-center justify-center md:space-x-2 border-b-2 ${currentTab === 'EVENTS' ? 'border-emerald-600 text-emerald-800' : 'border-transparent text-gray-500'}`}
-            >
-                <Calendar size={18} /> <span className="text-xs md:text-sm">Events</span>
-            </button>
-            <button
-                onClick={() => onTabChange('PROMOS')}
-                className={`flex-1 min-w-[80px] py-4 font-semibold flex flex-col md:flex-row items-center justify-center md:space-x-2 border-b-2 ${currentTab === 'PROMOS' ? 'border-emerald-600 text-emerald-800' : 'border-transparent text-gray-500'}`}
-            >
-                <Megaphone size={18} /> <span className="text-xs md:text-sm">Promo</span>
-            </button>
-            <button
-                onClick={() => onTabChange('KNOWLEDGE')}
-                className={`flex-1 min-w-[80px] py-4 font-semibold flex flex-col md:flex-row items-center justify-center md:space-x-2 border-b-2 ${currentTab === 'KNOWLEDGE' ? 'border-emerald-600 text-emerald-800' : 'border-transparent text-gray-500'}`}
-            >
-                <BrainCircuit size={18} /> <span className="text-xs md:text-sm">AI</span>
-            </button>
-            {/* Only ADMIN can see Users/Staff Management */}
-            {userRole === UserRole.ADMIN && (
-                <button
-                    onClick={() => onTabChange('USERS')}
-                    className={`flex-1 min-w-[80px] py-4 font-semibold flex flex-col md:flex-row items-center justify-center md:space-x-2 border-b-2 ${currentTab === 'USERS' ? 'border-emerald-600 text-emerald-800' : 'border-transparent text-gray-500'}`}
-                >
-                    <Users size={18} /> <span className="text-xs md:text-sm">Staff</span>
-                </button>
-            )}
-            <button
-                onClick={() => onTabChange('GUESTS')}
-                className={`flex-1 min-w-[80px] py-4 font-semibold flex flex-col md:flex-row items-center justify-center md:space-x-2 border-b-2 ${currentTab === 'GUESTS' ? 'border-emerald-600 text-emerald-800' : 'border-transparent text-gray-500'}`}
-            >
-                <UserCheck size={18} /> <span className="text-xs md:text-sm">Guests</span>
-            </button>
-            <button
-                onClick={() => onTabChange('HISTORY')}
-                className={`flex-1 min-w-[80px] py-4 font-semibold flex flex-col md:flex-row items-center justify-center md:space-x-2 border-b-2 ${currentTab === 'HISTORY' ? 'border-emerald-600 text-emerald-800' : 'border-transparent text-gray-500'}`}
-            >
-                <History size={18} /> <span className="text-xs md:text-sm">History</span>
-            </button>
+        <div className="flex bg-white shadow-md border-b border-gray-200 overflow-x-auto scrollbar-hide sticky top-[73px] md:top-[81px] z-20">
+            <div className="flex min-w-full">
+                {tabs.map((tab) => {
+                    const Icon = tab.icon;
+                    const isActive = currentTab === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => onTabChange(tab.id as TabType)}
+                            className={`relative flex-1 min-w-[90px] md:min-w-[120px] py-3 md:py-4 font-semibold flex flex-col md:flex-row items-center justify-center gap-1.5 md:gap-2 transition-all duration-200 group ${
+                                isActive 
+                                    ? 'text-emerald-700 bg-emerald-50/50' 
+                                    : 'text-gray-500 hover:text-emerald-600 hover:bg-gray-50'
+                            }`}
+                        >
+                            <div className={`relative transition-transform duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-105'}`}>
+                                <Icon size={18} className={isActive ? 'text-emerald-600' : 'text-gray-400 group-hover:text-emerald-500'} />
+                            </div>
+                            <span className={`text-xs md:text-sm transition-colors ${isActive ? 'text-emerald-700 font-bold' : 'text-gray-500 group-hover:text-emerald-600'}`}>
+                                {tab.label}
+                            </span>
+                            {isActive && (
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-500 shadow-sm"></div>
+                            )}
+                            {!isActive && (
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-transparent group-hover:bg-emerald-200/50 transition-colors"></div>
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
         </div>
     );
 };
