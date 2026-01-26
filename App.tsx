@@ -31,6 +31,7 @@ import { LanguageProvider, useTranslation } from './contexts/LanguageContext';
 import { BuggyStatusProvider, useBuggyStatus } from './contexts/BuggyStatusContext';
 import { ToastProvider } from './hooks/useToast';
 import PullToRefresh from './components/PullToRefresh';
+import { NetworkStatusBanner } from './components/NetworkStatusBanner';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{
@@ -790,6 +791,9 @@ const AppContent: React.FC = () => {
 
   return (
     <BuggyStatusProvider user={user} currentView={view}>
+      {/* Network Status Banner - Shows offline notification and auto-reloads */}
+      <NetworkStatusBanner autoReload={true} position="top" showWhenOnline={true} />
+      
       {/* PWA Install Prompt - Disabled */}
       {/* <PWAInstallPrompt /> */}
       <Routes>

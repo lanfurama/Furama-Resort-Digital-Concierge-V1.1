@@ -1,15 +1,16 @@
-import React from 'react';
+import React, { useCallback, memo } from 'react';
 import { GuestLogin } from '../components/login/GuestLogin';
-import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '../contexts/LanguageContext';
 
-const GuestLoginPage: React.FC = () => {
-  const navigate = useNavigate();
+const GuestLoginPage: React.FC = memo(() => {
   const { setLanguage } = useTranslation();
 
-  const handleLoginSuccess = (user: any) => {
+  // Memoize handler to prevent re-renders
+  const handleLoginSuccess = useCallback((user: any) => {
     // Save user to localStorage
-    localStorage.setItem('furama_user', JSON.stringify(user));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('furama_user', JSON.stringify(user));
+    }
     
     // Set language if available
     if (user.language) {
@@ -18,7 +19,7 @@ const GuestLoginPage: React.FC = () => {
     
     // Redirect to home (guest dashboard)
     window.location.href = '/';
-  };
+  }, [setLanguage]);
 
   return (
     <GuestLogin
@@ -26,7 +27,9 @@ const GuestLoginPage: React.FC = () => {
       setLanguage={setLanguage}
     />
   );
-};
+});
+
+GuestLoginPage.displayName = 'GuestLoginPage';
 
 export default GuestLoginPage;
 
