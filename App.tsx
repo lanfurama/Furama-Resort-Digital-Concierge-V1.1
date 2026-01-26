@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, useRef, Suspense, lazy, useCallback, memo } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AppView, User, UserRole } from './types';
 import ServiceMenu from './components/ServiceMenu';
@@ -210,14 +210,14 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const handleServiceSelect = (serviceId: string) => {
+  const handleServiceSelect = useCallback((serviceId: string) => {
     if (serviceId === 'DINING') setView(AppView.DINING_ORDER);
     else if (serviceId === 'SPA') setView(AppView.SPA_BOOKING);
     else if (serviceId === 'POOL') setView(AppView.POOL_ORDER);
     else if (serviceId === 'BUTLER') setView(AppView.BUTLER_REQUEST);
     else if (serviceId === 'EVENTS') setView(AppView.EVENTS);
     else if (serviceId === 'CHAT') setView(AppView.CHAT);
-  };
+  }, []);
 
   // Helper for Nav Bar Active State
   const isActive = (v: AppView) => view === v;
@@ -354,11 +354,12 @@ const AppContent: React.FC = () => {
     return <GuestHome user={user} />;
   };
 
-  // Guest Home Component - uses buggy status context
-  const GuestHome: React.FC<{ user: User }> = ({ user }) => {
+  // Guest Home Component - uses buggy status context - Memoized for performance
+  const GuestHome: React.FC<{ user: User }> = memo(({ user }) => {
     const { buggyStatus, buggyWaitTime } = useBuggyStatus();
+    const { t, language } = useTranslation();
 
-    const handleRefresh = async () => {
+    const handleRefresh = useCallback(async () => {
       // Simulate refresh delay for better UX
       await new Promise(resolve => setTimeout(resolve, 800));
 
@@ -371,9 +372,27 @@ const AppContent: React.FC = () => {
           await getActiveGuestOrders(user.roomNumber).then(orders => setActiveOrderCount(orders.length));
         }
       } catch (error) {
-        console.error("Refresh failed:", error);
+        // Silent error handling
       }
-    };
+    }, [user.roomNumber]);
+
+    // Memoize promotions rendering to prevent recalculation
+    const renderedPromotions = useMemo(() => {
+      return promotions
+        .filter((promo) => promo && promo.id)
+        .map((promo) => {
+          const tr = promo.translations?.[language];
+          const title = tr?.title || promo.title;
+          const desc = tr?.description || promo.description;
+          const discount = tr?.discount || promo.discount;
+          return {
+            ...promo,
+            title,
+            desc,
+            discount
+          };
+        });
+    }, [promotions, language]);
 
     return (
       <div className="flex flex-col h-screen max-w-md mx-auto shadow-2xl overflow-hidden relative">
@@ -443,7 +462,7 @@ const AppContent: React.FC = () => {
               <div className="flex flex-col min-h-full relative">
                 {/* Content background overlay for readability - Removed to fix gray divs issue */}
                 <div className="relative z-10">
-                {/* Optimized Hero Banner */}
+                {/* Optimized Hero Banner - GPU accelerated */}
                 <div className="mx-4 mt-6 h-44 rounded-3xl overflow-hidden relative shadow-xl mb-6">
                   <img
                     src="https://furamavietnam.com/wp-content/uploads/2025/10/furama-resort-danang.jpg"
@@ -451,6 +470,11 @@ const AppContent: React.FC = () => {
                     alt="Furama Resort Danang"
                     loading="lazy"
                     decoding="async"
+                    style={{
+                      transform: 'translateZ(0)',
+                      willChange: 'transform',
+                      WebkitTransform: 'translateZ(0)'
+                    }}
                     onError={(e) => {
                       const img = e.target as HTMLImageElement;
                       if (img.src.includes('furama-resort-danang.jpg')) {
@@ -491,43 +515,39 @@ const AppContent: React.FC = () => {
                     <div className="w-1 h-6 bg-gradient-to-b from-amber-500 to-amber-400 rounded-full"></div>
                     <h3 className="font-bold text-gray-800 text-lg">{t('exclusive_offers')}</h3>
                   </div>
-                  {promotions.length > 0 ? (
+                  {renderedPromotions.length > 0 ? (
                     <div className="flex space-x-4 overflow-x-auto pb-2 snap-x scrollbar-hide">
-                      {promotions
-                        .filter((promo) => promo && promo.id) // Filter out invalid promotions
-                        .map((promo) => {
-                          const tr = promo.translations?.[language];
-                          const title = tr?.title || promo.title;
-                          const desc = tr?.description || promo.description;
-                          const discount = tr?.discount || promo.discount;
-                          return (
-                            <div
-                              key={promo.id}
-                              className={`min-w-[280px] h-[200px] p-6 rounded-3xl text-white shadow-xl snap-center relative overflow-hidden shrink-0 transition-transform active:scale-95 flex flex-col ${
-                                promo.imageUrl ? '' : (promo.imageColor || 'bg-gradient-to-br from-emerald-500 to-emerald-600')
-                              }`}
-                              style={promo.imageUrl ? {
-                                backgroundImage: `url(${promo.imageUrl})`,
-                                backgroundSize: 'cover',
-                                backgroundPosition: 'center',
-                                backgroundRepeat: 'no-repeat'
-                              } : {}}
-                            >
-                              {promo.imageUrl && (
-                                <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-black/40 to-black/50 rounded-3xl"></div>
-                              )}
-                              <div className="relative z-10 h-full flex flex-col">
-                                <div className="bg-white/25 backdrop-blur-sm w-fit px-3 py-1.5 rounded-lg text-xs font-bold mb-3 border border-white/30 shadow-md">{discount}</div>
-                                <h4 className="font-bold text-xl mb-2 drop-shadow-md">{title}</h4>
-                                <p className="text-sm opacity-95 line-clamp-2 drop-shadow-sm mb-3 flex-1">{desc}</p>
-                                <p className="text-xs opacity-80 font-medium mt-auto">{promo.validUntil}</p>
-                              </div>
-                              <div className="absolute -bottom-6 -right-6 text-white/10">
-                                <Percent size={120} />
-                              </div>
-                            </div>
-                          );
-                        })}
+                      {renderedPromotions.map((promo) => (
+                        <div
+                          key={promo.id}
+                          className={`min-w-[280px] h-[200px] p-6 rounded-3xl text-white shadow-xl snap-center relative overflow-hidden shrink-0 transition-transform active:scale-95 flex flex-col ${
+                            promo.imageUrl ? '' : (promo.imageColor || 'bg-gradient-to-br from-emerald-500 to-emerald-600')
+                          }`}
+                          style={promo.imageUrl ? {
+                            backgroundImage: `url(${promo.imageUrl})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            backgroundRepeat: 'no-repeat',
+                            transform: 'translateZ(0)', // GPU acceleration
+                            willChange: 'transform'
+                          } : {
+                            transform: 'translateZ(0)'
+                          }}
+                        >
+                          {promo.imageUrl && (
+                            <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-black/40 to-black/50 rounded-3xl"></div>
+                          )}
+                          <div className="relative z-10 h-full flex flex-col">
+                            <div className="bg-white/25 backdrop-blur-sm w-fit px-3 py-1.5 rounded-lg text-xs font-bold mb-3 border border-white/30 shadow-md">{promo.discount}</div>
+                            <h4 className="font-bold text-xl mb-2 drop-shadow-md">{promo.title}</h4>
+                            <p className="text-sm opacity-95 line-clamp-2 drop-shadow-sm mb-3 flex-1">{promo.desc}</p>
+                            <p className="text-xs opacity-80 font-medium mt-auto">{promo.validUntil}</p>
+                          </div>
+                          <div className="absolute -bottom-6 -right-6 text-white/10">
+                            <Percent size={120} />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500 text-sm">
@@ -643,10 +663,16 @@ const AppContent: React.FC = () => {
               transition-duration: 0.01ms !important;
             }
           }
-        `}</style>
+        `}        </style>
       </div >
     );
-  };
+  }, (prevProps, nextProps) => {
+    // Only re-render if user actually changes
+    return prevProps.user.id === nextProps.user.id && 
+           prevProps.user.roomNumber === nextProps.user.roomNumber;
+  });
+
+  GuestHome.displayName = 'GuestHome';
 
   // BuggyNavButton Component - uses buggy status context, only re-renders when buggy status changes
   const BuggyNavButton: React.FC<{

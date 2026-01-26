@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { Utensils, Waves, Sparkles, User, Calendar } from 'lucide-react';
 import { useTranslation } from '../contexts/LanguageContext';
 
@@ -7,10 +7,11 @@ interface ServiceMenuProps {
     onSelect: (service: string) => void;
 }
 
-const ServiceMenu: React.FC<ServiceMenuProps> = ({ onSelect }) => {
+const ServiceMenu: React.FC<ServiceMenuProps> = memo(({ onSelect }) => {
     const { t } = useTranslation();
 
-    const services = [
+    // Memoize services array to prevent recreation on every render
+    const services = useMemo(() => [
         {
             id: 'DINING',
             name: t('dining'),
@@ -66,7 +67,7 @@ const ServiceMenu: React.FC<ServiceMenuProps> = ({ onSelect }) => {
             borderColor: 'border-pink-200',
             shadowColor: 'shadow-pink-300/50'
         },
-    ];
+    ], [t]);
 
     return (
         <div className="p-4 grid grid-cols-2 gap-3">
@@ -76,7 +77,9 @@ const ServiceMenu: React.FC<ServiceMenuProps> = ({ onSelect }) => {
                     onClick={() => onSelect(s.id)}
                     className={`relative flex flex-col items-center justify-center p-5 bg-white/80 backdrop-blur-sm rounded-3xl border-2 ${s.borderColor} transition-transform active:scale-95 overflow-hidden`}
                     style={{
-                        boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.5)'
+                        boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.5)',
+                        transform: 'translateZ(0)',
+                        willChange: 'transform'
                     }}
                 >
                     {/* Background Gradient */}
@@ -104,6 +107,11 @@ const ServiceMenu: React.FC<ServiceMenuProps> = ({ onSelect }) => {
             ))}
         </div>
     );
-};
+}, (prevProps, nextProps) => {
+    // Only re-render if onSelect function reference changes
+    return prevProps.onSelect === nextProps.onSelect;
+});
+
+ServiceMenu.displayName = 'ServiceMenu';
 
 export default ServiceMenu;
