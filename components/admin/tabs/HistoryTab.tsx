@@ -56,7 +56,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
                                 onChange={(e) => setHistoryFilterDate(e.target.value)}
                             />
                             {historyFilterDate && (
-                                <button onClick={() => setHistoryFilterDate('')} className="text-gray-400 hover:text-red-500">
+                                <button onClick={() => setHistoryFilterDate('')} className="text-gray-400 ">
                                     <X size={14} />
                                 </button>
                             )}
@@ -85,7 +85,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
                         </thead>
                         <tbody>
                             {filteredHistory.map((req, i) => (
-                                <tr key={req.id || i} className="border-b border-gray-100 hover:bg-gray-50">
+                                <tr key={req.id || i} className="border-b border-gray-100 ">
                                     <td className="p-4 text-sm text-gray-600">
                                         <div className="flex items-center">
                                             <Clock size={12} className="mr-1.5 text-gray-400" />

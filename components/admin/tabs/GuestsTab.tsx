@@ -179,14 +179,14 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                     </div>
                     <button
                         onClick={handleExportGuests}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 shadow-md transition"
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md active:scale-95"
                     >
                         <Download size={18} />
                         <span>Export CSV</span>
                     </button>
                     <button
                         onClick={() => setShowGuestForm(!showGuestForm)}
-                        className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition"
+                        className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md active:scale-95"
                     >
                         {showGuestForm ? <X size={18} /> : <Plus size={18} />}
                         <span>Add Guest</span>
@@ -274,7 +274,7 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                         <div className="flex-1">
                             <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase">Bulk Import Guests (CSV)</h3>
                             <p className="text-xs text-gray-500 mb-4">Format: LastName, RoomNumber, VillaType, CheckIn, CheckOut, Language</p>
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition cursor-pointer relative">
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center  active:scale-95 cursor-pointer relative">
                                 <input type="file" accept=".csv" onChange={(e) => setCsvFile(e.target.files?.[0] || null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                                 <Download className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
                                 <p className="text-sm text-gray-600 font-medium">{csvFile ? csvFile.name : 'Click to Upload CSV'}</p>
@@ -305,7 +305,7 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                                 setEditGuest({ lastName: '', roomNumber: '', villaType: '', language: 'English', checkIn: '', checkOut: '' });
                                 setShowGuestEditForm(false);
                             }}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                            className="absolute top-4 right-4 text-gray-400  active:scale-95-colors"
                         >
                             <X size={20} />
                         </button>
@@ -384,13 +384,13 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                                     setEditGuest({ lastName: '', roomNumber: '', villaType: '', language: 'English', checkIn: '', checkOut: '' });
                                     setShowGuestEditForm(false);
                                 }}
-                                className="bg-gray-500 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-gray-600"
+                                className="bg-gray-500 text-white px-6 py-2 rounded-lg text-sm font-bold "
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleUpdateGuest}
-                                className="bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700"
+                                className="bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold "
                             >
                                 Update Guest
                             </button>
@@ -421,7 +421,7 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                             else if (status === 'Expired') statusColor = 'bg-gray-100 text-gray-500';
 
                             return (
-                                <tr key={u.id || u.roomNumber} className="border-b border-gray-100 hover:bg-gray-50">
+                                <tr key={u.id || u.roomNumber} className="border-b border-gray-100 ">
                                     <td className="p-4">
                                         <div className="font-bold text-gray-800">{u.lastName}</div>
                                         <div className="text-xs text-gray-500">Room: {u.roomNumber}</div>
@@ -458,7 +458,7 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                                                             }
                                                         }
                                                     }}
-                                                    className="text-xs font-mono bg-gray-100 text-gray-800 px-2 py-1 rounded border border-gray-300 cursor-pointer hover:bg-gray-200 transition-colors select-all"
+                                                    className="text-xs font-mono bg-gray-100 text-gray-800 px-2 py-1 rounded border border-gray-300 cursor-pointer  active:scale-95-colors select-all"
                                                     title="Click to copy"
                                                 >
                                                     {u.checkInCode}
@@ -468,7 +468,7 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                                                 ) : (
                                                     <Copy
                                                         size={14}
-                                                        className="text-gray-400 hover:text-gray-600 cursor-pointer"
+                                                        className="text-gray-400  cursor-pointer"
                                                         onClick={async () => {
                                                             if (u.checkInCode) {
                                                                 try {
@@ -497,7 +497,7 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                                                             }
                                                         }
                                                     }}
-                                                    className="text-emerald-600 hover:text-emerald-700 p-1"
+                                                    className="text-emerald-600  p-1"
                                                     title="Regenerate Code"
                                                 >
                                                     <RefreshCw size={14} />
@@ -517,7 +517,7 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                                                         }
                                                     }
                                                 }}
-                                                className="text-xs text-emerald-600 hover:text-emerald-700 px-2 py-1 border border-emerald-300 rounded hover:bg-emerald-50"
+                                                className="text-xs text-emerald-600  px-2 py-1 border border-emerald-300 rounded "
                                                 title="Generate Check-in Code"
                                             >
                                                 Generate Code
@@ -539,12 +539,12 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                                                     });
                                                     setShowGuestEditForm(true);
                                                 }}
-                                                className="text-emerald-600 hover:text-emerald-700 p-2"
+                                                className="text-emerald-600  p-2"
                                                 title="Edit"
                                             >
                                                 <Pencil size={16} />
                                             </button>
-                                            <button onClick={() => onDelete(u.id || '')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16} /></button>
+                                            <button onClick={() => onDelete(u.id || '')} className="text-red-500  p-2"><Trash2 size={16} /></button>
                                         </div>
                                     </td>
                                 </tr>

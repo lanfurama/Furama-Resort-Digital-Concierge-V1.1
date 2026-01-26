@@ -135,7 +135,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
                                 setNewRoomType({ name: '', description: '', locationId: '', isVIP: false });
                                 setShowRoomTypeForm(!showRoomTypeForm);
                             }}
-                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition"
+                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md active:scale-95"
                         >
                             {showRoomTypeForm ? <X size={18} /> : <Plus size={18} />}
                             <span>{showRoomTypeForm ? 'Cancel' : 'Add Type'}</span>
@@ -148,7 +148,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
                                 setNewRoom({ number: '', typeId: '', status: 'Available', managementType: 'FURAMA_MANAGED' });
                                 setShowRoomForm(!showRoomForm);
                             }}
-                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition"
+                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md active:scale-95"
                         >
                             {showRoomForm ? <X size={18} /> : <Plus size={18} />}
                             <span>{showRoomForm ? 'Cancel' : 'Add Room'}</span>
@@ -289,7 +289,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
                         <div className="flex-1">
                             <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase">Bulk Import Rooms (CSV)</h3>
                             <p className="text-xs text-gray-500 mb-4">Format: RoomNumber, RoomTypeName (Must match existing Type)</p>
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition cursor-pointer relative">
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center  active:scale-95 cursor-pointer relative">
                                 <input type="file" accept=".csv" onChange={(e) => setRoomCsvFile(e.target.files?.[0] || null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                                 <Upload className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
                                 <p className="text-sm text-gray-600 font-medium">{roomCsvFile ? roomCsvFile.name : 'Click to Upload CSV'}</p>
@@ -316,7 +316,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
                             {roomTypes.map((rt) => {
                                 const linkedLoc = rt.locationId ? locations.find(l => String(l.id) === String(rt.locationId)) : null;
                                 return (
-                                    <tr key={rt.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                    <tr key={rt.id} className="border-b border-gray-100 ">
                                         <td className="p-4">
                                             <div className="font-bold text-gray-800">{rt.name}</div>
                                             <div className="text-xs text-gray-500">{rt.description}</div>
@@ -348,8 +348,8 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
                                                         isVIP: rt.isVIP || false
                                                     });
                                                     setShowRoomTypeForm(true);
-                                                }} className="text-emerald-600 hover:text-emerald-700 p-2" title="Edit"><Pencil size={16} /></button>
-                                                <button onClick={() => onDelete(rt.id, 'ROOM_TYPE')} className="text-red-500 hover:text-red-700 p-2" title="Delete"><Trash2 size={16} /></button>
+                                                }} className="text-emerald-600  p-2" title="Edit"><Pencil size={16} /></button>
+                                                <button onClick={() => onDelete(rt.id, 'ROOM_TYPE')} className="text-red-500  p-2" title="Delete"><Trash2 size={16} /></button>
                                             </div>
                                         </td>
                                     </tr>
@@ -372,7 +372,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
                             {rooms.map((r) => {
                                 const typeObj = roomTypes.find(rt => rt.id === r.typeId);
                                 return (
-                                    <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                    <tr key={r.id} className="border-b border-gray-100 ">
                                         <td className="p-4 font-bold text-gray-800">{r.number}</td>
                                         <td className="p-4 text-sm text-gray-600">{typeObj?.name || 'Unknown Type'}</td>
                                         <td className="p-4 text-sm text-gray-600">
@@ -403,12 +403,12 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
                                                         });
                                                         setShowRoomForm(true);
                                                     }}
-                                                    className="text-emerald-600 hover:text-emerald-700 p-2"
+                                                    className="text-emerald-600  p-2"
                                                     title="Edit"
                                                 >
                                                     <Pencil size={16} />
                                                 </button>
-                                                <button onClick={() => onDelete(r.id, 'ROOM')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16} /></button>
+                                                <button onClick={() => onDelete(r.id, 'ROOM')} className="text-red-500  p-2"><Trash2 size={16} /></button>
                                             </div>
                                         </td>
                                     </tr>

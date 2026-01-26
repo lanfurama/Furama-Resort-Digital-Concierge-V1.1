@@ -57,10 +57,9 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                     <div className="flex-1 w-full lg:w-auto min-w-[250px]">
-                        <div className="relative group">
-                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        <div className="relative">
                             <div className="relative">
-                                <Search size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                                <Search size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" />
                                 <input
                                     type="text"
                                     value={locationSearch}
@@ -71,7 +70,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                 {locationSearch && (
                                     <button
                                         onClick={() => setLocationSearch('')}
-                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100"
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 p-1 rounded-lg active:scale-95"
                                     >
                                         <X size={16} />
                                     </button>
@@ -82,10 +81,10 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                     <div className="flex flex-wrap gap-2 bg-gray-50/80 backdrop-blur-sm rounded-xl p-1.5 border border-gray-200">
                         <button
                             onClick={() => setLocationFilter('ALL')}
-                            className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-2 transition-all duration-200 ${
+                            className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-2 active:scale-95 ${
                                 locationFilter === 'ALL' 
                                     ? 'bg-white text-gray-900 shadow-md border border-gray-200' 
-                                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                                    : 'text-gray-600 bg-gray-50'
                             }`}
                         >
                             <span>All</span>
@@ -102,7 +101,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                             className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-2 transition-all duration-200 ${
                                 locationFilter === 'FACILITY' 
                                     ? 'bg-blue-50 text-blue-900 shadow-md border border-blue-200' 
-                                    : 'text-gray-600 hover:text-blue-700 hover:bg-blue-50/50'
+                                    : 'text-gray-600 bg-gray-50'
                             }`}
                         >
                             <span>Public Areas</span>
@@ -119,7 +118,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                             className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-2 transition-all duration-200 ${
                                 locationFilter === 'VILLA' 
                                     ? 'bg-purple-50 text-purple-900 shadow-md border border-purple-200' 
-                                    : 'text-gray-600 hover:text-purple-700 hover:bg-purple-50/50'
+                                    : 'text-gray-600 bg-gray-50'
                             }`}
                         >
                             <span>Villa</span>
@@ -136,7 +135,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                             className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-2 transition-all duration-200 ${
                                 locationFilter === 'RESTAURANT' 
                                     ? 'bg-amber-50 text-amber-900 shadow-md border border-amber-200' 
-                                    : 'text-gray-600 hover:text-amber-700 hover:bg-amber-50/50'
+                                    : 'text-gray-600 bg-gray-50'
                             }`}
                         >
                             <span>Restaurant</span>
@@ -155,7 +154,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                             setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
                             setShowLocationForm(true);
                         }}
-                        className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-3 rounded-xl flex items-center justify-center gap-2 hover:from-emerald-700 hover:to-teal-700 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 active:scale-95 font-semibold whitespace-nowrap"
+                        className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 font-semibold whitespace-nowrap"
                     >
                         <Plus size={18} />
                         <span>Add Location</span>
@@ -183,7 +182,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                 setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
                                 setShowLocationForm(false);
                             }}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-lg hover:bg-gray-100"
+                            className="absolute top-4 right-4 text-gray-500 p-2 rounded-lg active:scale-95"
                             aria-label="Close"
                         >
                             <X size={20} />
@@ -247,13 +246,13 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                     setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
                                     setShowLocationForm(false);
                                 }}
-                                className="px-6 py-3 rounded-xl text-sm font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all duration-200"
+                                className="px-6 py-3 rounded-xl text-sm font-semibold bg-gray-100 text-gray-700 active:scale-95"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSave}
-                                className="px-6 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 active:scale-95"
+                                className="px-6 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg active:scale-95"
                             >
                                 {editingLocation ? 'Update Location' : 'Create Location'}
                             </button>
@@ -290,7 +289,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                 filteredLocations.map((loc, index) => (
                                     <tr 
                                         key={loc.id || loc.name} 
-                                        className="hover:bg-gradient-to-r hover:from-emerald-50/50 hover:to-teal-50/50 transition-all duration-150 group"
+                                        className="bg-white"
                                     >
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
@@ -300,7 +299,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                                     'bg-amber-500'
                                                 }`}></div>
                                                 <div>
-                                                    <div className="font-semibold text-gray-900 group-hover:text-emerald-700 transition-colors">
+                                                    <div className="font-semibold text-gray-900">
                                                         {loc.name}
                                                     </div>
                                                     <div className="md:hidden text-xs text-gray-500 mt-1 font-mono">
@@ -342,19 +341,19 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                                         });
                                                         setShowLocationForm(true);
                                                     }}
-                                                    className="p-2.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-all duration-200 group/edit"
+                                                    className="p-2.5 text-emerald-600 bg-emerald-50/50 rounded-lg active:scale-95"
                                                     title="Edit"
                                                     type="button"
                                                 >
-                                                    <Pencil size={18} className="group-hover/edit:scale-110 transition-transform" />
+                                                    <Pencil size={18} />
                                                 </button>
                                                 <button
                                                     onClick={() => onDelete(loc.id || loc.name)}
-                                                    className="p-2.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200 group/delete"
+                                                    className="p-2.5 text-red-500 bg-red-50/50 rounded-lg active:scale-95"
                                                     title="Delete"
                                                     type="button"
                                                 >
-                                                    <Trash2 size={18} className="group-hover/delete:scale-110 transition-transform" />
+                                                    <Trash2 size={18} />
                                                 </button>
                                             </div>
                                         </td>

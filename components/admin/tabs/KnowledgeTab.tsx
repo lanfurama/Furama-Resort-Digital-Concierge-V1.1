@@ -62,7 +62,7 @@ export const KnowledgeTab: React.FC<KnowledgeTabProps> = ({ knowledge, onDelete,
                             }
                         }
                     }}
-                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition flex-1 md:flex-none"
+                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md active:scale-95 flex-1 md:flex-none"
                 >
                     {showKnowledgeForm && !editingKnowledgeItem ? <X size={18} /> : <Plus size={18} />}
                     <span>{showKnowledgeForm && !editingKnowledgeItem ? 'Cancel' : 'Add Knowledge'}</span>
@@ -122,7 +122,7 @@ export const KnowledgeTab: React.FC<KnowledgeTabProps> = ({ knowledge, onDelete,
             <div className="bg-white rounded-xl shadow-sm border border-gray-200">
                 <div className="divide-y divide-gray-100">
                     {knowledge.map((k) => (
-                        <div key={k.id} className="p-4 flex justify-between items-start hover:bg-gray-50">
+                        <div key={k.id} className="p-4 flex justify-between items-start ">
                             <div className="pr-4 flex-1">
                                 <div className="font-semibold text-emerald-800 text-sm mb-1">Q: {k.question}</div>
                                 <div className="text-gray-600 text-sm">A: {k.answer}</div>
@@ -137,12 +137,12 @@ export const KnowledgeTab: React.FC<KnowledgeTabProps> = ({ knowledge, onDelete,
                                         });
                                         setShowKnowledgeForm(true);
                                     }}
-                                    className="text-emerald-600 hover:text-emerald-700 p-2"
+                                    className="text-emerald-600  p-2"
                                     title="Edit"
                                 >
                                     <FileText size={16} />
                                 </button>
-                                <button onClick={() => onDelete(k.id)} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16} /></button>
+                                <button onClick={() => onDelete(k.id)} className="text-red-500  p-2"><Trash2 size={16} /></button>
                             </div>
                         </div>
                     ))}

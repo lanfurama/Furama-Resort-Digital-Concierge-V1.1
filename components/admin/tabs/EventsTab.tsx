@@ -84,7 +84,7 @@ export const EventsTab: React.FC<EventsTabProps> = ({ events, onDelete, onRefres
                             }
                         }
                     }}
-                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition flex-1 md:flex-none"
+                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md active:scale-95 flex-1 md:flex-none"
                 >
                     {showEventForm && !editingEvent ? <X size={18} /> : <Plus size={18} />}
                     <span>{showEventForm && !editingEvent ? 'Cancel' : 'Add Event'}</span>
@@ -172,7 +172,7 @@ export const EventsTab: React.FC<EventsTabProps> = ({ events, onDelete, onRefres
             <div className="bg-white rounded-xl shadow-sm border border-gray-200">
                 <div className="divide-y divide-gray-100">
                     {events.map((event) => (
-                        <div key={event.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
+                        <div key={event.id} className="p-4 flex justify-between items-center ">
                             <div>
                                 <div className="font-bold text-gray-800">{event.title}</div>
                                 <div className="text-sm text-emerald-600">{formatEventDate(event.date)} • {event.time}</div>
@@ -191,12 +191,12 @@ export const EventsTab: React.FC<EventsTabProps> = ({ events, onDelete, onRefres
                                         });
                                         setShowEventForm(true);
                                     }}
-                                    className="text-emerald-600 hover:text-emerald-700 p-2"
+                                    className="text-emerald-600  p-2"
                                     title="Edit"
                                 >
                                     <FileText size={16} />
                                 </button>
-                                <button onClick={() => onDelete(event.id)} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16} /></button>
+                                <button onClick={() => onDelete(event.id)} className="text-red-500  p-2"><Trash2 size={16} /></button>
                             </div>
                         </div>
                     ))}

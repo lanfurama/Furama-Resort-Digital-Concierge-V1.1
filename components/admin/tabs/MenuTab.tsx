@@ -67,7 +67,7 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
                                 setNewMenuItem({ name: '', price: 0, category: 'Dining', description: '' });
                             }
                         }}
-                        className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition flex-1 md:flex-none"
+                        className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 shadow-md active:scale-95 flex-1 md:flex-none"
                     >
                         {showMenuItemForm && !editingMenuItem ? <X size={18} /> : <Plus size={18} />}
                         <span>{showMenuItemForm && !editingMenuItem ? 'Cancel' : 'Add Item'}</span>
@@ -95,7 +95,7 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
                                 setNewMenuItem({ name: '', price: 0, category: 'Dining', description: '' });
                                 setShowMenuItemForm(false);
                             }}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                            className="absolute top-4 right-4 text-gray-500 active:scale-95"
                             aria-label="Close"
                         >
                             <X size={20} />
@@ -154,13 +154,13 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
                                     setNewMenuItem({ name: '', price: 0, category: 'Dining', description: '' });
                                     setShowMenuItemForm(false);
                                 }}
-                                className="bg-gray-500 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-gray-600"
+                                className="bg-gray-500 text-white px-6 py-2 rounded-lg text-sm font-bold active:scale-95"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSave}
-                                className="bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-emerald-700"
+                                className="bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold active:scale-95"
                             >
                                 {editingMenuItem ? 'Update Item' : 'Create Item'}
                             </button>
@@ -182,7 +182,7 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
                     </thead>
                     <tbody>
                         {filteredMenu.map((item) => (
-                            <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                            <tr key={item.id} className="border-b border-gray-100 bg-white">
                                 <td className="p-4">
                                     <div className="font-medium text-gray-800">{item.name}</div>
                                     <div className="text-xs text-gray-400 line-clamp-1">{item.description}</div>
@@ -212,13 +212,13 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
                                                 });
                                                 setShowMenuItemForm(true);
                                             }}
-                                            className="text-emerald-600 hover:text-emerald-700 p-2 relative z-10 cursor-pointer"
+                                            className="text-emerald-600 p-2 relative z-10 cursor-pointer active:scale-95"
                                             title="Edit"
                                             type="button"
                                         >
                                             <Pencil size={16} />
                                         </button>
-                                        <button onClick={() => onDelete(item.id)} className="text-red-500 hover:text-red-700 p-2 relative z-10 cursor-pointer" type="button"><Trash2 size={16} /></button>
+                                        <button onClick={() => onDelete(item.id)} className="text-red-500 p-2 relative z-10 cursor-pointer active:scale-95" type="button"><Trash2 size={16} /></button>
                                     </div>
                                 </td>
                             </tr>

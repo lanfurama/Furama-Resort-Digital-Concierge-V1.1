@@ -25,7 +25,7 @@ export const AdminTabs: React.FC<AdminTabsProps> = ({ currentTab, onTabChange, u
     ];
 
     return (
-        <div className="flex bg-white shadow-md border-b border-gray-200 overflow-x-auto scrollbar-hide sticky top-[73px] md:top-[81px] z-20">
+        <div className="flex bg-white shadow-md border-b-2 border-gray-300 overflow-x-auto scrollbar-hide sticky top-[73px] md:top-[81px] z-20">
             <div className="flex min-w-full">
                 {tabs.map((tab) => {
                     const Icon = tab.icon;
@@ -34,23 +34,20 @@ export const AdminTabs: React.FC<AdminTabsProps> = ({ currentTab, onTabChange, u
                         <button
                             key={tab.id}
                             onClick={() => onTabChange(tab.id as TabType)}
-                            className={`relative flex-1 min-w-[90px] md:min-w-[120px] py-3 md:py-4 font-semibold flex flex-col md:flex-row items-center justify-center gap-1.5 md:gap-2 transition-all duration-200 group ${
+                            className={`relative flex-1 min-w-[90px] md:min-w-[120px] py-3.5 md:py-4 font-semibold flex flex-col md:flex-row items-center justify-center gap-1.5 md:gap-2 active:scale-95 ${
                                 isActive 
-                                    ? 'text-emerald-700 bg-emerald-50/50' 
-                                    : 'text-gray-500 hover:text-emerald-600 hover:bg-gray-50'
+                                    ? 'text-emerald-800 bg-emerald-100 border-b-3 border-emerald-700 shadow-sm' 
+                                    : 'text-gray-700 bg-white'
                             }`}
                         >
-                            <div className={`relative transition-transform duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-105'}`}>
-                                <Icon size={18} className={isActive ? 'text-emerald-600' : 'text-gray-400 group-hover:text-emerald-500'} />
+                            <div className={`relative ${isActive ? 'scale-110' : ''}`}>
+                                <Icon size={20} className={isActive ? 'text-emerald-700' : 'text-gray-600'} strokeWidth={isActive ? 2.5 : 2} />
                             </div>
-                            <span className={`text-xs md:text-sm transition-colors ${isActive ? 'text-emerald-700 font-bold' : 'text-gray-500 group-hover:text-emerald-600'}`}>
+                            <span className={`text-xs md:text-sm font-medium ${isActive ? 'text-emerald-800 font-bold' : 'text-gray-700'}`}>
                                 {tab.label}
                             </span>
                             {isActive && (
-                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-500 shadow-sm"></div>
-                            )}
-                            {!isActive && (
-                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-transparent group-hover:bg-emerald-200/50 transition-colors"></div>
+                                <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-700"></div>
                             )}
                         </button>
                     );

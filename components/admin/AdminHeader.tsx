@@ -65,7 +65,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                 )}
                 <button 
                     onClick={onLogout} 
-                    className="text-sm font-semibold bg-white/10 hover:bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg hover:shadow-lg transition-all duration-200 border border-white/20 hover:border-white/30 hover:scale-105 active:scale-95"
+                    className="text-sm font-semibold bg-white/15 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/30 active:scale-95 shadow-md"
                 >
                     Logout
                 </button>

@@ -110,7 +110,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                         </div>
                         <button
                             onClick={() => setShowUserForm(!showUserForm)}
-                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-emerald-700 shadow-md transition"
+                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md active:scale-95"
                         >
                             {showUserForm ? <X size={18} /> : <Plus size={18} />}
                             <span>Add Staff</span>
@@ -225,7 +225,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                     </thead>
                     <tbody>
                         {staffUsers.map((u) => (
-                            <tr key={u.id || u.roomNumber} className="border-b border-gray-100 hover:bg-gray-50">
+                            <tr key={u.id || u.roomNumber} className="border-b border-gray-100 ">
                                 <td className="p-4">
                                     <div className="font-bold text-gray-800">{u.lastName}</div>
                                     <div className="text-xs text-gray-500">ID: {u.roomNumber}</div>
@@ -266,13 +266,13 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                             });
                                             setShowStaffEditForm(true);
                                         }}
-                                        className="text-blue-500 hover:text-blue-700 p-2"
+                                        className="text-blue-500  p-2"
                                         title="Edit Staff"
                                     >
                                         <Pencil size={16} />
                                     </button>
-                                    <button onClick={() => { setResetPasswordUserId(u.id || ''); setResetNewPassword(''); }} className="text-amber-500 hover:text-amber-700 p-2"><Key size={16} /></button>
-                                    <button onClick={() => onDelete(u.id || '')} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={16} /></button>
+                                    <button onClick={() => { setResetPasswordUserId(u.id || ''); setResetNewPassword(''); }} className="text-amber-500  p-2"><Key size={16} /></button>
+                                    <button onClick={() => onDelete(u.id || '')} className="text-red-500  p-2"><Trash2 size={16} /></button>
                                 </td>
                             </tr>
                         ))}
@@ -305,7 +305,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                             />
                             <button
                                 onClick={refreshSchedules}
-                                className="px-4 py-1.5 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm font-semibold flex items-center gap-2"
+                                className="px-4 py-1.5 bg-emerald-600 text-white rounded  text-sm font-semibold flex items-center gap-2"
                             >
                                 <RefreshCw size={14} /> Refresh
                             </button>
@@ -351,7 +351,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                                         notes: null
                                                     });
                                                 }}
-                                                className="ml-2 text-amber-700 hover:text-amber-900"
+                                                className="ml-2 text-amber-700 "
                                                 title="Cancel Edit"
                                             >
                                                 <X size={16} />
@@ -398,10 +398,10 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                         <div className="flex items-end gap-2">
                                             <button
                                                 onClick={saveSchedule}
-                                                className={`flex-1 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+                                                className={`flex-1 px-4 py-2 rounded-lg text-sm font-bold active:scale-95 ${
                                                     editingSchedule 
-                                                        ? 'bg-amber-600 hover:bg-amber-700 text-white' 
-                                                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                                        ? 'bg-amber-600  text-white' 
+                                                        : 'bg-emerald-600  text-white'
                                                 }`}
                                             >
                                                 {editingSchedule ? 'Update' : 'Add'} Schedule
@@ -439,10 +439,10 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                             {driverSchedules.filter(s => s.driver_id === selectedDriverForSchedule).map((schedule) => (
                                                 <div 
                                                     key={schedule.id} 
-                                                    className={`flex items-center justify-between p-3 rounded-lg transition-all ${
+                                                    className={`flex items-center justify-between p-3 rounded-lg active:scale-95-all ${
                                                         editingSchedule?.id === schedule.id 
                                                             ? 'bg-amber-100 border-2 border-amber-400 shadow-md' 
-                                                            : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
+                                                            : 'bg-gray-50 border border-gray-200 '
                                                     }`}
                                                 >
                                                     <div className="flex items-center gap-4">
@@ -482,10 +482,10 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                                                     }
                                                                 }, 100);
                                                             }}
-                                                            className={`p-1.5 rounded transition-colors ${
+                                                            className={`p-1.5 rounded active:scale-95 ${
                                                                 editingSchedule?.id === schedule.id 
-                                                                    ? 'bg-amber-600 text-white hover:bg-amber-700' 
-                                                                    : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50'
+                                                                    ? 'bg-amber-600 text-white ' 
+                                                                    : 'text-emerald-600  '
                                                             }`}
                                                             title="Edit Schedule"
                                                         >
@@ -493,7 +493,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                                         </button>
                                                         <button
                                                             onClick={() => deleteSchedule(schedule.driver_id, schedule.date)}
-                                                            className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition-colors"
+                                                            className="text-red-500   p-1.5 rounded active:scale-95"
                                                             title="Delete Schedule"
                                                         >
                                                             <Trash2 size={14} />
@@ -530,7 +530,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                 setEditStaff({ lastName: '', roomNumber: '', department: 'Dining', role: UserRole.STAFF, vehicleType: 'NORMAL' });
                                 setShowStaffEditForm(false);
                             }}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                            className="absolute top-4 right-4 text-gray-400  active:scale-95"
                         >
                             <X size={20} />
                         </button>
@@ -597,13 +597,13 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                         setEditStaff({ lastName: '', roomNumber: '', department: 'Dining', role: UserRole.STAFF, vehicleType: 'NORMAL' });
                                         setShowStaffEditForm(false);
                                     }}
-                                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition"
+                                    className="px-4 py-2 bg-gray-200  text-gray-700 rounded-lg font-medium active:scale-95"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleUpdateStaff}
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition"
+                                    className="px-4 py-2 bg-blue-600  text-white rounded-lg font-medium active:scale-95"
                                 >
                                     Save Changes
                                 </button>
@@ -619,7 +619,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                     <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[90vw] max-w-md p-6 relative">
                         <button
                             onClick={() => setResetPasswordUserId(null)}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+                            className="absolute top-4 right-4 text-gray-400 "
                         >
                             <X size={20} />
                         </button>
@@ -638,7 +638,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                             <div className="flex justify-end gap-2">
                                 <button
                                     onClick={() => setResetPasswordUserId(null)}
-                                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium"
+                                    className="px-4 py-2 bg-gray-200  text-gray-700 rounded-lg font-medium"
                                 >
                                     Cancel
                                 </button>

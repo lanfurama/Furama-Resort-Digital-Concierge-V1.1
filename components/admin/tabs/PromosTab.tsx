@@ -68,7 +68,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                             }
                         }
                     }}
-                    className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-5 py-2.5 rounded-xl flex items-center justify-center space-x-2 hover:from-emerald-700 hover:to-emerald-800 shadow-lg hover:shadow-xl transition-all duration-200 flex-1 md:flex-none font-semibold"
+                    className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-5 py-2.5 rounded-xl flex items-center justify-center space-x-2 shadow-lg active:scale-95 flex-1 md:flex-none font-semibold"
                 >
                     {showPromotionForm && !editingPromotion ? (
                         <>
@@ -108,7 +108,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                                     setNewPromotion({ title: '', description: '', discount: '', validUntil: '', imageColor: 'bg-emerald-500', imageUrl: '' });
                                     setShowPromotionForm(false);
                                 }}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                                className="text-gray-500 active:scale-95"
                             >
                                 <X size={20} />
                             </button>
@@ -202,14 +202,14 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                                     setNewPromotion({ title: '', description: '', discount: '', validUntil: '', imageColor: 'bg-emerald-500', imageUrl: '' });
                                     setShowPromotionForm(false);
                                 }}
-                                className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-semibold transition-colors"
+                                className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold active:scale-95"
                             >
                                 Cancel
                             </button>
                         )}
                         <button
                             onClick={handleSave}
-                            className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-xl text-sm font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                            className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-xl text-sm font-semibold shadow-lg active:scale-95"
                         >
                             {editingPromotion ? 'Update Promotion' : 'Create Promotion'}
                         </button>
@@ -225,7 +225,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                     <p className="text-sm text-gray-500 mb-4">Create your first promotion to attract more guests</p>
                     <button
                         onClick={() => setShowPromotionForm(true)}
-                        className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold hover:bg-emerald-700 transition-colors inline-flex items-center gap-2"
+                        className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold active:scale-95 inline-flex items-center gap-2"
                     >
                         <Plus size={18} />
                         Add Your First Promotion
@@ -237,11 +237,11 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                         {promotions.map((promo) => (
                             <div 
                                 key={promo.id} 
-                                className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:bg-gradient-to-r hover:from-gray-50 hover:to-white transition-all duration-200 group"
+                                className="p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white group"
                             >
                                 <div className="flex items-start gap-4 flex-1 min-w-0">
                                     {/* Discount Tag */}
-                                    <div className={`flex-shrink-0 w-20 h-20 ${promo.imageColor || 'bg-emerald-500'} rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-lg group-hover:scale-105 transition-transform duration-200`}>
+                                    <div className={`flex-shrink-0 w-20 h-20 ${promo.imageColor || 'bg-emerald-500'} rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-lg`}>
                                         <div className="text-center px-2">
                                             <div className="leading-tight">{promo.discount || 'N/A'}</div>
                                         </div>
@@ -249,7 +249,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                                     
                                     {/* Promotion Details */}
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-lg text-gray-900 mb-1.5 group-hover:text-emerald-700 transition-colors">
+                                        <h3 className="font-bold text-lg text-gray-900 mb-1.5">
                                             {promo.title}
                                         </h3>
                                         <p className="text-sm text-gray-600 mb-2 line-clamp-2">
@@ -284,7 +284,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                                                 }
                                             }, 100);
                                         }}
-                                        className="p-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg transition-all duration-200 hover:scale-110 shadow-sm hover:shadow-md"
+                                        className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg active:scale-95 shadow-sm"
                                         title="Edit Promotion"
                                     >
                                         <Edit2 size={18} />
@@ -295,7 +295,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                                                 onDelete(promo.id);
                                             }
                                         }} 
-                                        className="p-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-all duration-200 hover:scale-110 shadow-sm hover:shadow-md"
+                                        className="p-2.5 bg-red-50 text-red-600 rounded-lg active:scale-95 shadow-sm"
                                         title="Delete Promotion"
                                     >
                                         <Trash2 size={18} />
