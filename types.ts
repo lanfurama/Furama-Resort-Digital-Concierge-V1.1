@@ -165,6 +165,8 @@ export interface RideRequest {
   notes?: string; // General notes: luggage info, lost items, special instructions
   isMerged?: boolean;
   segments?: RouteSegment[];
+  /** Driver progress for merged ride: 0..2*segments.length. Even = pick up at segment.from, odd = drop at segment.to. */
+  mergedProgress?: number;
 }
 
 export interface ServiceRequest {

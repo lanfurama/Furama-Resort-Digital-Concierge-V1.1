@@ -92,12 +92,24 @@ Khi khách yêu cầu trực tiếp (không qua ứng dụng), Tài xế có th�
 
 ## 6. GỘP CHUYẾN
 
-Khi có nhiều khách đi cùng hướng, hệ thống sẽ gợi ý gộp chuyến:
+Khi có nhiều khách đi cùng hướng (tổng ≤ 7 khách), ứng dụng sẽ hiển thị **gợi ý gộp chuyến** ở đầu danh sách yêu cầu.
 
-1. Tài xế có thể chấp nhận hoặc từ chối gợi ý gộp
-2. Nếu gộp: Đón khách theo thứ tự, trả khách theo thứ tự
-3. Nhấn **"Picked Up"** cho từng khách khi đón
-4. Nhấn **"Completed"** khi trả xong khách cuối
+### Chấp nhận hoặc từ chối gộp
+
+- **Chấp nhận gộp:** Nhấn **"Chấp nhận gộp"** → hệ thống gộp hai chuyến thành một, tự động gán chuyến gộp cho bạn và chuyển sang màn hình chuyến hiện tại. Bạn thực hiện chuyến gộp theo thứ tự tuyến đã hiển thị.
+- **Từ chối:** Nhấn **"Từ chối"** → bỏ qua gợi ý này; hai chuyến vẫn hiển thị riêng và có thể nhận từng chuyến như bình thường.
+
+### Thực hiện chuyến gộp: đón/trả theo thứ tự
+
+Chuyến gộp có nhiều **đoạn** (segment), mỗi đoạn là một cặp điểm đón → điểm trả. Ứng dụng hiển thị rõ từng đoạn và số khách trên xe.
+
+1. **Đã đón** — Nhấn khi đã đón xong khách tại **điểm đón** của đoạn hiện tại (khách đã lên xe).
+2. **Đã trả** — Nhấn khi đã trả xong khách tại **điểm trả** của đoạn hiện tại (trừ đoạn cuối).
+3. **Hoàn thành** — Chỉ hiển thị ở đoạn cuối; nhấn khi đã trả xong **khách cuối cùng** và kết thúc chuyến gộp.
+
+➡️ Thực hiện lần lượt: đón → trả → đón → trả → … → **Hoàn thành** ở đoạn cuối.
+
+**[📸 CHÈN ẢNH: Màn hình chuyến gộp với các nút Đã đón / Đã trả / Hoàn thành]**
 
 ---
 

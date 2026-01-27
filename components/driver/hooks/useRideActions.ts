@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getRides, updateRideStatus } from '../../../services/dataService';
+import { getRides, updateRideStatus, updateRide } from '../../../services/dataService';
 import { BuggyStatus } from '../../../types';
 import { useToast } from '../../../hooks/useToast';
 
@@ -93,10 +93,54 @@ export const useRideActions = (
         }
     };
 
+    /** For merged rides: advance one step (Đã đón or Đã trả). */
+    const advanceMergedProgress = async (id: string, currentProgress: number) => {
+        if (loadingAction) return;
+        setLoadingAction(`merge-step-${id}`);
+        try {
+            const next = currentProgress + 1;
+            await updateRide({ id, mergedProgress: next });
+            const allRides = await getRides();
+            setRides(allRides);
+            const isPick = next % 2 === 1;
+            toast.success(isPick ? 'Đã đón khách.' : 'Đã trả khách.');
+        } catch (error) {
+            console.error('Failed to advance merged progress:', error);
+            const allRides = await getRides();
+            setRides(allRides);
+            toast.error('Cập nhật thất bại. Vui lòng thử lại.');
+        } finally {
+            setLoadingAction(null);
+        }
+    };
+
+    /** For merged rides: mark whole trip completed (Hoàn thành khi trả xong khách cuối). */
+    const completeMergedRide = async (id: string) => {
+        if (loadingAction) return;
+        setLoadingAction(`complete-${id}`);
+        try {
+            await updateRideStatus(id, BuggyStatus.COMPLETED);
+            setShowChat(false);
+            setMyRideId(null);
+            const allRides = await getRides();
+            setRides(allRides);
+            toast.success('Đã hoàn thành chuyến gộp.');
+        } catch (error) {
+            console.error('Failed to complete merged ride:', error);
+            const allRides = await getRides();
+            setRides(allRides);
+            toast.error('Không thể hoàn thành. Vui lòng thử lại.');
+        } finally {
+            setLoadingAction(null);
+        }
+    };
+
     return {
         loadingAction,
         acceptRide,
         pickUpGuest,
-        completeRide
+        completeRide,
+        advanceMergedProgress,
+        completeMergedRide
     };
 };

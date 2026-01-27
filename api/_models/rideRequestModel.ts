@@ -19,6 +19,9 @@ export interface RideRequest {
   assigned_timestamp?: Date;
   pick_timestamp?: Date;
   drop_timestamp?: Date;
+  is_merged?: boolean;
+  segments?: unknown; // JSONB: RouteSegment[]
+  merged_progress?: number;
 }
 
 export const rideRequestModel = {
@@ -196,6 +199,18 @@ export const rideRequestModel = {
     if (rideRequest.notes !== undefined) {
       fields.push(`notes = $${paramCount++}`);
       values.push(rideRequest.notes || null);
+    }
+    if ((rideRequest as any).is_merged !== undefined) {
+      fields.push(`is_merged = $${paramCount++}`);
+      values.push((rideRequest as any).is_merged);
+    }
+    if ((rideRequest as any).segments !== undefined) {
+      fields.push(`segments = $${paramCount++}`);
+      values.push(typeof (rideRequest as any).segments === 'string' ? (rideRequest as any).segments : JSON.stringify((rideRequest as any).segments));
+    }
+    if ((rideRequest as any).merged_progress !== undefined) {
+      fields.push(`merged_progress = $${paramCount++}`);
+      values.push((rideRequest as any).merged_progress);
     }
 
     if (fields.length === 0) {

@@ -7,7 +7,10 @@ import { LoadingOverlay } from './driver/LoadingOverlay';
 import { EmptyState } from './driver/EmptyState';
 import { CurrentJobBanner } from './driver/CurrentJobBanner';
 import { CurrentJobCard } from './driver/CurrentJobCard';
+import { CurrentJobCardMerged } from './driver/CurrentJobCardMerged';
+import { MergeSuggestionCard } from './driver/MergeSuggestionCard';
 import { RideRequestCard } from './driver/RideRequestCard';
+import { useDriverMerge } from './driver/hooks/useDriverMerge';
 import { HistoryRideCard } from './driver/HistoryRideCard';
 import { ScheduleSection } from './driver/ScheduleSection';
 import { CreateRideModal } from './driver/CreateRideModal';
@@ -22,7 +25,8 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     
     const { driverInfo, locations, schedules, currentTime, currentDriverId, currentDriverActualId } = useDriverData();
     const { rides, setRides, myRideId, setMyRideId, showChat, setShowChat, setHasUnreadChat } = useRides(currentDriverActualId);
-    const { loadingAction, acceptRide, pickUpGuest, completeRide } = useRideActions(setRides, setMyRideId, setShowChat);
+    const { loadingAction, acceptRide, pickUpGuest, completeRide, advanceMergedProgress, completeMergedRide } = useRideActions(setRides, setMyRideId, setShowChat);
+    const { mergeSuggestion, acceptMerge, rejectMerge, isMerging } = useDriverMerge(pendingRides, locations, setRides, setMyRideId, currentDriverActualId);
     const { showCreateModal, setShowCreateModal, isCreatingRide, manualRideData, setManualRideData, handleCreateManualRide } = useCreateRide(setRides, setMyRideId, setViewMode);
 
     const pendingRides = getPendingRides(rides, currentTime);
@@ -57,18 +61,39 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 {viewMode === 'REQUESTS' && (
                     <>
                         {myCurrentRide ? (
-                            <CurrentJobCard
-                                ride={myCurrentRide}
-                                loadingAction={loadingAction}
-                                onPickUp={pickUpGuest}
-                                onComplete={completeRide}
-                                onOpenChat={() => {
-                                    setShowChat(true);
-                                    setHasUnreadChat(false);
-                                }}
-                            />
+                            myCurrentRide.isMerged && (myCurrentRide.segments?.length ?? 0) > 0 ? (
+                                <CurrentJobCardMerged
+                                    ride={myCurrentRide}
+                                    loadingAction={loadingAction}
+                                    onAdvanceStep={advanceMergedProgress}
+                                    onComplete={completeMergedRide}
+                                    onOpenChat={() => {
+                                        setShowChat(true);
+                                        setHasUnreadChat(false);
+                                    }}
+                                />
+                            ) : (
+                                <CurrentJobCard
+                                    ride={myCurrentRide}
+                                    loadingAction={loadingAction}
+                                    onPickUp={pickUpGuest}
+                                    onComplete={completeRide}
+                                    onOpenChat={() => {
+                                        setShowChat(true);
+                                        setHasUnreadChat(false);
+                                    }}
+                                />
+                            )
                         ) : (
                             <div className="p-4 space-y-3">
+                                {mergeSuggestion && (
+                                    <MergeSuggestionCard
+                                        suggestion={mergeSuggestion}
+                                        onAccept={acceptMerge}
+                                        onReject={rejectMerge}
+                                        isMerging={isMerging}
+                                    />
+                                )}
                                 {pendingRides.length === 0 ? (
                                     <EmptyState
                                         icon={Zap}

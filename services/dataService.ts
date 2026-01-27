@@ -2516,6 +2516,7 @@ export const getRides = async (): Promise<RideRequest[]> => {
             ? JSON.parse(r.segments)
             : r.segments
           : undefined,
+        mergedProgress: r.merged_progress ?? (r as any).mergedProgress ?? 0,
       };
     });
 
@@ -3009,6 +3010,8 @@ export const updateRide = async (
       requestBody.is_merged = updateData.isMerged;
     if (updateData.segments !== undefined)
       requestBody.segments = JSON.stringify(updateData.segments);
+    if (updateData.mergedProgress !== undefined)
+      requestBody.merged_progress = updateData.mergedProgress;
 
     console.log("Updating ride via API - Ride ID:", id);
     console.log("Updating ride via API - Update Data:", requestBody);
