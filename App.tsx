@@ -509,15 +509,25 @@ const AppContent: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Exclusive Offers */}
-                <div className="px-6 pt-4 pb-6">
-                  <div className="flex items-center gap-2 mb-4 px-1">
-                    <div className="w-1 h-6 bg-gradient-to-b from-amber-500 to-amber-400 rounded-full"></div>
-                    <h3 className="font-bold text-gray-800 text-lg">{t('exclusive_offers')}</h3>
+                {/* Exclusive Offers - Premium Resort Design */}
+                <div className="px-5 pt-6 pb-8">
+                  {/* Elegant Header */}
+                  <div className="mb-6">
+                    <div className="flex items-center gap-3 mb-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-0.5 h-6 bg-gradient-to-b from-emerald-600 via-emerald-500 to-emerald-400 rounded-full"></div>
+                        <Sparkles className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <h3 className="font-semibold text-gray-900 text-lg tracking-tight">
+                        {t('exclusive_offers')}
+                      </h3>
+                    </div>
+                    <div className="h-px bg-gradient-to-r from-emerald-100 via-emerald-200 to-transparent ml-2.5"></div>
                   </div>
+                  
                   {renderedPromotions.length > 0 ? (
-                    <div className="flex space-x-4 overflow-x-auto pb-2 snap-x scrollbar-hide">
-                      {renderedPromotions.map((promo) => {
+                    <div className="flex space-x-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide -mx-5 px-5">
+                      {renderedPromotions.map((promo, index) => {
                         const formatDate = (dateStr?: string) => {
                           if (!dateStr) return '';
                           try {
@@ -531,43 +541,96 @@ const AppContent: React.FC = () => {
                           }
                         };
 
+                        // Sophisticated gradient palette for resort theme
+                        const gradientColors = [
+                          'from-slate-800 via-slate-700 to-slate-800',
+                          'from-emerald-700 via-teal-700 to-cyan-700',
+                          'from-amber-700 via-orange-700 to-amber-800',
+                          'from-rose-700 via-pink-700 to-rose-800',
+                          'from-indigo-700 via-blue-700 to-indigo-800',
+                        ];
+                        const gradient = gradientColors[index % gradientColors.length];
+
                         return (
                           <div
                             key={promo.id}
-                            className={`min-w-[280px] h-[200px] rounded-3xl text-white shadow-xl snap-center relative overflow-hidden shrink-0 flex flex-col ${
-                              promo.imageUrl ? '' : (promo.imageColor || 'bg-gradient-to-br from-emerald-500 to-emerald-600')
+                            className={`min-w-[300px] h-[260px] rounded-3xl text-white snap-center relative overflow-hidden shrink-0 flex flex-col active:scale-[0.97] transition-transform duration-200 ${
+                              promo.imageUrl ? '' : (promo.imageColor || `bg-gradient-to-br ${gradient}`)
                             }`}
                             style={promo.imageUrl ? {
                               backgroundImage: `url(${promo.imageUrl})`,
                               backgroundSize: 'cover',
                               backgroundPosition: 'center',
                               backgroundRepeat: 'no-repeat'
-                            } : {}}
+                            } : {
+                              boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05)'
+                            }}
                           >
+                            {/* Sophisticated Background Overlay for image cards */}
                             {promo.imageUrl && (
-                              <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-black/40 to-black/50 rounded-3xl"></div>
+                              <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/75 rounded-3xl"></div>
                             )}
-                            <div className="relative z-10 h-full flex flex-col p-6">
-                              {promo.discount && (
-                                <div className="bg-white/25 backdrop-blur-sm w-fit px-3 py-1.5 rounded-lg text-xs font-bold mb-3 border border-white/30 shadow-md">
-                                  {promo.discount}
+                            
+                            {/* Subtle decorative elements */}
+                            <div className="absolute top-0 right-0 w-40 h-40 bg-white/3 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+                            <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/3 rounded-full -ml-16 -mb-16 blur-2xl"></div>
+                            
+                            {/* Content Container */}
+                            <div className="relative z-10 h-full flex flex-col p-6 justify-between">
+                              <div className="flex-1 flex flex-col">
+                                {/* Premium Discount Badge */}
+                                {promo.discount && (
+                                  <div className="mb-4">
+                                    <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/30 shadow-lg">
+                                      <Tag className="w-3 h-3 text-white" />
+                                      <span className="text-xs font-bold text-white tracking-wide">{promo.discount}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Title with better typography */}
+                                <h4 className="font-bold text-2xl mb-3 leading-tight text-white drop-shadow-lg tracking-tight">
+                                  {promo.title}
+                                </h4>
+                                
+                                {/* Description with better readability */}
+                                {promo.desc && (
+                                  <p className="text-sm text-white/90 line-clamp-3 leading-relaxed drop-shadow-md">
+                                    {promo.desc}
+                                  </p>
+                                )}
+                              </div>
+                              
+                              {/* Elegant Footer with date */}
+                              {promo.validUntil && (
+                                <div className="mt-4 pt-4 border-t border-white/15">
+                                  <div className="flex items-center gap-2 text-white/80">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    <p className="text-xs font-medium">
+                                      Valid until {formatDate(promo.validUntil) || promo.validUntil}
+                                    </p>
+                                  </div>
                                 </div>
                               )}
-                              <h4 className="font-bold text-xl mb-2 drop-shadow-md">{promo.title}</h4>
-                              {promo.desc && (
-                                <p className="text-sm opacity-95 line-clamp-2 drop-shadow-sm mb-3 flex-1">{promo.desc}</p>
-                              )}
-                              {promo.validUntil && (
-                                <p className="text-xs opacity-80 font-medium mt-auto">{formatDate(promo.validUntil) || promo.validUntil}</p>
-                              )}
                             </div>
+                            
+                            {/* Subtle shine overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none rounded-3xl"></div>
                           </div>
                         );
                       })}
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-gray-500 text-sm">
-                      {t('no_offers_available') || 'No offers available at the moment'}
+                    <div className="text-center py-12 px-4">
+                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 mb-4 border border-emerald-100">
+                        <Tag className="w-7 h-7 text-emerald-600" />
+                      </div>
+                      <p className="text-gray-600 text-sm font-medium mb-1">
+                        {t('no_offers_available') || 'No offers available at the moment'}
+                      </p>
+                      <p className="text-gray-400 text-xs">
+                        Check back soon for exciting deals!
+                      </p>
                     </div>
                   )}
                 </div>
