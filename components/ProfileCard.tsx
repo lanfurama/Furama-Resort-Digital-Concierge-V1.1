@@ -15,6 +15,73 @@ const SUPPORTED_LANGUAGES = [
     'Russian'
 ];
 
+/** Tên mỗi ngôn ngữ theo từng ngôn ngữ giao diện (mô tả trong ngoặc theo ngôn ngữ đã chọn) */
+const LANGUAGE_LABELS_BY_UI: Record<string, Record<string, string>> = {
+    English: {
+        English: 'English',
+        Vietnamese: 'Vietnamese',
+        Korean: 'Korean',
+        Japanese: 'Japanese',
+        Chinese: 'Chinese',
+        French: 'French',
+        Russian: 'Russian'
+    },
+    Vietnamese: {
+        English: 'Tiếng Anh',
+        Vietnamese: 'Tiếng Việt',
+        Korean: 'Tiếng Hàn',
+        Japanese: 'Tiếng Nhật',
+        Chinese: 'Tiếng Trung',
+        French: 'Tiếng Pháp',
+        Russian: 'Tiếng Nga'
+    },
+    Korean: {
+        English: '영어',
+        Vietnamese: '베트남어',
+        Korean: '한국어',
+        Japanese: '일본어',
+        Chinese: '중국어',
+        French: '프랑스어',
+        Russian: '러시아어'
+    },
+    Japanese: {
+        English: '英語',
+        Vietnamese: 'ベトナム語',
+        Korean: '韓国語',
+        Japanese: '日本語',
+        Chinese: '中国語',
+        French: 'フランス語',
+        Russian: 'ロシア語'
+    },
+    Chinese: {
+        English: '英语',
+        Vietnamese: '越南语',
+        Korean: '韩语',
+        Japanese: '日语',
+        Chinese: '中文',
+        French: '法语',
+        Russian: '俄语'
+    },
+    French: {
+        English: 'Anglais',
+        Vietnamese: 'Vietnamien',
+        Korean: 'Coréen',
+        Japanese: 'Japonais',
+        Chinese: 'Chinois',
+        French: 'Français',
+        Russian: 'Russe'
+    },
+    Russian: {
+        English: 'Английский',
+        Vietnamese: 'Вьетнамский',
+        Korean: 'Корейский',
+        Japanese: 'Японский',
+        Chinese: 'Китайский',
+        French: 'Французский',
+        Russian: 'Русский'
+    }
+};
+
 interface ProfileCardProps {
     user: User;
     onUserUpdate?: (updatedUser: User) => void;
@@ -174,7 +241,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                         <div className="w-1 h-6 bg-gradient-to-b from-emerald-500 to-teal-600 rounded-full"></div>
-                        <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Profile Settings</h4>
+                        <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{t('profile_settings')}</h4>
                     </div>
                     {!isEditingProfile && (
                         <button
@@ -189,25 +256,25 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                 {isEditingProfile ? (
                     <div className="space-y-3">
                         <div>
-                            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Name</label>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1.5">{t('name')}</label>
                             <input
                                 type="text"
                                 value={profileName}
                                 onChange={(e) => setProfileName(e.target.value)}
-                                placeholder="Enter your name"
+                                placeholder={t('enter_your_name')}
                                 className="w-full px-3 py-2 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                                 style={{ color: '#111827' }}
                             />
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Current Password</label>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1.5">{t('current_password')}</label>
                             <div className="relative">
                                 <input
                                     type={showCurrentPassword ? "text" : "password"}
                                     value={currentPassword}
                                     onChange={(e) => setCurrentPassword(e.target.value)}
-                                    placeholder="Enter current password"
+                                    placeholder={t('enter_current_password')}
                                     className="w-full px-3 py-2 pr-10 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                                     style={{ color: '#111827' }}
                                 />
@@ -222,13 +289,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-gray-600 mb-1.5">New Password</label>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1.5">{t('new_password')}</label>
                             <div className="relative">
                                 <input
                                     type={showNewPassword ? "text" : "password"}
                                     value={newPassword}
                                     onChange={(e) => setNewPassword(e.target.value)}
-                                    placeholder="Enter new password (min 4 chars)"
+                                    placeholder={t('enter_new_password')}
                                     className="w-full px-3 py-2 pr-10 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                                     style={{ color: '#111827' }}
                                 />
@@ -243,13 +310,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Confirm New Password</label>
+                            <label className="block text-xs font-semibold text-gray-600 mb-1.5">{t('confirm_new_password')}</label>
                             <div className="relative">
                                 <input
                                     type={showConfirmPassword ? "text" : "password"}
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
-                                    placeholder="Confirm new password"
+                                    placeholder={t('confirm_new_password_placeholder')}
                                     className="w-full px-3 py-2 pr-10 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                                     style={{ color: '#111827' }}
                                 />
@@ -285,7 +352,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                                 {isSavingProfile ? (
                                     <>
                                         <span className="animate-spin">⏳</span>
-                                        Saving...
+                                        {t('saving')}
                                     </>
                                 ) : (
                                     <>
@@ -299,25 +366,25 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                 ) : (
                     <div className="space-y-2">
                         <div className="flex items-center justify-between py-2">
-                            <span className="text-xs font-semibold text-gray-600">Name</span>
-                            <span className="text-sm font-bold text-gray-800">{user.lastName || 'Not set'}</span>
+                            <span className="text-xs font-semibold text-gray-600">{t('name')}</span>
+                            <span className="text-sm font-bold text-gray-800">{user.lastName || t('not_set')}</span>
                         </div>
                         <div className="flex items-center justify-between py-2 border-t border-gray-100">
                             <span className="text-xs font-semibold text-gray-600 flex items-center gap-1">
                                 <Lock size={12} />
-                                Password
+                                {t('password')}
                             </span>
                             <span className="text-sm font-bold text-gray-800">••••••</span>
                         </div>
                         {savedCheckInCode && (
                             <div className="flex items-center justify-between py-2 border-t border-gray-100">
-                                <span className="text-xs font-semibold text-gray-600">Check-in Code</span>
+                                <span className="text-xs font-semibold text-gray-600">{t('check_in_code')}</span>
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm font-bold text-emerald-700 font-mono tracking-wider">{savedCheckInCode}</span>
                                     <button
                                         onClick={handleCopyCode}
                                         className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all"
-                                        title="Copy code"
+                                        title={t('copy_code')}
                                     >
                                         {codeCopied ? (
                                             <Check size={14} className="text-emerald-600" />
@@ -392,15 +459,19 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                                 backgroundColor: '#ffffff'
                             }}
                         >
-                            {SUPPORTED_LANGUAGES.map(lang => (
-                                <option
-                                    key={lang}
-                                    value={lang}
-                                    style={{ backgroundColor: '#ffffff', color: '#111827' }}
-                                >
-                                    {lang}
-                                </option>
-                            ))}
+                            {SUPPORTED_LANGUAGES.map(lang => {
+                                const labels = LANGUAGE_LABELS_BY_UI[language] ?? LANGUAGE_LABELS_BY_UI['English'];
+                                const desc = labels[lang] ?? lang;
+                                return (
+                                    <option
+                                        key={lang}
+                                        value={lang}
+                                        style={{ backgroundColor: '#ffffff', color: '#111827' }}
+                                    >
+                                        {lang} ({desc})
+                                    </option>
+                                );
+                            })}
                         </select>
                     </div>
                 </div>

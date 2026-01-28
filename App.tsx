@@ -27,7 +27,7 @@ const SupervisorDashboard = lazy(() => import('./components/SupervisorDashboard'
 import { getPromotions, getActiveGuestOrders } from './services/dataService';
 import { BuggyStatus } from './types';
 import { User as UserIcon, LogOut, MessageSquare, Car, Percent, ShoppingCart, Home, Sparkles, Calendar, Tag } from 'lucide-react';
-import { LanguageProvider, useTranslation } from './contexts/LanguageContext';
+import { useTranslation } from './contexts/LanguageContext';
 import { BuggyStatusProvider, useBuggyStatus } from './contexts/BuggyStatusContext';
 import { ToastProvider } from './hooks/useToast';
 import PullToRefresh from './components/PullToRefresh';
@@ -489,9 +489,9 @@ const AppContent: React.FC = () => {
                   <div className="absolute inset-0 flex items-center p-6 relative z-10">
                     <div>
                       <div className="inline-block px-4 py-2 bg-white/10 backdrop-blur-sm rounded-xl mb-3 border border-white/20 shadow-md">
-                        <h2 className="text-white font-serif text-2xl sm:text-3xl font-bold mb-1 drop-shadow-lg">Furama Danang</h2>
+                        <h2 className="text-white font-serif text-2xl sm:text-3xl font-bold mb-1 drop-shadow-lg">{t('hero_title')}</h2>
                       </div>
-                      <p className="text-emerald-100 text-sm font-medium drop-shadow-md mt-2">A Culinary Beach Resort</p>
+                      <p className="text-emerald-100 text-sm font-medium drop-shadow-md mt-2">{t('hero_subtitle')}</p>
                     </div>
                   </div>
                 </div>
@@ -967,14 +967,12 @@ const AppContent: React.FC = () => {
   );
 };
 
-// Main App Wrapper for Providers
+// Main App Wrapper for Providers (LanguageProvider is at index.tsx root)
 const App: React.FC = () => {
   return (
-    <LanguageProvider>
-      <ToastProvider>
-        <AppContent />
-      </ToastProvider>
-    </LanguageProvider>
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
   );
 };
 

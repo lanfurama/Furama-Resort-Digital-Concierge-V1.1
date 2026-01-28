@@ -7,13 +7,23 @@ import { useToast } from '../hooks/useToast';
 import Loading from './Loading';
 
 const REVIEW_CATEGORIES = [
-    { id: 'reception', label: 'Reception & Front Desk' },
-    { id: 'hygiene', label: 'Room Cleanliness (Hygiene)' },
-    { id: 'fb', label: 'Food & Beverage (F&B)' },
-    { id: 'buggy', label: 'Buggy Service' },
-    { id: 'facilities', label: 'Pool & Spa Facilities' },
-    { id: 'overall', label: 'Overall Satisfaction' },
+    { id: 'reception', label: 'Reception & Front Desk', labelKey: 'review_reception' as const },
+    { id: 'hygiene', label: 'Room Cleanliness (Hygiene)', labelKey: 'review_hygiene' as const },
+    { id: 'fb', label: 'Food & Beverage (F&B)', labelKey: 'review_fb' as const },
+    { id: 'buggy', label: 'Buggy Service', labelKey: 'review_buggy' as const },
+    { id: 'facilities', label: 'Pool & Spa Facilities', labelKey: 'review_facilities' as const },
+    { id: 'overall', label: 'Overall Satisfaction', labelKey: 'review_overall' as const },
 ];
+
+/** Map English category (stored in API) to translation key for display */
+const CATEGORY_LABEL_TO_KEY: Record<string, string> = {
+    'Reception & Front Desk': 'review_reception',
+    'Room Cleanliness (Hygiene)': 'review_hygiene',
+    'Food & Beverage (F&B)': 'review_fb',
+    'Buggy Service': 'review_buggy',
+    'Pool & Spa Facilities': 'review_facilities',
+    'Overall Satisfaction': 'review_overall',
+};
 
 interface HotelReviewProps {
     user: User;
@@ -33,6 +43,7 @@ export const HotelReviewComponent: React.FC<HotelReviewProps> = ({ user, onRevie
     const initialRatings = REVIEW_CATEGORIES.map(cat => ({
         id: cat.id,
         label: cat.label,
+        labelKey: cat.labelKey,
         value: 5
     }));
 
@@ -50,6 +61,7 @@ export const HotelReviewComponent: React.FC<HotelReviewProps> = ({ user, onRevie
                         return {
                             id: cat.id,
                             label: cat.label,
+                            labelKey: cat.labelKey,
                             value: existing ? existing.rating : 5
                         };
                     });
@@ -92,11 +104,11 @@ export const HotelReviewComponent: React.FC<HotelReviewProps> = ({ user, onRevie
             setExistingReview(review);
             setIsHotelReviewSubmitted(true);
             setShowHotelReview(false);
-            toast.success('Thank you for your feedback!');
+            toast.success(t('review_thanks'));
             onReviewSubmitted?.();
         } catch (error: any) {
             console.error('Failed to submit review:', error);
-            toast.error(`Failed to submit review: ${error.message || 'Please try again.'}`);
+            toast.error(`${t('review_failed')} ${error.message || ''}`);
         } finally {
             setIsSubmittingReview(false);
         }
@@ -127,7 +139,7 @@ export const HotelReviewComponent: React.FC<HotelReviewProps> = ({ user, onRevie
             </div>
 
             {isLoadingReview ? (
-                <Loading size="sm" message={t('loading') || 'Loading review...'} />
+                <Loading size="sm" message={t('review_loading')} />
             ) : !showHotelReview && !isHotelReviewSubmitted ? (
                 <button
                     onClick={() => setShowHotelReview(true)}
@@ -141,12 +153,12 @@ export const HotelReviewComponent: React.FC<HotelReviewProps> = ({ user, onRevie
                 </button>
             ) : showHotelReview ? (
                 <div className="animate-in fade-in slide-in-from-top-2">
-                    <p className="text-xs text-gray-500 mb-3 text-center">Please rate us on the following categories:</p>
+                    <p className="text-xs text-gray-500 mb-3 text-center">{t('review_rate_categories')}</p>
 
                     <div className="space-y-3 mb-4">
                         {ratings.map((item) => (
                             <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white/80 backdrop-blur-sm p-3 rounded-xl border-2 border-gray-100 shadow-md hover:shadow-lg transition-all">
-                                <span className="text-xs font-bold text-gray-800 mb-2 sm:mb-0">{item.label}</span>
+                                <span className="text-xs font-bold text-gray-800 mb-2 sm:mb-0">{t(item.labelKey)}</span>
                                 <div className="flex space-x-1.5">
                                     {[1, 2, 3, 4, 5].map(star => (
                                         <button
@@ -169,7 +181,7 @@ export const HotelReviewComponent: React.FC<HotelReviewProps> = ({ user, onRevie
                         className="w-full bg-white border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-900 placeholder:text-gray-400 mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all caret-emerald-600"
                         style={{ caretColor: '#10b981' }}
                         rows={3}
-                        placeholder="Any additional comments or suggestions?"
+                        placeholder={t('review_comment_placeholder')}
                         value={hotelComment}
                         onChange={(e) => setHotelComment(e.target.value)}
                     ></textarea>
@@ -190,7 +202,7 @@ export const HotelReviewComponent: React.FC<HotelReviewProps> = ({ user, onRevie
                             {isSubmittingReview ? (
                                 <>
                                     <span className="animate-spin mr-2">⏳</span>
-                                    {t('submitting') || 'Submitting...'}
+                                    {t('review_submitting')}
                                 </>
                             ) : (
                                 <>
@@ -204,12 +216,12 @@ export const HotelReviewComponent: React.FC<HotelReviewProps> = ({ user, onRevie
             ) : (
                 <div className="bg-gradient-to-br from-white/80 to-emerald-50/50 rounded-2xl p-4 border-2 border-emerald-100 shadow-md">
                     <div className="text-center mb-4">
-                        <p className="text-sm text-gray-700 italic font-medium leading-relaxed">"{hotelComment || existingReview?.comment || 'Thank you for your valuable feedback!'}"</p>
+                        <p className="text-sm text-gray-700 italic font-medium leading-relaxed">"{hotelComment || existingReview?.comment || t('review_feedback_display')}"</p>
                     </div>
                     <div className="grid grid-cols-2 gap-2 mb-3">
                         {existingReview?.categoryRatings.map((cat, idx) => (
                             <div key={idx} className="flex justify-between items-center bg-white/60 backdrop-blur-sm px-2 py-1.5 rounded-lg border border-gray-200">
-                                <span className="truncate mr-1 text-[10px] font-semibold text-gray-700">{cat.category}</span>
+                                <span className="truncate mr-1 text-[10px] font-semibold text-gray-700">{CATEGORY_LABEL_TO_KEY[cat.category] ? t(CATEGORY_LABEL_TO_KEY[cat.category]) : cat.category}</span>
                                 <span className="flex items-center font-bold text-amber-600 gap-0.5">
                                     {cat.rating} <Star size={10} className="fill-current" />
                                 </span>
@@ -234,7 +246,7 @@ export const HotelReviewComponent: React.FC<HotelReviewProps> = ({ user, onRevie
                         }}
                         className="w-full text-center text-xs text-emerald-700 font-bold bg-emerald-50 hover:bg-emerald-100 py-2 rounded-xl border border-emerald-200 transition-all"
                     >
-                        Edit Review
+                        {t('edit_review')}
                     </button>
                 </div>
             )}
