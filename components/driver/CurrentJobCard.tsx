@@ -1,5 +1,6 @@
 import React from 'react';
 import { Navigation, MessageSquare, Loader2 } from 'lucide-react';
+import { useTranslation } from '../../contexts/LanguageContext';
 import { RideRequest, BuggyStatus } from '../../types';
 import { formatTime } from './utils/rideUtils';
 
@@ -18,6 +19,7 @@ export const CurrentJobCard: React.FC<CurrentJobCardProps> = ({
     onComplete,
     onOpenChat
 }) => {
+    const { t } = useTranslation();
     const isPickingUp = loadingAction === `pickup-${ride.id}`;
     const isCompleting = loadingAction === `complete-${ride.id}`;
     const canPickUp = ride.status === BuggyStatus.ARRIVING || ride.status === BuggyStatus.ASSIGNED;
@@ -46,7 +48,7 @@ export const CurrentJobCard: React.FC<CurrentJobCardProps> = ({
                     <button
                         onClick={onOpenChat}
                         className="p-3 rounded-xl border-2 border-gray-300 hover:bg-gray-100 hover:border-emerald-400 transition-all min-w-[52px] min-h-[52px] flex items-center justify-center bg-white shadow-sm"
-                        title="Chat"
+                        title={t('driver_chat')}
                     >
                         <MessageSquare size={22} className="text-emerald-600" />
                     </button>
@@ -54,24 +56,24 @@ export const CurrentJobCard: React.FC<CurrentJobCardProps> = ({
                         <button
                             onClick={() => onPickUp(ride.id)}
                             disabled={isPickingUp}
-                            className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-6 py-4 rounded-xl font-bold text-base hover:from-emerald-700 hover:to-emerald-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg min-w-[140px] min-h-[56px] flex items-center justify-center"
+                            className="bg-sky-600 hover:bg-sky-700 text-white px-6 py-4 rounded-xl font-bold text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md min-w-[140px] min-h-[56px] flex items-center justify-center"
                         >
                             {isPickingUp ? (
                                 <Loader2 size={20} className="animate-spin" />
                             ) : (
-                                'Pick Up Guest'
+                                t('driver_pick_up_guest')
                             )}
                         </button>
                     ) : (
                         <button
                             onClick={() => onComplete(ride.id)}
                             disabled={isCompleting}
-                            className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-6 py-4 rounded-xl font-bold text-base hover:from-emerald-700 hover:to-emerald-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg min-w-[140px] min-h-[56px] flex items-center justify-center"
+                            className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-4 rounded-xl font-bold text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md min-w-[140px] min-h-[56px] flex items-center justify-center"
                         >
                             {isCompleting ? (
                                 <Loader2 size={20} className="animate-spin" />
                             ) : (
-                                'Complete'
+                                t('driver_complete')
                             )}
                         </button>
                     )}

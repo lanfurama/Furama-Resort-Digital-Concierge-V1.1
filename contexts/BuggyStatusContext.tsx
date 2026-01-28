@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect, useRef, ReactNod
 import { BuggyStatus, UserRole } from '../types';
 import { getActiveRideForUser } from '../services/dataService';
 import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
+import { playGuestNotificationFeedback } from '../utils/buggyUtils';
 
 interface BuggyStatusContextProps {
   buggyStatus: BuggyStatus | null;
@@ -24,33 +25,53 @@ export const BuggyStatusProvider: React.FC<{
   const activeRideTimestampRef = useRef<number | null>(null);
   const isOnBuggyPage = currentView === 'BUGGY';
 
+  const shouldPlayFeedback = useCallback((prev: BuggyStatus | null, next: BuggyStatus | null) => {
+    if (prev === next) return false;
+    if (prev === BuggyStatus.SEARCHING && next === BuggyStatus.ASSIGNED) return true;
+    if (prev === BuggyStatus.ASSIGNED && next === BuggyStatus.ARRIVING) return true;
+    if (prev === BuggyStatus.ARRIVING && next === BuggyStatus.ON_TRIP) return true;
+    if (prev === BuggyStatus.ON_TRIP && next === null) return true;
+    if (prev === BuggyStatus.ON_TRIP && next === BuggyStatus.COMPLETED) return true;
+    return false;
+  }, []);
+
   // Callback for checking buggy status
   const checkBuggyStatus = useCallback(async () => {
     if (!user || user.role !== UserRole.GUEST || !user.roomNumber) return;
 
+    const onBuggyPage = currentView === 'BUGGY';
+
     try {
       const activeRide = await getActiveRideForUser(user.roomNumber);
       if (activeRide) {
-        // Only update status if it actually changed
-        if (activeRide.status !== prevBuggyStatusRef.current) {
-          prevBuggyStatusRef.current = activeRide.status;
-          setBuggyStatus(activeRide.status);
+        const prev = prevBuggyStatusRef.current;
+        const next = activeRide.status;
+        if (next !== prev) {
+          if (!onBuggyPage && shouldPlayFeedback(prev, next)) {
+            const sound = localStorage.getItem('guest_sound_enabled') !== 'false';
+            const vibrate = localStorage.getItem('guest_vibrate_enabled') !== 'false';
+            playGuestNotificationFeedback(sound, vibrate);
+          }
+          prevBuggyStatusRef.current = next;
+          setBuggyStatus(next);
           activeRideTimestampRef.current = activeRide.timestamp;
-
-          // Reset wait time if status changed away from SEARCHING
-          if (activeRide.status !== BuggyStatus.SEARCHING) {
+          if (next !== BuggyStatus.SEARCHING) {
             if (prevBuggyWaitTimeRef.current !== 0) {
               prevBuggyWaitTimeRef.current = 0;
               setBuggyWaitTime(0);
             }
           }
         } else {
-          // Update timestamp if status hasn't changed but ride still exists
           activeRideTimestampRef.current = activeRide.timestamp;
         }
       } else {
-        // Only update if status was not already null
-        if (prevBuggyStatusRef.current !== null) {
+        const prev = prevBuggyStatusRef.current;
+        if (prev !== null) {
+          if (!onBuggyPage && shouldPlayFeedback(prev, null)) {
+            const sound = localStorage.getItem('guest_sound_enabled') !== 'false';
+            const vibrate = localStorage.getItem('guest_vibrate_enabled') !== 'false';
+            playGuestNotificationFeedback(sound, vibrate);
+          }
           prevBuggyStatusRef.current = null;
           setBuggyStatus(null);
           activeRideTimestampRef.current = null;
@@ -73,7 +94,7 @@ export const BuggyStatusProvider: React.FC<{
         setBuggyWaitTime(0);
       }
     }
-  }, [user]);
+  }, [user, currentView, shouldPlayFeedback]);
 
   // Use adaptive polling for status check (base 5s, slows down when idle/hidden)
   useAdaptivePolling(

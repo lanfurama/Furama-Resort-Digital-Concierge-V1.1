@@ -1,5 +1,6 @@
 import React from 'react';
 import { Navigation, MessageSquare, Loader2, UserCheck, MapPin } from 'lucide-react';
+import { useTranslation } from '../../contexts/LanguageContext';
 import { RideRequest, RouteSegment } from '../../types';
 import { formatTime } from './utils/rideUtils';
 
@@ -18,6 +19,7 @@ export const CurrentJobCardMerged: React.FC<CurrentJobCardMergedProps> = ({
     onComplete,
     onOpenChat
 }) => {
+    const { t } = useTranslation();
     const segments: RouteSegment[] = ride.segments || [];
     const progress = ride.mergedProgress ?? 0;
     const totalSteps = segments.length * 2;
@@ -30,10 +32,16 @@ export const CurrentJobCardMerged: React.FC<CurrentJobCardMergedProps> = ({
 
     const currentSegment = segments[segmentIndex];
     const buttonLabel = isPickStep
-        ? 'Đã đón'
+        ? t('driver_picked_up')
         : isLastStep
-            ? 'Hoàn thành'
-            : 'Đã trả';
+            ? t('driver_complete')
+            : t('driver_drop_off');
+
+    const actionButtonClass = isPickStep
+        ? 'bg-sky-600 hover:bg-sky-700'
+        : isLastStep
+            ? 'bg-teal-600 hover:bg-teal-700'
+            : 'bg-slate-600 hover:bg-slate-700';
 
     const handleAction = () => {
         if (isLastStep && !isPickStep) {
@@ -48,7 +56,7 @@ export const CurrentJobCardMerged: React.FC<CurrentJobCardMergedProps> = ({
             <div className="flex items-start gap-4">
                 <div className="flex flex-col items-center min-w-[80px]">
                     <div className="text-3xl font-black text-amber-700 mb-1">#{ride.roomNumber}</div>
-                    <div className="text-xs text-amber-600 font-medium">Chuyến gộp</div>
+                    <div className="text-xs text-amber-600 font-medium">{t('driver_merged_trip')}</div>
                     <div className="text-sm text-gray-600 font-medium mt-1">{formatTime(ride.timestamp)}</div>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -58,7 +66,8 @@ export const CurrentJobCardMerged: React.FC<CurrentJobCardMergedProps> = ({
                             const stepIndex = idx * 2;
                             const done = progress > stepIndex + 1;
                             const current = progress === stepIndex || progress === stepIndex + 1;
-                            const onBoardStr = seg.onBoard.map((g) => `#${g.roomNumber} (${g.count} khách)`).join(', ');
+                            const guestWord = t('guests');
+                            const onBoardStr = seg.onBoard.map((g) => `#${g.roomNumber} (${g.count} ${guestWord})`).join(', ');
                             return (
                                 <div
                                     key={idx}
@@ -81,7 +90,7 @@ export const CurrentJobCardMerged: React.FC<CurrentJobCardMergedProps> = ({
                                         <span>{seg.from} → {seg.to}</span>
                                     </div>
                                     <div className="ml-6 text-xs text-gray-600 mt-0.5">
-                                        Trên xe: {onBoardStr || '—'}
+                                        {t('driver_on_board')} {onBoardStr || '—'}
                                     </div>
                                 </div>
                             );
@@ -92,14 +101,14 @@ export const CurrentJobCardMerged: React.FC<CurrentJobCardMergedProps> = ({
                     <button
                         onClick={onOpenChat}
                         className="p-3 rounded-xl border-2 border-gray-300 hover:bg-gray-100 hover:border-amber-400 min-w-[52px] min-h-[52px] flex items-center justify-center bg-white"
-                        title="Chat"
+                        title={t('driver_chat')}
                     >
                         <MessageSquare size={22} className="text-amber-600" />
                     </button>
                     <button
                         onClick={handleAction}
                         disabled={isLoadingStep || isCompleting}
-                        className="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-6 py-4 rounded-xl font-bold text-base hover:from-amber-600 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg min-w-[140px] min-h-[56px] flex items-center justify-center gap-2"
+                        className={`${actionButtonClass} text-white px-6 py-4 rounded-xl font-bold text-base transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md min-w-[140px] min-h-[56px] flex items-center justify-center gap-2`}
                     >
                         {isLoadingStep || isCompleting ? (
                             <Loader2 size={20} className="animate-spin" />

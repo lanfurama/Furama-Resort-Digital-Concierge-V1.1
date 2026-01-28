@@ -1,6 +1,7 @@
 import React from 'react';
 import { MapPin, Star, Calendar, X } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
+import { useTranslation } from '../../contexts/LanguageContext';
 import { DriverSchedule } from '../../services/dataService';
 
 interface DriverHeaderProps {
@@ -20,6 +21,7 @@ export const DriverHeader: React.FC<DriverHeaderProps> = ({
     currentDriverId,
     onLogout
 }) => {
+    const { language, setLanguage, t } = useTranslation();
     const today = new Date().toISOString().split('T')[0];
     const todaySchedule = schedules.find(s => s.date === today);
 
@@ -50,7 +52,7 @@ export const DriverHeader: React.FC<DriverHeaderProps> = ({
                         <div className="flex items-center gap-2 mt-1.5">
                             <Calendar size={14} className="text-emerald-600 flex-shrink-0" />
                             <p className="text-sm text-emerald-700 font-semibold">
-                                {todaySchedule.is_day_off ? 'Day Off' :
+                                {todaySchedule.is_day_off ? t('driver_day_off') :
                                     `${todaySchedule.shift_start?.substring(0, 5)} - ${todaySchedule.shift_end?.substring(0, 5)}`}
                             </p>
                         </div>
@@ -58,16 +60,31 @@ export const DriverHeader: React.FC<DriverHeaderProps> = ({
                 </div>
             </div>
 
-            {/* Right Icons - Larger Touch Targets */}
-            <div className="flex items-center gap-3 flex-shrink-0 ml-3">
-                {/* Notification Bell */}
+            {/* Right: Language switch (EN/VI) + Notification + Logout */}
+            <div className="flex items-center gap-2 flex-shrink-0 ml-3">
+                <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5" role="group" aria-label={t('app_language')}>
+                    <button
+                        type="button"
+                        onClick={() => setLanguage('English')}
+                        className={`px-2.5 py-1.5 text-sm font-bold rounded-md transition-colors ${language === 'English' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                    >
+                        {t('driver_lang_en')}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setLanguage('Vietnamese')}
+                        className={`px-2.5 py-1.5 text-sm font-bold rounded-md transition-colors ${language === 'Vietnamese' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                    >
+                        {t('driver_lang_vi')}
+                    </button>
+                </div>
                 {currentDriverId && (
                     <NotificationBell userId={currentDriverId} variant="light" />
                 )}
                 <button
                     onClick={onLogout}
                     className="p-3 rounded-xl hover:bg-red-50 transition-all text-gray-500 hover:text-red-600 min-w-[44px] min-h-[44px] flex items-center justify-center"
-                    title="Logout"
+                    title={t('logout')}
                 >
                     <X size={20} />
                 </button>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 interface DriverTabsProps {
     viewMode: 'REQUESTS' | 'HISTORY';
@@ -13,6 +14,7 @@ export const DriverTabs: React.FC<DriverTabsProps> = ({
     requestsCount,
     historyCount
 }) => {
+    const { t } = useTranslation();
     return (
         <div className="bg-white border-b-2 border-gray-200 px-4 shadow-sm">
             <div className="flex space-x-2">
@@ -24,7 +26,7 @@ export const DriverTabs: React.FC<DriverTabsProps> = ({
                         }`}
                     style={{ borderBottomWidth: viewMode === 'REQUESTS' ? '3px' : '0px' }}
                 >
-                    REQUESTS ({requestsCount})
+                    {t('driver_requests')} ({requestsCount})
                 </button>
                 <button
                     onClick={() => onViewModeChange('HISTORY')}
@@ -34,7 +36,7 @@ export const DriverTabs: React.FC<DriverTabsProps> = ({
                         }`}
                     style={{ borderBottomWidth: viewMode === 'HISTORY' ? '3px' : '0px' }}
                 >
-                    HISTORY ({historyCount})
+                    {t('driver_history')} ({historyCount})
                 </button>
             </div>
         </div>

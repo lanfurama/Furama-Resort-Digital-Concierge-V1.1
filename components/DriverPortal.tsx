@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Plus, Zap, History } from 'lucide-react';
+import { BuggyStatus } from '../types';
+import { useTranslation } from '../contexts/LanguageContext';
 import ServiceChat from './ServiceChat';
 import { DriverHeader } from './driver/DriverHeader';
 import { DriverTabs } from './driver/DriverTabs';
@@ -10,6 +12,8 @@ import { CurrentJobCard } from './driver/CurrentJobCard';
 import { CurrentJobCardMerged } from './driver/CurrentJobCardMerged';
 import { MergeSuggestionCard } from './driver/MergeSuggestionCard';
 import { RideRequestCard } from './driver/RideRequestCard';
+import { DriverAlertType } from './driver/DriverPulseNotification';
+import { useDriverAlertFeedback } from './driver/hooks/useDriverAlertFeedback';
 import { useDriverMerge } from './driver/hooks/useDriverMerge';
 import { HistoryRideCard } from './driver/HistoryRideCard';
 import { ScheduleSection } from './driver/ScheduleSection';
@@ -22,21 +26,50 @@ import { getPendingRides, getHistoryRides, getCurrentRide } from './driver/utils
 
 const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     const [viewMode, setViewMode] = useState<'REQUESTS' | 'HISTORY'>('REQUESTS');
-    
+    const { t } = useTranslation();
     const { driverInfo, locations, schedules, currentTime, currentDriverId, currentDriverActualId } = useDriverData();
     const { rides, setRides, myRideId, setMyRideId, showChat, setShowChat, setHasUnreadChat } = useRides(currentDriverActualId);
     const { loadingAction, acceptRide, pickUpGuest, completeRide, advanceMergedProgress, completeMergedRide } = useRideActions(setRides, setMyRideId, setShowChat);
-    const { mergeSuggestion, acceptMerge, rejectMerge, isMerging } = useDriverMerge(pendingRides, locations, setRides, setMyRideId, currentDriverActualId);
-    const { showCreateModal, setShowCreateModal, isCreatingRide, manualRideData, setManualRideData, handleCreateManualRide } = useCreateRide(setRides, setMyRideId, setViewMode);
 
     const pendingRides = getPendingRides(rides, currentTime);
     const historyRides = getHistoryRides(rides, currentDriverActualId);
     const myCurrentRide = getCurrentRide(rides, myRideId);
 
+    const { mergeSuggestion, acceptMerge, rejectMerge, isMerging } = useDriverMerge(pendingRides, locations, setRides, setMyRideId, currentDriverActualId);
+    const { showCreateModal, setShowCreateModal, isCreatingRide, manualRideData, setManualRideData, handleCreateManualRide } = useCreateRide(setRides, setMyRideId, setViewMode);
+
+    const activeAlert = useMemo((): { type: DriverAlertType; message: string; detail?: string } | null => {
+        if (mergeSuggestion) {
+            return { type: 'MERGE', message: t('driver_alert_merge'), detail: t('driver_alert_merge_detail') };
+        }
+        if (pendingRides.length > 0) {
+            const first = pendingRides[0];
+            const msg = viewMode === 'HISTORY' ? t('driver_alert_request_switch') : t('driver_alert_request');
+            const roomPrefix = t('driver_room_prefix');
+            return { type: 'REQUEST', message: msg, detail: first ? `${roomPrefix}${first.roomNumber}` : undefined };
+        }
+        if (myCurrentRide) {
+            const canPickUp = myCurrentRide.status === BuggyStatus.ARRIVING || myCurrentRide.status === BuggyStatus.ASSIGNED;
+            if (canPickUp) {
+                return { type: 'PICKUP', message: t('driver_alert_pickup'), detail: `${t('driver_room_prefix')}${myCurrentRide.roomNumber}` };
+            }
+            const segments = myCurrentRide.segments ?? [];
+            const totalSteps = segments.length * 2;
+            const progress = myCurrentRide.mergedProgress ?? 0;
+            const needCompleteMerged = myCurrentRide.isMerged && segments.length > 0 && progress === totalSteps - 1;
+            const needCompleteNormal = myCurrentRide.status === BuggyStatus.ON_TRIP;
+            if (needCompleteNormal || needCompleteMerged) {
+                return { type: 'COMPLETE', message: t('driver_alert_complete'), detail: `${t('driver_room_prefix')}${myCurrentRide.roomNumber}` };
+            }
+        }
+        return null;
+    }, [mergeSuggestion, pendingRides, viewMode, myCurrentRide, t]);
+
+    useDriverAlertFeedback(!!activeAlert, { soundEnabled: true, vibrateEnabled: true, intervalMs: 2500 });
+
     return (
         <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white text-gray-900 flex flex-col relative">
             <LoadingOverlay loadingAction={loadingAction} />
-            
             <DriverHeader
                 driverInfo={driverInfo}
                 schedules={schedules}
@@ -97,8 +130,8 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                                 {pendingRides.length === 0 ? (
                                     <EmptyState
                                         icon={Zap}
-                                        title="Waiting for requests..."
-                                        description="New ride requests will appear here"
+                                        title={t('driver_waiting_requests')}
+                                        description={t('driver_new_requests_desc')}
                                     />
                                 ) : (
                                     pendingRides.map((ride) => (
@@ -124,8 +157,8 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                         {historyRides.length === 0 ? (
                             <EmptyState
                                 icon={History}
-                                title="No completed trips history."
-                                description="Your completed rides will appear here"
+                                title={t('driver_no_history')}
+                                description={t('driver_history_desc')}
                                 iconColor="text-gray-500"
                             />
                         ) : (

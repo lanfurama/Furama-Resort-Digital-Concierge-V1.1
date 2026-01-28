@@ -14,7 +14,7 @@ import { useScrollPrevention } from '../hooks/useScrollPrevention';
 import { useRideETA } from '../hooks/useRideETA';
 import { useRideCancel } from '../hooks/useRideCancel';
 import { useBuggyBookingState } from '../hooks/useBuggyBookingState';
-import { playNotificationSound } from '../utils/buggyUtils';
+import { playGuestNotificationFeedback } from '../utils/buggyUtils';
 import { BuggyBookingForm } from './BuggyBookingForm';
 import { NotificationToast } from './NotificationToast';
 
@@ -28,16 +28,20 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   const [showChat, setShowChat] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' | 'warning' } | null>(null);
   const [soundEnabled] = useState(() => localStorage.getItem('guest_sound_enabled') !== 'false');
+  const [vibrateEnabled] = useState(() => localStorage.getItem('guest_vibrate_enabled') !== 'false');
 
   const bookingState = useBuggyBookingState(user.roomNumber);
   const containerRef = useScrollPrevention();
 
-  const playSound = useCallback(() => playNotificationSound(soundEnabled), [soundEnabled]);
+  const playSoundAndVibrate = useCallback(
+    () => playGuestNotificationFeedback(soundEnabled, vibrateEnabled),
+    [soundEnabled, vibrateEnabled]
+  );
 
   const { activeRide, isLoading: isLoadingRide, sharedRidesInfo } = useRideStatus({
     roomNumber: user.roomNumber,
     onNotification: (message, type) => setNotification({ message, type }),
-    playNotificationSound: playSound
+    playNotificationSound: playSoundAndVibrate
   });
 
   const { elapsedTime, arrivingElapsedTime } = useRideTimers(activeRide);
@@ -85,6 +89,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       setNotification({ message: t('pickup_destination_same_error'), type: 'warning' });
       return;
     }
+    playSoundAndVibrate();
     try {
       await bookRide(bookingState.pickup, bookingState.destination, bookingState.guestCount || 1, bookingState.notes || undefined);
     } catch {

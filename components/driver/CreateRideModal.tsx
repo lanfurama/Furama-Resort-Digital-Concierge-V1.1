@@ -101,16 +101,15 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                     <button
                         onClick={onSubmit}
                         disabled={!canSubmit}
-                        className="group relative w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold py-3.5 md:py-2 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed mt-4 text-base md:text-sm min-h-[56px] md:min-h-[48px] shadow-xl overflow-hidden transition-all flex items-center justify-center gap-2"
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 md:py-2 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed mt-4 text-base md:text-sm min-h-[56px] md:min-h-[48px] shadow-md transition-colors flex items-center justify-center gap-2"
                     >
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
                         {isCreating ? (
                             <>
                                 <Loader2 size={20} className="animate-spin" />
-                                <span className="relative z-10">Creating Ride...</span>
+                                <span>Creating Ride...</span>
                             </>
                         ) : (
-                            <span className="relative z-10">Start Trip</span>
+                            <span>Start Trip</span>
                         )}
                     </button>
                 </div>

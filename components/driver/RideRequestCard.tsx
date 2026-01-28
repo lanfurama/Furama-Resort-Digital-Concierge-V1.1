@@ -1,5 +1,6 @@
 import React from 'react';
 import { Navigation, Clock, Loader2 } from 'lucide-react';
+import { useTranslation } from '../../contexts/LanguageContext';
 import { RideRequest } from '../../types';
 import { formatTime, formatWaitingTime, getWaitingTimeColor, getPriorityInfo } from './utils/rideUtils';
 
@@ -16,6 +17,7 @@ export const RideRequestCard: React.FC<RideRequestCardProps> = ({
     loadingAction,
     onAccept
 }) => {
+    const { t } = useTranslation();
     const priorityInfo = getPriorityInfo(ride, currentTime);
     const isAccepting = loadingAction === ride.id;
     const isDisabled = loadingAction !== null;
@@ -52,12 +54,12 @@ export const RideRequestCard: React.FC<RideRequestCardProps> = ({
                 <button
                     onClick={() => onAccept(ride.id)}
                     disabled={isAccepting || isDisabled}
-                    className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-6 py-4 rounded-xl font-bold text-base hover:from-emerald-700 hover:to-emerald-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg min-w-[120px] min-h-[56px] flex items-center justify-center"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-4 rounded-xl font-bold text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md min-w-[120px] min-h-[56px] flex items-center justify-center"
                 >
                     {isAccepting ? (
                         <Loader2 size={20} className="animate-spin" />
                     ) : (
-                        'Accept'
+                        t('driver_accept')
                     )}
                 </button>
             </div>
