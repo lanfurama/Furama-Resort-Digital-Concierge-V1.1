@@ -2,7 +2,7 @@ import React, { createContext, useState, useContext, useEffect, useRef, ReactNod
 import { BuggyStatus, UserRole } from '../types';
 import { getActiveRideForUser } from '../services/dataService';
 import { useAdaptivePolling } from '../hooks/useAdaptivePolling';
-import { playGuestNotificationFeedback } from '../utils/buggyUtils';
+import { playGuestNotificationFeedback, playGuestChimeOnly } from '../utils/buggyUtils';
 
 interface BuggyStatusContextProps {
   buggyStatus: BuggyStatus | null;
@@ -149,6 +149,23 @@ export const BuggyStatusProvider: React.FC<{
       setBuggyWaitTime(0);
     }
   }, [user]);
+
+  // Play searching chime every 2.5s when status is SEARCHING (works on any page)
+  useEffect(() => {
+    const soundEnabled = localStorage.getItem('guest_sound_enabled') !== 'false';
+    if (buggyStatus !== BuggyStatus.SEARCHING || !soundEnabled) return;
+    
+    // Play immediately
+    playGuestChimeOnly(soundEnabled);
+    
+    // Then play every 2.5 seconds
+    const interval = setInterval(() => {
+      const currentSoundEnabled = localStorage.getItem('guest_sound_enabled') !== 'false';
+      playGuestChimeOnly(currentSoundEnabled);
+    }, 2500);
+    
+    return () => clearInterval(interval);
+  }, [buggyStatus]);
 
   return (
     <BuggyStatusContext.Provider value={{ buggyStatus, buggyWaitTime }}>

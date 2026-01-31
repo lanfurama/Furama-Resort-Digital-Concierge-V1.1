@@ -14,7 +14,7 @@ import { useScrollPrevention } from '../hooks/useScrollPrevention';
 import { useRideETA } from '../hooks/useRideETA';
 import { useRideCancel } from '../hooks/useRideCancel';
 import { useBuggyBookingState } from '../hooks/useBuggyBookingState';
-import { playGuestNotificationFeedback, playGuestChimeOnly, unlockGuestAudioContext } from '../utils/buggyUtils';
+import { playGuestNotificationFeedback, unlockGuestAudioContext } from '../utils/buggyUtils';
 import { BuggyBookingForm } from './BuggyBookingForm';
 import { NotificationToast } from './NotificationToast';
 
@@ -81,15 +81,8 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     }
   }, [notification]);
 
-  // Âm thanh lặp lại khi đang "Finding driver" – ding-dong mỗi 2.5s
-  const isSearching = activeRide?.status === BuggyStatus.SEARCHING;
-  useEffect(() => {
-    if (!isSearching || !soundEnabled) return;
-    const tick = () => playGuestChimeOnly(soundEnabled);
-    tick();
-    const interval = setInterval(tick, 2500);
-    return () => clearInterval(interval);
-  }, [isSearching, soundEnabled]);
+  // Note: Âm thanh lặp lại khi đang "Finding driver" được xử lý ở BuggyStatusContext
+  // để vẫn phát khi user chuyển sang trang khác
 
   const handleSetDestination = (dest: string) => {
     if (activeRide) return;

@@ -442,8 +442,8 @@ const AppContent: React.FC = () => {
         <div className="flex-1 min-h-0 overflow-hidden flex flex-col relative z-10">
           <PullToRefresh onRefresh={handleRefresh}>
             <div
-              className={`flex-1 relative scrollbar-hide ${view === AppView.BUGGY ? 'overflow-hidden h-full' : 'min-h-full'}`}
-            style={view === AppView.BUGGY ? {
+              className={`flex-1 relative scrollbar-hide ${(view === AppView.BUGGY || view === AppView.CHAT) ? 'overflow-hidden h-full' : 'min-h-full'}`}
+            style={(view === AppView.BUGGY || view === AppView.CHAT) ? {
               overflow: 'hidden',
               height: '100%',
               maxHeight: '100%',

@@ -466,7 +466,17 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative">
+    <div 
+      className="flex flex-col bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20"
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 'calc(5rem + max(0.5rem, env(safe-area-inset-bottom)))',
+        overflow: 'hidden'
+      }}
+    >
       <PermissionRequestModal
         isOpen={showPermissionModal}
         type="microphone"
