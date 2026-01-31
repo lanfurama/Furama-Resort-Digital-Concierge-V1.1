@@ -4,7 +4,7 @@ import { StaffLogin } from '../components/login/StaffLogin';
 import { UserRole } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
 import { setDriverOnlineFor10Hours } from '../services/dataService';
-import { Briefcase, Building2, Car, UserCheck, ArrowLeft, Shield } from 'lucide-react';
+import { Briefcase, Car, UserCheck, ArrowLeft, Shield } from 'lucide-react';
 
 const CollectionLoginPage: React.FC = () => {
   const { setLanguage } = useTranslation();
@@ -21,7 +21,7 @@ const CollectionLoginPage: React.FC = () => {
     [UserRole.GUEST]: '/login'
   };
 
-  // Chỉ hiển thị 5 role được yêu cầu - Hotline đặt ở cuối
+  // Chỉ hiển thị 4 role: Staff, Driver, Supervisor, Admin
   const allowedRoles = [
     {
       role: UserRole.STAFF,
@@ -62,16 +62,6 @@ const CollectionLoginPage: React.FC = () => {
       bgColor: 'bg-gradient-to-br from-emerald-50 to-teal-50',
       textColor: 'text-emerald-700',
       borderColor: 'border-emerald-400'
-    },
-    {
-      role: UserRole.RECEPTION,
-      label: 'Hotline',
-      icon: Building2,
-      description: 'Front Desk Access',
-      color: 'from-pink-500 to-rose-600',
-      bgColor: 'bg-gradient-to-br from-pink-50 to-rose-50',
-      textColor: 'text-pink-700',
-      borderColor: 'border-pink-400'
     }
   ];
 

@@ -46,7 +46,7 @@ export const playNotificationSound = (soundEnabled: boolean): void => {
   }
 };
 
-/** Hai nốt ding-dong (C5 → E5), dùng chung cho guest và driver */
+/** Hai nốt ding-dong (C5 → E5) – dùng cho driver */
 function playNotificationChime(ctx: AudioContext): void {
   const now = ctx.currentTime;
   const playTone = (freq: number, start: number, duration: number, volume: number) => {
@@ -66,12 +66,87 @@ function playNotificationChime(ctx: AudioContext): void {
   playTone(659.25, now + 0.16, 0.16, 0.1); // E5
 }
 
+/**
+ * Âm thanh guest: giai điệu 3 nốt đi lên (da-da-daa) – khác hẳn driver (ding-dong 2 nốt).
+ * Dùng triangle wave, ngắn gọn, dễ phân biệt.
+ */
+function playGuestChime(ctx: AudioContext): void {
+  const now = ctx.currentTime;
+  const playTone = (freq: number, start: number, duration: number, volume: number) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(volume, start + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+    osc.start(start);
+    osc.stop(start + duration);
+  };
+  // Ba nốt ngắn đi lên: A4 → C5 → E5 (arpeggio)
+  playTone(440, now, 0.1, 0.1);             // A4
+  playTone(523.25, now + 0.12, 0.1, 0.1);    // C5
+  playTone(659.25, now + 0.24, 0.14, 0.12);  // E5 (nốt cuối hơi dài hơn)
+}
+
 /** Chuỗi rung ngắn: 150ms rung, 80ms nghỉ, 150ms rung */
 const VIBRATE_PATTERN = [150, 80, 150];
 
+/** Shared AudioContext for guest – mở bằng user gesture (click Request) để trình duyệt cho phép phát sau này */
+let guestAudioContext: AudioContext | null = null;
+
+const getAudioContextCtor = (): typeof AudioContext | null =>
+  window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext || null;
+
 /**
- * Một lần: chuông ding-dong + rung. Dùng khi guest gửi request hoặc có cập nhật trạng thái (driver assigned, arriving, ...).
- * Gọi từ user gesture (click) thì âm thanh dễ phát; trình duyệt cần resume AudioContext trước khi play.
+ * Lấy hoặc tạo AudioContext cho guest. Dùng chung một context để có thể phát sau khi đã unlock bằng user gesture.
+ */
+function getOrCreateGuestAudioContext(): AudioContext | null {
+  const Ctx = getAudioContextCtor();
+  if (!Ctx) return null;
+  if (guestAudioContext && guestAudioContext.state !== 'closed') {
+    return guestAudioContext;
+  }
+  guestAudioContext = new Ctx();
+  return guestAudioContext;
+}
+
+/**
+ * Gọi khi user bấm (vd: Request Buggy) để mở AudioContext – trình duyệt chỉ cho phép âm thanh sau user gesture.
+ * Gọi trước khi play lần đầu hoặc ngay khi vào màn Buggy để khi có driver assigned thì vẫn nghe được.
+ */
+export function unlockGuestAudioContext(): void {
+  const ctx = getOrCreateGuestAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+}
+
+/**
+ * Chỉ phát chuông ding-dong (không rung). Dùng khi đang "Finding driver" – lặp mỗi vài giây.
+ */
+export const playGuestChimeOnly = (soundEnabled: boolean): void => {
+  if (!soundEnabled) return;
+  try {
+    const ctx = getOrCreateGuestAudioContext();
+    if (ctx) {
+      const play = () => playGuestChime(ctx);
+      if (ctx.state === 'suspended') {
+        ctx.resume().then(play).catch(() => {});
+      } else {
+        play();
+      }
+    }
+  } catch {
+    // Ignore
+  }
+};
+
+/**
+ * Một lần: giai điệu guest (3 nốt) + rung. Dùng khi guest gửi request hoặc có cập nhật trạng thái.
+ * Âm thanh guest khác hẳn driver (ding-dong 2 nốt).
  */
 export const playGuestNotificationFeedback = (
   soundEnabled: boolean,
@@ -86,10 +161,9 @@ export const playGuestNotificationFeedback = (
   }
   if (soundEnabled) {
     try {
-      const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (Ctx) {
-        const ctx = new Ctx();
-        const play = () => playNotificationChime(ctx);
+      const ctx = getOrCreateGuestAudioContext();
+      if (ctx) {
+        const play = () => playGuestChime(ctx);
         if (ctx.state === 'suspended') {
           ctx.resume().then(play).catch(() => {});
         } else {

@@ -53,13 +53,13 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, setLangu
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50">
+    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-100">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Gradient Orbs */}
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-emerald-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-teal-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-cyan-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
         
         {/* Grid Pattern */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
@@ -68,7 +68,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, setLangu
       {/* Back Button */}
       <button
         onClick={() => navigate('/fu25ad/login')}
-        className="absolute top-6 left-6 z-20 text-gray-600 hover:text-gray-900 transition-all flex items-center gap-2 bg-white/80 backdrop-blur-md px-4 py-2.5 rounded-xl shadow-lg hover:shadow-xl border border-white/20 hover:scale-105"
+        className="absolute top-6 left-6 z-20 text-emerald-800 hover:text-emerald-900 transition-all flex items-center gap-2 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-xl shadow-lg hover:shadow-xl border-2 border-emerald-400 hover:scale-105"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -79,9 +79,9 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, setLangu
       {/* Main Login Card */}
       <div className="w-full max-w-md z-10 relative">
         {/* Glassmorphism Card */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 md:p-10 relative overflow-hidden">
+        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border-2 border-emerald-400/50 p-8 md:p-10 relative overflow-hidden">
           {/* Decorative Top Accent */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500"></div>
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600"></div>
           
           {/* Sparkle Icons */}
           <div className="absolute top-6 right-6 text-emerald-400/30">
@@ -174,7 +174,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, setLangu
             <button
               type="submit"
               disabled={isAuthLoading}
-              className="w-full bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group"
+              className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none relative overflow-hidden group"
             >
               <span className="relative z-10 flex items-center justify-center gap-2">
                 {isAuthLoading ? (
@@ -189,7 +189,7 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, setLangu
                   </>
                 )}
               </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-emerald-700 via-teal-700 to-cyan-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-teal-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             </button>
           </form>
 

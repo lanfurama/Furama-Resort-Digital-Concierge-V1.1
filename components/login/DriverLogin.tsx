@@ -53,29 +53,29 @@ export const DriverLogin: React.FC<DriverLoginProps> = ({ onLoginSuccess, setLan
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 flex flex-col justify-center items-center p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-100 flex flex-col justify-center items-center p-6 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Road lines animation */}
-        <div className="absolute top-1/2 left-0 w-full h-1 bg-yellow-400/20 transform -translate-y-1/2">
-          <div className="absolute w-full h-full bg-gradient-to-r from-transparent via-yellow-400/40 to-transparent animate-pulse"></div>
+        <div className="absolute top-1/2 left-0 w-full h-1 bg-amber-400/30 transform -translate-y-1/2">
+          <div className="absolute w-full h-full bg-gradient-to-r from-transparent via-amber-400/50 to-transparent animate-pulse"></div>
         </div>
         
         {/* Floating car icons */}
-        <div className="absolute top-1/4 left-1/4 text-emerald-500/10 animate-bounce" style={{ animationDuration: '3s' }}>
+        <div className="absolute top-1/4 left-1/4 text-amber-400/20 animate-bounce" style={{ animationDuration: '3s' }}>
           <Car size={80} />
         </div>
-        <div className="absolute bottom-1/4 right-1/4 text-emerald-400/10 animate-bounce" style={{ animationDuration: '4s', animationDelay: '1s' }}>
+        <div className="absolute bottom-1/4 right-1/4 text-amber-500/20 animate-bounce" style={{ animationDuration: '4s', animationDelay: '1s' }}>
           <Car size={60} />
         </div>
         
         {/* Navigation compass */}
-        <div className="absolute top-1/3 right-1/3 text-emerald-300/10 animate-spin" style={{ animationDuration: '20s' }}>
+        <div className="absolute top-1/3 right-1/3 text-amber-400/20 animate-spin" style={{ animationDuration: '20s' }}>
           <Navigation size={100} />
         </div>
         
         {/* Map pin elements */}
-        <div className="absolute bottom-1/3 left-1/3 text-emerald-400/10 animate-pulse">
+        <div className="absolute bottom-1/3 left-1/3 text-amber-500/20 animate-pulse">
           <MapPin size={50} />
         </div>
       </div>
@@ -83,19 +83,19 @@ export const DriverLogin: React.FC<DriverLoginProps> = ({ onLoginSuccess, setLan
       {/* Back Button */}
       <button
         onClick={() => navigate('/fu25ad/login')}
-        className="absolute top-6 left-6 z-20 text-white/80 hover:text-white transition flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl shadow-lg hover:bg-white/20 border border-white/20"
+        className="absolute top-6 left-6 z-20 text-amber-800 hover:text-amber-900 transition flex items-center gap-2 bg-white/95 backdrop-blur-md px-4 py-2 rounded-xl shadow-lg hover:shadow-xl border-2 border-amber-400"
       >
         <ArrowLeft size={18} />
         <span className="text-sm font-semibold">Back to Role Selection</span>
       </button>
 
       {/* Main Login Card */}
-      <div className="w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl p-8 z-10 relative border border-white/20">
+      <div className="w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl p-8 z-10 relative border-2 border-amber-400/50">
         {/* Driver Badge Header */}
         <div className="flex items-center justify-center mb-6">
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full blur-lg opacity-50"></div>
-            <div className="relative bg-gradient-to-br from-emerald-500 to-emerald-700 p-4 rounded-full shadow-xl">
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full blur-lg opacity-50"></div>
+            <div className="relative bg-gradient-to-br from-amber-500 to-yellow-600 p-4 rounded-full shadow-xl">
               <Car size={32} className="text-white" />
             </div>
           </div>
@@ -103,18 +103,18 @@ export const DriverLogin: React.FC<DriverLoginProps> = ({ onLoginSuccess, setLan
 
         {/* Branding */}
         <div className="text-center mb-8">
-          <h1 className="font-serif text-4xl font-bold bg-gradient-to-r from-emerald-700 via-emerald-600 to-emerald-700 bg-clip-text text-transparent mb-2">
+          <h1 className="font-serif text-4xl font-bold bg-gradient-to-r from-amber-700 via-amber-600 to-amber-700 bg-clip-text text-transparent mb-2">
             FURAMA
           </h1>
-          <p className="text-xs tracking-[0.2em] text-emerald-600 uppercase font-semibold mb-3">
+          <p className="text-xs tracking-[0.2em] text-amber-700 uppercase font-semibold mb-3">
             Resort & Villas Danang
           </p>
           <div className="flex items-center justify-center gap-2 mb-4">
             <div className="w-12 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent"></div>
-            <Zap size={16} className="text-amber-400" />
+            <Zap size={16} className="text-amber-500" />
             <div className="w-12 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent"></div>
           </div>
-          <div className="flex items-center justify-center gap-2 text-emerald-700 font-bold">
+          <div className="flex items-center justify-center gap-2 text-amber-700 font-bold">
             <Shield size={18} />
             <span className="text-lg">Driver Portal</span>
           </div>
@@ -125,7 +125,7 @@ export const DriverLogin: React.FC<DriverLoginProps> = ({ onLoginSuccess, setLan
           {/* Username Field */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider flex items-center gap-2">
-              <Navigation size={14} className="text-emerald-600" />
+              <Navigation size={14} className="text-amber-600" />
               Staff ID
             </label>
             <div className="relative">
@@ -133,7 +133,7 @@ export const DriverLogin: React.FC<DriverLoginProps> = ({ onLoginSuccess, setLan
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-3.5 pl-12 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none transition-all text-gray-900 font-medium placeholder:text-gray-400"
+                className="w-full px-4 py-3.5 pl-12 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-amber-500 focus:ring-4 focus:ring-amber-100 outline-none transition-all text-gray-900 font-medium placeholder:text-gray-400"
                 placeholder="Enter your Staff ID"
                 required
                 disabled={isAuthLoading}
@@ -147,7 +147,7 @@ export const DriverLogin: React.FC<DriverLoginProps> = ({ onLoginSuccess, setLan
           {/* Password Field */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider flex items-center gap-2">
-              <Shield size={14} className="text-emerald-600" />
+              <Shield size={14} className="text-amber-600" />
               Password
             </label>
             <div className="relative">
@@ -155,7 +155,7 @@ export const DriverLogin: React.FC<DriverLoginProps> = ({ onLoginSuccess, setLan
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3.5 pl-12 pr-12 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 outline-none transition-all text-gray-900 font-medium placeholder:text-gray-400"
+                className="w-full px-4 py-3.5 pl-12 pr-12 rounded-xl border-2 border-gray-200 bg-gray-50 focus:border-amber-500 focus:ring-4 focus:ring-amber-100 outline-none transition-all text-gray-900 font-medium placeholder:text-gray-400"
                 placeholder="Enter your password"
                 required
                 disabled={isAuthLoading}
@@ -166,7 +166,7 @@ export const DriverLogin: React.FC<DriverLoginProps> = ({ onLoginSuccess, setLan
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600 transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-amber-600 transition-colors"
                 disabled={isAuthLoading}
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
@@ -186,7 +186,7 @@ export const DriverLogin: React.FC<DriverLoginProps> = ({ onLoginSuccess, setLan
           <button
             type="submit"
             disabled={isAuthLoading}
-            className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2 relative overflow-hidden group"
+            className="w-full bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2 relative overflow-hidden group"
           >
             {/* Button shine effect */}
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
@@ -215,10 +215,10 @@ export const DriverLogin: React.FC<DriverLoginProps> = ({ onLoginSuccess, setLan
 
       {/* Additional decorative elements */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-0">
-        <div className="flex items-center gap-2 text-white/20 text-xs">
-          <div className="w-8 h-px bg-white/20"></div>
+        <div className="flex items-center gap-2 text-amber-700/60 text-xs font-medium">
+          <div className="w-8 h-px bg-amber-400/50"></div>
           <span className="uppercase tracking-wider">Secure Driver Access</span>
-          <div className="w-8 h-px bg-white/20"></div>
+          <div className="w-8 h-px bg-amber-400/50"></div>
         </div>
       </div>
 

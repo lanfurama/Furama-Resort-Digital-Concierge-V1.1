@@ -111,10 +111,8 @@ const AppContent: React.FC = () => {
             setLanguage(parsedUser.language as any);
           }
 
-          // Show loading animation for 2.5 seconds to simulate system load
-          setTimeout(() => {
-            setIsAppLoading(false);
-          }, 2500);
+          // Show home immediately after user is restored (no artificial delay)
+          setIsAppLoading(false);
 
         } catch (error) {
           console.error('Failed to restore user from localStorage:', error);
@@ -360,9 +358,6 @@ const AppContent: React.FC = () => {
     const { t, language } = useTranslation();
 
     const handleRefresh = useCallback(async () => {
-      // Simulate refresh delay for better UX
-      await new Promise(resolve => setTimeout(resolve, 800));
-
       try {
         // Refresh promotions
         await getPromotions().then(setPromotions);

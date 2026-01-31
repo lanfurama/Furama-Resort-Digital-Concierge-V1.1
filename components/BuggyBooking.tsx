@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Car, Navigation } from 'lucide-react';
 import { BuggyStatus, User } from '../types';
 import ServiceChat from './ServiceChat';
@@ -14,7 +14,7 @@ import { useScrollPrevention } from '../hooks/useScrollPrevention';
 import { useRideETA } from '../hooks/useRideETA';
 import { useRideCancel } from '../hooks/useRideCancel';
 import { useBuggyBookingState } from '../hooks/useBuggyBookingState';
-import { playGuestNotificationFeedback } from '../utils/buggyUtils';
+import { playGuestNotificationFeedback, playGuestChimeOnly, unlockGuestAudioContext } from '../utils/buggyUtils';
 import { BuggyBookingForm } from './BuggyBookingForm';
 import { NotificationToast } from './NotificationToast';
 
@@ -32,6 +32,13 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
 
   const bookingState = useBuggyBookingState(user.roomNumber);
   const containerRef = useScrollPrevention();
+  const audioUnlockedRef = useRef(false);
+
+  const ensureAudioUnlocked = useCallback(() => {
+    if (audioUnlockedRef.current) return;
+    audioUnlockedRef.current = true;
+    unlockGuestAudioContext();
+  }, []);
 
   const playSoundAndVibrate = useCallback(
     () => playGuestNotificationFeedback(soundEnabled, vibrateEnabled),
@@ -74,6 +81,16 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     }
   }, [notification]);
 
+  // Âm thanh lặp lại khi đang "Finding driver" – ding-dong mỗi 2.5s
+  const isSearching = activeRide?.status === BuggyStatus.SEARCHING;
+  useEffect(() => {
+    if (!isSearching || !soundEnabled) return;
+    const tick = () => playGuestChimeOnly(soundEnabled);
+    tick();
+    const interval = setInterval(tick, 2500);
+    return () => clearInterval(interval);
+  }, [isSearching, soundEnabled]);
+
   const handleSetDestination = (dest: string) => {
     if (activeRide) return;
     if (dest === bookingState.pickup) {
@@ -89,6 +106,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       setNotification({ message: t('pickup_destination_same_error'), type: 'warning' });
       return;
     }
+    unlockGuestAudioContext();
     playSoundAndVibrate();
     try {
       await bookRide(bookingState.pickup, bookingState.destination, bookingState.guestCount || 1, bookingState.notes || undefined);
@@ -109,6 +127,8 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     <div
       ref={containerRef}
       className="flex flex-col bg-gradient-to-br from-emerald-50 via-stone-50 to-amber-50/30 relative overflow-hidden"
+      onClick={ensureAudioUnlocked}
+      onTouchStart={ensureAudioUnlocked}
       style={{
         position: 'absolute',
         top: 0,
