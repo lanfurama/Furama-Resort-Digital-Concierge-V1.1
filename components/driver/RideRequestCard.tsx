@@ -30,7 +30,7 @@ export const RideRequestCard: React.FC<RideRequestCardProps> = ({
                     <div className="text-sm text-gray-600 font-medium mb-2">{formatTime(ride.timestamp)}</div>
                     {/* Priority Badge */}
                     <div className={`${priorityInfo.color} ${priorityInfo.textColor} px-2 py-1 rounded-lg text-xs font-bold mb-2 ${priorityInfo.border ? `border ${priorityInfo.border}` : ''}`}>
-                        {priorityInfo.label}
+                        {t(priorityInfo.labelKey)}
                     </div>
                     {/* Waiting Time Display - Larger */}
                     <div className={`text-sm mt-1 flex items-center gap-1.5 font-bold ${getWaitingTimeColor(ride.timestamp, currentTime)}`}>

@@ -2,6 +2,21 @@ import { useState } from 'react';
 import { getRides, updateRideStatus, updateRide } from '../../../services/dataService';
 import { BuggyStatus } from '../../../types';
 import { useToast } from '../../../hooks/useToast';
+import { useTranslation } from '../../../contexts/LanguageContext';
+
+/** Returns current driver id from localStorage, or null if missing/invalid (no fallback). */
+function getDriverId(): string | null {
+    const savedUser = localStorage.getItem('furama_user');
+    if (!savedUser) return null;
+    try {
+        const user = JSON.parse(savedUser);
+        const id = user?.id;
+        if (id == null || id === '') return null;
+        return typeof id === 'number' ? String(id) : String(id);
+    } catch {
+        return null;
+    }
+}
 
 export const useRideActions = (
     setRides: React.Dispatch<React.SetStateAction<any[]>>,
@@ -9,26 +24,18 @@ export const useRideActions = (
     setShowChat: React.Dispatch<React.SetStateAction<boolean>>
 ) => {
     const toast = useToast();
+    const { t } = useTranslation();
     const [loadingAction, setLoadingAction] = useState<string | null>(null);
-
-    const getDriverId = (): string => {
-        const savedUser = localStorage.getItem('furama_user');
-        if (savedUser) {
-            try {
-                const user = JSON.parse(savedUser);
-                return user.id || 'driver-1';
-            } catch (e) {
-                console.error('Failed to parse user from localStorage:', e);
-            }
-        }
-        return 'driver-1';
-    };
 
     const acceptRide = async (id: string) => {
         if (loadingAction) return;
+        const driverId = getDriverId();
+        if (!driverId) {
+            toast.error(t('driver_session_invalid'));
+            return;
+        }
         setLoadingAction(id);
         try {
-            const driverId = getDriverId();
             // Optimistic update
             setRides(prevRides => prevRides.map(ride =>
                 ride.id === id ? { ...ride, status: BuggyStatus.ARRIVING, driverId } : ride
@@ -38,13 +45,13 @@ export const useRideActions = (
             await updateRideStatus(id, BuggyStatus.ARRIVING, driverId, 5);
             const allRides = await getRides();
             setRides(allRides);
-            toast.success('Ride accepted successfully!');
+            toast.success(t('driver_toast_accept_success'));
         } catch (error) {
             console.error('Failed to accept ride:', error);
             const allRides = await getRides();
             setRides(allRides);
             setMyRideId(null);
-            toast.error('Failed to accept ride. Please try again.');
+            toast.error(t('driver_toast_accept_failed'));
         } finally {
             setLoadingAction(null);
         }
@@ -62,12 +69,12 @@ export const useRideActions = (
             await updateRideStatus(id, BuggyStatus.ON_TRIP);
             const allRides = await getRides();
             setRides(allRides);
-            toast.success('Guest picked up! Trip started.');
+            toast.success(t('driver_toast_pickup_success'));
         } catch (error) {
             console.error('Failed to pick up guest:', error);
             const allRides = await getRides();
             setRides(allRides);
-            toast.error('Failed to update ride status. Please try again.');
+            toast.error(t('driver_toast_pickup_failed'));
         } finally {
             setLoadingAction(null);
         }
@@ -82,12 +89,12 @@ export const useRideActions = (
             setMyRideId(null);
             const allRides = await getRides();
             setRides(allRides);
-            toast.success('Ride completed successfully!');
+            toast.success(t('driver_toast_complete_success'));
         } catch (error) {
             console.error('Failed to complete ride:', error);
             const allRides = await getRides();
             setRides(allRides);
-            toast.error('Failed to complete ride. Please try again.');
+            toast.error(t('driver_toast_complete_failed'));
         } finally {
             setLoadingAction(null);
         }
@@ -103,12 +110,12 @@ export const useRideActions = (
             const allRides = await getRides();
             setRides(allRides);
             const isPick = next % 2 === 1;
-            toast.success(isPick ? 'Đã đón khách.' : 'Đã trả khách.');
+            toast.success(isPick ? t('driver_toast_merge_step_pick') : t('driver_toast_merge_step_drop'));
         } catch (error) {
             console.error('Failed to advance merged progress:', error);
             const allRides = await getRides();
             setRides(allRides);
-            toast.error('Cập nhật thất bại. Vui lòng thử lại.');
+            toast.error(t('driver_toast_merge_update_failed'));
         } finally {
             setLoadingAction(null);
         }
@@ -124,12 +131,12 @@ export const useRideActions = (
             setMyRideId(null);
             const allRides = await getRides();
             setRides(allRides);
-            toast.success('Đã hoàn thành chuyến gộp.');
+            toast.success(t('driver_toast_merged_complete_success'));
         } catch (error) {
             console.error('Failed to complete merged ride:', error);
             const allRides = await getRides();
             setRides(allRides);
-            toast.error('Không thể hoàn thành. Vui lòng thử lại.');
+            toast.error(t('driver_toast_merged_complete_failed'));
         } finally {
             setLoadingAction(null);
         }

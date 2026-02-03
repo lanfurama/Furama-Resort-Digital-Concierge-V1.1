@@ -38,23 +38,26 @@ export const getWaitingTimeColor = (timestamp: number, currentTime: number): str
     }
 };
 
+/** Translation key for priority badge (use with t() in component). */
+export type PriorityLabelKey = 'driver_priority_urgent' | 'driver_priority_high' | 'driver_priority_villa' | 'driver_priority_new';
+
 /**
- * Get priority badge info for a ride
+ * Get priority badge info for a ride (labelKey for i18n)
  */
-export const getPriorityInfo = (ride: RideRequest, currentTime: number) => {
+export const getPriorityInfo = (ride: RideRequest, currentTime: number): { labelKey: PriorityLabelKey; color: string; textColor: string; border?: string } => {
     const waitingMinutes = getWaitingTime(ride.timestamp, currentTime);
     const roomNumber = ride.roomNumber.toUpperCase();
     const firstChar = roomNumber.charAt(0);
     const isVilla = ['D', 'P', 'S', 'Q'].includes(firstChar);
 
     if (waitingMinutes > 10) {
-        return { label: 'URGENT', color: 'bg-red-500', textColor: 'text-white' };
+        return { labelKey: 'driver_priority_urgent', color: 'bg-red-500', textColor: 'text-white' };
     } else if (waitingMinutes > 5) {
-        return { label: 'HIGH', color: 'bg-orange-500', textColor: 'text-white' };
+        return { labelKey: 'driver_priority_high', color: 'bg-orange-500', textColor: 'text-white' };
     } else if (isVilla) {
-        return { label: 'VILLA', color: 'bg-purple-500/20', textColor: 'text-purple-300', border: 'border-purple-500/50' };
+        return { labelKey: 'driver_priority_villa', color: 'bg-purple-500/20', textColor: 'text-purple-300', border: 'border-purple-500/50' };
     } else {
-        return { label: 'NEW', color: 'bg-emerald-500', textColor: 'text-white' };
+        return { labelKey: 'driver_priority_new', color: 'bg-emerald-500', textColor: 'text-white' };
     }
 };
 

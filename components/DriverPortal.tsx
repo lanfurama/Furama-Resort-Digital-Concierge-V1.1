@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Zap, History } from 'lucide-react';
 import { BuggyStatus } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
@@ -12,7 +13,7 @@ import { CurrentJobCard } from './driver/CurrentJobCard';
 import { CurrentJobCardMerged } from './driver/CurrentJobCardMerged';
 import { MergeSuggestionCard } from './driver/MergeSuggestionCard';
 import { RideRequestCard } from './driver/RideRequestCard';
-import { DriverAlertType } from './driver/DriverPulseNotification';
+import { DriverAlertType, DriverPulseNotification } from './driver/DriverPulseNotification';
 import { useDriverAlertFeedback } from './driver/hooks/useDriverAlertFeedback';
 import { useDriverMerge } from './driver/hooks/useDriverMerge';
 import { HistoryRideCard } from './driver/HistoryRideCard';
@@ -25,9 +26,16 @@ import { useCreateRide } from './driver/hooks/useCreateRide';
 import { getPendingRides, getHistoryRides, getCurrentRide } from './driver/utils/rideFilters';
 
 const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
+    const navigate = useNavigate();
     const [viewMode, setViewMode] = useState<'REQUESTS' | 'HISTORY'>('REQUESTS');
     const { t } = useTranslation();
     const { driverInfo, locations, schedules, currentTime, currentDriverId, currentDriverActualId } = useDriverData();
+
+    useEffect(() => {
+        if (currentDriverActualId === null) {
+            navigate('/driver/login', { replace: true });
+        }
+    }, [currentDriverActualId, navigate]);
     const { rides, setRides, myRideId, setMyRideId, showChat, setShowChat, setHasUnreadChat } = useRides(currentDriverActualId);
     const { loadingAction, acceptRide, pickUpGuest, completeRide, advanceMergedProgress, completeMergedRide } = useRideActions(setRides, setMyRideId, setShowChat);
 
@@ -69,6 +77,17 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white text-gray-900 flex flex-col relative">
+            {activeAlert && (
+                <DriverPulseNotification
+                    type={activeAlert.type}
+                    message={activeAlert.message}
+                    detail={activeAlert.detail}
+                    soundEnabled={true}
+                    vibrateEnabled={true}
+                    intervalMs={2500}
+                    topClass="top-20"
+                />
+            )}
             <LoadingOverlay loadingAction={loadingAction} />
             <DriverHeader
                 driverInfo={driverInfo}
@@ -197,8 +216,8 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 onSubmit={handleCreateManualRide}
             />
 
-            {/* Chat Widget for Driver */}
-            {myCurrentRide && showChat && (
+            {/* Chat Widget for Driver (hidden for merged rides - roomNumber like "101+205") */}
+            {myCurrentRide && showChat && !myCurrentRide.roomNumber?.includes('+') && (
                 <ServiceChat
                     serviceType="BUGGY"
                     roomNumber={myCurrentRide.roomNumber}

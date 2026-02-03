@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigation, MessageSquare, Loader2, UserCheck, MapPin } from 'lucide-react';
+import { Navigation, Loader2, UserCheck, MapPin } from 'lucide-react';
 import { useTranslation } from '../../contexts/LanguageContext';
 import { RideRequest, RouteSegment } from '../../types';
 import { formatTime } from './utils/rideUtils';
@@ -17,7 +17,7 @@ export const CurrentJobCardMerged: React.FC<CurrentJobCardMergedProps> = ({
     loadingAction,
     onAdvanceStep,
     onComplete,
-    onOpenChat
+    onOpenChat: _onOpenChat // Not used: chat disabled for merged rides
 }) => {
     const { t } = useTranslation();
     const segments: RouteSegment[] = ride.segments || [];
@@ -98,13 +98,7 @@ export const CurrentJobCardMerged: React.FC<CurrentJobCardMergedProps> = ({
                     </div>
                 </div>
                 <div className="flex flex-col items-end gap-3">
-                    <button
-                        onClick={onOpenChat}
-                        className="p-3 rounded-xl border-2 border-gray-300 hover:bg-gray-100 hover:border-amber-400 min-w-[52px] min-h-[52px] flex items-center justify-center bg-white"
-                        title={t('driver_chat')}
-                    >
-                        <MessageSquare size={22} className="text-amber-600" />
-                    </button>
+                    {/* Chat hidden for merged rides - roomNumber is "101+205", not a single room */}
                     <button
                         onClick={handleAction}
                         disabled={isLoadingStep || isCompleting}

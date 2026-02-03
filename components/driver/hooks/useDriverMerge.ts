@@ -6,6 +6,7 @@ import { canCombineRides, calculateOptimalMergeRoute } from '../../ReceptionPort
 import { resolveLocationCoordinates, calculateDistance } from '../../ReceptionPortal/utils/locationUtils';
 import { getRides, updateRide, cancelRide, updateRideStatus } from '../../../services/dataService';
 import { useToast } from '../../../hooks/useToast';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 export type MergeSuggestion = {
     ride1: RideRequest;
@@ -27,6 +28,7 @@ export const useDriverMerge = (
     currentDriverActualId: string | null
 ) => {
     const toast = useToast();
+    const { t } = useTranslation();
     const [dismissedPairKey, setDismissedPairKey] = useState<string | null>(null);
     const [isMerging, setIsMerging] = useState(false);
 
@@ -96,21 +98,23 @@ export const useDriverMerge = (
             }
             const updatedRides = await getRides();
             setRides(updatedRides);
-            toast.success(`Đã gộp chuyến và nhận chuyến: Room ${ride1.roomNumber}+${ride2.roomNumber}. Tổng ${totalGuests} khách.`);
+            const roomsStr = `${ride1.roomNumber}+${ride2.roomNumber}`;
+            const msg = t('driver_toast_merge_success').replace('{rooms}', roomsStr).replace('{count}', String(totalGuests));
+            toast.success(msg);
         } catch (error) {
             console.error('Failed to merge rides:', error);
-            toast.error('Không thể gộp chuyến. Vui lòng thử lại.');
+            toast.error(t('driver_toast_merge_failed'));
         } finally {
             setIsMerging(false);
         }
-    }, [mergeSuggestion, setRides, setMyRideId, currentDriverActualId, toast]);
+    }, [mergeSuggestion, setRides, setMyRideId, currentDriverActualId, toast, t]);
 
     const rejectMerge = useCallback(() => {
         if (!mergeSuggestion) return;
         const key = [mergeSuggestion.ride1.id, mergeSuggestion.ride2.id].sort().join('-');
         setDismissedPairKey(key);
-        toast.success('Đã bỏ qua gợi ý gộp chuyến.');
-    }, [mergeSuggestion, toast]);
+        toast.success(t('driver_toast_merge_rejected'));
+    }, [mergeSuggestion, toast, t]);
 
     return { mergeSuggestion, acceptMerge, rejectMerge, isMerging };
 };

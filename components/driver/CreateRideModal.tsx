@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Loader2 } from 'lucide-react';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 interface Location {
     id: string;
@@ -13,10 +14,11 @@ interface CreateRideModalProps {
         roomNumber: string;
         pickup: string;
         destination: string;
+        guestCount?: number;
     };
     locations: Location[];
     onClose: () => void;
-    onDataChange: (data: { roomNumber: string; pickup: string; destination: string }) => void;
+    onDataChange: (data: { roomNumber: string; pickup: string; destination: string; guestCount?: number }) => void;
     onSubmit: () => void;
 }
 
@@ -29,13 +31,15 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
     onDataChange,
     onSubmit
 }) => {
+    const { t } = useTranslation();
     if (!isOpen) return null;
 
-    const handleChange = (field: keyof typeof rideData, value: string) => {
+    const handleChange = (field: keyof typeof rideData, value: string | number) => {
         onDataChange({ ...rideData, [field]: value });
     };
 
-    const canSubmit = rideData.pickup && rideData.destination && !isCreating;
+    const samePickupAndDestination = Boolean(rideData.pickup && rideData.destination && rideData.pickup === rideData.destination);
+    const canSubmit = rideData.pickup && rideData.destination && !samePickupAndDestination && !isCreating;
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in" onClick={() => !isCreating && onClose()}>
@@ -46,7 +50,7 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex justify-between items-center p-5 border-b-2 border-gray-200/60 sticky top-0 bg-white/95 backdrop-blur-sm z-10">
-                    <h3 className="font-bold text-lg md:text-xl text-gray-900">Create New Ride</h3>
+                    <h3 className="font-bold text-lg md:text-xl text-gray-900">{t('driver_create_new_ride')}</h3>
                     <button
                         onClick={() => !isCreating && onClose()}
                         disabled={isCreating}
@@ -57,7 +61,7 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                 </div>
                 <div className="p-5 md:p-6 space-y-4">
                     <div>
-                        <label className="block text-xs md:text-sm uppercase text-gray-600 font-bold mb-2">Room Number (Optional)</label>
+                        <label className="block text-xs md:text-sm uppercase text-gray-600 font-bold mb-2">{t('driver_room_optional')}</label>
                         <input
                             type="text"
                             value={rideData.roomNumber}
@@ -69,14 +73,14 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                         />
                     </div>
                     <div>
-                        <label className="block text-xs md:text-sm uppercase text-gray-600 font-bold mb-2">Pickup Location</label>
+                        <label className="block text-xs md:text-sm uppercase text-gray-600 font-bold mb-2">{t('driver_pickup_location')}</label>
                         <select
                             value={rideData.pickup}
                             onChange={(e) => handleChange('pickup', e.target.value)}
                             disabled={isCreating}
                             className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-3.5 md:p-3 text-gray-900 text-sm md:text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-h-[44px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <option value="">Select Pickup...</option>
+                            <option value="">{t('driver_select_pickup')}</option>
                             <option value="Current Location">Current Location</option>
                             {locations.map(loc => (
                                 <option key={loc.id} value={loc.name}>{loc.name}</option>
@@ -84,19 +88,36 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                         </select>
                     </div>
                     <div>
-                        <label className="block text-xs md:text-sm uppercase text-gray-600 font-bold mb-2">Destination</label>
+                        <label className="block text-xs md:text-sm uppercase text-gray-600 font-bold mb-2">{t('number_of_guests')}</label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={7}
+                            value={rideData.guestCount ?? 1}
+                            onChange={(e) => handleChange('guestCount', parseInt(e.target.value, 10) || 1)}
+                            disabled={isCreating}
+                            className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-3.5 md:p-3 text-gray-900 text-sm md:text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-h-[44px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs md:text-sm uppercase text-gray-600 font-bold mb-2">{t('driver_destination')}</label>
                         <select
                             value={rideData.destination}
                             onChange={(e) => handleChange('destination', e.target.value)}
                             disabled={isCreating}
                             className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-3.5 md:p-3 text-gray-900 text-sm md:text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-h-[44px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <option value="">Select Destination...</option>
+                            <option value="">{t('driver_select_destination')}</option>
                             {locations.map(loc => (
                                 <option key={loc.id} value={loc.name}>{loc.name}</option>
                             ))}
                         </select>
                     </div>
+                    {samePickupAndDestination && (
+                        <p className="text-sm text-amber-700 font-medium bg-amber-50 border border-amber-200 rounded-xl px-3 py-2" role="alert">
+                            {t('pickup_destination_same_error')}
+                        </p>
+                    )}
 
                     <button
                         onClick={onSubmit}
@@ -106,10 +127,10 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                         {isCreating ? (
                             <>
                                 <Loader2 size={20} className="animate-spin" />
-                                <span>Creating Ride...</span>
+                                <span>{t('driver_creating_ride')}</span>
                             </>
                         ) : (
-                            <span>Start Trip</span>
+                            <span>{t('driver_start_trip')}</span>
                         )}
                     </button>
                 </div>

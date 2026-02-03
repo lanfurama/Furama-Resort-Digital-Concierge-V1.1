@@ -1,10 +1,12 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DriverLogin } from '../components/login/DriverLogin';
 import { UserRole } from '../types';
 import { useTranslation } from '../contexts/LanguageContext';
 import { setDriverOnlineFor10Hours } from '../services/dataService';
 
 const DriverLoginPage: React.FC = () => {
+  const navigate = useNavigate();
   const { setLanguage } = useTranslation();
 
   const handleLoginSuccess = async (user: any) => {
@@ -23,7 +25,7 @@ const DriverLoginPage: React.FC = () => {
       }
     }
     
-    window.location.href = '/driver';
+    navigate('/driver', { replace: true });
   };
 
   return (

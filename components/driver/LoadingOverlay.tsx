@@ -1,17 +1,19 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 interface LoadingOverlayProps {
     loadingAction: string | null;
 }
 
 export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ loadingAction }) => {
+    const { t } = useTranslation();
     if (!loadingAction) return null;
 
     const getMessage = () => {
-        if (loadingAction.startsWith('pickup-')) return 'Picking up guest...';
-        if (loadingAction.startsWith('complete-')) return 'Completing ride...';
-        return 'Processing...';
+        if (loadingAction.startsWith('pickup-')) return t('driver_loading_picking_up');
+        if (loadingAction.startsWith('complete-')) return t('driver_loading_completing');
+        return t('driver_loading_processing');
     };
 
     return (

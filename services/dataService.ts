@@ -2626,17 +2626,7 @@ export const createManualRide = async (
       guest_count: guestCount || 1,
     };
 
-    console.log("Creating manual ride via API - Input:", {
-      driverId,
-      roomNumber,
-      pickup,
-      destination,
-    });
-    console.log("Creating manual ride via API - Request Body:", requestBody);
-
     const dbRide = await apiClient.post<any>("/ride-requests", requestBody);
-
-    console.log("Manual ride created successfully - API Response:", dbRide);
 
     const mappedRide: RideRequest = {
       id: dbRide.id.toString(),
@@ -2658,19 +2648,12 @@ export const createManualRide = async (
 
     // Update local cache
     rides = [mappedRide, ...rides];
-    console.log("Manual ride added to local cache:", mappedRide);
     return mappedRide;
   } catch (error: any) {
-    console.error("Failed to create manual ride via API:", error);
-    console.error("Error details:", {
+    logger.error("Failed to create manual ride via API", {
       message: error?.message,
-      response: error?.response,
       status: error?.response?.status,
-      body: error?.response?.body,
     });
-    console.warn(
-      "Falling back to local mock data. Ride will NOT be saved to database!",
-    );
     // Fallback to local state
     const allUsers = getUsersSync();
     const guest = allUsers.find(
@@ -2805,15 +2788,10 @@ export const updateRideStatus = async (
       updateData.eta = eta;
     }
 
-    console.log("Updating ride status via API - Ride ID:", rideId);
-    console.log("Updating ride status via API - Update Data:", updateData);
-
     const dbRide = await apiClient.put<any>(
       `/ride-requests/${rideId}`,
       updateData,
     );
-
-    console.log("Ride status updated successfully - API Response:", dbRide);
 
     // Map database response to frontend format
     // Handle timestamp: prefer timestamp (bigint), fallback to created_at, then existing ride timestamp, then Date.now()
@@ -2885,7 +2863,6 @@ export const updateRideStatus = async (
       // Add to cache if not found
       rides = [updatedRide, ...rides];
     }
-    console.log("Ride updated in local cache:", updatedRide);
 
     // Notify Guest of status change (only if we have room number)
     const roomNumber = updatedRide.roomNumber || ride?.roomNumber;
