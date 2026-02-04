@@ -404,16 +404,16 @@ const AppContent: React.FC = () => {
 
         {/* Header - Optimized */}
         <div
-          className="backdrop-blur-md bg-gradient-to-r from-emerald-900/95 via-emerald-800/95 to-teal-800/95 text-white pt-safe pb-3 px-4 flex justify-between items-center shadow-xl z-30 shrink-0 border-b border-white/20"
+          className="backdrop-blur-md bg-gradient-to-r from-emerald-900/95 via-emerald-800/95 to-teal-800/95 text-white pt-safe pb-2.5 px-4 flex justify-between items-center shadow-xl z-30 shrink-0 border-b border-white/20"
           style={{ 
             boxShadow: '0 4px 20px -5px rgba(0,0,0,0.3)',
-            paddingTop: 'max(0.75rem, calc(0.75rem + env(safe-area-inset-top)))'
+            paddingTop: 'max(0.5rem, calc(0.5rem + env(safe-area-inset-top)))'
           }}
         >
-          <div className="flex items-center space-x-3 flex-1 min-w-0">
+          <div className="flex items-center space-x-2.5 flex-1 min-w-0">
             <div className="relative flex-shrink-0">
-              <div className="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-br from-white/30 to-white/15 rounded-xl flex items-center justify-center border-2 border-white/40 shadow-lg backdrop-blur-sm transition-transform active:scale-95">
-                <span className="font-bold text-lg sm:text-xl text-white drop-shadow-lg">{user.lastName.charAt(0)}</span>
+              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-white/30 to-white/15 rounded-xl flex items-center justify-center border-2 border-white/40 shadow-lg backdrop-blur-sm transition-transform active:scale-95">
+                <span className="font-bold text-base sm:text-lg text-white drop-shadow-lg">{user.lastName.charAt(0)}</span>
               </div>
               <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-emerald-800 shadow-md"></div>
             </div>
@@ -457,8 +457,8 @@ const AppContent: React.FC = () => {
               <div className="flex flex-col min-h-full relative">
                 {/* Content background overlay for readability - Removed to fix gray divs issue */}
                 <div className="relative z-10">
-                {/* Optimized Hero Banner - GPU accelerated */}
-                <div className="mx-4 mt-6 h-44 rounded-3xl overflow-hidden relative shadow-xl mb-6">
+                {/* Hero Banner - compact, no redundant space */}
+                <div className="mx-4 mt-3 h-32 sm:h-36 rounded-2xl overflow-hidden relative shadow-lg mb-4">
                   <img
                     src="https://furamavietnam.com/wp-content/uploads/2025/10/furama-resort-danang.jpg"
                     className="absolute inset-0 w-full h-full object-cover"
@@ -479,24 +479,21 @@ const AppContent: React.FC = () => {
                       }
                     }}
                   />
-                  {/* Gradient overlay */}
                   <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/85 via-emerald-800/75 to-emerald-900/65"></div>
-                  <div className="absolute inset-0 flex items-center p-6 relative z-10">
+                  <div className="absolute inset-0 flex items-center p-4 relative z-10">
                     <div>
-                      <div className="inline-block px-4 py-2 bg-white/10 backdrop-blur-sm rounded-xl mb-3 border border-white/20 shadow-md">
-                        <h2 className="text-white font-serif text-2xl sm:text-3xl font-bold mb-1 drop-shadow-lg">{t('hero_title')}</h2>
-                      </div>
-                      <p className="text-emerald-100 text-sm font-medium drop-shadow-md mt-2">{t('hero_subtitle')}</p>
+                      <h2 className="text-white font-serif text-xl sm:text-2xl font-bold drop-shadow-lg">{t('hero_title')}</h2>
+                      <p className="text-emerald-100 text-xs sm:text-sm font-medium drop-shadow-md mt-1">{t('hero_subtitle')}</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Services Grid */}
+                {/* Services Grid - tighter spacing */}
                 <div className="px-4">
-                  <div className="flex justify-between items-center mb-3 px-1">
+                  <div className="flex justify-between items-center mb-2 px-1">
                     <div className="flex items-center gap-2">
-                      <div className="w-1 h-6 bg-gradient-to-b from-emerald-600 to-emerald-400 rounded-full"></div>
-                      <h3 className="font-bold text-gray-800 text-lg">{t('resort_services')}</h3>
+                      <div className="w-1 h-5 bg-gradient-to-b from-emerald-600 to-emerald-400 rounded-full"></div>
+                      <h3 className="font-bold text-gray-800 text-base">{t('resort_services')}</h3>
                     </div>
                   </div>
                   <div className="-mx-4">
@@ -504,24 +501,16 @@ const AppContent: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Exclusive Offers - Premium Resort Design */}
-                <div className="px-5 pt-6 pb-8">
-                  {/* Elegant Header */}
-                  <div className="mb-6">
-                    <div className="flex items-center gap-3 mb-1">
-                      <div className="flex items-center gap-2">
-                        <div className="w-0.5 h-6 bg-gradient-to-b from-emerald-600 via-emerald-500 to-emerald-400 rounded-full"></div>
-                        <Sparkles className="w-4 h-4 text-emerald-600" />
-                      </div>
-                      <h3 className="font-semibold text-gray-900 text-lg tracking-tight">
-                        {t('exclusive_offers')}
-                      </h3>
-                    </div>
-                    <div className="h-px bg-gradient-to-r from-emerald-100 via-emerald-200 to-transparent ml-2.5"></div>
+                {/* Exclusive Offers - refined card design */}
+                <div className="px-4 pt-5 pb-6">
+                  <div className="flex items-center gap-2 mb-3 px-1">
+                    <div className="w-1 h-5 bg-gradient-to-b from-emerald-600 to-emerald-400 rounded-full"></div>
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    <h3 className="font-bold text-gray-800 text-base">{t('exclusive_offers')}</h3>
                   </div>
-                  
+
                   {renderedPromotions.length > 0 ? (
-                    <div className="flex space-x-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide -mx-5 px-5">
+                    <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide -mx-4 px-4">
                       {renderedPromotions.map((promo, index) => {
                         const formatDate = (dateStr?: string) => {
                           if (!dateStr) return '';
@@ -536,95 +525,77 @@ const AppContent: React.FC = () => {
                           }
                         };
 
-                        // Sophisticated gradient palette for resort theme
                         const gradientColors = [
-                          'from-slate-800 via-slate-700 to-slate-800',
-                          'from-emerald-700 via-teal-700 to-cyan-700',
-                          'from-amber-700 via-orange-700 to-amber-800',
-                          'from-rose-700 via-pink-700 to-rose-800',
-                          'from-indigo-700 via-blue-700 to-indigo-800',
+                          'from-emerald-800/95 via-teal-800/95 to-cyan-900/95',
+                          'from-amber-800/95 via-orange-800/95 to-amber-900/95',
+                          'from-rose-800/95 via-pink-800/95 to-rose-900/95',
+                          'from-indigo-800/95 via-blue-800/95 to-indigo-900/95',
+                          'from-slate-800/95 via-slate-700/95 to-slate-800/95',
                         ];
                         const gradient = gradientColors[index % gradientColors.length];
 
                         return (
                           <div
                             key={promo.id}
-                            className={`min-w-[300px] h-[260px] rounded-3xl text-white snap-center relative overflow-hidden shrink-0 flex flex-col active:scale-[0.97] transition-transform duration-200 ${
-                              promo.imageUrl ? '' : (promo.imageColor || `bg-gradient-to-br ${gradient}`)
+                            className={`min-w-[280px] w-[280px] h-[200px] rounded-2xl snap-center shrink-0 overflow-hidden relative flex flex-col border border-white/20 shadow-xl active:scale-[0.98] transition-transform duration-200 ${
+                              promo.imageUrl ? '' : `bg-gradient-to-br ${gradient}`
                             }`}
                             style={promo.imageUrl ? {
                               backgroundImage: `url(${promo.imageUrl})`,
                               backgroundSize: 'cover',
                               backgroundPosition: 'center',
-                              backgroundRepeat: 'no-repeat'
-                            } : {
-                              boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05)'
-                            }}
+                              backgroundRepeat: 'no-repeat',
+                              boxShadow: '0 8px 24px -4px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.08)'
+                            } : undefined}
                           >
-                            {/* Sophisticated Background Overlay for image cards */}
                             {promo.imageUrl && (
-                              <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/75 rounded-3xl"></div>
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
                             )}
-                            
-                            {/* Subtle decorative elements */}
-                            <div className="absolute top-0 right-0 w-40 h-40 bg-white/3 rounded-full -mr-20 -mt-20 blur-3xl"></div>
-                            <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/3 rounded-full -ml-16 -mb-16 blur-2xl"></div>
-                            
-                            {/* Content Container */}
-                            <div className="relative z-10 h-full flex flex-col p-6 justify-between">
-                              <div className="flex-1 flex flex-col">
-                                {/* Premium Discount Badge */}
-                                {promo.discount && (
-                                  <div className="mb-4">
-                                    <div className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/30 shadow-lg">
-                                      <Tag className="w-3 h-3 text-white" />
-                                      <span className="text-xs font-bold text-white tracking-wide">{promo.discount}</span>
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                {/* Title with better typography */}
-                                <h4 className="font-bold text-2xl mb-3 leading-tight text-white drop-shadow-lg tracking-tight">
+
+                            <div className="relative z-10 h-full flex flex-col p-4 justify-between">
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 className="font-bold text-lg leading-snug text-white drop-shadow-md line-clamp-2 flex-1 min-w-0">
                                   {promo.title}
                                 </h4>
-                                
-                                {/* Description with better readability */}
-                                {promo.desc && (
-                                  <p className="text-sm text-white/90 line-clamp-3 leading-relaxed drop-shadow-md">
-                                    {promo.desc}
-                                  </p>
+                                {promo.discount && (
+                                  <span className="flex-shrink-0 inline-flex items-center gap-1 bg-amber-400 text-amber-950 text-[11px] font-bold px-2 py-0.5 rounded-md shadow-md">
+                                    <Tag className="w-2.5 h-2.5" />
+                                    {promo.discount}
+                                  </span>
                                 )}
                               </div>
-                              
-                              {/* Elegant Footer with date */}
+
+                              {promo.desc && (
+                                <p className="text-xs text-white/90 line-clamp-2 leading-relaxed drop-shadow-sm">
+                                  {promo.desc}
+                                </p>
+                              )}
+
                               {promo.validUntil && (
-                                <div className="mt-4 pt-4 border-t border-white/15">
-                                  <div className="flex items-center gap-2 text-white/80">
-                                    <Calendar className="w-3.5 h-3.5" />
-                                    <p className="text-xs font-medium">
-                                      Valid until {formatDate(promo.validUntil) || promo.validUntil}
-                                    </p>
-                                  </div>
+                                <div className="flex items-center gap-1.5 text-white/80 mt-auto pt-2 border-t border-white/15">
+                                  <Calendar className="w-3 h-3 flex-shrink-0" />
+                                  <span className="text-[11px] font-medium">
+                                    Valid until {formatDate(promo.validUntil) || promo.validUntil}
+                                  </span>
                                 </div>
                               )}
                             </div>
-                            
-                            {/* Subtle shine overlay */}
-                            <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none rounded-3xl"></div>
+
+                            <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10 pointer-events-none" aria-hidden />
                           </div>
                         );
                       })}
                     </div>
                   ) : (
-                    <div className="text-center py-12 px-4">
-                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 mb-4 border border-emerald-100">
-                        <Tag className="w-7 h-7 text-emerald-600" />
+                    <div className="rounded-2xl bg-white/60 backdrop-blur-sm border border-emerald-100 px-6 py-8 text-center">
+                      <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 mb-3">
+                        <Tag className="w-6 h-6" />
                       </div>
-                      <p className="text-gray-600 text-sm font-medium mb-1">
+                      <p className="text-gray-700 text-sm font-medium mb-0.5">
                         {t('no_offers_available') || 'No offers available at the moment'}
                       </p>
-                      <p className="text-gray-400 text-xs">
-                        Check back soon for exciting deals!
+                      <p className="text-gray-500 text-xs">
+                        Check back soon for new deals.
                       </p>
                     </div>
                   )}

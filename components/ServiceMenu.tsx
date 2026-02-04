@@ -70,14 +70,14 @@ const ServiceMenu: React.FC<ServiceMenuProps> = memo(({ onSelect }) => {
     ], [t]);
 
     return (
-        <div className="p-4 grid grid-cols-2 gap-3">
+        <div className="px-4 py-2 grid grid-cols-2 gap-2.5">
             {services.map((s) => (
                 <button
                     key={s.id}
                     onClick={() => onSelect(s.id)}
-                    className={`relative flex flex-col items-center justify-center p-5 bg-white/80 backdrop-blur-sm rounded-3xl border-2 ${s.borderColor} transition-transform active:scale-95 overflow-hidden`}
+                    className={`relative flex flex-col items-center justify-center py-3.5 px-3 bg-white/80 backdrop-blur-sm rounded-2xl border-2 ${s.borderColor} transition-transform active:scale-95 overflow-hidden`}
                     style={{
-                        boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.5)',
+                        boxShadow: '0 4px 16px -4px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.5)',
                         transform: 'translateZ(0)',
                         willChange: 'transform'
                     }}
@@ -91,16 +91,16 @@ const ServiceMenu: React.FC<ServiceMenuProps> = memo(({ onSelect }) => {
                     </div>
 
                     {/* Icon Container */}
-                    <div className={`relative z-10 p-4 rounded-2xl mb-3 ${s.iconBg} border-2 ${s.borderColor} shadow-lg`}
+                    <div className={`relative z-10 p-2.5 rounded-xl mb-2 ${s.iconBg} border-2 ${s.borderColor} shadow-md`}
                         style={{
-                            boxShadow: `0 4px 16px -4px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.5)`
+                            boxShadow: `0 2px 12px -2px rgba(0,0,0,0.12), 0 0 0 1px rgba(255,255,255,0.5)`
                         }}
                     >
-                        <s.icon size={26} className={s.iconColor} strokeWidth={2.5} />
+                        <s.icon size={22} className={s.iconColor} strokeWidth={2.5} />
                     </div>
 
                     {/* Service Name */}
-                    <span className={`relative z-10 font-bold text-gray-800 text-center text-sm leading-tight`}>
+                    <span className={`relative z-10 font-bold text-gray-800 text-center text-xs leading-tight`}>
                         {s.name}
                     </span>
                 </button>
