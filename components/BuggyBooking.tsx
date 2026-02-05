@@ -172,7 +172,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
           </div>
         </div>
       )}
-      {(isLoadingRide || bookingState.isLoadingLocations) && (
+      {!activeRide && (isLoadingRide || bookingState.isLoadingLocations) && (
         <div className="flex-1 flex items-center justify-center">
           <Loading size="md" message={t('loading') || 'Loading...'} />
         </div>
