@@ -46,7 +46,7 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
   const { t } = useTranslation();
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-3 min-h-0" style={{ maxHeight: 'calc(100% - 80px)', overflowX: 'hidden' }}>
+    <div className="flex-1 overflow-y-auto px-4 py-3 pb-24 min-h-0" style={{ maxHeight: 'calc(100% - 80px)', overflowX: 'hidden' }}>
       {/* Booking Progress Stepper */}
       <div className="mb-4">
         <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-lg border border-emerald-100/50 p-4">
