@@ -114,7 +114,7 @@ export const sendBuggyRequestEmail = async (
       <div class="container">
         <div class="header">
           <h2 style="margin: 0;">🚗 New Buggy Request</h2>
-          <p style="margin: 10px 0 0 0; opacity: 0.9;">Furama Resort Digital Concierge</p>
+          <p style="margin: 10px 0 0 0; opacity: 0.9;">Furama Digital Concierge</p>
         </div>
         <div class="content">
           <p>You have received a new buggy service request:</p>
@@ -131,7 +131,7 @@ export const sendBuggyRequestEmail = async (
           </p>
         </div>
         <div class="footer">
-          <p>This is an automated notification from Furama Resort Digital Concierge System.</p>
+          <p>This is an automated notification from Furama Digital Concierge System.</p>
           <p>Please do not reply to this email.</p>
         </div>
       </div>
@@ -200,7 +200,7 @@ export const sendBuggyRequestEmailToDriver = async (
           </p>
         </div>
         <div class="footer">
-          <p>This is an automated notification from Furama Resort Digital Concierge System.</p>
+          <p>This is an automated notification from Furama Digital Concierge System.</p>
           <p>Please do not reply to this email.</p>
         </div>
       </div>

@@ -34,6 +34,12 @@ HTTPS_REDIRECT=false
 # SSL_KEY_PATH=certs/server.key
 # SSL_CERT_PATH=certs/server.crt
 
+# CORS - Production: set allowed frontend origins (comma-separated). Leave unset for localhost dev origins.
+# ALLOWED_ORIGINS=https://your-domain.com,https://www.your-domain.com
+
+# Rate limit - max requests per IP per 15 minutes (default 100). Optional.
+# RATE_LIMIT_MAX=100
+
 # Node Environment
 # Use 'production' for production, 'development' for development
 NODE_ENV=production

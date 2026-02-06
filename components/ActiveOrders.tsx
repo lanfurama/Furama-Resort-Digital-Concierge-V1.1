@@ -6,6 +6,7 @@ import { Clock, ShoppingBag, Car, Utensils, Sparkles, Waves, User as UserIcon, M
 import ServiceChat from './ServiceChat';
 import Loading from './Loading';
 import { useTranslation } from '../contexts/LanguageContext';
+import { useToast } from '../hooks/useToast';
 
 interface ActiveOrdersProps {
     user: User;
@@ -14,10 +15,12 @@ interface ActiveOrdersProps {
 
 const ActiveOrders: React.FC<ActiveOrdersProps> = ({ user, onBack }) => {
     const { t, language } = useTranslation();
+    const toast = useToast();
     const [activeOrders, setActiveOrders] = useState<ServiceRequest[]>([]);
     const [activeChat, setActiveChat] = useState<{type: string, label: string} | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [serviceTypeFilter, setServiceTypeFilter] = useState<'ALL' | 'DINING' | 'SPA' | 'POOL' | 'BUTLER' | 'HOUSEKEEPING'>('ALL');
+    const [pendingCancelRequest, setPendingCancelRequest] = useState<ServiceRequest | null>(null);
     
     // Calculate waiting time in minutes
     const getWaitingTime = (timestamp: number): number => {
@@ -33,27 +36,28 @@ const ActiveOrders: React.FC<ActiveOrdersProps> = ({ user, onBack }) => {
         return `${hours}h ${mins}m ago`;
     };
     
-    // Handle cancel request
-    const handleCancel = async (req: ServiceRequest) => {
-        // Cannot cancel if already confirmed by staff
+    // Show confirm modal for cancel
+    const requestCancelConfirm = (req: ServiceRequest) => {
         if (req.status === 'CONFIRMED' || req.status === 'COMPLETED') {
-            alert('Cannot cancel request. Staff has already accepted your request.');
+            toast.warning(t('active_orders_cannot_cancel') || 'Cannot cancel request. Staff has already accepted your request.');
             return;
         }
-        
-        const waitingMinutes = getWaitingTime(req.timestamp);
-        const confirmMessage = `Are you sure you want to cancel this request?${waitingMinutes > 0 ? ` (Waiting for ${waitingMinutes} minutes)` : ''}`;
-        
-        if (window.confirm(confirmMessage)) {
-            try {
-                await cancelServiceRequest(req.id);
-                // Refresh orders
-                const updated = await getActiveGuestOrders(user.roomNumber);
-                setActiveOrders(updated);
-            } catch (error) {
-                console.error('Failed to cancel request:', error);
-                alert('Failed to cancel request. Please try again.');
-            }
+        setPendingCancelRequest(req);
+    };
+
+    // Handle cancel request (after user confirms in modal)
+    const handleCancelConfirm = async () => {
+        const req = pendingCancelRequest;
+        if (!req) return;
+        setPendingCancelRequest(null);
+        try {
+            await cancelServiceRequest(req.id);
+            const updated = await getActiveGuestOrders(user.roomNumber);
+            setActiveOrders(updated);
+            toast.success(t('active_orders_cancel_success') || 'Request cancelled.');
+        } catch (error) {
+            console.error('Failed to cancel request:', error);
+            toast.error(t('active_orders_cancel_failed') || 'Failed to cancel request. Please try again.');
         }
     };
     
@@ -279,7 +283,7 @@ const ActiveOrders: React.FC<ActiveOrdersProps> = ({ user, onBack }) => {
                                 {/* Cancel button - Show if PENDING (not confirmed by staff yet) */}
                                 {req.status === 'PENDING' && (
                                     <button 
-                                        onClick={() => handleCancel(req)}
+                                        onClick={() => requestCancelConfirm(req)}
                                         className="w-full py-2.5 flex items-center justify-center text-xs text-red-700 font-bold bg-red-50 hover:bg-red-100 rounded-lg transition-all border-2 border-red-200"
                                     >
                                         <X size={14} className="mr-1.5" strokeWidth={2.5} />
@@ -302,6 +306,36 @@ const ActiveOrders: React.FC<ActiveOrdersProps> = ({ user, onBack }) => {
                     ))
                 )}
             </div>
+
+            {/* Cancel confirm modal */}
+            {pendingCancelRequest && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={() => setPendingCancelRequest(null)}>
+                    <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-5 border-2 border-gray-200" onClick={e => e.stopPropagation()}>
+                        <p className="text-gray-800 font-medium mb-1">{t('active_orders_confirm_cancel_title') || 'Cancel request?'}</p>
+                        <p className="text-sm text-gray-600 mb-4">
+                            {(() => {
+                                const waitingMinutes = getWaitingTime(pendingCancelRequest.timestamp);
+                                return (t('active_orders_confirm_cancel_message') || 'Are you sure you want to cancel this request?')
+                                    + (waitingMinutes > 0 ? ` (${t('waiting') || 'Waiting'}: ${formatWaitingTime(waitingMinutes)})` : '');
+                            })()}
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setPendingCancelRequest(null)}
+                                className="flex-1 py-2.5 rounded-xl border-2 border-gray-300 text-gray-700 font-semibold text-sm hover:bg-gray-50"
+                            >
+                                {t('back') || 'Back'}
+                            </button>
+                            <button
+                                onClick={handleCancelConfirm}
+                                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-semibold text-sm hover:bg-red-700"
+                            >
+                                {t('confirm_cancel') || 'Confirm cancel'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
              {/* Active Service Chat Widget */}
             {activeChat && (

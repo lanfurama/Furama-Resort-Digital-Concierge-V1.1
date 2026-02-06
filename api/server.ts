@@ -4,24 +4,26 @@ import dotenv from 'dotenv';
 import routes from './_routes/index.js';
 import { checkAndSendCheckoutReminders } from './_services/checkoutReminderService.js';
 import logger from './_utils/logger.js';
+import { corsOptions } from './_config/cors.js';
+import { apiLimiter } from './_config/rateLimit.js';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
+// Middleware - CORS whitelist via ALLOWED_ORIGINS env (comma-separated); dev fallback allows localhost
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check endpoint
+// Health check endpoint (no rate limit)
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Furama Resort Digital Concierge API is running' });
+  res.json({ status: 'ok', message: 'Furama Digital Concierge API is running' });
 });
 
-// API routes with /api/v1 prefix
-app.use('/api/v1', routes);
+// API routes with /api/v1 prefix - rate limited
+app.use('/api/v1', apiLimiter, routes);
 
 // 404 handler
 app.use((req, res) => {

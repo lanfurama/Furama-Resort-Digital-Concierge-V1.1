@@ -122,7 +122,7 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                     <button
                         onClick={onSubmit}
                         disabled={!canSubmit}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 md:py-2 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed mt-4 text-base md:text-sm min-h-[56px] md:min-h-[48px] shadow-md transition-colors flex items-center justify-center gap-2"
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold py-3.5 md:py-2 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed mt-4 text-base md:text-sm min-h-[48px] md:min-h-[48px] shadow-md transition-colors flex items-center justify-center gap-2 touch-manipulation"
                     >
                         {isCreating ? (
                             <>

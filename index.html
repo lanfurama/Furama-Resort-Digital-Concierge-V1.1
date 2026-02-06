@@ -5,14 +5,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>Furama Resort Digital Concierge</title>
+    <title>Furama Digital Concierge</title>
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#065f46">
     
     <!-- Apple iOS PWA Support -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Furama Concierge">
+    <meta name="apple-mobile-web-app-title" content="Furama Digital Concierge">
     <link rel="apple-touch-icon" href="/icon-192x192.png">
     <link rel="apple-touch-icon" sizes="192x192" href="/icon-192x192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/icon-512x512.png">
@@ -29,7 +29,7 @@
     
     <!-- Additional PWA Meta Tags -->
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="Furama Concierge">
+    <meta name="application-name" content="Furama Digital Concierge">
     <script src="https://cdn.tailwindcss.com"></script>
     <link
         href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@400;700&display=swap"
@@ -126,6 +126,10 @@
             }
         }
 
+        /* Safe area insets for notched devices (Driver Portal, etc.) */
+        .safe-area-top {
+            padding-top: max(0.75rem, env(safe-area-inset-top)) !important;
+        }
         /* Fixed bottom navigation bar for mobile */
         .safe-area-bottom {
             padding-bottom: max(0.5rem, env(safe-area-inset-bottom)) !important;

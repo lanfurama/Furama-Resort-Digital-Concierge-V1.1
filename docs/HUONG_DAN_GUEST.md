@@ -22,7 +22,7 @@ Quý khách có thể:
 ### Bước 2: Nhập thông tin đăng nhập
 
 - **Số phòng:** Nhập số phòng Quý khách đang lưu trú
-- **Mã check-in:** Mã 6 ký tự được cung cấp khi check-in
+- **Mã check-in:** Mã 8 ký tự được cung cấp khi check-in
 
 **[📸 CHÈN ẢNH: Màn hình đăng nhập Guest Portal]**
 

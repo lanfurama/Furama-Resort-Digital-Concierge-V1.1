@@ -10,12 +10,12 @@ export const ScheduleSection: React.FC<ScheduleSectionProps> = ({ schedules }) =
     if (schedules.length === 0) return null;
 
     return (
-        <div className="mt-6 bg-white p-5 rounded-2xl border-2 border-emerald-200 shadow-lg">
-            <div className="flex items-center gap-3 mb-4">
-                <Calendar size={22} className="text-emerald-600" />
-                <h3 className="font-bold text-lg text-gray-800">Upcoming Schedule</h3>
+        <div className="mt-6 bg-white p-4 sm:p-5 rounded-2xl border-2 border-emerald-200 shadow-lg">
+            <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+                <Calendar size={20} className="text-emerald-600 sm:w-[22px] sm:h-[22px]" />
+                <h3 className="font-bold text-base sm:text-lg text-gray-800">Upcoming Schedule</h3>
             </div>
-            <div className="space-y-3 max-h-[250px] overflow-y-auto">
+            <div className="space-y-2 sm:space-y-3 max-h-[220px] sm:max-h-[250px] overflow-y-auto">
                 {schedules.slice(0, 7).map(schedule => {
                     const scheduleDate = new Date(schedule.date);
                     const isToday = scheduleDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];

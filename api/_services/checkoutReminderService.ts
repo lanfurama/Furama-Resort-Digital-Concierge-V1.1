@@ -150,7 +150,7 @@ const sendCheckoutReminderEmail = async (
           </p>
         </div>
         <div class="footer">
-          <p>This is an automated reminder from Furama Resort Digital Concierge System.</p>
+          <p>This is an automated reminder from Furama Digital Concierge System.</p>
           <p>Please do not reply to this email.</p>
         </div>
       </div>

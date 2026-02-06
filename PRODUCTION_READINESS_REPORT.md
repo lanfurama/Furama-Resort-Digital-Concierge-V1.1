@@ -1,5 +1,5 @@
 # 📋 BÁO CÁO ĐÁNH GIÁ SẴN SÀNG GO LIVE
-## Furama Resort Digital Concierge V1.1
+## Furama Digital Concierge
 
 **Ngày đánh giá:** 25/01/2026  
 **Phiên bản:** 1.1

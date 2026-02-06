@@ -1,5 +1,5 @@
 {
-  "name": "furama-resort-digital-concierge-v1.1",
+  "name": "furama-digital-concierge",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -36,6 +36,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-rate-limit": "^8.2.1",
     "get-port": "^7.1.0",
     "lucide-react": "^0.555.0",
     "microsoft-cognitiveservices-speech-sdk": "^1.47.0",

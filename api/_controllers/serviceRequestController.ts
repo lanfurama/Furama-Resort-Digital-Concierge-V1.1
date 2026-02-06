@@ -123,7 +123,7 @@ export const serviceRequestController = {
                           </p>
                         </div>
                         <div class="footer">
-                          <p>This is an automated notification from Furama Resort Digital Concierge System.</p>
+                          <p>This is an automated notification from Furama Digital Concierge System.</p>
                         </div>
                       </div>
                     </body>
@@ -237,7 +237,7 @@ export const serviceRequestController = {
                             <p>We hope you continue to enjoy your stay with us!</p>
                           </div>
                           <div class="footer">
-                            <p>This is an automated notification from Furama Resort Digital Concierge System.</p>
+                            <p>This is an automated notification from Furama Digital Concierge System.</p>
                           </div>
                         </div>
                       </body>

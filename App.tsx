@@ -32,6 +32,7 @@ import { BuggyStatusProvider, useBuggyStatus } from './contexts/BuggyStatusConte
 import { ToastProvider } from './hooks/useToast';
 import PullToRefresh from './components/PullToRefresh';
 import { NetworkStatusBanner } from './components/NetworkStatusBanner';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{
@@ -132,6 +133,18 @@ const AppContent: React.FC = () => {
       setIsAppLoading(false);
     }
   }, []); // Empty array - only run once on mount
+
+  // Sync user from localStorage when location changes (e.g. after guest login with navigate() instead of full reload)
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      const savedUser = localStorage.getItem('furama_user');
+      if (!savedUser) return;
+      const parsed = JSON.parse(savedUser);
+      setUser(prev => (prev ? prev : parsed));
+      if (parsed.language) setLanguage(parsed.language as any);
+    } catch (e) { /* ignore */ }
+  }, [location.pathname]);
 
   // Handle redirect if on login page and user exists (separate effect)
   useEffect(() => {
@@ -890,11 +903,13 @@ const AppContent: React.FC = () => {
         <Route
           path="/driver"
           element={
-            <ProtectedRoute allowedRoles={[UserRole.DRIVER]} redirectTo="/driver/login">
-              <Suspense fallback={<Loading fullScreen={true} message="Loading..." />}>
-                <DriverPortal onLogout={handleLogout} />
-              </Suspense>
-            </ProtectedRoute>
+            <ErrorBoundary>
+              <ProtectedRoute allowedRoles={[UserRole.DRIVER]} redirectTo="/driver/login">
+                <Suspense fallback={<Loading fullScreen={true} message="Loading..." />}>
+                  <DriverPortal onLogout={handleLogout} />
+                </Suspense>
+              </ProtectedRoute>
+            </ErrorBoundary>
           }
         />
 
@@ -920,9 +935,11 @@ const AppContent: React.FC = () => {
         <Route
           path="/"
           element={
-            <ProtectedRoute allowedRoles={[UserRole.GUEST]} redirectTo="/login">
-              <GuestHomeWrapper />
-            </ProtectedRoute>
+            <ErrorBoundary>
+              <ProtectedRoute allowedRoles={[UserRole.GUEST]} redirectTo="/login">
+                <GuestHomeWrapper />
+              </ProtectedRoute>
+            </ErrorBoundary>
           }
         />
 

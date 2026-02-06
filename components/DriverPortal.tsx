@@ -25,9 +25,32 @@ import { useRideActions } from './driver/hooks/useRideActions';
 import { useCreateRide } from './driver/hooks/useCreateRide';
 import { getPendingRides, getHistoryRides, getCurrentRide } from './driver/utils/rideFilters';
 
+const DRIVER_SOUND_KEY = 'furama_driver_sound';
+const DRIVER_VIBRATE_KEY = 'furama_driver_vibrate';
+
+function getStoredBool(key: string, defaultVal: boolean): boolean {
+    try {
+        const v = localStorage.getItem(key);
+        if (v === null) return defaultVal;
+        return v === '1' || v === 'true';
+    } catch {
+        return defaultVal;
+    }
+}
+
+function setStoredBool(key: string, value: boolean): void {
+    try {
+        localStorage.setItem(key, value ? '1' : '0');
+    } catch {
+        // ignore
+    }
+}
+
 const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     const navigate = useNavigate();
     const [viewMode, setViewMode] = useState<'REQUESTS' | 'HISTORY'>('REQUESTS');
+    const [soundEnabled, setSoundEnabled] = useState(() => getStoredBool(DRIVER_SOUND_KEY, true));
+    const [vibrateEnabled, setVibrateEnabled] = useState(() => getStoredBool(DRIVER_VIBRATE_KEY, true));
     const { t } = useTranslation();
     const { driverInfo, locations, schedules, currentTime, currentDriverId, currentDriverActualId } = useDriverData();
 
@@ -73,18 +96,31 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         return null;
     }, [mergeSuggestion, pendingRides, viewMode, myCurrentRide, t]);
 
-    useDriverAlertFeedback(!!activeAlert, { soundEnabled: true, vibrateEnabled: true, intervalMs: 2500 });
+    useDriverAlertFeedback(!!activeAlert, { soundEnabled, vibrateEnabled, intervalMs: 2500 });
+
+    const handleSoundToggle = () => {
+        setSoundEnabled(prev => {
+            const next = !prev;
+            setStoredBool(DRIVER_SOUND_KEY, next);
+            return next;
+        });
+    };
+    const handleVibrateToggle = () => {
+        setVibrateEnabled(prev => {
+            const next = !prev;
+            setStoredBool(DRIVER_VIBRATE_KEY, next);
+            return next;
+        });
+    };
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white text-gray-900 flex flex-col relative">
+        <div className="min-h-screen min-h-[100dvh] bg-gradient-to-b from-gray-50 to-white text-gray-900 flex flex-col relative">
             {activeAlert && (
                 <DriverPulseNotification
                     type={activeAlert.type}
                     message={activeAlert.message}
                     detail={activeAlert.detail}
-                    soundEnabled={true}
-                    vibrateEnabled={true}
-                    intervalMs={2500}
+                    soundEnabled={soundEnabled}
                     topClass="top-20"
                 />
             )}
@@ -94,6 +130,10 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 schedules={schedules}
                 currentDriverId={currentDriverId}
                 onLogout={onLogout}
+                soundEnabled={soundEnabled}
+                vibrateEnabled={vibrateEnabled}
+                onSoundToggle={handleSoundToggle}
+                onVibrateToggle={handleVibrateToggle}
             />
 
             <DriverTabs
@@ -103,7 +143,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 historyCount={historyRides.length}
             />
 
-            <div className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50 to-white">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden bg-gradient-to-b from-gray-50 to-white overscroll-behavior-y-contain">
                 {/* CURRENT JOB Banner */}
                 {myCurrentRide && viewMode === 'REQUESTS' && (
                     <CurrentJobBanner ride={myCurrentRide} currentTime={currentTime} />
@@ -137,7 +177,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                                 />
                             )
                         ) : (
-                            <div className="p-4 space-y-3">
+                            <div className="p-4 space-y-3" style={{ paddingBottom: 'max(7rem, calc(7rem + env(safe-area-inset-bottom, 0px)))' }}>
                                 {mergeSuggestion && (
                                     <MergeSuggestionCard
                                         suggestion={mergeSuggestion}
@@ -172,7 +212,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
                 {/* HISTORY VIEW */}
                 {viewMode === 'HISTORY' && (
-                    <div className="p-4">
+                    <div className="p-4" style={{ paddingBottom: 'max(5rem, calc(5rem + env(safe-area-inset-bottom, 0px)))' }}>
                         {historyRides.length === 0 ? (
                             <EmptyState
                                 icon={History}
@@ -194,15 +234,17 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             {/* Create Manual Ride Button - Enhanced FAB */}
             {!myCurrentRide && viewMode === 'REQUESTS' && (
                 <button
+                    type="button"
                     onClick={() => setShowCreateModal(true)}
-                    className="fixed bottom-20 md:bottom-6 right-4 md:right-6 w-20 h-20 md:w-18 md:h-18 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-3xl shadow-2xl flex items-center justify-center text-white z-40 border-4 border-white/50 hover:shadow-emerald-500/60 hover:scale-110 transition-all active:scale-95"
+                    className="fixed right-4 md:right-6 w-14 h-14 sm:w-16 sm:h-16 md:w-[4.5rem] md:h-[4.5rem] bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl md:rounded-3xl shadow-2xl flex items-center justify-center text-white z-40 border-2 md:border-4 border-white/50 hover:shadow-emerald-500/60 hover:scale-105 active:scale-95 transition-transform touch-manipulation"
                     style={{
-                        bottom: 'max(5rem, calc(5rem + env(safe-area-inset-bottom)))',
-                        boxShadow: '0 15px 40px -5px rgba(16, 185, 129, 0.5)'
+                        bottom: 'max(5.5rem, calc(5.5rem + env(safe-area-inset-bottom, 0px)))',
+                        boxShadow: '0 12px 32px -4px rgba(16, 185, 129, 0.45)'
                     }}
-                    title="Create Ride"
+                    title={t('driver_create_new_ride')}
+                    aria-label={t('driver_create_new_ride')}
                 >
-                    <Plus size={32} className="md:w-8 md:h-8" strokeWidth={3.5} />
+                    <Plus size={28} className="sm:w-8 sm:h-8 md:w-8 md:h-8" strokeWidth={3} />
                 </button>
             )}
 

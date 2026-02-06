@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.furama.resort.concierge',
-  appName: 'Furama Resort Digital Concierge',
+  appName: 'Furama Digital Concierge',
   webDir: 'dist',
   server: {
     androidScheme: 'https',

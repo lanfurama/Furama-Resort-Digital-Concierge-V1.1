@@ -1,4 +1,4 @@
-# Progressive Web App (PWA) Setup - Furama Resort Digital Concierge
+# Progressive Web App (PWA) Setup - Furama Digital Concierge
 
 ## ✅ Đã hoàn thành
 
@@ -28,7 +28,7 @@
 ### 4. Apple iOS Support (`index.html`)
 - ✅ **Apple Touch Icons**: Meta tags cho iOS
 - ✅ **Status Bar Style**: Black translucent
-- ✅ **App Title**: "Furama Concierge"
+- ✅ **App Title**: "Furama Digital Concierge"
 - ✅ **Microsoft Tiles**: Support cho Windows devices
 
 ### 5. Service Worker Registration (`index.html`)

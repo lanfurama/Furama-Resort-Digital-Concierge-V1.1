@@ -23,7 +23,7 @@ const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({
         microphone: {
             icon: <Mic className="w-8 h-8 text-emerald-600" />,
             title: t('permission_mic_title') || 'Microphone Access',
-            description: t('permission_mic_desc') || 'Furama Concierge needs microphone access to listen to your voice commands and provide assistance.',
+            description: t('permission_mic_desc') || 'Furama Digital Concierge needs microphone access to listen to your voice commands and provide assistance.',
             benefit: t('permission_mic_benefit') || 'Speak naturally to book amenities, ask questions, or request services.',
             button: t('allow_microphone') || 'Allow Microphone'
         },

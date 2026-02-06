@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { Zap, UserCheck, CheckCircle, Users } from 'lucide-react';
 
 export type DriverAlertType = 'REQUEST' | 'PICKUP' | 'COMPLETE' | 'MERGE';
@@ -8,9 +8,9 @@ interface DriverPulseNotificationProps {
     message: string;
     /** Optional: room number or short detail for context */
     detail?: string;
-    /** Play repeating beep. Default true. */
+    /** Reserved: sound is handled by useDriverAlertFeedback in DriverPortal to avoid double beep. */
     soundEnabled?: boolean;
-    /** Beep interval in ms. Default 2500. */
+    /** Reserved: beep interval is controlled by the hook. */
     beepIntervalMs?: number;
     /** Tailwind top class for fixed position, e.g. "top-14". Default "top-2". */
     topClass?: string;
@@ -23,67 +23,15 @@ const typeConfig: Record<DriverAlertType, { icon: typeof Zap; bg: string; border
     MERGE: { icon: Users, bg: 'bg-violet-500', border: 'border-violet-400' },
 };
 
-/** Pleasant two-tone chime (ding-dong style) via Web Audio API */
-function playNotificationChime(ctx: AudioContext) {
-    const now = ctx.currentTime;
-    const playTone = (freq: number, start: number, duration: number, volume: number) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = freq;
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        gain.gain.setValueAtTime(0, start);
-        gain.gain.linearRampToValueAtTime(volume, start + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
-        osc.start(start);
-        osc.stop(start + duration);
-    };
-    // Hai nốt C5 -> E5, nghe nhẹ kiểu "ding-dong" thông báo
-    playTone(523.25, now, 0.14, 0.11);       // C5
-    playTone(659.25, now + 0.16, 0.16, 0.1); // E5
-}
-
-/** Repeating notification chime loop */
-function useBeepLoop(enabled: boolean, intervalMs: number) {
-    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-    const audioContextRef = useRef<AudioContext | null>(null);
-
-    useEffect(() => {
-        if (!enabled) return;
-        const play = () => {
-            try {
-                const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-                if (!Ctx) return;
-                const ctx = audioContextRef.current ?? new Ctx();
-                if (!audioContextRef.current) audioContextRef.current = ctx;
-                if (ctx.state === 'suspended') ctx.resume();
-                playNotificationChime(ctx);
-            } catch {
-                // Ignore autoplay / audio errors
-            }
-        };
-        intervalRef.current = setInterval(play, intervalMs);
-        play();
-        return () => {
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            intervalRef.current = null;
-        };
-    }, [enabled, intervalMs]);
-}
-
+/** Visual-only alert banner. Chime + vibrate are handled by useDriverAlertFeedback in DriverPortal. */
 export const DriverPulseNotification: React.FC<DriverPulseNotificationProps> = ({
     type,
     message,
     detail,
-    soundEnabled = true,
-    beepIntervalMs = 2500,
     topClass = 'top-2',
 }) => {
     const config = typeConfig[type];
     const Icon = config.icon;
-
-    useBeepLoop(soundEnabled, beepIntervalMs);
 
     return (
         <div

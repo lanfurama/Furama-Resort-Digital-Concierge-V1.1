@@ -4,13 +4,15 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import routes from './_routes/index.js';
 import logger from './_utils/logger.js';
+import { corsOptions } from './_config/cors.js';
+import { apiLimiter } from './_config/rateLimit.js';
 
 dotenv.config();
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// Middleware - CORS whitelist via ALLOWED_ORIGINS env (comma-separated); dev fallback allows localhost
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -27,13 +29,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check - Vercel route /api/health đến đây
+// Health check - Vercel route /api/health (no rate limit)
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Furama Resort Digital Concierge API is running' });
+  res.json({ status: 'ok', message: 'Furama Digital Concierge API is running' });
 });
 
-// API routes - Mount at /v1
-app.use('/v1', routes);
+// API routes - Mount at /v1 with rate limiting
+app.use('/v1', apiLimiter, routes);
 
 // 404 handler for unmatched routes
 app.use((req, res) => {
