@@ -46,19 +46,26 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
   const { t } = useTranslation();
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-3 pb-24 min-h-0" style={{ maxHeight: 'calc(100% - 80px)', overflowX: 'hidden' }}>
+    <div
+      className="flex-1 overflow-y-auto px-4 py-3 min-h-0"
+      style={{
+        maxHeight: 'calc(100% - 80px)',
+        overflowX: 'hidden',
+        paddingBottom: 'max(1.5rem, calc(1.5rem + env(safe-area-inset-bottom)))'
+      }}
+    >
       {/* Booking Progress Stepper */}
       <div className="mb-4">
-        <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-lg border border-emerald-100/50 p-4">
+        <div className="bg-white rounded-xl shadow border border-gray-200 p-4">
           <div className="flex items-center justify-between relative">
-            <div className="absolute top-5 left-[10%] right-[10%] h-0.5 bg-gray-200"></div>
+            <div className="absolute top-5 left-[10%] right-[10%] h-0.5 bg-gray-200" />
             <div
               className="absolute top-5 h-0.5 bg-emerald-600"
               style={{
                 left: '10%',
                 width: destination ? '80%' : pickup ? '30%' : '0%'
               }}
-            ></div>
+            />
             {destination && (
               <div
                 className="absolute top-5 h-0.5 bg-emerald-600"
@@ -66,16 +73,14 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
                   left: '45%',
                   width: guestCount > 1 || notes ? '30%' : '15%'
                 }}
-              ></div>
+              />
             )}
 
             {/* Step 1: Pickup */}
             <div className="flex flex-col items-center flex-1 relative z-10">
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
-                  pickup
-                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50'
-                    : 'bg-gray-100 border-gray-300 text-gray-400'
+                  pickup ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-gray-100 border-gray-300 text-gray-400'
                 }`}
               >
                 {pickup ? <CheckCircle className="w-6 h-6" /> : <LocateFixed className="w-5 h-5" />}
@@ -90,7 +95,7 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
                   destination
-                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50'
+                    ? 'bg-emerald-600 border-emerald-600 text-white'
                     : pickup
                     ? 'bg-emerald-100 border-emerald-300 text-emerald-600'
                     : 'bg-gray-100 border-gray-300 text-gray-400'
@@ -109,7 +114,7 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
                 className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
                   destination
                     ? guestCount > 1 || notes
-                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50'
+                      ? 'bg-emerald-600 border-emerald-600 text-white'
                       : 'bg-emerald-100 border-emerald-300 text-emerald-600'
                     : 'bg-gray-100 border-gray-300 text-gray-400'
                 }`}
@@ -129,9 +134,7 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
             <div className="flex flex-col items-center flex-1 relative z-10">
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
-                  destination
-                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/50'
-                    : 'bg-gray-100 border-gray-300 text-gray-400'
+                  destination ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-gray-100 border-gray-300 text-gray-400'
                 }`}
               >
                 {destination ? <Car className="w-5 h-5" /> : <span className="text-lg opacity-50">✓</span>}
@@ -145,7 +148,7 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
       </div>
 
       {/* Booking Form */}
-      <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-emerald-100/50 p-4 space-y-3">
+      <div className="bg-white rounded-xl shadow border border-gray-200 p-4 space-y-3">
         {/* Pickup location */}
         <div className="relative group">
           <label className="text-xs font-bold text-gray-700 mb-1.5 block uppercase tracking-wide">{t('pickup_point')}</label>
@@ -156,20 +159,20 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
                 type="text"
                 value={t('detecting_location')}
                 readOnly
-                className="w-full pl-10 pr-3 py-3 text-sm bg-gradient-to-r from-emerald-50 to-emerald-100/50 border-2 border-emerald-300 rounded-xl text-emerald-700 font-semibold focus:outline-none cursor-default shadow-inner"
+                className="w-full pl-10 pr-3 py-3 min-h-[44px] text-sm bg-gray-50 border border-gray-300 rounded-xl text-gray-700 font-medium focus:outline-none cursor-default"
               />
             </div>
           ) : (
             <button
               onClick={() => onShowPickupDropdown(!showPickupDropdown)}
-              className="w-full relative flex items-center justify-between pl-10 pr-3 py-3 text-sm bg-gradient-to-r from-emerald-50 to-emerald-100/50 border-2 border-emerald-200 rounded-xl text-gray-900 font-semibold hover:border-emerald-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400"
+              className="w-full relative flex items-center justify-between pl-10 pr-3 py-3 min-h-[44px] text-sm bg-white border border-gray-300 rounded-xl text-gray-900 font-medium hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 touch-manipulation"
               style={{ transform: 'translateZ(0)' }}
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <LocateFixed className="absolute left-3 text-emerald-600 w-4 h-4 flex-shrink-0" />
                 <span className="truncate">{pickup}</span>
               </div>
-              <ChevronDown className={`w-4 h-4 text-emerald-600 flex-shrink-0 ${showPickupDropdown ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-4 h-4 text-gray-500 flex-shrink-0 ${showPickupDropdown ? 'rotate-180' : ''}`} />
             </button>
           )}
         </div>
@@ -179,10 +182,10 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
           <label className="text-xs font-bold text-gray-700 mb-1.5 block uppercase tracking-wide">{t('destination')}</label>
           <button
             onClick={() => onShowDestinationDropdown(true)}
-            className={`w-full relative flex items-center justify-between pl-10 pr-3 py-3 text-sm border-2 rounded-xl font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400 ${
+            className={`w-full relative flex items-center justify-between pl-10 pr-3 py-3 min-h-[44px] text-sm border rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 touch-manipulation ${
               destination
-                ? 'bg-gradient-to-r from-emerald-50 to-emerald-100/50 border-emerald-300 text-gray-900 hover:border-emerald-400 hover:shadow-md'
-                : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-emerald-300'
+                ? 'bg-white border-gray-300 text-gray-900 hover:border-gray-400'
+                : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400'
             }`}
             style={{ transform: 'translateZ(0)' }}
           >
@@ -195,7 +198,7 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
         </div>
 
         {/* Guest Count & Notes */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="relative group">
             <label className="text-xs font-bold text-gray-700 mb-1.5 block uppercase tracking-wide">{t('number_of_guests')}</label>
             <div className="relative">
@@ -207,7 +210,7 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
                     onGuestCountChange(value);
                   }
                 }}
-                className="w-full pl-9 pr-3 py-3 text-sm bg-white border-2 border-gray-200 rounded-xl text-gray-900 font-semibold hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400 appearance-none cursor-pointer shadow-sm hover:shadow-md"
+                className="w-full pl-9 pr-3 py-3 min-h-[44px] text-sm bg-white border border-gray-300 rounded-xl text-gray-900 font-medium hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 appearance-none cursor-pointer touch-manipulation"
               >
                 {[1, 2, 3, 4, 5, 6, 7].map((num) => (
                   <option key={num} value={num}>
@@ -231,7 +234,7 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
               onChange={(e) => onNotesChange(e.target.value)}
               placeholder={t('luggage_special_requests')}
               maxLength={100}
-              className="w-full px-3 py-3 text-sm bg-white border-2 border-gray-200 rounded-xl text-gray-900 font-medium hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/50 focus:border-emerald-400 shadow-sm hover:shadow-md"
+              className="w-full px-3 py-3 min-h-[44px] text-sm bg-white border border-gray-300 rounded-xl text-gray-900 font-medium hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 touch-manipulation"
             />
           </div>
         </div>
@@ -251,9 +254,9 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
         <button
           onClick={onBook}
           disabled={!destination || isBooking}
-          className={`w-full py-4 rounded-xl font-bold text-base shadow-xl flex items-center justify-center gap-2 relative overflow-hidden group ${
+          className={`w-full py-4 min-h-[48px] rounded-xl font-bold text-base shadow flex items-center justify-center gap-2 touch-manipulation ${
             destination && !isBooking
-              ? 'bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 text-white hover:shadow-2xl hover:shadow-emerald-500/50 active:scale-[0.98] cursor-pointer'
+              ? 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.99] cursor-pointer'
               : 'bg-gray-200 text-gray-500 cursor-not-allowed opacity-60'
           }`}
           style={{ transform: 'translateZ(0)' }}

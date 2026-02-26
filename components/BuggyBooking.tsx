@@ -119,7 +119,7 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
   return (
     <div
       ref={containerRef}
-      className="flex flex-col bg-gradient-to-br from-emerald-50 via-stone-50 to-amber-50/30 relative overflow-hidden"
+      className="flex flex-col bg-gray-50 relative overflow-hidden"
       onClick={ensureAudioUnlocked}
       onTouchStart={ensureAudioUnlocked}
       style={{
@@ -137,26 +137,35 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
       onWheel={preventScroll}
       onTouchMove={preventScroll}
     >
-      <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-amber-200/20 rounded-full blur-3xl pointer-events-none"></div>
-
-      <div className="bg-gradient-to-b from-emerald-900/95 via-emerald-800/90 to-emerald-900/95 backdrop-blur-sm flex-shrink-0 relative overflow-hidden shadow-lg">
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
-        <div className="px-4 py-3 flex items-center justify-between relative z-10">
-          <button onClick={onBack} className="text-white hover:bg-white/20 rounded-full p-2 backdrop-blur-sm">
+      <div
+        className="bg-slate-800 flex-shrink-0 shadow"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <div className="px-4 py-0.5 flex items-center justify-between">
+          <button
+            onClick={onBack}
+            className="text-white hover:bg-white/10 rounded-full p-2 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
+          >
             <Navigation className="w-5 h-5 rotate-180" />
           </button>
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <Car className="w-5 h-5" />
             {t('buggy_service') || 'Di chuyển'}
           </h2>
-          <div className="w-9"></div>
+          <div className="w-11 min-w-[44px]" aria-hidden />
         </div>
       </div>
 
       {activeRide && (
         <div className="flex-1 overflow-hidden flex flex-col min-h-0" style={{ maxHeight: 'calc(100% - 80px)' }}>
-          <div className="flex-1 overflow-y-auto px-3 py-3" style={{ maxHeight: '100%', overflowX: 'hidden' }}>
+          <div
+            className="flex-1 overflow-y-auto px-3 py-3"
+            style={{
+              maxHeight: '100%',
+              overflowX: 'hidden',
+              paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))'
+            }}
+          >
             <RideStatusCard
               activeRide={activeRide}
               elapsedTime={elapsedTime}

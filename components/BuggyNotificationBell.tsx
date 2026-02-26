@@ -210,60 +210,44 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
 
     return (
         <>
-            {/* Toast Notification */}
             {notification && (
-                <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-5 ${notification.type === 'success' ? 'bg-emerald-500' :
-                        notification.type === 'info' ? 'bg-blue-500' :
-                            'bg-amber-500'
-                    } text-white px-6 py-3 rounded-lg shadow-2xl flex items-center gap-2 max-w-sm`}>
+                <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-5 ${notification.type === 'success' ? 'bg-emerald-600' : notification.type === 'info' ? 'bg-slate-600' : 'bg-amber-500'} text-white px-4 py-3 rounded-lg shadow flex items-center gap-2 max-w-[min(24rem,calc(100vw-1rem))]`}>
                     <CheckCircle size={20} />
-                    <span className="font-semibold">{notification.message}</span>
+                    <span className="font-semibold text-sm">{notification.message}</span>
                 </div>
             )}
 
-            {/* Notification Bell */}
             <div className="relative z-[100]" ref={notificationBellRef}>
                 <button
                     onClick={() => setShowDropdown(!showDropdown)}
-                    className="relative p-2 rounded-lg transition-all bg-emerald-800 text-white hover:bg-emerald-700"
+                    className="relative p-2 min-h-[44px] min-w-[44px] rounded-lg transition-all bg-slate-700 text-white hover:bg-slate-600 touch-manipulation flex items-center justify-center"
                     title="View notifications"
                 >
                     <Bell size={18} />
                     {getTotalActivitiesCount() > 0 && (
-                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-emerald-900 animate-pulse">
+                        <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-slate-800">
                             {getTotalActivitiesCount() > 9 ? '9+' : getTotalActivitiesCount()}
                         </span>
                     )}
                 </button>
 
-                {/* Notification Dropdown */}
                 {showDropdown && (
                     <>
-                        <div className="fixed inset-0 z-[100]" onClick={() => setShowDropdown(false)}></div>
-                        <div className="absolute right-0 mt-2 w-96 backdrop-blur-xl bg-white/95 rounded-2xl shadow-2xl border-2 border-gray-200/60 overflow-hidden z-[101]"
-                            style={{
-                                boxShadow: '0 20px 60px -15px rgba(0,0,0,0.3)'
-                            }}
-                        >
-                            <div className="p-4 bg-gradient-to-r from-emerald-50 to-blue-50/50 border-b border-gray-200/60 flex justify-between items-center">
+                        <div className="fixed inset-0 z-[100]" onClick={() => setShowDropdown(false)} />
+                        <div className="absolute right-0 mt-2 w-full max-w-[min(24rem,calc(100vw-1rem))] bg-white rounded-xl shadow border border-gray-200 overflow-hidden z-[101]">
+                            <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
                                 <h3 className="font-bold text-gray-800 text-base">Notifications</h3>
                                 <div className="flex items-center gap-2">
                                     <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onSoundToggle(!soundEnabled);
-                                        }}
-                                        className={`p-1.5 rounded-lg transition-all ${soundEnabled
-                                                ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                                            }`}
-                                        title={soundEnabled ? 'Sound enabled - Click to disable' : 'Sound disabled - Click to enable'}
+                                        onClick={(e) => { e.stopPropagation(); onSoundToggle(!soundEnabled); }}
+                                        className={`p-2 min-h-[36px] min-w-[36px] rounded-lg transition-all flex items-center justify-center touch-manipulation ${soundEnabled ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}
+                                        title={soundEnabled ? 'Sound on' : 'Sound off'}
                                     >
                                         <Bell size={16} className={soundEnabled ? '' : 'opacity-50'} />
                                     </button>
                                     <button
                                         onClick={() => setShowDropdown(false)}
-                                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+                                        className="p-2 min-h-[36px] min-w-[36px] rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-200 transition-all flex items-center justify-center touch-manipulation"
                                     >
                                         <X size={18} strokeWidth={2.5} />
                                     </button>
@@ -273,7 +257,6 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                             <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                                 {(() => {
                                     const allActivities = getAllActivities();
-
                                     if (allActivities.length === 0) {
                                         return (
                                             <div className="p-12 text-center">
@@ -282,69 +265,45 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                                             </div>
                                         );
                                     }
-
+                                    const getBadge = (activityType: string, r: RideRequest) => {
+                                        switch (activityType) {
+                                            case 'PENDING': return { label: 'NEW REQUEST', cls: 'bg-gray-100 border-gray-200 text-gray-700' };
+                                            case 'ASSIGNED': return { label: 'DRIVER ACCEPTED', cls: 'bg-emerald-50 border-emerald-200 text-emerald-800' };
+                                            case 'ACTIVE': return { label: r.status === BuggyStatus.ARRIVING ? 'ARRIVING' : 'ON TRIP', cls: 'bg-emerald-50 border-emerald-200 text-emerald-800' };
+                                            case 'COMPLETED': return { label: 'COMPLETED', cls: 'bg-gray-100 border-gray-200 text-gray-600' };
+                                            default: return { label: 'BUGGY', cls: 'bg-gray-100 border-gray-200 text-gray-700' };
+                                        }
+                                    };
                                     return (
                                         <div className="divide-y divide-gray-100">
                                             {allActivities.map(({ ride, activityType }) => {
                                                 const driver = users.find(u => u.id === ride.driverId);
                                                 const driverName = driver ? driver.lastName : 'Unknown';
-
-                                                const getActivityBadge = () => {
-                                                    switch (activityType) {
-                                                        case 'PENDING':
-                                                            return { label: 'NEW REQUEST', bg: 'bg-orange-50', border: 'border-orange-100', text: 'text-orange-800' };
-                                                        case 'ASSIGNED':
-                                                            return { label: 'DRIVER ACCEPTED', bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-800' };
-                                                        case 'ACTIVE':
-                                                            return { label: ride.status === BuggyStatus.ARRIVING ? 'ARRIVING' : 'ON TRIP', bg: 'bg-purple-50', border: 'border-purple-100', text: 'text-purple-800' };
-                                                        case 'COMPLETED':
-                                                            return { label: 'COMPLETED', bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-800' };
-                                                        default:
-                                                            return { label: 'BUGGY', bg: 'bg-gray-50', border: 'border-gray-100', text: 'text-gray-800' };
-                                                    }
-                                                };
-
-                                                const badge = getActivityBadge();
+                                                const badge = getBadge(activityType, ride);
                                                 const displayTime = activityType === 'COMPLETED' && ride.completedAt
                                                     ? new Date(ride.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                                                     : new Date(ride.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
                                                 return (
                                                     <div
                                                         key={ride.id}
-                                                        className="p-4 hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50/30 transition-all cursor-pointer"
-                                                        onClick={() => {
-                                                            setShowDropdown(false);
-                                                            if (onNavigate) onNavigate();
-                                                        }}
+                                                        className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                                                        onClick={() => { setShowDropdown(false); if (onNavigate) onNavigate(); }}
                                                     >
                                                         <div className="flex justify-between items-start mb-2">
-                                                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border-2 ${badge.bg} ${badge.border} ${badge.text}`}>
-                                                                {badge.label}
-                                                            </span>
-                                                            <span className="text-[10px] text-gray-500 font-medium">
-                                                                {displayTime}
-                                                            </span>
+                                                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${badge.cls}`}>{badge.label}</span>
+                                                            <span className="text-[10px] text-gray-500 font-medium">{displayTime}</span>
                                                         </div>
                                                         <h4 className="text-sm font-bold mb-1 text-gray-900">{ride.guestName || `Guest ${ride.roomNumber}`}</h4>
-                                                        <p className="text-xs text-gray-500 leading-relaxed">
-                                                            {ride.pickup} → {ride.destination}
-                                                        </p>
+                                                        <p className="text-xs text-gray-500 leading-relaxed">{ride.pickup} → {ride.destination}</p>
                                                         <p className="text-[10px] text-gray-400 mt-0.5">Room {ride.roomNumber}</p>
                                                         {activityType === 'PENDING' && (
-                                                            <p className="text-[10px] text-orange-600 mt-1 font-semibold">
-                                                                Waiting: {Math.floor((Date.now() - ride.timestamp) / 1000 / 60)} min
-                                                            </p>
+                                                            <p className="text-[10px] text-gray-600 mt-1 font-semibold">Waiting: {Math.floor((Date.now() - ride.timestamp) / 1000 / 60)} min</p>
                                                         )}
                                                         {(activityType === 'ASSIGNED' || activityType === 'ACTIVE') && (
-                                                            <p className="text-[10px] text-blue-600 mt-1 font-semibold">
-                                                                Driver: {driverName}
-                                                            </p>
+                                                            <p className="text-[10px] text-emerald-700 mt-1 font-semibold">Driver: {driverName}</p>
                                                         )}
                                                         {activityType === 'COMPLETED' && (
-                                                            <p className="text-[10px] text-emerald-600 mt-1 font-semibold">
-                                                                Completed {Math.floor((Date.now() - (ride.completedAt || 0)) / 1000 / 60)} min ago
-                                                            </p>
+                                                            <p className="text-[10px] text-gray-600 mt-1 font-semibold">Completed {Math.floor((Date.now() - (ride.completedAt || 0)) / 1000 / 60)} min ago</p>
                                                         )}
                                                     </div>
                                                 );
