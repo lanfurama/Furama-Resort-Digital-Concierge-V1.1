@@ -47,9 +47,19 @@ export const useRideActions = (
             setRides(allRides);
             toast.success(t('driver_toast_accept_success'));
         } catch (error) {
-            console.error('Failed to accept ride:', error);
-            const allRides = await getRides();
-            setRides(allRides);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Failed to accept ride:', error);
+            }
+            // Retry once on network error
+            try {
+                const allRides = await getRides();
+                setRides(allRides);
+            } catch (retryError) {
+                // If retry also fails, still update state to prevent UI inconsistency
+                setRides(prevRides => prevRides.map(ride =>
+                    ride.id === id ? { ...ride, status: BuggyStatus.SEARCHING, driverId: undefined } : ride
+                ));
+            }
             setMyRideId(null);
             toast.error(t('driver_toast_accept_failed'));
         } finally {
@@ -71,9 +81,19 @@ export const useRideActions = (
             setRides(allRides);
             toast.success(t('driver_toast_pickup_success'));
         } catch (error) {
-            console.error('Failed to pick up guest:', error);
-            const allRides = await getRides();
-            setRides(allRides);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Failed to pick up guest:', error);
+            }
+            // Retry once on network error
+            try {
+                const allRides = await getRides();
+                setRides(allRides);
+            } catch (retryError) {
+                // If retry also fails, revert optimistic update
+                setRides(prevRides => prevRides.map(ride =>
+                    ride.id === id ? { ...ride, status: BuggyStatus.ARRIVING } : ride
+                ));
+            }
             toast.error(t('driver_toast_pickup_failed'));
         } finally {
             setLoadingAction(null);
@@ -91,9 +111,16 @@ export const useRideActions = (
             setRides(allRides);
             toast.success(t('driver_toast_complete_success'));
         } catch (error) {
-            console.error('Failed to complete ride:', error);
-            const allRides = await getRides();
-            setRides(allRides);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Failed to complete ride:', error);
+            }
+            // Retry once on network error
+            try {
+                const allRides = await getRides();
+                setRides(allRides);
+            } catch (retryError) {
+                // If retry also fails, keep current state
+            }
             toast.error(t('driver_toast_complete_failed'));
         } finally {
             setLoadingAction(null);
@@ -112,9 +139,19 @@ export const useRideActions = (
             const isPick = next % 2 === 1;
             toast.success(isPick ? t('driver_toast_merge_step_pick') : t('driver_toast_merge_step_drop'));
         } catch (error) {
-            console.error('Failed to advance merged progress:', error);
-            const allRides = await getRides();
-            setRides(allRides);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Failed to advance merged progress:', error);
+            }
+            // Retry once on network error
+            try {
+                const allRides = await getRides();
+                setRides(allRides);
+            } catch (retryError) {
+                // If retry also fails, revert optimistic update
+                setRides(prevRides => prevRides.map(ride =>
+                    ride.id === id ? { ...ride, mergedProgress: currentProgress } : ride
+                ));
+            }
             toast.error(t('driver_toast_merge_update_failed'));
         } finally {
             setLoadingAction(null);
@@ -133,9 +170,16 @@ export const useRideActions = (
             setRides(allRides);
             toast.success(t('driver_toast_merged_complete_success'));
         } catch (error) {
-            console.error('Failed to complete merged ride:', error);
-            const allRides = await getRides();
-            setRides(allRides);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Failed to complete merged ride:', error);
+            }
+            // Retry once on network error
+            try {
+                const allRides = await getRides();
+                setRides(allRides);
+            } catch (retryError) {
+                // If retry also fails, keep current state
+            }
             toast.error(t('driver_toast_merged_complete_failed'));
         } finally {
             setLoadingAction(null);

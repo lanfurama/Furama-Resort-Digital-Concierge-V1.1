@@ -133,24 +133,37 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
 
     // Poll for new messages (simulating real-time)
     useEffect(() => {
+        let isMounted = true;
+        let interval: NodeJS.Timeout | null = null;
+        
         const fetch = async () => {
+            if (!isMounted) return;
+            
             try {
                 const msgs = await getServiceMessages(roomNumber, serviceType);
+                if (!isMounted) return;
+                
                 const currentCount = messages.length;
                 
-            // Simple check to avoid tight loops if object ref changes but content is same
+                // Simple check to avoid tight loops if object ref changes but content is same
                 if (msgs.length !== currentCount || JSON.stringify(msgs) !== JSON.stringify(messages)) {
-                setMessages(msgs);
+                    setMessages(msgs);
                 }
             } catch (error) {
-                console.error('Failed to fetch messages:', error);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.error('Failed to fetch messages:', error);
+                }
             }
         };
 
         fetch();
-        const interval = setInterval(fetch, 5000); // Poll every 5 seconds to reduce API calls
-        return () => clearInterval(interval);
-    }, [roomNumber, serviceType]);
+        interval = setInterval(fetch, 5000); // Poll every 5 seconds to reduce API calls
+        
+        return () => {
+            isMounted = false;
+            if (interval) clearInterval(interval);
+        };
+    }, [roomNumber, serviceType]); // Removed messages from dependencies to prevent re-render loops
 
     // Poll for unread count when chat is closed
     useEffect(() => {
@@ -163,7 +176,9 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                     // Skip auto-open on first fetch (component mount) to avoid opening for old messages
                     // Only auto-open when unread count increases from a known value (indicating new message)
                     if (!isFirstFetchRef.current && prevCount >= 0 && count > prevCount) {
-                        console.log(`[ServiceChat] New message detected, auto-opening chat for ${serviceType} in room ${roomNumber}`);
+                        if (process.env.NODE_ENV !== 'production') {
+                            console.log(`[ServiceChat] New message detected, auto-opening chat for ${serviceType} in room ${roomNumber}`);
+                        }
                         if (controlledIsOpen === undefined) {
                             setInternalIsOpen(true);
                         }
@@ -176,7 +191,9 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                     prevUnreadCountRef.current = count;
                     isFirstFetchRef.current = false; // Mark first fetch as complete
                 } catch (error) {
-                    console.error('Failed to fetch unread count:', error);
+                    if (process.env.NODE_ENV !== 'production') {
+                        console.error('Failed to fetch unread count:', error);
+                    }
                 }
             };
 

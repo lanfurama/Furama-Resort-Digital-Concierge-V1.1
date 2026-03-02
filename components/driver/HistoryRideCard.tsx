@@ -7,7 +7,7 @@ interface HistoryRideCardProps {
     ride: RideRequest;
 }
 
-export const HistoryRideCard: React.FC<HistoryRideCardProps> = ({ ride }) => {
+export const HistoryRideCard: React.FC<HistoryRideCardProps> = React.memo(({ ride }) => {
     return (
         <div className="bg-white py-4 px-4 sm:px-5 rounded-2xl border-2 border-gray-200 hover:border-emerald-300 hover:shadow-lg transition-all shadow-md">
             <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
@@ -56,4 +56,4 @@ export const HistoryRideCard: React.FC<HistoryRideCardProps> = ({ ride }) => {
             </div>
         </div>
     );
-};
+});

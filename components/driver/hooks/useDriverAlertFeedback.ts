@@ -75,8 +75,29 @@ export function useDriverAlertFeedback(
         tick();
 
         return () => {
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            intervalRef.current = null;
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+            }
+            // Cleanup AudioContext on unmount
+            if (audioContextRef.current) {
+                audioContextRef.current.close().catch(() => {
+                    // Ignore errors during cleanup
+                });
+                audioContextRef.current = null;
+            }
         };
     }, [hasAlert, soundEnabled, vibrateEnabled, intervalMs]);
+    
+    // Cleanup AudioContext on unmount
+    useEffect(() => {
+        return () => {
+            if (audioContextRef.current) {
+                audioContextRef.current.close().catch(() => {
+                    // Ignore errors during cleanup
+                });
+                audioContextRef.current = null;
+            }
+        };
+    }, []);
 }

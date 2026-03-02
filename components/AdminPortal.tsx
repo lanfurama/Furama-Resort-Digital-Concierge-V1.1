@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { User, UserRole } from '../types';
 import Loading from './Loading';
 import { useAdminData } from '../hooks/useAdminData';
@@ -27,27 +27,27 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const { data, isLoading, refreshData, setData } = useAdminData();
     const { handleDelete } = useAdminCRUD();
     
-    // Extract data
-    const locations = data.locations;
-    const menu = data.menu;
-    const events = data.events;
-    const promotions = data.promotions;
-    const knowledge = data.knowledge;
-    const users = data.users;
-    const rides = data.rides;
-    const serviceHistory = data.serviceHistory;
-    const roomTypes = data.roomTypes;
-    const rooms = data.rooms;
+    // Memoize data extraction to prevent unnecessary re-renders
+    const locations = useMemo(() => data.locations, [data.locations]);
+    const menu = useMemo(() => data.menu, [data.menu]);
+    const events = useMemo(() => data.events, [data.events]);
+    const promotions = useMemo(() => data.promotions, [data.promotions]);
+    const knowledge = useMemo(() => data.knowledge, [data.knowledge]);
+    const users = useMemo(() => data.users, [data.users]);
+    const rides = useMemo(() => data.rides, [data.rides]);
+    const serviceHistory = useMemo(() => data.serviceHistory, [data.serviceHistory]);
+    const roomTypes = useMemo(() => data.roomTypes, [data.roomTypes]);
+    const rooms = useMemo(() => data.rooms, [data.rooms]);
     
-    // Helper functions to update data
-    const setLocations = (locs: typeof locations) => setData(prev => ({ ...prev, locations: locs }));
-    const setMenu = (m: typeof menu) => setData(prev => ({ ...prev, menu: m }));
-    const setEvents = (e: typeof events) => setData(prev => ({ ...prev, events: e }));
-    const setPromotions = (p: typeof promotions) => setData(prev => ({ ...prev, promotions: p }));
-    const setKnowledge = (k: typeof knowledge) => setData(prev => ({ ...prev, knowledge: k }));
-    const setUsers = (u: typeof users) => setData(prev => ({ ...prev, users: u }));
-    const setRoomTypes = (rt: typeof roomTypes) => setData(prev => ({ ...prev, roomTypes: rt }));
-    const setRooms = (r: typeof rooms) => setData(prev => ({ ...prev, rooms: r }));
+    // Memoize helper functions to prevent re-renders
+    const setLocations = useCallback((locs: typeof locations) => setData(prev => ({ ...prev, locations: locs })), [setData]);
+    const setMenu = useCallback((m: typeof menu) => setData(prev => ({ ...prev, menu: m })), [setData]);
+    const setEvents = useCallback((e: typeof events) => setData(prev => ({ ...prev, events: e })), [setData]);
+    const setPromotions = useCallback((p: typeof promotions) => setData(prev => ({ ...prev, promotions: p })), [setData]);
+    const setKnowledge = useCallback((k: typeof knowledge) => setData(prev => ({ ...prev, knowledge: k })), [setData]);
+    const setUsers = useCallback((u: typeof users) => setData(prev => ({ ...prev, users: u })), [setData]);
+    const setRoomTypes = useCallback((rt: typeof roomTypes) => setData(prev => ({ ...prev, roomTypes: rt })), [setData]);
+    const setRooms = useCallback((r: typeof rooms) => setData(prev => ({ ...prev, rooms: r })), [setData]);
     
     // Sound state
     const [soundEnabled, setSoundEnabled] = useState(() => {

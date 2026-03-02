@@ -51,9 +51,13 @@ export const useAdminData = () => {
             let locationsData: Location[];
             try {
                 locationsData = await getLocations();
-                console.log('Locations loaded from database:', locationsData);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log('Locations loaded from database:', locationsData);
+                }
             } catch (error) {
-                console.error('Failed to load locations from database, using sync:', error);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.error('Failed to load locations from database, using sync:', error);
+                }
                 locationsData = getLocationsSync();
             }
 
@@ -68,9 +72,13 @@ export const useAdminData = () => {
             let knowledgeData: KnowledgeItem[];
             try {
                 knowledgeData = await getKnowledgeBase();
-                console.log('Knowledge items loaded from database:', knowledgeData);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log('Knowledge items loaded from database:', knowledgeData);
+                }
             } catch (error) {
-                console.error('Failed to load knowledge items from database:', error);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.error('Failed to load knowledge items from database:', error);
+                }
                 knowledgeData = getKnowledgeBaseSync();
             }
 
@@ -78,9 +86,13 @@ export const useAdminData = () => {
             let usersData: User[];
             try {
                 usersData = await getUsers();
-                console.log('Users loaded from database:', usersData);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log('Users loaded from database:', usersData);
+                }
             } catch (error) {
-                console.error('Failed to load users from database:', error);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.error('Failed to load users from database:', error);
+                }
                 usersData = getUsersSync();
             }
 
@@ -88,9 +100,13 @@ export const useAdminData = () => {
             let historyData: any[];
             try {
                 historyData = await getUnifiedHistory();
-                console.log('Service history loaded from database:', historyData);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log('Service history loaded from database:', historyData);
+                }
             } catch (error) {
-                console.error('Failed to load service history from database:', error);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.error('Failed to load service history from database:', error);
+                }
                 historyData = [];
             }
 
@@ -98,9 +114,13 @@ export const useAdminData = () => {
             let ridesData: any[];
             try {
                 ridesData = await getRides();
-                console.log('Rides loaded from database:', ridesData);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log('Rides loaded from database:', ridesData);
+                }
             } catch (error) {
-                console.error('Failed to load rides from database:', error);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.error('Failed to load rides from database:', error);
+                }
                 ridesData = getRidesSync();
             }
 
@@ -126,18 +146,22 @@ export const useAdminData = () => {
                 driverSchedules: []
             });
 
-            // Debug: Check location ID matches
-            console.log('Data loaded - Checking location matches:', {
-                locations: locationsData.map(l => ({ id: l.id, name: l.name })),
-                roomTypes: roomTypesData.map(rt => ({
-                    id: rt.id,
-                    name: rt.name,
-                    locationId: rt.locationId,
-                    matchedLocation: rt.locationId ? locationsData.find(l => String(l.id) === String(rt.locationId))?.name || 'NOT FOUND' : 'NONE'
-                }))
-            });
+            // Debug: Check location ID matches (only in development)
+            if (process.env.NODE_ENV !== 'production') {
+                console.log('Data loaded - Checking location matches:', {
+                    locations: locationsData.map(l => ({ id: l.id, name: l.name })),
+                    roomTypes: roomTypesData.map(rt => ({
+                        id: rt.id,
+                        name: rt.name,
+                        locationId: rt.locationId,
+                        matchedLocation: rt.locationId ? locationsData.find(l => String(l.id) === String(rt.locationId))?.name || 'NOT FOUND' : 'NONE'
+                    }))
+                });
+            }
         } catch (error) {
-            console.error('Failed to load data:', error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Failed to load data:', error);
+            }
             // Fallback to sync versions
             setData({
                 locations: getLocationsSync(),
@@ -200,7 +224,9 @@ export const useAdminData = () => {
                         break;
                 }
             } catch (error) {
-                console.error(`Failed to refresh ${dataType}:`, error);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.error(`Failed to refresh ${dataType}:`, error);
+                }
             }
         } else {
             // Refresh all data
@@ -213,7 +239,9 @@ export const useAdminData = () => {
             const schedules = await getAllDriverSchedulesByDateRange(startDate, endDate);
             setData(prev => ({ ...prev, driverSchedules: schedules }));
         } catch (error) {
-            console.error('Failed to load driver schedules:', error);
+            if (process.env.NODE_ENV !== 'production') {
+                console.error('Failed to load driver schedules:', error);
+            }
         }
     };
 

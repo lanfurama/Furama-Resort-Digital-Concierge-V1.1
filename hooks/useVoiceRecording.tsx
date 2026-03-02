@@ -178,7 +178,9 @@ export const useVoiceRecording = (
             // If error is NotReadableError (likely contention with Speech API), we don't want to kill the experience.
             // Just fallback to simulated audio level or silence.
             if (error.name === 'NotReadableError' || error.name === 'TrackStartError' || error.name === 'NotAllowedError') {
-                console.warn("Microphone visualization disabled due to access restriction (likely in use by Speech API). Falling back to simulated levels.");
+                if (process.env.NODE_ENV !== 'production') {
+                    console.warn("Microphone visualization disabled due to access restriction (likely in use by Speech API). Falling back to simulated levels.");
+                }
                 // Start simulated noise monitoring to keep the UI alive
                 if (audioLevelIntervalRef.current) {
                     clearInterval(audioLevelIntervalRef.current);
@@ -200,7 +202,9 @@ export const useVoiceRecording = (
                 });
             } else {
                 // Fallback to alert if no error callback provided
-                console.warn(getMicrophoneErrorMessage(error));
+                if (process.env.NODE_ENV !== 'production') {
+                    console.warn(getMicrophoneErrorMessage(error));
+                }
             }
 
             // Fallback to gradual decrease if microphone access fails
@@ -353,10 +357,14 @@ export const useVoiceRecording = (
                         // Otherwise, use the average but cap at 10 to avoid deafening the VAD.
                         if (avg > 12) {
                             noiseFloorRef.current = 5;
-                            console.log(`[VAD] High initial noise (${avg.toFixed(2)}), assuming speech. Defaulting floor to 5.`);
+                            if (process.env.NODE_ENV !== 'production') {
+                                console.log(`[VAD] High initial noise (${avg.toFixed(2)}), assuming speech. Defaulting floor to 5.`);
+                            }
                         } else {
                             noiseFloorRef.current = Math.max(3, Math.min(10, avg));
-                            console.log(`[VAD] Noise floor calibrated to: ${noiseFloorRef.current.toFixed(2)}`);
+                            if (process.env.NODE_ENV !== 'production') {
+                                console.log(`[VAD] Noise floor calibrated to: ${noiseFloorRef.current.toFixed(2)}`);
+                            }
                         }
                     }
                     isCalibratingRef.current = false;

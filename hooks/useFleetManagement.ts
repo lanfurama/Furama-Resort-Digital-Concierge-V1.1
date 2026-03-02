@@ -27,7 +27,9 @@ export const useFleetManagement = (tab: string, rides: any[], users: any[]) => {
                 const parsed = JSON.parse(savedConfig);
                 setFleetConfig(parsed);
             } catch (error) {
-                console.error('Failed to load fleet config:', error);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.error('Failed to load fleet config:', error);
+                }
             }
         }
     }, []);
@@ -37,11 +39,16 @@ export const useFleetManagement = (tab: string, rides: any[], users: any[]) => {
         localStorage.setItem('fleetConfig', JSON.stringify(fleetConfig));
     }, [fleetConfig]);
 
-    // Auto-refresh rides and users when FLEET tab is active
+    // Auto-refresh rides and users when FLEET tab is active - optimized for mobile
     useEffect(() => {
         if (tab !== 'FLEET') return;
 
-        const refreshInterval = setInterval(async () => {
+        let refreshInterval: NodeJS.Timeout | null = null;
+        let isMounted = true;
+
+        const refreshData = async () => {
+            if (!isMounted) return;
+            
             try {
                 const [refreshedRides, refreshedUsers] = await Promise.all([
                     getRides().catch(() => getRidesSync()),
@@ -50,22 +57,55 @@ export const useFleetManagement = (tab: string, rides: any[], users: any[]) => {
                 // Note: This hook doesn't update rides/users directly
                 // The parent component should handle the state updates
             } catch (error) {
-                console.error('Failed to auto-refresh fleet data:', error);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.error('Failed to auto-refresh fleet data:', error);
+                }
             }
-        }, 3000);
+        };
 
-        return () => clearInterval(refreshInterval);
+        // Adaptive refresh based on visibility
+        const setupRefresh = () => {
+            if (refreshInterval) clearInterval(refreshInterval);
+            
+            if (document.hidden) {
+                // Background: refresh every 15 seconds
+                refreshInterval = setInterval(refreshData, 15000);
+            } else {
+                // Foreground: refresh every 8 seconds (reduced from 3s for mobile performance)
+                refreshInterval = setInterval(refreshData, 8000);
+            }
+        };
+
+        // Initial load
+        refreshData();
+        setupRefresh();
+
+        const handleVisibilityChange = () => setupRefresh();
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            isMounted = false;
+            if (refreshInterval) clearInterval(refreshInterval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [tab]);
 
-    // Auto-assign logic
+    // Auto-assign logic - debounced and optimized for mobile
     useEffect(() => {
         if (!fleetConfig.autoAssignEnabled || tab !== 'FLEET') return;
 
+        let autoAssignInterval: NodeJS.Timeout | null = null;
+        let debounceTimeout: NodeJS.Timeout | null = null;
+        let isMounted = true;
+
         const checkAndAutoAssign = async () => {
+            if (!isMounted) return;
+            
             const pendingRides = rides.filter(r => r.status === BuggyStatus.SEARCHING);
             if (pendingRides.length === 0) return;
 
             const now = Date.now();
+            // Debounce: prevent rapid consecutive checks
             if (now - lastAutoAssignRef.current < 10000) {
                 return;
             }
@@ -76,14 +116,43 @@ export const useFleetManagement = (tab: string, rides: any[], users: any[]) => {
             });
 
             if (ridesToAutoAssign.length > 0) {
-                console.log(`[Auto-Assign] Found ${ridesToAutoAssign.length} ride(s) waiting over ${fleetConfig.maxWaitTimeBeforeAutoAssign}s, triggering auto-assign...`);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log(`[Auto-Assign] Found ${ridesToAutoAssign.length} ride(s) waiting over ${fleetConfig.maxWaitTimeBeforeAutoAssign}s, triggering auto-assign...`);
+                }
                 lastAutoAssignRef.current = now;
                 await handleAutoAssign(true);
             }
         };
 
-        const autoAssignInterval = setInterval(checkAndAutoAssign, 5000);
-        return () => clearInterval(autoAssignInterval);
+        // Debounced check function
+        const debouncedCheck = () => {
+            if (debounceTimeout) clearTimeout(debounceTimeout);
+            debounceTimeout = setTimeout(checkAndAutoAssign, 1000); // 1s debounce
+        };
+
+        // Adaptive interval based on visibility
+        const setupAutoAssign = () => {
+            if (autoAssignInterval) clearInterval(autoAssignInterval);
+            
+            if (document.hidden) {
+                // Background: check every 15 seconds
+                autoAssignInterval = setInterval(debouncedCheck, 15000);
+            } else {
+                // Foreground: check every 8 seconds (reduced from 5s, with debounce)
+                autoAssignInterval = setInterval(debouncedCheck, 8000);
+            }
+        };
+
+        setupAutoAssign();
+        const handleVisibilityChange = () => setupAutoAssign();
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            isMounted = false;
+            if (autoAssignInterval) clearInterval(autoAssignInterval);
+            if (debounceTimeout) clearTimeout(debounceTimeout);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [rides, fleetConfig.autoAssignEnabled, fleetConfig.maxWaitTimeBeforeAutoAssign, tab]);
 
     const handleAutoAssign = async (isAutoTriggered: boolean = false) => {
@@ -119,14 +188,18 @@ export const useFleetManagement = (tab: string, rides: any[], users: any[]) => {
                 await updateRideStatus(assignment.ride.id, BuggyStatus.ASSIGNED, assignment.driver.id, 5);
                 assignmentCount++;
             } catch (error) {
-                console.error(`Failed to assign ride ${assignment.ride.id} to driver ${assignment.driver.id}:`, error);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.error(`Failed to assign ride ${assignment.ride.id} to driver ${assignment.driver.id}:`, error);
+                }
             }
         }
 
         if (!isAutoTriggered) {
             setAIAssignmentData({ status: 'completed', assignments });
         } else {
-            console.log(`[Auto-Assign] Successfully assigned ${assignmentCount} ride(s) automatically`);
+            if (process.env.NODE_ENV !== 'production') {
+                console.log(`[Auto-Assign] Successfully assigned ${assignmentCount} ride(s) automatically`);
+            }
         }
 
         return assignmentCount;

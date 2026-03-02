@@ -11,7 +11,7 @@ interface RideRequestCardProps {
     onAccept: (id: string) => void;
 }
 
-export const RideRequestCard: React.FC<RideRequestCardProps> = ({
+export const RideRequestCard: React.FC<RideRequestCardProps> = React.memo(({
     ride,
     currentTime,
     loadingAction,
@@ -65,4 +65,4 @@ export const RideRequestCard: React.FC<RideRequestCardProps> = ({
             </div>
         </div>
     );
-};
+});

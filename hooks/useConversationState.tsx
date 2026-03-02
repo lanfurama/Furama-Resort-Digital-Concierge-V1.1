@@ -70,7 +70,9 @@ export const useConversationState = (
     const processUserResponse = useCallback(
         async (transcript: string) => {
             if (processingRef.current) {
-                console.warn("[ConversationState] Already processing, skipping duplicate");
+                if (process.env.NODE_ENV !== 'production') {
+                    console.warn("[ConversationState] Already processing, skipping duplicate");
+                }
                 return;
             }
 
@@ -80,7 +82,9 @@ export const useConversationState = (
             try {
                 // Check for cancel intent
                 if (isCancelIntent(transcript)) {
-                    console.log("[ConversationState] Cancel intent detected");
+                    if (process.env.NODE_ENV !== 'production') {
+                        console.log("[ConversationState] Cancel intent detected");
+                    }
                     setState(resetConversation());
                     if (onCancel) onCancel();
                     return;
@@ -101,8 +105,10 @@ export const useConversationState = (
                         });
 
                         if (aiResult && aiResult.locationName) {
-                            console.log(`[ConversationState] AI parsed locationName: "${aiResult.locationName}"`);
-                            console.log(`[ConversationState] Available locations:`, locations.map(l => ({ name: l.name, id: l.id })));
+                            if (process.env.NODE_ENV !== 'production') {
+                                console.log(`[ConversationState] AI parsed locationName: "${aiResult.locationName}"`);
+                                console.log(`[ConversationState] Available locations:`, locations.map(l => ({ name: l.name, id: l.id })));
+                            }
 
                             // Then use smart matching API to validate and get best match
                             try {
@@ -114,7 +120,9 @@ export const useConversationState = (
                                     },
                                 });
 
-                                console.log(`[ConversationState] API match response:`, matchResponse.data);
+                                if (process.env.NODE_ENV !== 'production') {
+                                    console.log(`[ConversationState] API match response:`, matchResponse.data);
+                                }
 
                                 if (matchResponse.data.topSuggestion) {
                                     const matched = matchResponse.data.topSuggestion;

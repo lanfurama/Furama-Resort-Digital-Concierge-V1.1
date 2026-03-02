@@ -62,9 +62,10 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     const { rides, setRides, myRideId, setMyRideId, showChat, setShowChat, setHasUnreadChat } = useRides(currentDriverActualId);
     const { loadingAction, acceptRide, pickUpGuest, completeRide, advanceMergedProgress, completeMergedRide } = useRideActions(setRides, setMyRideId, setShowChat);
 
-    const pendingRides = getPendingRides(rides, currentTime);
-    const historyRides = getHistoryRides(rides, currentDriverActualId);
-    const myCurrentRide = getCurrentRide(rides, myRideId);
+    // Memoize filtered rides to prevent unnecessary recalculations
+    const pendingRides = useMemo(() => getPendingRides(rides, currentTime), [rides, currentTime]);
+    const historyRides = useMemo(() => getHistoryRides(rides, currentDriverActualId), [rides, currentDriverActualId]);
+    const myCurrentRide = useMemo(() => getCurrentRide(rides, myRideId), [rides, myRideId]);
 
     const { mergeSuggestion, acceptMerge, rejectMerge, isMerging } = useDriverMerge(pendingRides, locations, setRides, setMyRideId, currentDriverActualId);
     const { showCreateModal, setShowCreateModal, isCreatingRide, manualRideData, setManualRideData, handleCreateManualRide } = useCreateRide(setRides, setMyRideId, setViewMode);
@@ -98,20 +99,32 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
     useDriverAlertFeedback(!!activeAlert, { soundEnabled, vibrateEnabled, intervalMs: 2500 });
 
-    const handleSoundToggle = () => {
+    // Memoize toggle handlers to prevent re-renders
+    const handleSoundToggle = useCallback(() => {
         setSoundEnabled(prev => {
             const next = !prev;
             setStoredBool(DRIVER_SOUND_KEY, next);
             return next;
         });
-    };
-    const handleVibrateToggle = () => {
+    }, []);
+    
+    const handleVibrateToggle = useCallback(() => {
         setVibrateEnabled(prev => {
             const next = !prev;
             setStoredBool(DRIVER_VIBRATE_KEY, next);
             return next;
         });
-    };
+    }, []);
+    
+    // Memoize chat handlers
+    const handleOpenChat = useCallback(() => {
+        setShowChat(true);
+        setHasUnreadChat(false);
+    }, [setShowChat, setHasUnreadChat]);
+    
+    const handleCloseChat = useCallback(() => {
+        setShowChat(false);
+    }, [setShowChat]);
 
     return (
         <div className="min-h-screen min-h-[100dvh] bg-gradient-to-b from-gray-50 to-white text-gray-900 flex flex-col relative">
@@ -159,10 +172,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                                     loadingAction={loadingAction}
                                     onAdvanceStep={advanceMergedProgress}
                                     onComplete={completeMergedRide}
-                                    onOpenChat={() => {
-                                        setShowChat(true);
-                                        setHasUnreadChat(false);
-                                    }}
+                                    onOpenChat={handleOpenChat}
                                 />
                             ) : (
                                 <CurrentJobCard
@@ -170,10 +180,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                                     loadingAction={loadingAction}
                                     onPickUp={pickUpGuest}
                                     onComplete={completeRide}
-                                    onOpenChat={() => {
-                                        setShowChat(true);
-                                        setHasUnreadChat(false);
-                                    }}
+                                    onOpenChat={handleOpenChat}
                                 />
                             )
                         ) : (
@@ -266,7 +273,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                     label={`Guest Room ${myCurrentRide.roomNumber}`}
                     autoOpen={true}
                     userRole="staff"
-                    onClose={() => setShowChat(false)}
+                    onClose={handleCloseChat}
                 />
             )}
         </div>

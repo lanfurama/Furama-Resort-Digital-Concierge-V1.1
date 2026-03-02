@@ -80,7 +80,9 @@ export const useBuggyLocation = (
                 setIsDetecting(false);
             },
             (err) => {
-                console.warn('Geolocation error:', err);
+                if (process.env.NODE_ENV !== 'production') {
+                    console.warn('Geolocation error:', err);
+                }
                 setError(err);
                 setIsDetecting(false);
             },

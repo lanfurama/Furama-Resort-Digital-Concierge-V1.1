@@ -26,10 +26,33 @@ export default defineConfig(({ mode }) => {
                     main: './index.html',
                 },
                 output: {
-                    manualChunks: {
-                        'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-                        'vendor-ui': ['lucide-react'],
-                        'vendor-ai': ['@google/genai'],
+                    manualChunks: (id) => {
+                        // Vendor chunks
+                        if (id.includes('node_modules')) {
+                            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+                                return 'vendor-react';
+                            }
+                            if (id.includes('lucide-react')) {
+                                return 'vendor-ui';
+                            }
+                            if (id.includes('@google/genai')) {
+                                return 'vendor-ai';
+                            }
+                            // Other node_modules
+                            return 'vendor';
+                        }
+                        // Driver module chunk
+                        if (id.includes('components/driver') || id.includes('driver/hooks')) {
+                            return 'driver-module';
+                        }
+                        // Admin module chunk
+                        if (id.includes('components/admin') || id.includes('hooks/useAdmin')) {
+                            return 'admin-module';
+                        }
+                        // Shared components
+                        if (id.includes('components/') && !id.includes('driver') && !id.includes('admin')) {
+                            return 'shared-components';
+                        }
                     },
                 },
             },

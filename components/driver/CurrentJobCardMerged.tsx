@@ -12,7 +12,7 @@ interface CurrentJobCardMergedProps {
     onOpenChat: () => void;
 }
 
-export const CurrentJobCardMerged: React.FC<CurrentJobCardMergedProps> = ({
+export const CurrentJobCardMerged: React.FC<CurrentJobCardMergedProps> = React.memo(({
     ride,
     loadingAction,
     onAdvanceStep,
@@ -117,4 +117,4 @@ export const CurrentJobCardMerged: React.FC<CurrentJobCardMergedProps> = ({
             </div>
         </div>
     );
-};
+});

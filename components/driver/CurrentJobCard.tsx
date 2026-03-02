@@ -12,7 +12,7 @@ interface CurrentJobCardProps {
     onOpenChat: () => void;
 }
 
-export const CurrentJobCard: React.FC<CurrentJobCardProps> = ({
+export const CurrentJobCard: React.FC<CurrentJobCardProps> = React.memo(({
     ride,
     loadingAction,
     onPickUp,
@@ -81,4 +81,4 @@ export const CurrentJobCard: React.FC<CurrentJobCardProps> = ({
             </div>
         </div>
     );
-};
+});
