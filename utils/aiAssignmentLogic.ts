@@ -197,3 +197,163 @@ export function canTriggerAutoAssign(
 ): boolean {
     return now - lastAutoAssignTime >= minIntervalMs;
 }
+
+// ============================================================================
+// Main Assignment Logic
+// ============================================================================
+
+/**
+ * Main AI assignment logic function
+ * 
+ * @param pendingRides - List of rides waiting to be assigned
+ * @param availableDrivers - List of available drivers
+ * @param allRides - All rides (to check driver's current ride status)
+ * @param roomTypes - List of room types (to check VIP status)
+ * @param checkDriverAvailabilityFn - Function to check if driver is available by schedule
+ * @returns Array of assignments: { driver, ride, cost }
+ */
+export async function aiAssignmentLogic(
+    pendingRides: RideRequest[],
+    availableDrivers: User[],
+    allRides: RideRequest[],
+    roomTypes?: Array<{ id: string; name: string; isVIP?: boolean }>,
+    checkDriverAvailabilityFn?: (driverId: string, date: string, time?: string) => Promise<boolean>
+): Promise<Array<{ driver: User; ride: RideRequest; cost: number }>> {
+    const now = Date.now();
+    const assignments: Array<{ driver: User; ride: RideRequest; cost: number }> = [];
+
+    // Helper to check if ride requires VIP vehicle
+    const requiresVIPVehicle = (ride: RideRequest): boolean => {
+        if (!roomTypes || !ride.roomNumber) return false;
+        
+        // Try to find room type by matching room number with room type name
+        // Check if any VIP room type name appears in the room number or vice versa
+        const roomType = roomTypes.find(rt => {
+            if (!rt.isVIP) return false;
+            
+            const roomNumLower = ride.roomNumber.toLowerCase().trim();
+            const typeNameLower = rt.name.toLowerCase();
+            
+            // Check if room number contains room type name (e.g., "Presidential Suite" in room number)
+            if (roomNumLower.includes(typeNameLower) || typeNameLower.includes(roomNumLower)) {
+                return true;
+            }
+            
+            // Check common VIP prefixes
+            if (roomNumLower.startsWith('v') || roomNumLower.startsWith('p') || 
+                roomNumLower.startsWith('presidential') || roomNumLower.startsWith('vip')) {
+                return true;
+            }
+            
+            return false;
+        });
+        
+        return roomType?.isVIP === true;
+    };
+
+    // Helper to check if driver matches vehicle type requirement
+    const driverMatchesVehicleType = (driver: User, requiresVIP: boolean): boolean => {
+        if (!requiresVIP) return true; // Normal rides can use any vehicle
+        return driver.vehicleType === 'VIP'; // VIP rides require VIP vehicle
+    };
+
+    // Calculate cost for each (driver, ride) pair
+    for (const ride of pendingRides) {
+        const rideRequiresVIP = requiresVIPVehicle(ride);
+        const rideDate = new Date(ride.timestamp).toISOString().split('T')[0];
+        const rideTime = new Date(ride.timestamp).toTimeString().substring(0, 8); // HH:MM:SS
+
+        for (const driver of availableDrivers) {
+            // Check vehicle type match
+            if (!driverMatchesVehicleType(driver, rideRequiresVIP)) {
+                continue; // Skip drivers who don't have the required vehicle type
+            }
+
+            // Check driver schedule availability
+            let isScheduleAvailable = true;
+            if (checkDriverAvailabilityFn) {
+                try {
+                    isScheduleAvailable = await checkDriverAvailabilityFn(
+                        driver.id ? String(driver.id) : '',
+                        rideDate,
+                        rideTime
+                    );
+                } catch (error) {
+                    // If check fails, default to available (don't block assignment)
+                    isScheduleAvailable = true;
+                }
+            }
+
+            // Check driver's current ride status
+            const driverIdStr = driver.id ? String(driver.id) : '';
+            const driverActiveRides = allRides.filter((r) => {
+                const rideDriverId = r.driverId ? String(r.driverId) : '';
+                return (
+                    rideDriverId === driverIdStr &&
+                    (r.status === 'ASSIGNED' ||
+                        r.status === 'ARRIVING' ||
+                        r.status === 'ON_TRIP')
+                );
+            });
+            const isDriverAvailable = driverActiveRides.length === 0;
+            const currentRide = driverActiveRides[0] || null;
+
+            // Calculate wait time
+            const waitTimeSeconds = Math.floor((now - ride.timestamp) / 1000);
+
+            // Calculate chain trip distance (if driver has current ride)
+            let chainDistanceMeters: number | null = null;
+            if (currentRide) {
+                // Simplified: assume chain trip if same destination or nearby
+                // In production, you'd calculate actual GPS distance
+                if (currentRide.destination === ride.pickup) {
+                    chainDistanceMeters = 0; // Same location
+                } else {
+                    // For now, set to null (no chain trip bonus)
+                    chainDistanceMeters = null;
+                }
+            }
+
+            // Compute assignment cost
+            const cost = computeAssignmentCost({
+                isScheduleAvailable,
+                isDriverAvailable,
+                currentRide,
+                waitTimeSeconds,
+                chainDistanceMeters,
+                now
+            });
+
+            assignments.push({ driver, ride, cost });
+        }
+    }
+
+    // Sort by cost (lower = better)
+    assignments.sort((a, b) => a.cost - b.cost);
+
+    // Greedy assignment: assign each ride to the best available driver
+    const assignedRides = new Set<string>();
+    const assignedDrivers = new Set<string>();
+    const finalAssignments: Array<{ driver: User; ride: RideRequest; cost: number }> = [];
+
+    for (const assignment of assignments) {
+        const rideId = assignment.ride.id;
+        const driverId = assignment.driver.id ? String(assignment.driver.id) : '';
+
+        // Skip if ride or driver already assigned
+        if (assignedRides.has(rideId) || assignedDrivers.has(driverId)) {
+            continue;
+        }
+
+        // Skip if cost is too high (driver not available)
+        if (assignment.cost >= COST_UNAVAILABLE_SCHEDULE) {
+            continue;
+        }
+
+        assignedRides.add(rideId);
+        assignedDrivers.add(driverId);
+        finalAssignments.push(assignment);
+    }
+
+    return finalAssignments;
+}

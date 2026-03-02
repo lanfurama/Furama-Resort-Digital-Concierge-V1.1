@@ -385,6 +385,9 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                                 value={newSchedule.shift_start}
                                                 onChange={(e) => setNewSchedule({ ...newSchedule, shift_start: e.target.value })}
                                             />
+                                            {!newSchedule.is_day_off && (
+                                                <p className="text-xs text-gray-500 mt-1">Day: 07:00-23:00, Night: 22:00-07:00</p>
+                                            )}
                                         </div>
                                         <div>
                                             <label className="block text-xs font-semibold text-gray-500 mb-1">Shift End</label>

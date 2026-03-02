@@ -53,8 +53,61 @@ export const useScheduleManagement = (
         }
     };
 
+    const validateShiftSchedule = (shiftStart: string | null, shiftEnd: string | null, isDayOff: boolean): string | null => {
+        if (isDayOff) return null; // Day off không cần validation
+        
+        if (!shiftStart || !shiftEnd) {
+            return 'Shift start and end times are required for work days.';
+        }
+
+        const startTime = shiftStart.substring(0, 5); // HH:MM
+        const endTime = shiftEnd.substring(0, 5); // HH:MM
+        
+        const [startHour, startMin] = startTime.split(':').map(Number);
+        const [endHour, endMin] = endTime.split(':').map(Number);
+        
+        const startMinutes = startHour * 60 + startMin;
+        const endMinutes = endHour * 60 + endMin;
+        
+        // Ca ngày: 07:00 - 23:00
+        const dayShiftStart = 7 * 60; // 07:00
+        const dayShiftEnd = 23 * 60; // 23:00
+        
+        // Ca đêm: 22:00 - 07:00 (qua đêm)
+        const nightShiftStart = 22 * 60; // 22:00
+        const nightShiftEnd = 7 * 60; // 07:00
+        
+        // Kiểm tra ca ngày
+        const isDayShift = startMinutes >= dayShiftStart && endMinutes <= dayShiftEnd && startMinutes < endMinutes;
+        
+        // Kiểm tra ca đêm (qua đêm)
+        const isNightShift = (startMinutes >= nightShiftStart && endMinutes <= 24 * 60) || 
+                            (startMinutes >= 0 && endMinutes <= nightShiftEnd) ||
+                            (startMinutes >= nightShiftStart && endMinutes <= nightShiftEnd);
+        
+        if (!isDayShift && !isNightShift) {
+            return 'Invalid shift time. Day shift: 07:00-23:00, Night shift: 22:00-07:00';
+        }
+        
+        return null;
+    };
+
     const saveSchedule = async () => {
         if (!selectedDriverForSchedule) return;
+
+        // Validate shift schedule
+        if (!newSchedule.is_day_off) {
+            const validationError = validateShiftSchedule(
+                newSchedule.shift_start || null,
+                newSchedule.shift_end || null,
+                newSchedule.is_day_off || false
+            );
+            
+            if (validationError) {
+                alert(validationError);
+                return;
+            }
+        }
 
         try {
             if (editingSchedule) {

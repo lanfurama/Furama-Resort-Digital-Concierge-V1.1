@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getRides, getRidesSync, getUsers, getUsersSync, updateRideStatus } from '../services/dataService';
+import { getRides, getRidesSync, getUsers, getUsersSync, updateRideStatus, getRoomTypes, checkDriverAvailability } from '../services/dataService';
 import { BuggyStatus } from '../types';
 import { aiAssignmentLogic } from '../utils/aiAssignmentLogic';
 
@@ -178,8 +178,24 @@ export const useFleetManagement = (tab: string, rides: any[], users: any[]) => {
             setAIAssignmentData({ status: 'loading' });
         }
 
-        // Use AI assignment logic
-        const assignments = await aiAssignmentLogic(pendingRides, availableDrivers, rides);
+        // Fetch room types for VIP checking
+        let roomTypes: Array<{ id: string; name: string; isVIP?: boolean }> | undefined;
+        try {
+            roomTypes = await getRoomTypes();
+        } catch (error) {
+            if (process.env.NODE_ENV !== 'production') {
+                console.warn('Failed to fetch room types for assignment logic:', error);
+            }
+        }
+
+        // Use AI assignment logic with vehicle_type and schedule checks
+        const assignments = await aiAssignmentLogic(
+            pendingRides,
+            availableDrivers,
+            rides,
+            roomTypes,
+            checkDriverAvailability
+        );
 
         // Process assignments
         let assignmentCount = 0;
