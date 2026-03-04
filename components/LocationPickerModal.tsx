@@ -111,7 +111,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
       >
         <div
           ref={modalRef}
-          className="bg-white rounded-xl shadow w-full max-w-md max-h-[calc(100vh-8rem)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+          className="bg-white rounded-xl shadow w-full max-w-md max-h-[calc(100vh-8rem)] flex flex-col overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50 flex-shrink-0">

@@ -104,7 +104,7 @@ const SupervisorDashboard: React.FC = () => {
     // Show loading skeleton with Modern Premium design
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-gray-50/50 p-6 space-y-8 animate-pulse font-sans">
+            <div className="min-h-screen bg-gray-50/50 p-6 space-y-8 font-sans">
                 {/* Header Skeleton */}
                 <div className="flex justify-between items-center">
                     <div className="h-10 w-64 bg-gray-200 rounded-lg"></div>
@@ -178,7 +178,7 @@ const SupervisorDashboard: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50/50 p-6 space-y-8 animate-in fade-in duration-500 font-sans text-gray-800">
+        <div className="min-h-screen bg-gray-50/50 p-6 space-y-8 font-sans text-gray-800">
             {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
@@ -207,8 +207,8 @@ const SupervisorDashboard: React.FC = () => {
             {/* Main KPI Stats Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Total Guests */}
-                <div className="group bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 relative overflow-hidden transition-all hover:shadow-md">
-                    <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                <div className="group bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 relative overflow-hidden hover:shadow-md">
+                    <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:opacity-10">
                         <Users size={80} />
                     </div>
                     <div className="relative z-10">
@@ -224,8 +224,8 @@ const SupervisorDashboard: React.FC = () => {
                 </div>
 
                 {/* Buggy Fleet Status */}
-                <div className="group bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 relative overflow-hidden transition-all hover:shadow-md">
-                    <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                <div className="group bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 relative overflow-hidden hover:shadow-md">
+                    <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:opacity-10">
                         <Car size={80} />
                     </div>
                     <div className="relative z-10">
@@ -251,8 +251,8 @@ const SupervisorDashboard: React.FC = () => {
                 </div>
 
                 {/* Revenue */}
-                <div className="group bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 relative overflow-hidden transition-all hover:shadow-md">
-                    <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                <div className="group bg-white p-6 rounded-2xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 relative overflow-hidden hover:shadow-md">
+                    <div className="absolute right-0 top-0 p-6 opacity-5 group-hover:opacity-10">
                         <DollarSign size={80} />
                     </div>
                     <div className="relative z-10">
@@ -320,7 +320,7 @@ const SupervisorDashboard: React.FC = () => {
                                         </div>
                                         <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
                                             <div
-                                                className={`h-full ${item.color} rounded-full transition-all duration-1000 ease-out`}
+                                                className={`h-full ${item.color} rounded-full`}
                                                 style={{ width: `${(item.val / maxVal) * 100}%` }}
                                             ></div>
                                         </div>
@@ -341,7 +341,7 @@ const SupervisorDashboard: React.FC = () => {
                                         <button
                                             key={period}
                                             onClick={() => setDriverPerformancePeriod(period)}
-                                            className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all uppercase tracking-wide ${driverPerformancePeriod === period
+                                            className={`px-3 py-1 text-[10px] font-bold rounded-md uppercase tracking-wide ${driverPerformancePeriod === period
                                                 ? 'bg-white text-emerald-600 shadow-sm'
                                                 : 'text-gray-500 hover:text-gray-700'
                                                 }`}
@@ -375,12 +375,12 @@ const SupervisorDashboard: React.FC = () => {
                                                 </div>
                                                 <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                                                     <div
-                                                        className={`h-full rounded-full transition-all duration-1000 ${index === 0 ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' : 'bg-emerald-500'
+                                                        className={`h-full rounded-full ${index === 0 ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' : 'bg-emerald-500'
                                                             }`}
                                                         style={{ width: `${percentage}%` }}
                                                     />
                                                 </div>
-                                                <div className="flex gap-3 mt-1 opacity-0 group-hover:opacity-100 transition-opacity text-[9px] text-gray-400">
+                                                <div className="flex gap-3 mt-1 opacity-0 group-hover:opacity-100 text-[9px] text-gray-400">
                                                     <span>{driver.total_rides ?? 0} rides</span>
                                                     <span>{(driver.avg_rating ?? 0).toFixed(1)} ★</span>
                                                     {(driver.avg_response_time ?? 0) > 0 && (
@@ -421,7 +421,7 @@ const SupervisorDashboard: React.FC = () => {
                             </div>
                         ) : (
                             recentActivity.map((item) => (
-                                <div key={item.id} className="group flex items-start gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
+                                <div key={item.id} className="group flex items-start gap-4 p-4 rounded-xl hover:bg-gray-50 border border-transparent hover:border-gray-100">
                                     <div className="mt-1">
                                         {item.type === 'DINING' && <div className="p-2 bg-orange-100 text-orange-600 rounded-lg"><Utensils size={14} /></div>}
                                         {item.type === 'SPA' && <div className="p-2 bg-purple-100 text-purple-600 rounded-lg"><Sparkles size={14} /></div>}

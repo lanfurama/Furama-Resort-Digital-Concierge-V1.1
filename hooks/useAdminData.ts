@@ -214,9 +214,17 @@ export const useAdminData = () => {
                         const users = await getUsers().catch(() => getUsersSync());
                         setData(prev => ({ ...prev, users }));
                         break;
+                    case 'roomTypes':
+                        const roomTypes = await getRoomTypes().catch(() => []);
+                        setData(prev => ({ ...prev, roomTypes }));
+                        break;
                     case 'rooms':
                         const rooms = await getRooms();
                         setData(prev => ({ ...prev, rooms }));
+                        break;
+                    case 'serviceHistory':
+                        const serviceHistory = await getUnifiedHistory().catch(() => []);
+                        setData(prev => ({ ...prev, serviceHistory }));
                         break;
                     case 'rides':
                         const rides = await getRides().catch(() => getRidesSync());

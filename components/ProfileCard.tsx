@@ -246,7 +246,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                     {!isEditingProfile && (
                         <button
                             onClick={() => setIsEditingProfile(true)}
-                            className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all"
+                            className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
                         >
                             <Edit2 size={16} strokeWidth={2.5} />
                         </button>
@@ -262,7 +262,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                                 value={profileName}
                                 onChange={(e) => setProfileName(e.target.value)}
                                 placeholder={t('enter_your_name')}
-                                className="w-full px-3 py-2 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                className="w-full px-3 py-2 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
                                 style={{ color: '#111827' }}
                             />
                         </div>
@@ -275,7 +275,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                                     value={currentPassword}
                                     onChange={(e) => setCurrentPassword(e.target.value)}
                                     placeholder={t('enter_current_password')}
-                                    className="w-full px-3 py-2 pr-10 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                    className="w-full px-3 py-2 pr-10 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
                                     style={{ color: '#111827' }}
                                 />
                                 <button
@@ -296,7 +296,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                                     value={newPassword}
                                     onChange={(e) => setNewPassword(e.target.value)}
                                     placeholder={t('enter_new_password')}
-                                    className="w-full px-3 py-2 pr-10 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                    className="w-full px-3 py-2 pr-10 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
                                     style={{ color: '#111827' }}
                                 />
                                 <button
@@ -317,7 +317,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     placeholder={t('confirm_new_password_placeholder')}
-                                    className="w-full px-3 py-2 pr-10 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                    className="w-full px-3 py-2 pr-10 bg-gray-50 border-2 border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
                                     style={{ color: '#111827' }}
                                 />
                                 <button
@@ -340,14 +340,14 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                                     setConfirmPassword('');
                                 }}
                                 disabled={isSavingProfile}
-                                className="flex-1 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl border-2 border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                                className="flex-1 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl border-2 border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {t('cancel')}
                             </button>
                             <button
                                 onClick={handleSaveProfile}
                                 disabled={isSavingProfile}
-                                className="flex-1 py-2 text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5 shadow-lg"
+                                className="flex-1 py-2 text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 shadow-lg"
                             >
                                 {isSavingProfile ? (
                                     <>
@@ -383,7 +383,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                                     <span className="text-sm font-bold text-emerald-700 font-mono tracking-wider">{savedCheckInCode}</span>
                                     <button
                                         onClick={handleCopyCode}
-                                        className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all"
+                                        className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
                                         title={t('copy_code')}
                                     >
                                         {codeCopied ? (
@@ -442,7 +442,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                                 {t('app_language')}
                             </p>
                             {isLangSaving && (
-                                <span className="text-[10px] text-emerald-600 font-bold animate-pulse bg-emerald-50 px-2 py-1 rounded-full">
+                                <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded-full">
                                     Updating...
                                 </span>
                             )}
@@ -450,7 +450,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                         <select
                             value={selectedLang}
                             onChange={(e) => handleLanguageChange(e.target.value)}
-                            className="w-full bg-white border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all appearance-none cursor-pointer"
+                            className="w-full bg-white border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent appearance-none cursor-pointer"
                             style={{
                                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23374151' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
                                 backgroundRepeat: 'no-repeat',
@@ -487,13 +487,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                         <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{t('personal_notes')}</h4>
                     </div>
                     {isSaving && (
-                        <span className="text-xs text-emerald-600 font-bold animate-pulse bg-emerald-50 px-2 py-1 rounded-full">
+                        <span className="text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded-full">
                             Saved!
                         </span>
                     )}
                 </div>
                 <textarea
-                    className="w-full bg-gradient-to-br from-yellow-50 to-amber-50 border-2 border-yellow-200 rounded-xl p-3 text-sm text-gray-900 placeholder:text-gray-500 focus:ring-2 focus:ring-yellow-400 focus:outline-none resize-none transition-all caret-yellow-600"
+                    className="w-full bg-gradient-to-br from-yellow-50 to-amber-50 border-2 border-yellow-200 rounded-xl p-3 text-sm text-gray-900 placeholder:text-gray-500 focus:ring-2 focus:ring-yellow-400 focus:outline-none resize-none caret-yellow-600"
                     style={{ caretColor: '#d97706' }}
                     rows={3}
                     placeholder="e.g. Extra pillows, No nuts in food..."
@@ -502,7 +502,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ user, onUserUpdate }) 
                 ></textarea>
                 <button
                     onClick={handleSaveNotes}
-                    className="group relative mt-3 w-full py-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 font-bold text-xs rounded-xl hover:from-emerald-100 hover:to-teal-100 transition-all border-2 border-emerald-200 hover:border-emerald-300 flex items-center justify-center shadow-md"
+                    className="group relative mt-3 w-full py-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 font-bold text-xs rounded-xl hover:from-emerald-100 hover:to-teal-100 border-2 border-emerald-200 hover:border-emerald-300 flex items-center justify-center shadow-md"
                 >
                     <Save size={14} className="mr-1.5" />
                     {t('save_notes')}

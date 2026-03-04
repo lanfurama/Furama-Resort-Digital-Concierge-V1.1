@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { History, Clock, Star, Filter, Calendar, X } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { History, Clock, Star, Filter, Calendar, X, RefreshCw } from 'lucide-react';
 
 interface HistoryTabProps {
     serviceHistory: any[];
@@ -7,6 +7,7 @@ interface HistoryTabProps {
     setHistoryFilterType: (type: string) => void;
     historyFilterDate: string;
     setHistoryFilterDate: (date: string) => void;
+    onRefresh?: () => Promise<void>;
 }
 
 export const HistoryTab: React.FC<HistoryTabProps> = ({
@@ -14,8 +15,19 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
     historyFilterType,
     setHistoryFilterType,
     historyFilterDate,
-    setHistoryFilterDate
+    setHistoryFilterDate,
+    onRefresh
 }) => {
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const handleRefresh = async () => {
+        if (!onRefresh) return;
+        setIsRefreshing(true);
+        try {
+            await onRefresh();
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
     const filteredHistory = useMemo(() => {
         return serviceHistory.filter(req => {
             const matchesType = historyFilterType === 'ALL' || req.type === historyFilterType;
@@ -30,7 +42,17 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h2 className="text-xl font-bold text-gray-800 flex items-center">Service Order History</h2>
-                <div className="flex items-center space-x-2 w-full md:w-auto">
+                <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
+                    {onRefresh && (
+                        <button
+                            onClick={handleRefresh}
+                            disabled={isRefreshing}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-70"
+                        >
+                            <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+                            Refresh
+                        </button>
+                    )}
                     <div className="flex space-x-2 bg-white p-1.5 rounded-lg border border-gray-200">
                         <div className="flex items-center space-x-1 px-2 border-r border-gray-200">
                             <Filter size={14} className="text-gray-400" />

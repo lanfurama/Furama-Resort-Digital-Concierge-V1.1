@@ -2511,7 +2511,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               onClick={() => setViewMode("BUGGY")}
               aria-current={viewMode === "BUGGY" ? "page" : undefined}
               aria-label="Switch to Buggy Fleet view"
-              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm transition-all min-h-[44px] touch-manipulation ${viewMode === "BUGGY"
+              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm min-h-[44px] touch-manipulation ${viewMode === "BUGGY"
                 ? "bg-emerald-600 text-white shadow-md"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
@@ -2523,7 +2523,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               onClick={() => setViewMode("REPORTS")}
               aria-current={viewMode === "REPORTS" ? "page" : undefined}
               aria-label="Switch to Reports view"
-              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm transition-all min-h-[44px] touch-manipulation ${viewMode === "REPORTS"
+              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm min-h-[44px] touch-manipulation ${viewMode === "REPORTS"
                 ? "bg-purple-600 text-white shadow-md"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
@@ -2535,7 +2535,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               onClick={() => setViewMode("PERFORMANCE")}
               aria-current={viewMode === "PERFORMANCE" ? "page" : undefined}
               aria-label="Switch to Performance view"
-              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm transition-all min-h-[44px] touch-manipulation ${viewMode === "PERFORMANCE"
+              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-lg font-semibold text-xs md:text-sm min-h-[44px] touch-manipulation ${viewMode === "PERFORMANCE"
                 ? "bg-indigo-600 text-white shadow-md"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
@@ -2586,7 +2586,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                 <div className="flex items-center gap-1 md:gap-1.5 relative z-10">
                   <button
                     onClick={() => setShowFleetSettings(!showFleetSettings)}
-                    className={`p-2 md:p-1.5 rounded-md transition min-h-[44px] md:min-h-0 touch-manipulation ${showFleetSettings ? "bg-gray-200 text-gray-800" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"}`}
+                    className={`p-2 md:p-1.5 rounded-md min-h-[44px] md:min-h-0 touch-manipulation ${showFleetSettings ? "bg-gray-200 text-gray-800" : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"}`}
                   >
                     <Settings size={18} className="md:w-[18px] md:h-[18px]" />
                   </button>
@@ -2607,7 +2607,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                         setUsers(getUsersSync());
                       }
                     }}
-                    className="p-2 md:p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition min-h-[44px] md:min-h-0 touch-manipulation"
+                    className="p-2 md:p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md min-h-[44px] md:min-h-0 touch-manipulation"
                   >
                     <RefreshCw size={18} className="md:w-[18px] md:h-[18px]" />
                   </button>
@@ -2635,7 +2635,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             await handleAutoAssign();
                           }}
                           disabled={!hasPendingRides || !hasOnlineDrivers}
-                          className="bg-blue-600 text-white px-2.5 md:px-3 py-2 md:py-1.5 rounded-md flex items-center gap-1 md:gap-1.5 hover:bg-blue-700 transition text-xs md:text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed relative min-h-[44px] md:min-h-0 touch-manipulation"
+                          className="bg-blue-600 text-white px-2.5 md:px-3 py-2 md:py-1.5 rounded-md flex items-center gap-1 md:gap-1.5 hover:bg-blue-700 text-xs md:text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed relative min-h-[44px] md:min-h-0 touch-manipulation"
                         >
                           <Zap size={14} className="md:w-4 md:h-4" />
                           <span className="hidden sm:inline">Assign by AI</span>
@@ -2659,7 +2659,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
                       if (!hasPendingRides || !hasOnlineDrivers) {
                         return (
-                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-xl whitespace-nowrap z-[9999] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-xl whitespace-nowrap z-[9999] opacity-0 group-hover:opacity-100 pointer-events-none">
                             <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-0">
                               <div className="border-4 border-transparent border-b-gray-900"></div>
                             </div>
@@ -2690,7 +2690,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                         );
                       }
                       return (
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-xl whitespace-nowrap z-[9999] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-xl whitespace-nowrap z-[9999] opacity-0 group-hover:opacity-100 pointer-events-none">
                           <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-0">
                             <div className="border-4 border-transparent border-b-gray-900"></div>
                           </div>
@@ -2814,16 +2814,16 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               {/* Dispatch Configuration Modal */}
               {showFleetSettings && (
                 <div
-                  className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in"
+                  className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
                   onClick={() => setShowFleetSettings(false)}
                 >
                   <div
-                    className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[95vw] max-w-96 p-4 md:p-6 mx-2 animate-in slide-in-from-top-5 relative"
+                    className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[95vw] max-w-96 p-4 md:p-6 mx-2 relative"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
                       onClick={() => setShowFleetSettings(false)}
-                      className="touch-btn absolute top-3 right-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors active:scale-95"
+                      className="touch-btn absolute top-3 right-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
                       aria-label="Close"
                     >
                       <X size={22} />
@@ -2839,7 +2839,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                         </label>
                         <input
                           type="number"
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           value={fleetConfig.maxWaitTimeBeforeAutoAssign}
                           onChange={(e) =>
                             setFleetConfig({
@@ -2872,7 +2872,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                           );
                           setShowFleetSettings(false);
                         }}
-                        className="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-lg hover:bg-emerald-700 transition shadow-md active:scale-95"
+                        className="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-lg hover:bg-emerald-700 shadow-md"
                       >
                         Save Settings
                       </button>
@@ -2884,7 +2884,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
               {/* AI Assignment Modal */}
               {showAIAssignment && aiAssignmentData && (
                 <div
-                  className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 animate-in fade-in"
+                  className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
                   onClick={() => {
                     if (
                       aiAssignmentData.status === "completed" ||
@@ -2896,7 +2896,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   }}
                 >
                   <div
-                    className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[95vw] sm:w-[90vw] max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in slide-in-from-top-5 relative"
+                    className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[95vw] sm:w-[90vw] max-w-4xl max-h-[90vh] overflow-hidden flex flex-col relative"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {/* Header */}
@@ -2921,7 +2921,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                               setShowAIAssignment(false);
                               setAIAssignmentData(null);
                             }}
-                            className="text-white/80 hover:text-white transition-colors p-1 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center"
+                            className="text-white/80 hover:text-white p-1 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center"
                             aria-label="Close"
                           >
                             <X size={20} className="md:w-6 md:h-6" />
@@ -2949,15 +2949,15 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                           </p>
                           <div className="mt-6 flex gap-2">
                             <div
-                              className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"
+                              className="w-2 h-2 bg-blue-600 rounded-full"
                               style={{ animationDelay: "0ms" }}
                             ></div>
                             <div
-                              className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"
+                              className="w-2 h-2 bg-blue-600 rounded-full"
                               style={{ animationDelay: "150ms" }}
                             ></div>
                             <div
-                              className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"
+                              className="w-2 h-2 bg-blue-600 rounded-full"
                               style={{ animationDelay: "300ms" }}
                             ></div>
                           </div>
@@ -2992,7 +2992,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                   return (
                                     <div
                                       key={`${assignment.driver.id}-${assignment.ride.id}`}
-                                      className="bg-gradient-to-r from-blue-50 to-emerald-50 border-2 border-blue-200 rounded-lg p-3 md:p-4 animate-in fade-in slide-in-from-left"
+                                      className="bg-gradient-to-r from-blue-50 to-emerald-50 border-2 border-blue-200 rounded-lg p-3 md:p-4"
                                       style={{
                                         animationDelay: `${idx * 100}ms`,
                                       }}
@@ -3208,7 +3208,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                               setShowAIAssignment(false);
                               setAIAssignmentData(null);
                             }}
-                            className="bg-blue-600 text-white px-5 md:px-6 py-2.5 md:py-2 rounded-lg hover:bg-blue-700 transition font-medium text-sm md:text-base min-h-[44px] md:min-h-0 touch-manipulation"
+                            className="bg-blue-600 text-white px-5 md:px-6 py-2.5 md:py-2 rounded-lg hover:bg-blue-700 font-medium text-sm md:text-base min-h-[44px] md:min-h-0 touch-manipulation"
                           >
                             Close
                           </button>
@@ -3251,7 +3251,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                         return (
                           <button
                             onClick={() => setShowMergeModal(true)}
-                            className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 md:py-1 bg-blue-500 hover:bg-blue-600 text-white text-[10px] md:text-xs font-semibold rounded transition-colors min-h-[36px] md:min-h-0 touch-manipulation"
+                            className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 md:py-1 bg-blue-500 hover:bg-blue-600 text-white text-[10px] md:text-xs font-semibold rounded min-h-[36px] md:min-h-0 touch-manipulation"
                             title="View Merge Options"
                           >
                             <span>🔗</span>
@@ -3264,7 +3264,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       <div className="flex items-center gap-1.5 md:gap-2">
                         {/* AI Assignment Progress Indicator - Inline */}
                         {aiAssignmentProgress.isProcessing && (
-                          <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 border border-blue-200 rounded-lg animate-pulse">
+                          <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 border border-blue-200 rounded-lg">
                             <Loader2 size={12} className="text-blue-600 animate-spin" />
                             <span className="text-[10px] md:text-xs text-blue-700 font-medium">
                               AI: {aiAssignmentProgress.processedCount}/{aiAssignmentProgress.totalCount}
@@ -3284,14 +3284,14 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                               autoAssignEnabled: !prev.autoAssignEnabled
                             }));
                           }}
-                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 touch-manipulation ${fleetConfig.autoAssignEnabled
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 touch-manipulation ${fleetConfig.autoAssignEnabled
                             ? "bg-emerald-500"
                             : "bg-gray-300"
                             } ${aiAssignmentProgress.isProcessing ? "opacity-50 cursor-not-allowed" : ""}`}
                           title={fleetConfig.autoAssignEnabled ? "Auto Assign is ON" : "Auto Assign is OFF"}
                         >
                           <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${fleetConfig.autoAssignEnabled ? "translate-x-4" : "translate-x-1"
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white ${fleetConfig.autoAssignEnabled ? "translate-x-4" : "translate-x-1"
                               }`}
                           />
                         </button>
@@ -3374,7 +3374,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                     setSelectedRideForDetail(ride);
                                     setShowDetailRequestModal(true);
                                   }}
-                                  className={`${style.bg} ${style.border} p-2 md:p-2.5 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-md hover:border-emerald-400 touch-manipulation`}
+                                  className={`${style.bg} ${style.border} p-2 md:p-2.5 rounded-lg border cursor-pointer hover:shadow-md hover:border-emerald-400 touch-manipulation`}
                                 >
                                   {/* Header Row: Room + Guest + Pax + Wait Time */}
                                   <div className="flex items-center justify-between gap-2 mb-1">
@@ -3424,7 +3424,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                         setSelectedRideForAssign(ride);
                                         setShowManualAssignModal(true);
                                       }}
-                                      className="w-full bg-emerald-600 text-white text-[10px] md:text-xs font-semibold px-2 md:px-3 py-2 md:py-1.5 rounded-md hover:bg-emerald-700 transition min-h-[36px] md:min-h-0 touch-manipulation"
+                                      className="w-full bg-emerald-600 text-white text-[10px] md:text-xs font-semibold px-2 md:px-3 py-2 md:py-1.5 rounded-md hover:bg-emerald-700 min-h-[36px] md:min-h-0 touch-manipulation"
                                     >
                                       Assign Driver
                                     </button>
@@ -3436,7 +3436,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             {totalPendingCount > pendingRidesLimit && (
                               <button
                                 onClick={() => setPendingRidesLimit(prev => prev + 10)}
-                                className="w-full mt-2 py-2 px-3 text-[10px] md:text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-all touch-manipulation min-h-[40px] flex items-center justify-center gap-1"
+                                className="w-full mt-2 py-2 px-3 text-[10px] md:text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 touch-manipulation min-h-[40px] flex items-center justify-center gap-1"
                                 aria-label={`Load more pending rides. ${totalPendingCount - pendingRidesLimit} remaining`}
                               >
                                 <span>⬇</span>
@@ -3511,7 +3511,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       <div className="flex gap-0.5 flex-shrink-0">
                         <button
                           onClick={() => setDriverViewMode("LIST")}
-                          className={`p-1.5 md:p-1 rounded transition min-h-[36px] md:min-h-0 touch-manipulation ${driverViewMode === "LIST"
+                          className={`p-1.5 md:p-1 rounded min-h-[36px] md:min-h-0 touch-manipulation ${driverViewMode === "LIST"
                             ? "text-blue-600 bg-blue-50"
                             : "text-gray-400 hover:text-gray-600"
                             }`}
@@ -3521,7 +3521,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                         </button>
                         <button
                           onClick={() => setDriverViewMode("MAP")}
-                          className={`p-1.5 md:p-1 rounded transition min-h-[36px] md:min-h-0 touch-manipulation ${driverViewMode === "MAP"
+                          className={`p-1.5 md:p-1 rounded min-h-[36px] md:min-h-0 touch-manipulation ${driverViewMode === "MAP"
                             ? "text-blue-600 bg-blue-50"
                             : "text-gray-400 hover:text-gray-600"
                             }`}
@@ -3683,7 +3683,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                 return (
                                   <div
                                     key={driver.id}
-                                    className={`${style.bg} ${style.border} p-2 md:p-2.5 rounded-lg border transition-all duration-200`}
+                                    className={`${style.bg} ${style.border} p-2 md:p-2.5 rounded-lg border`}
                                   >
                                     {/* Driver Header - Compact */}
                                     <div className="flex items-center justify-between gap-2">
@@ -3701,7 +3701,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                         )}
                                         {/* Enhanced Status Badge with Icon and Animation */}
                                         <span
-                                          className={`text-[8px] md:text-[9px] px-1.5 md:px-2 py-0.5 md:py-1 rounded font-bold ${style.badge} flex items-center gap-1 transition-all`}
+                                          className={`text-[8px] md:text-[9px] px-1.5 md:px-2 py-0.5 md:py-1 rounded font-bold ${style.badge} flex items-center gap-1`}
                                           role="status"
                                           aria-label={`Driver status: ${style.text}`}
                                         >
@@ -3732,7 +3732,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                             e.stopPropagation();
                                             handleToggleDriverStatus(driver);
                                           }}
-                                          className={`text-[8px] md:text-[9px] px-1.5 md:px-2 py-0.5 rounded font-medium text-white transition-colors min-h-[28px] md:min-h-0 touch-manipulation ${driverStatus === "OFFLINE"
+                                          className={`text-[8px] md:text-[9px] px-1.5 md:px-2 py-0.5 rounded font-medium text-white min-h-[28px] md:min-h-0 touch-manipulation ${driverStatus === "OFFLINE"
                                             ? "bg-emerald-500 hover:bg-emerald-600"
                                             : "bg-red-500 hover:bg-red-600"
                                             }`}
@@ -3822,7 +3822,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                                       ? handleEndRide(ride.id)
                                                       : handlePickupGuest(ride.id)
                                                   }
-                                                  className={`text-[9px] md:text-[10px] px-2 py-1.5 md:py-1 rounded font-medium transition-colors flex-shrink-0 flex items-center gap-1 min-h-[32px] md:min-h-0 touch-manipulation ${ride.status ===
+                                                  className={`text-[9px] md:text-[10px] px-2 py-1.5 md:py-1 rounded font-medium flex-shrink-0 flex items-center gap-1 min-h-[32px] md:min-h-0 touch-manipulation ${ride.status ===
                                                     BuggyStatus.ON_TRIP
                                                     ? "bg-emerald-500 hover:bg-emerald-600 text-white"
                                                     : "bg-blue-500 hover:bg-blue-600 text-white"
@@ -3852,7 +3852,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             {totalDriverCount > driverListLimit && (
                               <button
                                 onClick={() => setDriverListLimit(prev => prev + 15)}
-                                className="w-full mt-2 py-2 px-3 text-[10px] md:text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-all touch-manipulation min-h-[40px] flex items-center justify-center gap-1"
+                                className="w-full mt-2 py-2 px-3 text-[10px] md:text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 touch-manipulation min-h-[40px] flex items-center justify-center gap-1"
                                 aria-label={`Load more drivers. ${totalDriverCount - driverListLimit} remaining`}
                               >
                                 <span>⬇</span>
@@ -3879,7 +3879,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       ) : (
                         <div ref={mapRef} className="w-full h-full" />
                       )}
-                      <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur p-2 rounded text-[10px] shadow border border-gray-200 z-10">
+                      <div className="absolute bottom-2 left-2 bg-white/90 p-2 rounded text-[10px] shadow border border-gray-200 z-10">
                         <div className="flex items-center mb-1 text-gray-800">
                           <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-1.5"></div>{" "}
                           Available Driver
@@ -3906,7 +3906,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             onClick={() =>
                               mapInstance.setZoom(mapInstance.getZoom()! + 1)
                             }
-                            className="bg-white/90 backdrop-blur p-1.5 rounded shadow border border-gray-200 hover:bg-white transition"
+                            className="bg-white/90 p-1.5 rounded shadow border border-gray-200 hover:bg-white"
                             title="Zoom In"
                           >
                             <ZoomIn size={14} className="text-gray-700" />
@@ -3915,7 +3915,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             onClick={() =>
                               mapInstance.setZoom(mapInstance.getZoom()! - 1)
                             }
-                            className="bg-white/90 backdrop-blur p-1.5 rounded shadow border border-gray-200 hover:bg-white transition"
+                            className="bg-white/90 p-1.5 rounded shadow border border-gray-200 hover:bg-white"
                             title="Zoom Out"
                           >
                             <ZoomOut size={14} className="text-gray-700" />
@@ -3953,7 +3953,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                 mapInstance.fitBounds(bounds);
                               }
                             }}
-                            className="bg-white/90 backdrop-blur p-1.5 rounded shadow border border-gray-200 hover:bg-white transition"
+                            className="bg-white/90 p-1.5 rounded shadow border border-gray-200 hover:bg-white"
                             title="Fit All Drivers"
                           >
                             <Navigation size={14} className="text-gray-700" />
@@ -4027,7 +4027,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                           return (
                             <div
                               key={ride.id}
-                              className="bg-gray-50 p-2 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+                              className="bg-gray-50 p-2 rounded-lg border border-gray-200 hover:bg-gray-100"
                             >
                               {/* Header Row: Room + Driver + Pax + Time */}
                               <div className="flex items-center justify-between gap-2">
@@ -4104,7 +4104,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   </h3>
                   <button
                     onClick={() => setShowMergeModal(false)}
-                    className="text-white hover:text-gray-200 transition min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center"
+                    className="text-white hover:text-gray-200 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center"
                   >
                     <X size={20} className="md:w-6 md:h-6" />
                   </button>
@@ -4802,7 +4802,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                     handleMergeRides(ride1.id!, ride2.id!);
                                     setShowMergeModal(false);
                                   }}
-                                  className={`px-3 md:px-3 py-2 md:py-1.5 rounded-md font-medium text-xs transition hover:scale-105 flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${isSameRoute
+                                  className={`px-3 md:px-3 py-2 md:py-1.5 rounded-md font-medium text-xs flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${isSameRoute
                                     ? "bg-green-500 text-white hover:bg-green-600"
                                     : "bg-blue-500 text-white hover:bg-blue-600"
                                     }`}
@@ -4822,7 +4822,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                 <div className="p-3 md:p-4 border-t bg-gray-50 flex justify-end">
                   <button
                     onClick={() => setShowMergeModal(false)}
-                    className="w-full sm:w-auto px-4 py-3 md:py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
+                    className="w-full sm:w-auto px-4 py-3 md:py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
                   >
                     Close
                   </button>
@@ -4833,7 +4833,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
           {/* Create New Ride Modal - Centered on Mobile */}
           {showCreateRideModal && (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
                 <div className="bg-white border-b border-gray-200 p-3 flex justify-between items-center z-10 rounded-t-2xl">
                   <h3 className="font-bold text-base md:text-lg text-gray-900">
@@ -4841,7 +4841,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   </h3>
                   <button
                     onClick={() => setShowCreateRideModal(false)}
-                    className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center"
+                    className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center"
                   >
                     <X size={20} />
                   </button>
@@ -4849,23 +4849,23 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
                 <div className="relative p-6 flex flex-col items-center bg-gradient-to-b from-blue-50/80 to-white border-b border-blue-100 overflow-hidden">
                   {/* Glowing background effect */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-blue-400/20 rounded-full blur-2xl animate-pulse pointer-events-none"></div>
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-blue-400/20 rounded-full pointer-events-none"></div>
 
                   <button
                     type="button"
                     onClick={handleVoiceAssistantStart}
-                    className="group relative w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-2xl shadow-blue-600/30 flex items-center justify-center hover:scale-110 transition-all duration-300 ring-4 ring-white z-10"
+                    className="group relative w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-2xl shadow-blue-600/30 flex items-center justify-center ring-4 ring-white z-10"
                   >
                     {/* Inner highlight */}
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/20 to-transparent opacity-0 group-hover:opacity-100"></div>
 
-                    <Mic size={32} className="md:w-10 md:h-10 drop-shadow-sm group-hover:drop-shadow-md transition-all" />
+                    <Mic size={32} className="md:w-10 md:h-10 drop-shadow-sm group-hover:drop-shadow-md" />
 
                     {isListening && (
                       <>
                         <span className="absolute inset-0 rounded-full border-4 border-red-400/50 animate-ping"></span>
                         <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 border-2 border-white rounded-full flex items-center justify-center shadow-sm">
-                          <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                          <span className="w-2 h-2 bg-white rounded-full"></span>
                         </span>
                       </>
                     )}
@@ -4907,7 +4907,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             setPickupSearchQuery("");
                           }
                         }}
-                        className="w-full px-2.5 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base shadow-sm min-h-[44px] transition-colors"
+                        className="w-full px-2.5 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base shadow-sm min-h-[44px]"
                       />
                     </div>
                     <div>
@@ -4924,7 +4924,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             guestName: e.target.value,
                           }))
                         }
-                        className="w-full px-2.5 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base shadow-sm min-h-[44px] transition-colors"
+                        className="w-full px-2.5 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base shadow-sm min-h-[44px]"
                       />
                     </div>
                     {/* Row 2: Pickup + Destination */}
@@ -4942,7 +4942,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                           setLocationFilterType("ALL");
                           setPickupSearchQuery("");
                         }}
-                        className="w-full px-2.5 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 hover:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer placeholder:text-gray-400 text-base shadow-sm min-h-[44px] touch-manipulation transition-colors"
+                        className="w-full px-2.5 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 hover:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer placeholder:text-gray-400 text-base shadow-sm min-h-[44px] touch-manipulation"
                       />
                     </div>
                     <div>
@@ -4962,7 +4962,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                           setLocationFilterType("ALL");
                           setDestinationSearchQuery("");
                         }}
-                        className="w-full px-2.5 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 hover:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer placeholder:text-gray-400 text-base shadow-sm min-h-[44px] touch-manipulation transition-colors"
+                        className="w-full px-2.5 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 hover:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 cursor-pointer placeholder:text-gray-400 text-base shadow-sm min-h-[44px] touch-manipulation"
                       />
                     </div>
                     {/* Row 3: Guest Count + Notes (compact) */}
@@ -4974,7 +4974,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                         <button
                           type="button"
                           onClick={() => setNewRideData(p => ({ ...p, guestCount: Math.max(1, (p.guestCount || 1) - 1) }))}
-                          className="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-gray-200 border-2 border-gray-300 flex items-center justify-center text-gray-700 hover:bg-gray-300 active:bg-gray-400 touch-manipulation font-bold text-xl transition-colors"
+                          className="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-gray-200 border-2 border-gray-300 flex items-center justify-center text-gray-700 hover:bg-gray-300 active:bg-gray-400 touch-manipulation font-bold text-xl"
                         >
                           -
                         </button>
@@ -4984,7 +4984,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                         <button
                           type="button"
                           onClick={() => setNewRideData(p => ({ ...p, guestCount: Math.min(7, (p.guestCount || 1) + 1) }))}
-                          className="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-gray-200 border-2 border-gray-300 flex items-center justify-center text-gray-700 hover:bg-gray-300 active:bg-gray-400 touch-manipulation font-bold text-xl transition-colors"
+                          className="w-10 h-10 md:w-11 md:h-11 rounded-lg bg-gray-200 border-2 border-gray-300 flex items-center justify-center text-gray-700 hover:bg-gray-300 active:bg-gray-400 touch-manipulation font-bold text-xl"
                         >
                           +
                         </button>
@@ -5004,7 +5004,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                             notes: e.target.value,
                           }))
                         }
-                        className="w-full px-2.5 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base shadow-sm min-h-[44px] transition-colors"
+                        className="w-full px-2.5 py-2 border-2 border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base shadow-sm min-h-[44px]"
                       />
                     </div>
                   </div>
@@ -5014,7 +5014,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                 <div className="p-3 md:p-4 border-t bg-gray-50 flex justify-end gap-3 z-10 rounded-b-2xl">
                   <button
                     onClick={() => setShowCreateRideModal(false)}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors min-h-[44px] md:min-h-0"
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 min-h-[44px] md:min-h-0"
                     disabled={isCreatingRide}
                   >
                     Hủy
@@ -5022,7 +5022,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   <button
                     onClick={handleCreateRide}
                     disabled={isCreatingRide || !newRideData.roomNumber || !newRideData.pickup || !newRideData.destination}
-                    className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20 flex items-center gap-2 min-h-[44px] md:min-h-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 flex items-center gap-2 min-h-[44px] md:min-h-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isCreatingRide ? (
                       <>
@@ -5060,7 +5060,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                         setDestinationSearchQuery("");
                       }
                     }}
-                    className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center"
+                    className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center"
                   >
                     <X size={20} />
                   </button>
@@ -5079,7 +5079,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     <button
                       onClick={() => setLocationFilterType("ALL")}
-                      className={`px-3 md:px-4 py-2.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition whitespace-nowrap flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${locationFilterType === "ALL"
+                      className={`px-3 md:px-4 py-2.5 md:py-2 rounded-lg text-xs md:text-sm font-medium whitespace-nowrap flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${locationFilterType === "ALL"
                         ? "bg-emerald-600 text-white"
                         : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                         }`}
@@ -5088,7 +5088,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                     </button>
                     <button
                       onClick={() => setLocationFilterType("RESTAURANT")}
-                      className={`px-3 md:px-4 py-2.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition whitespace-nowrap flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${locationFilterType === "RESTAURANT"
+                      className={`px-3 md:px-4 py-2.5 md:py-2 rounded-lg text-xs md:text-sm font-medium whitespace-nowrap flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${locationFilterType === "RESTAURANT"
                         ? "bg-emerald-600 text-white"
                         : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                         }`}
@@ -5097,7 +5097,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                     </button>
                     <button
                       onClick={() => setLocationFilterType("FACILITY")}
-                      className={`px-3 md:px-4 py-2.5 md:py-2 rounded-lg text-xs md:text-sm font-medium transition whitespace-nowrap flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${locationFilterType === "FACILITY"
+                      className={`px-3 md:px-4 py-2.5 md:py-2 rounded-lg text-xs md:text-sm font-medium whitespace-nowrap flex-shrink-0 min-h-[44px] md:min-h-0 touch-manipulation ${locationFilterType === "FACILITY"
                         ? "bg-emerald-600 text-white"
                         : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                         }`}
@@ -5144,7 +5144,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                               setDestinationSearchQuery("");
                             }
                           }}
-                          className={`w-full text-center p-3 md:p-2.5 rounded-lg transition text-xs md:text-sm min-h-[44px] md:min-h-0 touch-manipulation ${isSelected ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-white text-gray-900 hover:bg-gray-100 border border-gray-200"}`}
+                          className={`w-full text-center p-3 md:p-2.5 rounded-lg text-xs md:text-sm min-h-[44px] md:min-h-0 touch-manipulation ${isSelected ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-white text-gray-900 hover:bg-gray-100 border border-gray-200"}`}
                         >
                           {loc.name}
                         </button>
@@ -5331,14 +5331,14 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
 
           return (
             <div
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+              className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
               onClick={() => setShowDetailRequestModal(false)}
             >
               <div
                 className="backdrop-blur-xl bg-white rounded-2xl shadow-2xl w-[95vw] sm:w-full max-w-lg max-h-[90vh] overflow-y-auto border-2 border-gray-200 flex flex-col"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 p-4 md:p-5 flex justify-between items-center z-10">
+                <div className="sticky top-0 bg-white/95 border-b border-gray-200 p-4 md:p-5 flex justify-between items-center z-10">
                   <div className="min-w-0 flex-1">
                     <h3 className="font-bold text-base md:text-lg text-gray-900">
                       Ride Request Details
@@ -5346,7 +5346,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                   </div>
                   <button
                     onClick={() => setShowDetailRequestModal(false)}
-                    className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center flex-shrink-0"
+                    className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center flex-shrink-0"
                   >
                     <X size={20} />
                   </button>
@@ -5408,7 +5408,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                 <div className="p-3 md:p-4 border-t bg-gray-50 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 rounded-b-xl">
                   <button
                     onClick={() => setShowDetailRequestModal(false)}
-                    className="w-full sm:w-auto px-4 py-3 md:py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
+                    className="w-full sm:w-auto px-4 py-3 md:py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
                   >
                     Close
                   </button>
@@ -5418,7 +5418,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                       setSelectedRideForAssign(selectedRideForDetail);
                       setShowManualAssignModal(true);
                     }}
-                    className="w-full sm:w-auto px-4 py-3 md:py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-medium flex items-center justify-center gap-2 text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
+                    className="w-full sm:w-auto px-4 py-3 md:py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium flex items-center justify-center gap-2 text-base md:text-sm min-h-[44px] md:min-h-0 touch-manipulation"
                   >
                     <Car size={16} />
                     Assign Driver
@@ -5433,14 +5433,14 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
       {
         showManualAssignModal && selectedRideForAssign && (
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
             onClick={() => setShowManualAssignModal(false)}
           >
             <div
               className="backdrop-blur-xl bg-white rounded-2xl shadow-2xl w-[95vw] sm:w-full max-w-2xl max-h-[90vh] overflow-y-auto border-2 border-gray-200"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 p-4 md:p-5 flex justify-between items-center z-10">
+              <div className="sticky top-0 bg-white/95 border-b border-gray-200 p-4 md:p-5 flex justify-between items-center z-10">
                 <div className="min-w-0 flex-1 pr-2">
                   <h3 className="font-bold text-base md:text-lg text-gray-900">
                     Assign Driver
@@ -5453,7 +5453,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                 </div>
                 <button
                   onClick={() => setShowManualAssignModal(false)}
-                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center flex-shrink-0"
+                  className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 touch-manipulation flex items-center justify-center flex-shrink-0"
                 >
                   <X size={20} />
                 </button>
@@ -5545,7 +5545,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
                                   key={driver.id}
                                   onClick={() => handleAssignDriver(driver)}
                                   disabled={driverStatus.status === "busy"}
-                                  className={`p-3 md:p-4 rounded-lg border-2 transition-all text-left min-h-[60px] md:min-h-0 touch-manipulation ${driverStatus.status === "busy"
+                                  className={`p-3 md:p-4 rounded-lg border-2 text-left min-h-[60px] md:min-h-0 touch-manipulation ${driverStatus.status === "busy"
                                     ? "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
                                     : "border-emerald-200 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100 cursor-pointer"
                                     }`}
@@ -5980,7 +5980,7 @@ const ReceptionPortal: React.FC<ReceptionPortalProps> = ({
         viewMode === "BUGGY" && !showCreateRideModal && (
           <button
             onClick={handleVoiceAssistantStart}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-full w-20 h-20 md:w-16 md:h-16 flex items-center justify-center transition-all z-50 touch-manipulation hover:scale-110 active:scale-95"
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-full w-20 h-20 md:w-16 md:h-16 flex items-center justify-center z-50 touch-manipulation"
             style={{
               boxShadow: "0 8px 30px -4px rgba(16, 185, 129, 0.6), 0 4px 15px rgba(16, 185, 129, 0.3)",
             }}

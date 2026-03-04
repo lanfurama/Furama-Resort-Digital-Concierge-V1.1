@@ -122,19 +122,19 @@ const ActiveOrders: React.FC<ActiveOrdersProps> = ({ user, onBack }) => {
     return (
         <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative">
              {/* Header - Modern Design */}
-            <div className="px-3 py-2 text-white shadow-lg backdrop-blur-md bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 flex items-center z-10 sticky top-0 border-b border-white/20"
+            <div className="px-3 py-2 text-white shadow-lg bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 flex items-center z-10 sticky top-0 border-b border-white/20"
                 style={{
                     boxShadow: '0 4px 20px -5px rgba(0,0,0,0.2)'
                 }}
             >
                 <button 
                     onClick={onBack} 
-                    className="mr-2 text-white/90 hover:text-white hover:bg-white/10 rounded-full p-1 transition-all"
+                    className="mr-2 text-white/90 hover:text-white hover:bg-white/10 rounded-full p-1"
                 >
                     <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
                 </button>
                 <div className="flex items-center gap-2 flex-1">
-                    <div className="w-7 h-7 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+                    <div className="w-7 h-7 rounded-xl bg-white/20 flex items-center justify-center border border-white/30">
                         <ShoppingBag className="w-3.5 h-3.5" />
                     </div>
                     <div>
@@ -146,13 +146,13 @@ const ActiveOrders: React.FC<ActiveOrdersProps> = ({ user, onBack }) => {
 
             {/* Service Type Filter */}
             <div className="px-3 pb-2 pt-2">
-                <div className="flex flex-wrap items-center gap-2 bg-white/80 rounded-lg border border-gray-200/60 p-2 backdrop-blur-sm">
+                <div className="flex flex-wrap items-center gap-2 bg-white/80 rounded-lg border border-gray-200/60 p-2">
                     <span className="text-xs font-semibold text-gray-600 mr-1">Filter:</span>
                     {(['ALL', 'DINING', 'SPA', 'POOL', 'BUTLER', 'HOUSEKEEPING'] as const).map(type => (
                         <button
                             key={type}
                             onClick={() => setServiceTypeFilter(type)}
-                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold ${
                                 serviceTypeFilter === type
                                     ? type === 'ALL'
                                         ? 'bg-emerald-600 text-white shadow-md'
@@ -189,7 +189,7 @@ const ActiveOrders: React.FC<ActiveOrdersProps> = ({ user, onBack }) => {
                     </div>
                 ) : (
                     filteredOrders.map((req, i) => (
-                        <div key={i} className="backdrop-blur-sm bg-white/95 p-4 rounded-xl shadow-md border-2 border-gray-200/60 flex flex-col transition-all hover:shadow-lg"
+                        <div key={i} className="backdrop-blur-sm bg-white/95 p-4 rounded-xl shadow-md border-2 border-gray-200/60 flex flex-col hover:shadow-lg"
                             style={{
                                 boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1)'
                             }}
@@ -284,7 +284,7 @@ const ActiveOrders: React.FC<ActiveOrdersProps> = ({ user, onBack }) => {
                                 {req.status === 'PENDING' && (
                                     <button 
                                         onClick={() => requestCancelConfirm(req)}
-                                        className="w-full py-2.5 flex items-center justify-center text-xs text-red-700 font-bold bg-red-50 hover:bg-red-100 rounded-lg transition-all border-2 border-red-200"
+                                        className="w-full py-2.5 flex items-center justify-center text-xs text-red-700 font-bold bg-red-50 hover:bg-red-100 rounded-lg border-2 border-red-200"
                                     >
                                         <X size={14} className="mr-1.5" strokeWidth={2.5} />
                                         Cancel Request
@@ -295,7 +295,7 @@ const ActiveOrders: React.FC<ActiveOrdersProps> = ({ user, onBack }) => {
                                 {(req.status === 'PENDING' || req.status === 'CONFIRMED') && (
                                     <button 
                                         onClick={() => setActiveChat({ type: req.type, label: getChatLabel(req.type) })}
-                                        className="w-full py-2.5 flex items-center justify-center text-xs text-emerald-700 font-bold bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-all border-2 border-emerald-200"
+                                        className="w-full py-2.5 flex items-center justify-center text-xs text-emerald-700 font-bold bg-emerald-50 hover:bg-emerald-100 rounded-lg border-2 border-emerald-200"
                                     >
                                         <MessageSquarePlus size={14} className="mr-1.5" strokeWidth={2.5} />
                                         {t('chat_with')} {getChatLabel(req.type)}
@@ -309,7 +309,7 @@ const ActiveOrders: React.FC<ActiveOrdersProps> = ({ user, onBack }) => {
 
             {/* Cancel confirm modal */}
             {pendingCancelRequest && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={() => setPendingCancelRequest(null)}>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4" onClick={() => setPendingCancelRequest(null)}>
                     <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-5 border-2 border-gray-200" onClick={e => e.stopPropagation()}>
                         <p className="text-gray-800 font-medium mb-1">{t('active_orders_confirm_cancel_title') || 'Cancel request?'}</p>
                         <p className="text-sm text-gray-600 mb-4">

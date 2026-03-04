@@ -341,7 +341,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
     if (isOrderPlaced) {
         return (
             <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-emerald-50 via-teal-50 to-blue-50 p-8 text-center">
-                <div className="w-24 h-24 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-3xl flex items-center justify-center mb-6 shadow-2xl shadow-emerald-300/50 animate-pulse">
+                <div className="w-24 h-24 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-3xl flex items-center justify-center mb-6 shadow-2xl shadow-emerald-300/50">
                     <Sparkles className="w-12 h-12 text-white" />
                 </div>
                 <h2 className="text-3xl font-bold mb-3 text-gray-800">{t('request_received')}</h2>
@@ -356,11 +356,11 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
     return (
         <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 via-blue-50/30 to-emerald-50/20 relative overflow-x-hidden">
             {/* Header with gradient and glassmorphism */}
-            <div className={`p-2 text-white shadow-lg backdrop-blur-md bg-gradient-to-r ${config.gradient} flex items-center justify-between z-10 border-b border-white/20 overflow-x-hidden`}>
+            <div className={`p-2 text-white shadow-lg bg-gradient-to-r ${config.gradient} flex items-center justify-between z-10 border-b border-white/20 overflow-x-hidden`}>
                 <div className="flex items-center flex-1 min-w-0">
                     <button
                         onClick={onBack}
-                        className="mr-3 text-white/90 hover:text-white hover:bg-white/10 rounded-full p-2 transition-all duration-300 flex-shrink-0"
+                        className="mr-3 text-white/90 hover:text-white hover:bg-white/10 rounded-full p-2 flex-shrink-0"
                     >
                         <ArrowLeft className="w-5 h-5" />
                     </button>
@@ -370,7 +370,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                     </div>
                 </div>
                 <div className="relative ml-3 flex-shrink-0">
-                    <div className="p-2 rounded-full bg-white/10 backdrop-blur-sm">
+                    <div className="p-2 rounded-full bg-white/10">
                         <ShoppingBag className="w-5 h-5" />
                     </div>
                     {cart.length > 0 && (
@@ -413,7 +413,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                             handleSearchSubmit();
                                         }
                                     }}
-                                    className="w-full pl-10 pr-10 py-2 text-sm text-gray-900 placeholder:text-gray-400 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                    className="w-full pl-10 pr-10 py-2 text-sm text-gray-900 placeholder:text-gray-400 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
                                 />
                                 {searchQuery && (
                                     <button
@@ -421,7 +421,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                             setSearchQuery('');
                                             setShowSuggestions(false);
                                         }}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                                     >
                                         <X size={16} />
                                     </button>
@@ -437,7 +437,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                             <button
                                                 key={idx}
                                                 onClick={() => handleSuggestionClick(suggestion)}
-                                                className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-emerald-50 transition-colors flex items-center gap-2 border-b border-gray-100 last:border-b-0"
+                                                className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-emerald-50 flex items-center gap-2 border-b border-gray-100 last:border-b-0"
                                             >
                                                 <Clock size={14} className="text-gray-400 flex-shrink-0" />
                                                 <span className="flex-1 truncate">{suggestion}</span>
@@ -451,7 +451,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                                         setSearchHistory([]);
                                                         setShowSuggestions(false);
                                                     }}
-                                                    className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                                                    className="text-xs text-gray-500 hover:text-gray-700"
                                                 >
                                                     {language === 'Vietnamese' ? 'Xóa lịch sử' : 'Clear history'}
                                                 </button>
@@ -470,7 +470,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                         <select
                                             value={dietaryFilter}
                                             onChange={(e) => setDietaryFilter(e.target.value as 'ALL' | 'VEGETARIAN' | 'VEGAN')}
-                                            className="flex-1 min-w-0 text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                            className="flex-1 min-w-0 text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
                                         >
                                             <option value="ALL">{t('filter_all_dietary')}</option>
                                             <option value="VEGETARIAN">{t('filter_vegetarian')}</option>
@@ -486,7 +486,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                         <select
                                             value={durationFilter}
                                             onChange={(e) => setDurationFilter(e.target.value as 'ALL' | '15_MIN' | '30_MIN' | '1_HOUR' | '2_HOURS' | '4_HOURS')}
-                                            className="flex-1 min-w-0 text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                            className="flex-1 min-w-0 text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
                                         >
                                             <option value="ALL">{t('filter_all_duration')}</option>
                                             <option value="15_MIN">{t('filter_duration_15min')}</option>
@@ -504,7 +504,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                     <select
                                         value={priceFilter}
                                         onChange={(e) => setPriceFilter(e.target.value as 'ALL' | 'UNDER_100K' | '100K_300K' | '300K_500K' | 'OVER_500K')}
-                                        className="flex-1 min-w-0 text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                        className="flex-1 min-w-0 text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
                                     >
                                         <option value="ALL">{t('filter_all_prices')}</option>
                                         <option value="UNDER_100K">{t('filter_price_under_100k')}</option>
@@ -520,7 +520,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                     <select
                                         value={sortBy}
                                         onChange={(e) => setSortBy(e.target.value as 'NAME' | 'PRICE_LOW' | 'PRICE_HIGH')}
-                                        className="flex-1 min-w-0 text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                                        className="flex-1 min-w-0 text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
                                     >
                                         <option value="NAME">{t('sort_name_az')}</option>
                                         <option value="PRICE_LOW">{t('sort_price_low_high')}</option>
@@ -539,7 +539,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                 return (
                                     <div
                                         key={item.id}
-                                        className="bg-white/95 backdrop-blur-sm p-4 rounded-2xl shadow-lg border-2 border-gray-100/60 flex justify-between items-start gap-3 transition-all hover:shadow-xl hover:border-gray-200 overflow-hidden"
+                                        className="bg-white/95 p-4 rounded-2xl shadow-lg border-2 border-gray-100/60 flex justify-between items-start gap-3 hover:shadow-xl hover:border-gray-200 overflow-hidden"
                                         style={{
                                             boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1)'
                                         }}
@@ -553,7 +553,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                                         </div>
                                         <button
                                             onClick={() => addToCart(item)}
-                                            className={`flex-shrink-0 p-3 rounded-xl transition-all duration-300 ${config.lightBg} ${config.textColor} hover:shadow-lg border-2 ${config.borderColor}`}
+                                            className={`flex-shrink-0 p-3 rounded-xl ${config.lightBg} ${config.textColor} hover:shadow-lg border-2 ${config.borderColor}`}
                                             style={{
                                                 boxShadow: `0 4px 12px -2px rgba(0,0,0,0.1)`
                                             }}
@@ -588,7 +588,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
             {/* Cart Summary - Modern fixed footer */}
             {cart.length > 0 && (
                 <div
-                    className="fixed left-1/2 -translate-x-1/2 backdrop-blur-lg bg-white/95 border-t-2 border-gray-200/60 p-4 shadow-2xl z-30 max-w-md w-full"
+                    className="fixed left-1/2 -translate-x-1/2 bg-white/95 border-t-2 border-gray-200/60 p-4 shadow-2xl z-30 max-w-md w-full"
                     style={{
                         bottom: 'calc(5rem + 0.75rem)', // 80px nav + 12px gap for safety
                         boxShadow: '0 -10px 40px -10px rgba(0,0,0,0.2)',
@@ -598,7 +598,7 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                     <div className="w-full">
                         <div className="flex justify-between items-center mb-4 px-2">
                             <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full ${config.textColor} animate-pulse`} style={{
+                                <div className={`w-2 h-2 rounded-full ${config.textColor}`} style={{
                                     backgroundColor: config.textColor.includes('orange') ? '#ea580c' :
                                         config.textColor.includes('purple') ? '#9333ea' :
                                             config.textColor.includes('blue') ? '#2563eb' :
@@ -615,13 +615,13 @@ const ServiceBooking: React.FC<ServiceBookingProps> = React.memo(({ type, user, 
                         </div>
                         <button
                             onClick={handlePlaceOrder}
-                            className={`group relative w-full py-4 rounded-2xl font-bold text-base text-white shadow-2xl transition-all duration-300 overflow-hidden bg-gradient-to-r ${config.btnGradient} hover:shadow-2xl`}
+                            className={`group relative w-full py-4 rounded-2xl font-bold text-base text-white shadow-2xl overflow-hidden bg-gradient-to-r ${config.btnGradient} hover:shadow-2xl`}
                             style={{
                                 boxShadow: `0 10px 30px -5px rgba(0,0,0,0.3)`
                             }}
                         >
                             {/* Animated gradient overlay */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%]"></div>
                             <span className="relative z-10 flex items-center justify-center gap-2">
                                 <ShoppingBag className="w-5 h-5" />
                                 {t('place_order')}

@@ -7,7 +7,7 @@ interface SkeletonCardProps {
 export const SkeletonCard: React.FC<SkeletonCardProps> = ({ variant = 'menu-item' }) => {
     if (variant === 'menu-item') {
         return (
-            <div className="bg-white rounded-2xl p-4 border-2 border-gray-100 animate-pulse">
+            <div className="bg-white rounded-2xl p-4 border-2 border-gray-100">
                 <div className="flex gap-4">
                     {/* Image skeleton */}
                     <div className="w-24 h-24 bg-gray-200 rounded-xl flex-shrink-0" />
@@ -36,7 +36,7 @@ export const SkeletonCard: React.FC<SkeletonCardProps> = ({ variant = 'menu-item
 
     if (variant === 'service-card') {
         return (
-            <div className="relative flex flex-col items-center justify-center p-4 bg-gray-50 rounded-2xl border-2 border-gray-100 animate-pulse">
+            <div className="relative flex flex-col items-center justify-center p-4 bg-gray-50 rounded-2xl border-2 border-gray-100">
                 {/* Icon skeleton */}
                 <div className="p-3 rounded-xl mb-2 bg-gray-200 w-16 h-16" />
 
@@ -48,7 +48,7 @@ export const SkeletonCard: React.FC<SkeletonCardProps> = ({ variant = 'menu-item
 
     if (variant === 'order-card') {
         return (
-            <div className="bg-white rounded-2xl p-4 border-2 border-gray-100 animate-pulse">
+            <div className="bg-white rounded-2xl p-4 border-2 border-gray-100">
                 <div className="flex justify-between items-start mb-3">
                     <div className="space-y-2 flex-1">
                         <div className="h-4 bg-gray-200 rounded w-32" />

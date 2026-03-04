@@ -71,14 +71,14 @@ export const DriverHeader: React.FC<DriverHeaderProps> = ({
                     <button
                         type="button"
                         onClick={() => setLanguage('English')}
-                        className={`min-h-[36px] min-w-[32px] sm:min-h-[40px] sm:min-w-[40px] md:min-h-0 md:min-w-0 px-1.5 sm:px-2 md:px-2.5 py-1.5 sm:py-2 md:py-1.5 text-[10px] sm:text-xs md:text-sm font-bold rounded transition-colors touch-manipulation ${language === 'English' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 active:bg-gray-200'}`}
+                        className={`min-h-[36px] min-w-[32px] sm:min-h-[40px] sm:min-w-[40px] md:min-h-0 md:min-w-0 px-1.5 sm:px-2 md:px-2.5 py-1.5 sm:py-2 md:py-1.5 text-[10px] sm:text-xs md:text-sm font-bold rounded touch-manipulation ${language === 'English' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 active:bg-gray-200'}`}
                     >
                         {t('driver_lang_en')}
                     </button>
                     <button
                         type="button"
                         onClick={() => setLanguage('Vietnamese')}
-                        className={`min-h-[36px] min-w-[32px] sm:min-h-[40px] sm:min-w-[40px] md:min-h-0 md:min-w-0 px-1.5 sm:px-2 md:px-2.5 py-1.5 sm:py-2 md:py-1.5 text-[10px] sm:text-xs md:text-sm font-bold rounded transition-colors touch-manipulation ${language === 'Vietnamese' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 active:bg-gray-200'}`}
+                        className={`min-h-[36px] min-w-[32px] sm:min-h-[40px] sm:min-w-[40px] md:min-h-0 md:min-w-0 px-1.5 sm:px-2 md:px-2.5 py-1.5 sm:py-2 md:py-1.5 text-[10px] sm:text-xs md:text-sm font-bold rounded touch-manipulation ${language === 'Vietnamese' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 active:bg-gray-200'}`}
                     >
                         {t('driver_lang_vi')}
                     </button>
@@ -87,7 +87,7 @@ export const DriverHeader: React.FC<DriverHeaderProps> = ({
                     <button
                         type="button"
                         onClick={onSoundToggle}
-                        className={`min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center rounded-lg transition-colors touch-manipulation flex-shrink-0 ${soundEnabled ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:bg-gray-100'}`}
+                        className={`min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center rounded-lg touch-manipulation flex-shrink-0 ${soundEnabled ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:bg-gray-100'}`}
                         title={t('driver_alert_sound')}
                         aria-label={t('driver_alert_sound')}
                         aria-pressed={soundEnabled}
@@ -99,7 +99,7 @@ export const DriverHeader: React.FC<DriverHeaderProps> = ({
                     <button
                         type="button"
                         onClick={onVibrateToggle}
-                        className={`min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center rounded-lg transition-colors touch-manipulation flex-shrink-0 ${vibrateEnabled ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:bg-gray-100'}`}
+                        className={`min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center rounded-lg touch-manipulation flex-shrink-0 ${vibrateEnabled ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:bg-gray-100'}`}
                         title={t('driver_alert_vibrate')}
                         aria-label={t('driver_alert_vibrate')}
                         aria-pressed={vibrateEnabled}
@@ -115,7 +115,7 @@ export const DriverHeader: React.FC<DriverHeaderProps> = ({
                 <button
                     type="button"
                     onClick={onLogout}
-                    className="p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl hover:bg-red-50 active:bg-red-100 transition-all text-gray-500 hover:text-red-600 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center touch-manipulation flex-shrink-0"
+                    className="p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl hover:bg-red-50 active:bg-red-100 text-gray-500 hover:text-red-600 min-w-[36px] min-h-[36px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center touch-manipulation flex-shrink-0"
                     title={t('logout')}
                     aria-label={t('logout')}
                 >

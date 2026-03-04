@@ -57,7 +57,7 @@ export const DriverLogin: React.FC<DriverLoginProps> = ({ onLoginSuccess, setLan
       {/* Back Button */}
       <button
         onClick={() => navigate('/fu25ad/login')}
-        className="absolute top-4 left-4 z-20 text-gray-600 hover:text-gray-900 transition flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow border border-gray-200 hover:border-gray-300 text-sm font-medium"
+        className="absolute top-4 left-4 z-20 text-gray-600 hover:text-gray-900 flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow border border-gray-200 hover:border-gray-300 text-sm font-medium"
       >
         <ArrowLeft size={16} />
         <span>Back to Role Selection</span>
@@ -135,7 +135,7 @@ export const DriverLogin: React.FC<DriverLoginProps> = ({ onLoginSuccess, setLan
           <button
             type="submit"
             disabled={isAuthLoading}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-lg shadow-sm transition-colors active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-lg shadow-sm active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2"
           >
             {isAuthLoading ? (
               <>

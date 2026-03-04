@@ -349,7 +349,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                 >
                     {/* Chat Window */}
                     <div 
-                        className="bg-white w-full max-w-md rounded-2xl shadow-2xl border-2 border-emerald-200 flex flex-col overflow-hidden pointer-events-auto animate-in zoom-in-95 fade-in"
+                        className="bg-white w-full max-w-md rounded-2xl shadow-2xl border-2 border-emerald-200 flex flex-col overflow-hidden pointer-events-auto"
                         onClick={(e) => e.stopPropagation()}
                         style={{ 
                             zIndex: 100000,
@@ -366,7 +366,7 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                              </div>
                              <div className="min-w-0 flex-1">
                                  <h3 className="font-bold text-sm truncate">Chat with {label}</h3>
-                                 <p className="text-[10px] opacity-90 flex items-center"><span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1 animate-pulse"></span> Online</p>
+                                 <p className="text-[10px] opacity-90 flex items-center"><span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1"></span> Online</p>
                              </div>
                         </div>
                         
@@ -374,18 +374,18 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                             {/* Language Selector Toggle */}
                             <button 
                                 onClick={() => setShowLangSelector(!showLangSelector)}
-                                className={`p-1.5 rounded-full hover:bg-white/20 transition ${targetLang !== 'Original' ? 'text-amber-300' : 'text-white'}`}
+                                className={`p-1.5 rounded-full hover:bg-white/20 ${targetLang !== 'Original' ? 'text-amber-300' : 'text-white'}`}
                                 title="Translate Chat"
                             >
                                 <Globe size={16} />
                             </button>
-                            <button onClick={handleClose} className="hover:bg-white/20 p-1.5 rounded-full transition"><X size={18}/></button>
+                            <button onClick={handleClose} className="hover:bg-white/20 p-1.5 rounded-full"><X size={18}/></button>
                         </div>
 
                         {/* Language Dropdown */}
                         {showLangSelector && (
                             <div 
-                                className="absolute top-full mt-2 right-0 bg-white text-gray-800 rounded-lg shadow-xl border border-gray-200 py-2 w-40 animate-in fade-in zoom-in-95"
+                                className="absolute top-full mt-2 right-0 bg-white text-gray-800 rounded-lg shadow-xl border border-gray-200 py-2 w-40"
                                 style={{ zIndex: 100000 }}
                             >
                                 <p className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase">Translate to</p>
@@ -455,12 +455,12 @@ const ServiceChat: React.FC<ServiceChatProps> = ({
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                             placeholder={`Type a message${targetLang !== 'Original' ? ' (Auto-translating for ' + (userRole === 'user' ? 'Staff' : 'Guest') + ')' : ''}...`}
-                            className="flex-1 bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                            className="flex-1 bg-gray-50 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                         />
                         <button 
                             onClick={handleSend}
                             disabled={!input.trim()}
-                            className="p-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-full hover:from-emerald-700 hover:to-emerald-800 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                            className="p-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-full hover:from-emerald-700 hover:to-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
                         >
                             <Send size={16} />
                         </button>

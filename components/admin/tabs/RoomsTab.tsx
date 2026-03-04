@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Pencil, X, Upload, List, Grid3x3 } from 'lucide-react';
+import { Plus, Trash2, Pencil, X, Upload, List, Grid3x3, Loader2, RefreshCw } from 'lucide-react';
 import { RoomType, Room, Location } from '../../../types';
 import { addRoomType, updateRoomType, getRoomTypes, getLocations, addRoom, updateRoom, getRooms, importRoomsFromCSV } from '../../../services/dataService';
+import { useToast } from '../../../hooks/useToast';
 
 interface RoomsTabProps {
     roomTypes: RoomType[];
@@ -24,6 +25,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
     setRooms,
     setLocations
 }) => {
+    const toast = useToast();
     const [roomView, setRoomView] = useState<'TYPES' | 'LIST'>('TYPES');
     const [showRoomTypeForm, setShowRoomTypeForm] = useState(false);
     const [editingRoomType, setEditingRoomType] = useState<RoomType | null>(null);
@@ -33,12 +35,23 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
     const [editingRoom, setEditingRoom] = useState<Room | null>(null);
     const [newRoom, setNewRoom] = useState<Partial<Room>>({ number: '', typeId: '', status: 'Available', managementType: 'FURAMA_MANAGED' });
     const [roomCsvFile, setRoomCsvFile] = useState<File | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        try {
+            await onRefresh();
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const handleAddRoomType = async () => {
         if (!newRoomType.name) {
-            alert('Please enter a room type name.');
+            toast.error('Please enter a room type name.');
             return;
         }
+        setIsSaving(true);
         try {
             if (editingRoomType) {
                 const updated = await updateRoomType(editingRoomType.id, {
@@ -48,7 +61,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
                     isVIP: newRoomType.isVIP || false
                 });
                 setEditingRoomType(null);
-                alert(`Room type "${updated.name}" updated successfully!`);
+                toast.success(`Room type "${updated.name}" updated successfully!`);
             } else {
                 const created = await addRoomType({
                     id: '',
@@ -57,7 +70,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
                     locationId: newRoomType.locationId || '',
                     isVIP: newRoomType.isVIP || false
                 });
-                alert(`Room type "${created.name}" created successfully!`);
+                toast.success(`Room type "${created.name}" created successfully!`);
             }
             setNewRoomType({ name: '', description: '', locationId: '', isVIP: false });
             setShowRoomTypeForm(false);
@@ -68,22 +81,25 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
             await onRefresh();
         } catch (error: any) {
             console.error('Failed to save room type:', error);
-            alert(`Failed to save room type: ${error?.message || 'Unknown error'}`);
+            toast.error(`Failed to save room type: ${error?.message || 'Unknown error'}`);
+        } finally {
+            setIsSaving(false);
         }
     };
 
     const handleAddRoom = async () => {
         if (!newRoom.number || !newRoom.typeId) {
-            alert('Please enter room number and select a type.');
+            toast.error('Please enter room number and select a type.');
             return;
         }
+        setIsSaving(true);
         try {
             if (editingRoom) {
                 await updateRoom(editingRoom.id, newRoom as Room);
-                alert(`Room ${newRoom.number} updated successfully!`);
+                toast.success(`Room ${newRoom.number} updated successfully!`);
             } else {
                 await addRoom(newRoom as Room);
-                alert(`Room ${newRoom.number} added successfully!`);
+                toast.success(`Room ${newRoom.number} added successfully!`);
             }
             setShowRoomForm(false);
             const refreshedRooms = await getRooms();
@@ -91,7 +107,9 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
             await onRefresh();
         } catch (error) {
             console.error('Failed to save room:', error);
-            alert('Failed to save room.');
+            toast.error('Failed to save room.');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -100,13 +118,13 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
         try {
             const text = await roomCsvFile.text();
             await importRoomsFromCSV(text);
-            alert('Rooms imported successfully!');
+            toast.success('Rooms imported successfully!');
             setRoomCsvFile(null);
             const refreshedRooms = await getRooms();
             setRooms(refreshedRooms);
             await onRefresh();
         } catch (error: any) {
-            alert(`Failed to import rooms: ${error?.message || 'Unknown error'}`);
+            toast.error(`Failed to import rooms: ${error?.message || 'Unknown error'}`);
         }
     };
 
@@ -118,6 +136,14 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
                     {roomView === 'TYPES' ? 'Room Definitions' : 'Room Inventory'}
                 </h2>
                 <div className="flex items-center space-x-2">
+                    <button
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-70"
+                        title="Refresh"
+                    >
+                        <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
+                    </button>
                     <div className="flex bg-white rounded-lg border border-gray-200 p-1">
                         <button onClick={() => setRoomView('TYPES')} className={`px-3 py-1 text-xs rounded flex items-center gap-1.5 ${roomView === 'TYPES' ? 'bg-emerald-100 text-emerald-800 font-bold' : 'text-gray-500'}`}>
                             <Grid3x3 size={14} />
@@ -135,7 +161,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
                                 setNewRoomType({ name: '', description: '', locationId: '', isVIP: false });
                                 setShowRoomTypeForm(!showRoomTypeForm);
                             }}
-                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md active:scale-95"
+                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md"
                         >
                             {showRoomTypeForm ? <X size={18} /> : <Plus size={18} />}
                             <span>{showRoomTypeForm ? 'Cancel' : 'Add Type'}</span>
@@ -148,7 +174,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
                                 setNewRoom({ number: '', typeId: '', status: 'Available', managementType: 'FURAMA_MANAGED' });
                                 setShowRoomForm(!showRoomForm);
                             }}
-                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md active:scale-95"
+                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md"
                         >
                             {showRoomForm ? <X size={18} /> : <Plus size={18} />}
                             <span>{showRoomForm ? 'Cancel' : 'Add Room'}</span>
@@ -221,8 +247,10 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
                         )}
                         <button
                             onClick={handleAddRoomType}
-                            className="bg-emerald-800 text-white px-6 py-2 rounded-lg text-sm font-bold"
+                            disabled={isSaving}
+                            className="bg-emerald-800 text-white px-6 py-2 rounded-lg text-sm font-bold disabled:opacity-70 flex items-center gap-2"
                         >
+                            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                             {editingRoomType ? 'Update Type' : 'Create Type'}
                         </button>
                     </div>
@@ -283,13 +311,16 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({
                                     </select>
                                 </div>
                             </div>
-                            <button onClick={handleAddRoom} className="bg-emerald-800 text-white px-4 py-2 rounded-lg text-sm font-bold w-full">Add Room</button>
+                            <button onClick={handleAddRoom} disabled={isSaving} className="bg-emerald-800 text-white px-4 py-2 rounded-lg text-sm font-bold w-full disabled:opacity-70 flex items-center justify-center gap-2">
+                                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                                Add Room
+                            </button>
                         </div>
                         <div className="w-px bg-gray-200 hidden md:block"></div>
                         <div className="flex-1">
                             <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase">Bulk Import Rooms (CSV)</h3>
                             <p className="text-xs text-gray-500 mb-4">Format: RoomNumber, RoomTypeName (Must match existing Type)</p>
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center  active:scale-95 cursor-pointer relative">
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center  cursor-pointer relative">
                                 <input type="file" accept=".csv" onChange={(e) => setRoomCsvFile(e.target.files?.[0] || null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                                 <Upload className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
                                 <p className="text-sm text-gray-600 font-medium">{roomCsvFile ? roomCsvFile.name : 'Click to Upload CSV'}</p>

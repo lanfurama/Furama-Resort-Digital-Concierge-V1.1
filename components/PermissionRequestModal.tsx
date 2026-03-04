@@ -42,12 +42,12 @@ const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             {/* Backdrop */}
             <div
-                className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+                className="absolute inset-0 bg-black/40"
                 onClick={onCancel}
             />
 
             {/* Modal Content */}
-            <div className="relative bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-white/20">
+            <div className="relative bg-white/95 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-white/20">
 
                 {/* Header Decoration */}
                 <div className={`h-2 w-full ${type === 'microphone' ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-blue-500 to-cyan-500'}`} />
@@ -55,7 +55,7 @@ const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({
                 <div className="p-6">
                     <button
                         onClick={onCancel}
-                        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
+                        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100"
                     >
                         <X size={20} />
                     </button>
@@ -90,7 +90,7 @@ const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({
                         <div className="flex flex-col gap-3 w-full">
                             <button
                                 onClick={onConfirm}
-                                className={`w-full py-3 px-4 rounded-xl font-bold text-white shadow-lg transition-all hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2
+                                className={`w-full py-3 px-4 rounded-xl font-bold text-white shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2
                   ${type === 'microphone'
                                         ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
                                         : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700'
@@ -102,7 +102,7 @@ const PermissionRequestModal: React.FC<PermissionRequestModalProps> = ({
 
                             <button
                                 onClick={onCancel}
-                                className="w-full py-3 px-4 rounded-xl font-semibold text-gray-500 hover:bg-gray-100 transition-colors"
+                                className="w-full py-3 px-4 rounded-xl font-semibold text-gray-500 hover:bg-gray-100"
                             >
                                 {t('not_now') || 'Not Now'}
                             </button>

@@ -243,7 +243,7 @@ const DriverPortal: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                 <button
                     type="button"
                     onClick={() => setShowCreateModal(true)}
-                    className="fixed right-4 md:right-6 w-14 h-14 sm:w-16 sm:h-16 md:w-[4.5rem] md:h-[4.5rem] bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl md:rounded-3xl shadow-2xl flex items-center justify-center text-white z-40 border-2 md:border-4 border-white/50 hover:shadow-emerald-500/60 hover:scale-105 active:scale-95 transition-transform touch-manipulation"
+                    className="fixed right-4 md:right-6 w-14 h-14 sm:w-16 sm:h-16 md:w-[4.5rem] md:h-[4.5rem] bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl md:rounded-3xl shadow-2xl flex items-center justify-center text-white z-40 border-2 md:border-4 border-white/50 hover:shadow-emerald-500/60 touch-manipulation"
                     style={{
                         bottom: 'max(5.5rem, calc(5.5rem + env(safe-area-inset-bottom, 0px)))',
                         boxShadow: '0 12px 32px -4px rgba(16, 185, 129, 0.45)'

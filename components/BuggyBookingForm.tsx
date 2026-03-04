@@ -256,7 +256,7 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
           disabled={!destination || isBooking}
           className={`w-full py-4 min-h-[48px] rounded-xl font-bold text-base shadow flex items-center justify-center gap-2 touch-manipulation ${
             destination && !isBooking
-              ? 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.99] cursor-pointer'
+              ? 'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer'
               : 'bg-gray-200 text-gray-500 cursor-not-allowed opacity-60'
           }`}
           style={{ transform: 'translateZ(0)' }}

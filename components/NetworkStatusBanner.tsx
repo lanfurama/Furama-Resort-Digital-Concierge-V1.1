@@ -28,7 +28,7 @@ export const NetworkStatusBanner: React.FC<NetworkStatusBannerProps> = memo(({
   if (isOnline && wasOffline && showWhenOnline) {
     return (
       <div
-        className={`fixed ${position === 'top' ? 'top-0' : 'bottom-0'} left-0 right-0 z-[9999] bg-emerald-500 text-white px-4 py-3 shadow-lg transition-transform duration-300 ease-out animate-slide-down`}
+        className={`fixed ${position === 'top' ? 'top-0' : 'bottom-0'} left-0 right-0 z-[9999] bg-emerald-500 text-white px-4 py-3 shadow-lg animate-slide-down`}
         style={{
           transform: 'translateZ(0)',
           willChange: 'transform',
@@ -48,7 +48,7 @@ export const NetworkStatusBanner: React.FC<NetworkStatusBannerProps> = memo(({
   if (!isOnline) {
     return (
       <div
-        className={`fixed ${position === 'top' ? 'top-0' : 'bottom-0'} left-0 right-0 z-[9999] bg-red-500 text-white px-4 py-3 shadow-lg transition-transform duration-300 ease-out`}
+        className={`fixed ${position === 'top' ? 'top-0' : 'bottom-0'} left-0 right-0 z-[9999] bg-red-500 text-white px-4 py-3 shadow-lg`}
         style={{
           transform: 'translateZ(0)',
           willChange: 'transform',
@@ -56,7 +56,7 @@ export const NetworkStatusBanner: React.FC<NetworkStatusBannerProps> = memo(({
         }}
       >
         <div className="flex items-center justify-center gap-2 text-sm font-medium">
-          <WifiOff className="w-4 h-4 flex-shrink-0 animate-pulse" />
+          <WifiOff className="w-4 h-4 flex-shrink-0" />
           <span className="text-center">No internet connection. Waiting for connection...</span>
         </div>
       </div>
@@ -86,7 +86,7 @@ if (typeof document !== 'undefined') {
         }
       }
       .animate-slide-down {
-        animation: slide-down 0.3s ease-out forwards;
+        animation: slide-down 0.3s forwards;
         will-change: transform, opacity;
       }
       /* WebView optimizations */

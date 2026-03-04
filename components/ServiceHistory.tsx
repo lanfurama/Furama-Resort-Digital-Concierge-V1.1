@@ -170,7 +170,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                         <select
                             value={serviceFilter}
                             onChange={(e) => setServiceFilter(e.target.value as 'ALL' | 'DINING' | 'SPA' | 'POOL' | 'BUGGY' | 'BUTLER')}
-                            className="text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                            className="text-xs font-semibold bg-white text-gray-700 border-2 border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
                         >
                             <option value="ALL">All</option>
                             <option value="BUGGY">{t('buggy')}</option>
@@ -222,7 +222,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                             }
 
                             return (
-                                <div key={i} className="backdrop-blur-sm bg-white/95 p-3 rounded-2xl shadow-lg border-2 border-gray-100/60 flex flex-col transition-all hover:shadow-xl"
+                                <div key={i} className="backdrop-blur-sm bg-white/95 p-3 rounded-2xl shadow-lg border-2 border-gray-100/60 flex flex-col hover:shadow-xl"
                                     style={{ boxShadow: '0 4px 20px -5px rgba(0,0,0,0.1)' }}
                                 >
                                     <div className="flex items-start gap-3">
@@ -288,10 +288,10 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                                                 </div>
                                             ) : (
                                                 activeRatingId === req.id ? (
-                                                    <div className="animate-in fade-in bg-gradient-to-br from-gray-50 to-blue-50 p-3 rounded-xl border-2 border-gray-200">
+                                                    <div className="animate-in bg-gradient-to-br from-gray-50 to-blue-50 p-3 rounded-xl border-2 border-gray-200">
                                                         <div className="flex items-center justify-center space-x-2 mb-3">
                                                             {[1, 2, 3, 4, 5].map(star => (
-                                                                <button key={star} onClick={() => setServiceRatingValue(star)} className="transition-all hover:scale-110">
+                                                                <button key={star} onClick={() => setServiceRatingValue(star)} className="transition-all">
                                                                     <Star size={22} className={`${star <= serviceRatingValue ? 'fill-amber-400 text-amber-400 drop-shadow-sm' : 'text-gray-200'}`} />
                                                                 </button>
                                                             ))}
@@ -299,7 +299,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                                                         <input
                                                             type="text"
                                                             placeholder="Comments (optional)..."
-                                                            className="w-full text-xs bg-white border-2 border-gray-200 rounded-xl p-2.5 mb-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all caret-emerald-600"
+                                                            className="w-full text-xs bg-white border-2 border-gray-200 rounded-xl p-2.5 mb-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent caret-emerald-600"
                                                             style={{ caretColor: '#10b981' }}
                                                             value={serviceCommentValue}
                                                             onChange={(e) => setServiceCommentValue(e.target.value)}
@@ -312,14 +312,14 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                                                                     setServiceCommentValue('');
                                                                 }}
                                                                 disabled={isSubmittingRating}
-                                                                className="flex-1 py-2 text-xs text-gray-600 hover:bg-gray-100 rounded-xl border-2 border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold"
+                                                                className="flex-1 py-2 text-xs text-gray-600 hover:bg-gray-100 rounded-xl border-2 border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
                                                             >
                                                                 {t('cancel')}
                                                             </button>
                                                             <button
                                                                 onClick={() => handleSubmitServiceRating(req.id, req.type)}
                                                                 disabled={isSubmittingRating}
-                                                                className="group relative flex-1 py-2 text-xs bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center shadow-lg overflow-hidden"
+                                                                className="group relative flex-1 py-2 text-xs bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-lg overflow-hidden"
                                                             >
                                                                 {isSubmittingRating ? (
                                                                     <>
@@ -328,7 +328,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                                                                     </>
                                                                 ) : (
                                                                     <>
-                                                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                                                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%]"></div>
                                                                         <span className="relative z-10">{t('submit')}</span>
                                                                     </>
                                                                 )}
@@ -339,7 +339,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                                                     <div className="flex gap-2">
                                                         <button
                                                             onClick={() => setActiveRatingId(req.id)}
-                                                            className="flex-1 py-2 flex items-center justify-center text-xs text-emerald-700 font-bold bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 rounded-xl transition-all border-2 border-emerald-200 hover:border-emerald-300 shadow-md"
+                                                            className="flex-1 py-2 flex items-center justify-center text-xs text-emerald-700 font-bold bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 rounded-xl border-2 border-emerald-200 hover:border-emerald-300 shadow-md"
                                                         >
                                                             <ThumbsUp size={14} className="mr-1.5" />
                                                             {t('rate_service')}
@@ -351,7 +351,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                                                                     setLostItemDescription('');
                                                                     setShowLostItemModal(true);
                                                                 }}
-                                                                className="flex-1 py-2 flex items-center justify-center text-xs text-amber-700 font-bold bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 rounded-xl transition-all border-2 border-amber-200 hover:border-amber-300 shadow-md"
+                                                                className="flex-1 py-2 flex items-center justify-center text-xs text-amber-700 font-bold bg-gradient-to-r from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 rounded-xl border-2 border-amber-200 hover:border-amber-300 shadow-md"
                                                             >
                                                                 <AlertCircle size={14} className="mr-1.5" />
                                                                 Report Lost Item
@@ -384,7 +384,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                                     setLostItemRideId(null);
                                     setLostItemDescription('');
                                 }}
-                                className="text-gray-400 hover:text-gray-600 transition"
+                                className="text-gray-400 hover:text-gray-600"
                             >
                                 <X size={24} />
                             </button>
@@ -399,7 +399,7 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                                     value={lostItemDescription}
                                     onChange={(e) => setLostItemDescription(e.target.value)}
                                     placeholder="Please describe the lost item (e.g., Black wallet, iPhone 14, etc.)"
-                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none transition resize-none"
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-none"
                                     rows={4}
                                     required
                                 />
@@ -412,14 +412,14 @@ export const ServiceHistory: React.FC<ServiceHistoryProps> = ({
                                         setLostItemRideId(null);
                                         setLostItemDescription('');
                                     }}
-                                    className="flex-1 py-3 px-4 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition"
+                                    className="flex-1 py-3 px-4 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleSubmitLostItem}
                                     disabled={isSubmittingLostItem || !lostItemDescription.trim()}
-                                    className="flex-1 py-3 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                    className="flex-1 py-3 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isSubmittingLostItem ? 'Submitting...' : 'Submit Report'}
                                 </button>

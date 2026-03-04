@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { User, UserRole } from '../types';
-import Loading from './Loading';
+import { DataLoader } from './DataLoader';
 import { useAdminData } from '../hooks/useAdminData';
 import { useAdminCRUD } from '../hooks/useAdminCRUD';
 import { AdminHeader } from './admin/AdminHeader';
@@ -59,11 +59,24 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
     const [historyFilterType, setHistoryFilterType] = useState<string>('ALL');
     const [historyFilterDate, setHistoryFilterDate] = useState<string>('');
 
-    if (isLoading) {
-        return <Loading />;
-    }
+    // Polling when tab is HISTORY or FLEET and document is visible (realtime feel)
+    const POLL_INTERVAL_MS = 30000;
+    const refreshDataRef = useRef(refreshData);
+    refreshDataRef.current = refreshData;
+    useEffect(() => {
+        if (tab !== 'HISTORY' && tab !== 'FLEET') return;
+        const tick = () => {
+            if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+                if (tab === 'HISTORY') refreshDataRef.current('serviceHistory');
+                if (tab === 'FLEET') refreshDataRef.current('rides');
+            }
+        };
+        const id = setInterval(tick, POLL_INTERVAL_MS);
+        return () => clearInterval(id);
+    }, [tab]);
 
     return (
+        <DataLoader isLoading={isLoading} fullScreen message="Loading...">
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-emerald-50/30 to-teal-50/30 flex flex-col font-sans">
             <AdminHeader
                 user={user}
@@ -86,7 +99,10 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 {tab === 'LOCATIONS' && (
                     <LocationsTab
                         locations={locations}
-                        onDelete={async (id: string) => await handleDelete(id, 'LOCATION')}
+                        onDelete={async (id: string) => {
+                            await handleDelete(id, 'LOCATION');
+                            await refreshData('locations');
+                        }}
                         onRefresh={async () => await refreshData('locations')}
                     />
                 )}
@@ -94,16 +110,22 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 {tab === 'MENU' && (
                     <MenuTab
                         menu={menu}
-                        onDelete={async (id: string) => await handleDelete(id, 'MENU_ITEM')}
-                        onRefresh={async () => await refreshData()}
+                        onDelete={async (id: string) => {
+                            await handleDelete(id, 'MENU_ITEM');
+                            await refreshData('menu');
+                        }}
+                        onRefresh={async () => await refreshData('menu')}
                     />
                 )}
 
                 {tab === 'EVENTS' && (
                     <EventsTab
                         events={events}
-                        onDelete={async (id: string) => await handleDelete(id, 'EVENT')}
-                        onRefresh={async () => await refreshData()}
+                        onDelete={async (id: string) => {
+                            await handleDelete(id, 'EVENT');
+                            await refreshData('events');
+                        }}
+                        onRefresh={async () => await refreshData('events')}
                         setEvents={setEvents}
                     />
                 )}
@@ -111,8 +133,11 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 {tab === 'PROMOS' && (
                     <PromosTab
                         promotions={promotions}
-                        onDelete={async (id: string) => await handleDelete(id, 'PROMOTION')}
-                        onRefresh={async () => await refreshData()}
+                        onDelete={async (id: string) => {
+                            await handleDelete(id, 'PROMOTION');
+                            await refreshData('promotions');
+                        }}
+                        onRefresh={async () => await refreshData('promotions')}
                         setPromotions={setPromotions}
                     />
                 )}
@@ -120,8 +145,11 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                 {tab === 'KNOWLEDGE' && (
                     <KnowledgeTab
                         knowledge={knowledge}
-                        onDelete={async (id: string) => await handleDelete(id, 'KNOWLEDGE_ITEM')}
-                        onRefresh={async () => await refreshData()}
+                        onDelete={async (id: string) => {
+                            await handleDelete(id, 'KNOWLEDGE_ITEM');
+                            await refreshData('knowledge');
+                        }}
+                        onRefresh={async () => await refreshData('knowledge')}
                         setKnowledge={setKnowledge}
                     />
                 )}
@@ -133,6 +161,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                         setHistoryFilterType={setHistoryFilterType}
                         historyFilterDate={historyFilterDate}
                         setHistoryFilterDate={setHistoryFilterDate}
+                        onRefresh={async () => await refreshData('serviceHistory')}
                     />
                 )}
 
@@ -148,8 +177,15 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                         roomTypes={roomTypes}
                         rooms={rooms}
                         locations={locations}
-                        onDelete={async (id: string, type: 'ROOM_TYPE' | 'ROOM') => await handleDelete(id, type)}
-                        onRefresh={async () => await refreshData()}
+                        onDelete={async (id: string, type: 'ROOM_TYPE' | 'ROOM') => {
+                            await handleDelete(id, type);
+                            await refreshData('roomTypes');
+                            await refreshData('rooms');
+                        }}
+                        onRefresh={async () => {
+                            await refreshData('roomTypes');
+                            await refreshData('rooms');
+                        }}
                         setRoomTypes={setRoomTypes}
                         setRooms={setRooms}
                         setLocations={setLocations}
@@ -160,8 +196,11 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     <UsersTab
                         users={users}
                         userRole={user.role}
-                        onDelete={async (id: string) => await handleDelete(id, 'USER')}
-                        onRefresh={async () => await refreshData()}
+                        onDelete={async (id: string) => {
+                            await handleDelete(id, 'USER');
+                            await refreshData('users');
+                        }}
+                        onRefresh={async () => await refreshData('users')}
                         setUsers={setUsers}
                     />
                 )}
@@ -170,13 +209,17 @@ const AdminPortal: React.FC<AdminPortalProps> = ({ onLogout, user }) => {
                     <GuestsTab
                         users={users}
                         roomTypes={roomTypes}
-                        onDelete={async (id: string) => await handleDelete(id, 'USER')}
-                        onRefresh={async () => await refreshData()}
+                        onDelete={async (id: string) => {
+                            await handleDelete(id, 'USER');
+                            await refreshData('users');
+                        }}
+                        onRefresh={async () => await refreshData('users')}
                         setUsers={setUsers}
                     />
                 )}
             </div>
         </div>
+        </DataLoader>
     );
 };
 

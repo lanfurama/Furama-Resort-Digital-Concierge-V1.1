@@ -143,7 +143,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({
                 style={{
                     height: `${Math.max(pullDistance, 0)}px`,
                     opacity: Math.min(pullDistance / 40, 1),
-                    transition: isDragging.current ? 'none' : 'height 0.3s ease-out, opacity 0.3s ease-out'
+                    transition: isDragging.current ? 'none' : 'height 0.3s, opacity 0.3s'
                 }}
             >
                 <div className="flex items-center justify-center p-2 rounded-full bg-white shadow-md border border-gray-100 mt-2">
@@ -151,7 +151,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({
                         <Loader2 className="w-5 h-5 text-emerald-600 animate-spin" />
                     ) : (
                         <ArrowDown
-                            className="w-5 h-5 text-emerald-600 transition-transform duration-200"
+                            className="w-5 h-5 text-emerald-600"
                             style={{ transform: `rotate(${pullDistance >= threshold ? 180 : 0}deg)` }}
                         />
                     )}

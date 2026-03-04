@@ -34,7 +34,7 @@ export const AdminTabs: React.FC<AdminTabsProps> = ({ currentTab, onTabChange, u
                         <button
                             key={tab.id}
                             onClick={() => onTabChange(tab.id as TabType)}
-                            className={`relative flex-1 min-w-[90px] md:min-w-[120px] py-3.5 md:py-4 font-semibold flex flex-col md:flex-row items-center justify-center gap-1.5 md:gap-2 active:scale-95 ${
+                            className={`relative flex-1 min-w-[90px] md:min-w-[120px] py-3.5 md:py-4 font-semibold flex flex-col md:flex-row items-center justify-center gap-1.5 md:gap-2 ${
                                 isActive 
                                     ? 'text-emerald-800 bg-emerald-100 border-b-3 border-emerald-700 shadow-sm' 
                                     : 'text-gray-700 bg-white'

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, FileText, X, Edit2, Calendar, Tag, Image as ImageIcon } from 'lucide-react';
+import { Plus, Trash2, FileText, X, Edit2, Calendar, Tag, Image as ImageIcon, Loader2, RefreshCw } from 'lucide-react';
 import { Promotion } from '../../../types';
 import { addPromotion, updatePromotion, getPromotions } from '../../../services/dataService';
+import { useToast } from '../../../hooks/useToast';
 
 interface PromosTabProps {
     promotions: Promotion[];
@@ -11,23 +12,35 @@ interface PromosTabProps {
 }
 
 export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRefresh, setPromotions }) => {
+    const toast = useToast();
     const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
     const [showPromotionForm, setShowPromotionForm] = useState(false);
     const [newPromotion, setNewPromotion] = useState<Partial<Promotion>>({ title: '', description: '', discount: '', validUntil: '', imageColor: 'bg-emerald-500', imageUrl: '' });
+    const [isSaving, setIsSaving] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        try {
+            await onRefresh();
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const handleSave = async () => {
         if (!newPromotion.title || !newPromotion.description || !newPromotion.discount || !newPromotion.validUntil) {
-            alert('Please fill in all required fields.');
+            toast.error('Please fill in all required fields.');
             return;
         }
+        setIsSaving(true);
         try {
             if (editingPromotion) {
                 const updated = await updatePromotion(editingPromotion.id, newPromotion as Promotion);
-                alert(`Promotion "${updated.title}" updated successfully!`);
+                toast.success(`Promotion "${updated.title}" updated successfully!`);
                 setEditingPromotion(null);
             } else {
                 await addPromotion(newPromotion as Promotion);
-                alert(`Promotion "${newPromotion.title}" created successfully!`);
+                toast.success(`Promotion "${newPromotion.title}" created successfully!`);
             }
             setNewPromotion({ title: '', description: '', discount: '', validUntil: '', imageColor: 'bg-emerald-500', imageUrl: '' });
             setShowPromotionForm(false);
@@ -40,7 +53,9 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
             await onRefresh();
         } catch (error: any) {
             console.error('Failed to save promotion:', error);
-            alert(`Failed to save promotion: ${error?.message || 'Unknown error'}`);
+            toast.error(`Failed to save promotion: ${error?.message || 'Unknown error'}`);
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -55,7 +70,16 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                     </h2>
                     <p className="text-sm text-gray-500 mt-1">{promotions.length} promotion{promotions.length !== 1 ? 's' : ''} active</p>
                 </div>
-                <button
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className="p-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-70"
+                        title="Refresh"
+                    >
+                        <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+                    </button>
+                    <button
                     onClick={() => {
                         if (showPromotionForm && !editingPromotion) {
                             setShowPromotionForm(false);
@@ -68,7 +92,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                             }
                         }
                     }}
-                    className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-5 py-2.5 rounded-xl flex items-center justify-center space-x-2 shadow-lg active:scale-95 flex-1 md:flex-none font-semibold"
+                    className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-5 py-2.5 rounded-xl flex items-center justify-center space-x-2 shadow-lg flex-1 md:flex-none font-semibold"
                 >
                     {showPromotionForm && !editingPromotion ? (
                         <>
@@ -82,11 +106,12 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                         </>
                     )}
                 </button>
+                </div>
             </div>
 
             {/* Promotion Edit Form */}
             {showPromotionForm && (
-                <div className="bg-white p-6 rounded-2xl shadow-xl border-2 border-emerald-100 mb-6 animate-in slide-in-from-top-2" data-promo-form>
+                <div className="bg-white p-6 rounded-2xl shadow-xl border-2 border-emerald-100 mb-6" data-promo-form>
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                             {editingPromotion ? (
@@ -108,7 +133,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                                     setNewPromotion({ title: '', description: '', discount: '', validUntil: '', imageColor: 'bg-emerald-500', imageUrl: '' });
                                     setShowPromotionForm(false);
                                 }}
-                                className="text-gray-500 active:scale-95"
+                                className="text-gray-500"
                             >
                                 <X size={20} />
                             </button>
@@ -122,7 +147,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                             </label>
                             <input
                                 type="text"
-                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm bg-white text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm bg-white text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
                                 value={newPromotion.title || ''}
                                 onChange={e => setNewPromotion({ ...newPromotion, title: e.target.value })}
                                 placeholder="e.g. Early Bird Special, Happy Hour"
@@ -131,7 +156,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                         <div className="col-span-1 md:col-span-2">
                             <label className="block text-sm font-bold text-gray-700 mb-2">Description *</label>
                             <textarea
-                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm bg-white text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all resize-none"
+                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm bg-white text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none resize-none"
                                 value={newPromotion.description || ''}
                                 onChange={e => setNewPromotion({ ...newPromotion, description: e.target.value })}
                                 placeholder="Describe the promotion details..."
@@ -145,7 +170,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                             </label>
                             <input
                                 type="text"
-                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm bg-white text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm bg-white text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
                                 value={newPromotion.discount || ''}
                                 onChange={e => setNewPromotion({ ...newPromotion, discount: e.target.value })}
                                 placeholder="e.g. 30% OFF, From $45"
@@ -158,7 +183,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                             </label>
                             <input
                                 type="text"
-                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm bg-white text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm bg-white text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
                                 value={newPromotion.validUntil || ''}
                                 onChange={e => setNewPromotion({ ...newPromotion, validUntil: e.target.value })}
                                 placeholder="e.g. Dec 31, Daily 14:00-16:00"
@@ -171,7 +196,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                             </label>
                             <input
                                 type="url"
-                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm bg-white text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm bg-white text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
                                 value={newPromotion.imageUrl || ''}
                                 onChange={e => setNewPromotion({ ...newPromotion, imageUrl: e.target.value })}
                                 placeholder="https://example.com/image.jpg"
@@ -180,7 +205,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                         <div className="col-span-1 md:col-span-2">
                             <label className="block text-sm font-bold text-gray-700 mb-2">Tag Color</label>
                             <select
-                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm bg-white text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm bg-white text-gray-900 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none"
                                 value={newPromotion.imageColor || 'bg-emerald-500'}
                                 onChange={e => setNewPromotion({ ...newPromotion, imageColor: e.target.value })}
                             >
@@ -202,15 +227,17 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                                     setNewPromotion({ title: '', description: '', discount: '', validUntil: '', imageColor: 'bg-emerald-500', imageUrl: '' });
                                     setShowPromotionForm(false);
                                 }}
-                                className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold active:scale-95"
+                                className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold"
                             >
                                 Cancel
                             </button>
                         )}
                         <button
                             onClick={handleSave}
-                            className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-xl text-sm font-semibold shadow-lg active:scale-95"
+                            disabled={isSaving}
+                            className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-xl text-sm font-semibold shadow-lg disabled:opacity-70 flex items-center gap-2"
                         >
+                            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                             {editingPromotion ? 'Update Promotion' : 'Create Promotion'}
                         </button>
                     </div>
@@ -225,7 +252,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                     <p className="text-sm text-gray-500 mb-4">Create your first promotion to attract more guests</p>
                     <button
                         onClick={() => setShowPromotionForm(true)}
-                        className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold active:scale-95 inline-flex items-center gap-2"
+                        className="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-semibold inline-flex items-center gap-2"
                     >
                         <Plus size={18} />
                         Add Your First Promotion
@@ -284,7 +311,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                                                 }
                                             }, 100);
                                         }}
-                                        className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg active:scale-95 shadow-sm"
+                                        className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg shadow-sm"
                                         title="Edit Promotion"
                                     >
                                         <Edit2 size={18} />
@@ -295,7 +322,7 @@ export const PromosTab: React.FC<PromosTabProps> = ({ promotions, onDelete, onRe
                                                 onDelete(promo.id);
                                             }
                                         }} 
-                                        className="p-2.5 bg-red-50 text-red-600 rounded-lg active:scale-95 shadow-sm"
+                                        className="p-2.5 bg-red-50 text-red-600 rounded-lg shadow-sm"
                                         title="Delete Promotion"
                                     >
                                         <Trash2 size={18} />

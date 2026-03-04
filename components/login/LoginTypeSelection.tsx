@@ -24,7 +24,7 @@ export const LoginTypeSelection: React.FC<LoginTypeSelectionProps> = ({ onSelect
           {/* Guest Login Button */}
           <button
             onClick={onSelectGuest}
-            className="w-full bg-emerald-50 hover:bg-emerald-100 p-6 rounded-xl shadow-md hover:shadow-lg transition-all transform hover:scale-105 active:scale-95 border-2 border-emerald-200 hover:border-emerald-300"
+            className="w-full bg-emerald-50 hover:bg-emerald-100 p-6 rounded-xl shadow-md hover:shadow-lg transform border-2 border-emerald-200 hover:border-emerald-300"
           >
             <div className="flex items-center space-x-4">
               <div className="p-3 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg">
@@ -40,7 +40,7 @@ export const LoginTypeSelection: React.FC<LoginTypeSelectionProps> = ({ onSelect
           {/* Staff/Admin Login Button */}
           <button
             onClick={onSelectStaff}
-            className="w-full bg-purple-50 hover:bg-purple-100 p-6 rounded-xl shadow-md hover:shadow-lg transition-all transform hover:scale-105 active:scale-95 border-2 border-purple-200 hover:border-purple-300"
+            className="w-full bg-purple-50 hover:bg-purple-100 p-6 rounded-xl shadow-md hover:shadow-lg transform border-2 border-purple-200 hover:border-purple-300"
           >
             <div className="flex items-center space-x-4">
               <div className="p-3 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg">

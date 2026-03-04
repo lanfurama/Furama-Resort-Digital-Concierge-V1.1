@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Trash2, Pencil, X } from 'lucide-react';
+import { Plus, Trash2, Pencil, X, Loader2, RefreshCw } from 'lucide-react';
 import { MenuItem } from '../../../types';
 import { addMenuItem, updateMenuItem } from '../../../services/dataService';
+import { useToast } from '../../../hooks/useToast';
 
 interface MenuTabProps {
     menu: MenuItem[];
@@ -10,10 +11,21 @@ interface MenuTabProps {
 }
 
 export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) => {
+    const toast = useToast();
     const [menuFilter, setMenuFilter] = useState<'ALL' | 'Dining' | 'Spa' | 'Pool' | 'Butler'>('ALL');
     const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null);
     const [showMenuItemForm, setShowMenuItemForm] = useState(false);
     const [newMenuItem, setNewMenuItem] = useState<Partial<MenuItem>>({ name: '', price: 0, category: 'Dining', description: '' });
+    const [isSaving, setIsSaving] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        try {
+            await onRefresh();
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const filteredMenu = useMemo(() => {
         return menuFilter === 'ALL' ? menu : menu.filter(m => m.category === menuFilter);
@@ -21,28 +33,31 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
 
     const handleSave = async () => {
         if (!newMenuItem.name) {
-            alert('Please enter a name.');
+            toast.error('Please enter a name.');
             return;
         }
         if (!newMenuItem.price || newMenuItem.price <= 0) {
-            alert('Please enter a valid price.');
+            toast.error('Please enter a valid price.');
             return;
         }
+        setIsSaving(true);
         try {
             if (editingMenuItem && editingMenuItem.id) {
                 await updateMenuItem(editingMenuItem.id, newMenuItem as MenuItem);
                 setEditingMenuItem(null);
-                alert(`Menu item "${newMenuItem.name}" updated successfully!`);
+                toast.success(`Menu item "${newMenuItem.name}" updated successfully!`);
             } else {
                 await addMenuItem(newMenuItem as MenuItem);
-                alert(`Menu item "${newMenuItem.name}" added successfully!`);
+                toast.success(`Menu item "${newMenuItem.name}" added successfully!`);
             }
             setNewMenuItem({ name: '', price: 0, category: 'Dining', description: '' });
             setShowMenuItemForm(false);
             await onRefresh();
         } catch (error) {
             console.error('Failed to save menu item:', error);
-            alert('Failed to save menu item. Please try again.');
+            toast.error('Failed to save menu item. Please try again.');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -60,6 +75,14 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
                         <button onClick={() => setMenuFilter('Butler')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Butler' ? 'bg-amber-100 text-amber-800 font-bold' : 'text-gray-500'}`}>Butler</button>
                     </div>
                     <button
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-70"
+                        title="Refresh"
+                    >
+                        <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+                    </button>
+                    <button
                         onClick={() => {
                             setShowMenuItemForm(!showMenuItemForm);
                             if (!showMenuItemForm) {
@@ -67,7 +90,7 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
                                 setNewMenuItem({ name: '', price: 0, category: 'Dining', description: '' });
                             }
                         }}
-                        className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 shadow-md active:scale-95 flex-1 md:flex-none"
+                        className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 shadow-md flex-1 md:flex-none"
                     >
                         {showMenuItemForm && !editingMenuItem ? <X size={18} /> : <Plus size={18} />}
                         <span>{showMenuItemForm && !editingMenuItem ? 'Cancel' : 'Add Item'}</span>
@@ -78,7 +101,7 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
             {/* Menu Item Edit Modal */}
             {showMenuItemForm && (
                 <div
-                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in"
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
                     onClick={() => {
                         setEditingMenuItem(null);
                         setNewMenuItem({ name: '', price: 0, category: 'Dining', description: '' });
@@ -86,7 +109,7 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
                     }}
                 >
                     <div
-                        className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[90vw] max-w-2xl p-6 animate-in slide-in-from-top-5 relative"
+                        className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[90vw] max-w-2xl p-6 relative"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <button
@@ -95,7 +118,7 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
                                 setNewMenuItem({ name: '', price: 0, category: 'Dining', description: '' });
                                 setShowMenuItemForm(false);
                             }}
-                            className="absolute top-4 right-4 text-gray-500 active:scale-95"
+                            className="absolute top-4 right-4 text-gray-500"
                             aria-label="Close"
                         >
                             <X size={20} />
@@ -154,14 +177,16 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
                                     setNewMenuItem({ name: '', price: 0, category: 'Dining', description: '' });
                                     setShowMenuItemForm(false);
                                 }}
-                                className="bg-gray-500 text-white px-6 py-2 rounded-lg text-sm font-bold active:scale-95"
+                                className="bg-gray-500 text-white px-6 py-2 rounded-lg text-sm font-bold"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSave}
-                                className="bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold active:scale-95"
+                                disabled={isSaving}
+                                className="bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold disabled:opacity-70 flex items-center gap-2"
                             >
+                                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                                 {editingMenuItem ? 'Update Item' : 'Create Item'}
                             </button>
                         </div>
@@ -212,13 +237,13 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
                                                 });
                                                 setShowMenuItemForm(true);
                                             }}
-                                            className="text-emerald-600 p-2 relative z-10 cursor-pointer active:scale-95"
+                                            className="text-emerald-600 p-2 relative z-10 cursor-pointer"
                                             title="Edit"
                                             type="button"
                                         >
                                             <Pencil size={16} />
                                         </button>
-                                        <button onClick={() => onDelete(item.id)} className="text-red-500 p-2 relative z-10 cursor-pointer active:scale-95" type="button"><Trash2 size={16} /></button>
+                                        <button onClick={() => onDelete(item.id)} className="text-red-500 p-2 relative z-10 cursor-pointer" type="button"><Trash2 size={16} /></button>
                                     </div>
                                 </td>
                             </tr>

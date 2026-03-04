@@ -68,7 +68,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                 {/* Back Button */}
                 <button
                     onClick={onBack}
-                    className="absolute top-2.5 left-2.5 text-white/90 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-all duration-300"
+                    className="absolute top-2.5 left-2.5 text-white/90 hover:text-white hover:bg-white/10 rounded-full p-1.5"
                 >
                     <ArrowLeft className="w-5 h-5" strokeWidth={2.5} />
                 </button>
@@ -79,7 +79,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
             <PullToRefresh onRefresh={handleRefresh}>
                 <div className="flex-1 px-3 py-4 space-y-4 -mt-1 relative z-20 pb-24 min-h-full">
                     {isLoadingHistory && (
-                        <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                        <div className="fixed inset-0 bg-white/80 z-50 flex items-center justify-center">
                             <Loading size="md" message={t('loading') || 'Loading account data...'} />
                         </div>
                     )}
@@ -98,7 +98,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                     setNewCheckOutDate(minDate.toISOString().split('T')[0]);
                                     setShowExtendStayModal(true);
                                 }}
-                                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all transform active:scale-95 flex items-center justify-center gap-2"
+                                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transform flex items-center justify-center gap-2"
                             >
                                 <Calendar size={18} />
                                 <span>Request to Extend Stay</span>
@@ -130,7 +130,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                 </h3>
                                 <button
                                     onClick={() => setShowExtendStayModal(false)}
-                                    className="text-gray-400 hover:text-gray-600 transition"
+                                    className="text-gray-400 hover:text-gray-600"
                                 >
                                     <X size={24} />
                                 </button>
@@ -160,7 +160,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                         value={newCheckOutDate}
                                         onChange={(e) => setNewCheckOutDate(e.target.value)}
                                         min={user.checkOut ? new Date(new Date(user.checkOut).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined}
-                                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none transition"
+                                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none"
                                         required
                                     />
                                 </div>
@@ -173,7 +173,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                         value={extendStayReason}
                                         onChange={(e) => setExtendStayReason(e.target.value)}
                                         placeholder="Please let us know why you'd like to extend your stay..."
-                                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none transition resize-none"
+                                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none resize-none"
                                         rows={3}
                                     />
                                 </div>
@@ -185,7 +185,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                             setNewCheckOutDate('');
                                             setExtendStayReason('');
                                         }}
-                                        className="flex-1 py-3 px-4 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition"
+                                        className="flex-1 py-3 px-4 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50"
                                     >
                                         Cancel
                                     </button>
@@ -233,7 +233,7 @@ const GuestAccount: React.FC<GuestAccountProps> = ({ user, onBack }) => {
                                             }
                                         }}
                                         disabled={isSubmittingExtend || !newCheckOutDate}
-                                        className="flex-1 py-3 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-lg shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        className="flex-1 py-3 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                     >
                                         {isSubmittingExtend ? (
                                             <>

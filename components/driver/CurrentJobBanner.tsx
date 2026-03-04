@@ -23,7 +23,7 @@ export const CurrentJobBanner: React.FC<CurrentJobBannerProps> = ({ ride, curren
                 <span className="font-bold text-sm sm:text-base uppercase tracking-wide">{t('driver_current_job')}</span>
                 <div className={`text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg font-bold ${
                     waitingMinutes >= 10
-                        ? 'bg-red-500 text-white shadow-lg animate-pulse'
+                        ? 'bg-red-500 text-white shadow-lg'
                         : waitingMinutes >= 5
                             ? 'bg-orange-500 text-white'
                             : 'bg-white/25 text-white'
@@ -32,7 +32,7 @@ export const CurrentJobBanner: React.FC<CurrentJobBannerProps> = ({ ride, curren
                     <span>{formatWaitingTime(ride.timestamp, currentTime)}</span>
                 </div>
             </div>
-            <span className="bg-white/20 backdrop-blur-sm px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-bold uppercase tracking-wide border border-white/30">
+            <span className="bg-white/20 px-3 sm:px-4 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-bold uppercase tracking-wide border border-white/30">
                 {ride.status === BuggyStatus.ON_TRIP ? t('ON_TRIP') :
                     ride.status === BuggyStatus.ARRIVING ? t('ARRIVING') : t('ASSIGNED')}
             </span>

@@ -47,7 +47,7 @@ export const CurrentJobCard: React.FC<CurrentJobCardProps> = React.memo(({
                 <div className="flex flex-row sm:flex-col items-stretch sm:items-end gap-2 sm:gap-3">
                     <button
                         onClick={onOpenChat}
-                        className="p-3 rounded-xl border-2 border-gray-300 hover:bg-gray-100 hover:border-emerald-400 active:bg-gray-200 transition-all min-w-[48px] min-h-[48px] flex items-center justify-center bg-white shadow-sm touch-manipulation"
+                        className="p-3 rounded-xl border-2 border-gray-300 hover:bg-gray-100 hover:border-emerald-400 active:bg-gray-200 min-w-[48px] min-h-[48px] flex items-center justify-center bg-white shadow-sm touch-manipulation"
                         title={t('driver_chat')}
                     >
                         <MessageSquare size={20} className="text-emerald-600 sm:w-[22px] sm:h-[22px]" />
@@ -56,7 +56,7 @@ export const CurrentJobCard: React.FC<CurrentJobCardProps> = React.memo(({
                         <button
                             onClick={() => onPickUp(ride.id)}
                             disabled={isPickingUp}
-                            className="flex-1 sm:flex-none min-h-[48px] sm:min-h-[56px] sm:min-w-[140px] bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white px-6 py-3.5 rounded-xl font-bold text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center touch-manipulation"
+                            className="flex-1 sm:flex-none min-h-[48px] sm:min-h-[56px] sm:min-w-[140px] bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white px-6 py-3.5 rounded-xl font-bold text-base disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center touch-manipulation"
                         >
                             {isPickingUp ? (
                                 <Loader2 size={20} className="animate-spin" />
@@ -68,7 +68,7 @@ export const CurrentJobCard: React.FC<CurrentJobCardProps> = React.memo(({
                         <button
                             onClick={() => onComplete(ride.id)}
                             disabled={isCompleting}
-                            className="flex-1 sm:flex-none min-h-[48px] sm:min-h-[56px] sm:min-w-[140px] bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white px-6 py-3.5 rounded-xl font-bold text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center touch-manipulation"
+                            className="flex-1 sm:flex-none min-h-[48px] sm:min-h-[56px] sm:min-w-[140px] bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white px-6 py-3.5 rounded-xl font-bold text-base disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center touch-manipulation"
                         >
                             {isCompleting ? (
                                 <Loader2 size={20} className="animate-spin" />

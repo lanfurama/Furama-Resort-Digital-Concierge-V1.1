@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Trash2, Pencil, X, Search, MapPin } from 'lucide-react';
+import { Plus, Trash2, Pencil, X, Search, MapPin, Loader2, RefreshCw } from 'lucide-react';
 import { Location } from '../../../types';
 import { addLocation, updateLocation } from '../../../services/dataService';
+import { useToast } from '../../../hooks/useToast';
 
 interface LocationsTabProps {
     locations: Location[];
@@ -10,11 +11,22 @@ interface LocationsTabProps {
 }
 
 export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete, onRefresh }) => {
+    const toast = useToast();
     const [locationFilter, setLocationFilter] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('ALL');
     const [locationSearch, setLocationSearch] = useState<string>('');
     const [editingLocation, setEditingLocation] = useState<Location | null>(null);
     const [showLocationForm, setShowLocationForm] = useState(false);
     const [newLocation, setNewLocation] = useState<Partial<Location>>({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
+    const [isSaving, setIsSaving] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        try {
+            await onRefresh();
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const filteredLocations = useMemo(() => {
         return locations.filter(l => {
@@ -26,28 +38,31 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
 
     const handleSave = async () => {
         if (!newLocation.name) {
-            alert('Please enter a name.');
+            toast.error('Please enter a name.');
             return;
         }
         if (!newLocation.lat || !newLocation.lng) {
-            alert('Please enter valid coordinates.');
+            toast.error('Please enter valid coordinates.');
             return;
         }
+        setIsSaving(true);
         try {
             if (editingLocation && editingLocation.id) {
                 await updateLocation(editingLocation.id, newLocation as Location);
                 setEditingLocation(null);
-                alert(`Location "${newLocation.name}" updated successfully!`);
+                toast.success(`Location "${newLocation.name}" updated successfully!`);
             } else {
                 await addLocation(newLocation as Location);
-                alert(`Location "${newLocation.name}" added successfully!`);
+                toast.success(`Location "${newLocation.name}" added successfully!`);
             }
             setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
             setShowLocationForm(false);
             await onRefresh();
         } catch (error) {
             console.error('Failed to save location:', error);
-            alert('Failed to save location. Please try again.');
+            toast.error('Failed to save location. Please try again.');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -65,12 +80,12 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                     value={locationSearch}
                                     onChange={(e) => setLocationSearch(e.target.value)}
                                     placeholder="Search locations..."
-                                    className="w-full pl-12 pr-10 py-3 text-sm border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 bg-white/80 backdrop-blur-sm transition-all duration-200 placeholder-gray-400"
+                                    className="w-full pl-12 pr-10 py-3 text-sm border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 bg-white/80 placeholder-gray-400"
                                 />
                                 {locationSearch && (
                                     <button
                                         onClick={() => setLocationSearch('')}
-                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 p-1 rounded-lg active:scale-95"
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 p-1 rounded-lg"
                                     >
                                         <X size={16} />
                                     </button>
@@ -78,10 +93,10 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                             </div>
                         </div>
                     </div>
-                    <div className="flex flex-wrap gap-2 bg-gray-50/80 backdrop-blur-sm rounded-xl p-1.5 border border-gray-200">
+                    <div className="flex flex-wrap gap-2 bg-gray-50/80 rounded-xl p-1.5 border border-gray-200">
                         <button
                             onClick={() => setLocationFilter('ALL')}
-                            className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-2 active:scale-95 ${
+                            className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-2 ${
                                 locationFilter === 'ALL' 
                                     ? 'bg-white text-gray-900 shadow-md border border-gray-200' 
                                     : 'text-gray-600 bg-gray-50'
@@ -98,7 +113,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                         </button>
                         <button
                             onClick={() => setLocationFilter('FACILITY')}
-                            className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-2 transition-all duration-200 ${
+                            className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-2 ${
                                 locationFilter === 'FACILITY' 
                                     ? 'bg-blue-50 text-blue-900 shadow-md border border-blue-200' 
                                     : 'text-gray-600 bg-gray-50'
@@ -115,7 +130,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                         </button>
                         <button
                             onClick={() => setLocationFilter('VILLA')}
-                            className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-2 transition-all duration-200 ${
+                            className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-2 ${
                                 locationFilter === 'VILLA' 
                                     ? 'bg-purple-50 text-purple-900 shadow-md border border-purple-200' 
                                     : 'text-gray-600 bg-gray-50'
@@ -132,7 +147,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                         </button>
                         <button
                             onClick={() => setLocationFilter('RESTAURANT')}
-                            className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-2 transition-all duration-200 ${
+                            className={`px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-2 ${
                                 locationFilter === 'RESTAURANT' 
                                     ? 'bg-amber-50 text-amber-900 shadow-md border border-amber-200' 
                                     : 'text-gray-600 bg-gray-50'
@@ -148,24 +163,35 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                             </span>
                         </button>
                     </div>
-                    <button
-                        onClick={() => {
-                            setEditingLocation(null);
-                            setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
-                            setShowLocationForm(true);
-                        }}
-                        className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 font-semibold whitespace-nowrap"
-                    >
-                        <Plus size={18} />
-                        <span>Add Location</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleRefresh}
+                            disabled={isRefreshing}
+                            className="p-3 rounded-xl border-2 border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-70 flex items-center gap-2"
+                            title="Refresh list"
+                        >
+                            <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+                            <span className="hidden sm:inline">Refresh</span>
+                        </button>
+                        <button
+                            onClick={() => {
+                                setEditingLocation(null);
+                                setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
+                                setShowLocationForm(true);
+                            }}
+                            className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg font-semibold whitespace-nowrap"
+                        >
+                            <Plus size={18} />
+                            <span>Add Location</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {/* Location Edit Modal */}
             {showLocationForm && (
                 <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in p-4"
+                    className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
                     onClick={() => {
                         setEditingLocation(null);
                         setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
@@ -173,7 +199,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                     }}
                 >
                     <div
-                        className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-2xl p-6 md:p-8 animate-in slide-in-from-top-5 relative max-h-[90vh] overflow-y-auto"
+                        className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-2xl p-6 md:p-8 relative max-h-[90vh] overflow-y-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <button
@@ -182,7 +208,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                 setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
                                 setShowLocationForm(false);
                             }}
-                            className="absolute top-4 right-4 text-gray-500 p-2 rounded-lg active:scale-95"
+                            className="absolute top-4 right-4 text-gray-500 p-2 rounded-lg"
                             aria-label="Close"
                         >
                             <X size={20} />
@@ -198,7 +224,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">Location Name</label>
                                 <input
                                     type="text"
-                                    className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm bg-white/80 backdrop-blur-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all duration-200 text-gray-900 placeholder-gray-400"
+                                    className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm bg-white/80 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 outline-none text-gray-900 placeholder-gray-400"
                                     value={newLocation.name || ''}
                                     onChange={e => setNewLocation({ ...newLocation, name: e.target.value })}
                                     placeholder="e.g. Main Pool, Beach Bar, Villa D1"
@@ -209,7 +235,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                 <input
                                     type="number"
                                     step="any"
-                                    className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm bg-white/80 backdrop-blur-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all duration-200 text-gray-900 placeholder-gray-400 font-mono"
+                                    className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm bg-white/80 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 outline-none text-gray-900 placeholder-gray-400 font-mono"
                                     value={newLocation.lat || ''}
                                     onChange={e => setNewLocation({ ...newLocation, lat: parseFloat(e.target.value) || 0 })}
                                     placeholder="e.g. 16.0471"
@@ -220,7 +246,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                 <input
                                     type="number"
                                     step="any"
-                                    className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm bg-white/80 backdrop-blur-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all duration-200 text-gray-900 placeholder-gray-400 font-mono"
+                                    className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm bg-white/80 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 outline-none text-gray-900 placeholder-gray-400 font-mono"
                                     value={newLocation.lng || ''}
                                     onChange={e => setNewLocation({ ...newLocation, lng: parseFloat(e.target.value) || 0 })}
                                     placeholder="e.g. 108.2068"
@@ -229,7 +255,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                             <div className="col-span-1 md:col-span-2">
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">Location Type</label>
                                 <select
-                                    className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm bg-white/80 backdrop-blur-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all duration-200 text-gray-900"
+                                    className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm bg-white/80 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 outline-none text-gray-900"
                                     value={newLocation.type || 'FACILITY'}
                                     onChange={e => setNewLocation({ ...newLocation, type: e.target.value as 'VILLA' | 'FACILITY' | 'RESTAURANT' })}
                                 >
@@ -246,14 +272,16 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                     setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
                                     setShowLocationForm(false);
                                 }}
-                                className="px-6 py-3 rounded-xl text-sm font-semibold bg-gray-100 text-gray-700 active:scale-95"
+                                className="px-6 py-3 rounded-xl text-sm font-semibold bg-gray-100 text-gray-700"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSave}
-                                className="px-6 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg active:scale-95"
+                                disabled={isSaving}
+                                className="px-6 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
                             >
+                                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                                 {editingLocation ? 'Update Location' : 'Create Location'}
                             </button>
                         </div>
@@ -341,7 +369,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                                         });
                                                         setShowLocationForm(true);
                                                     }}
-                                                    className="p-2.5 text-emerald-600 bg-emerald-50/50 rounded-lg active:scale-95"
+                                                    className="p-2.5 text-emerald-600 bg-emerald-50/50 rounded-lg"
                                                     title="Edit"
                                                     type="button"
                                                 >
@@ -349,7 +377,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                                 </button>
                                                 <button
                                                     onClick={() => onDelete(loc.id || loc.name)}
-                                                    className="p-2.5 text-red-500 bg-red-50/50 rounded-lg active:scale-95"
+                                                    className="p-2.5 text-red-500 bg-red-50/50 rounded-lg"
                                                     title="Delete"
                                                     type="button"
                                                 >

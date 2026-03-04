@@ -42,19 +42,19 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
     const canSubmit = rideData.pickup && rideData.destination && !samePickupAndDestination && !isCreating;
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in" onClick={() => !isCreating && onClose()}>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => !isCreating && onClose()}>
             <div className="backdrop-blur-xl bg-white/95 rounded-3xl shadow-2xl w-full max-w-sm border-2 border-gray-200/60 max-h-[90vh] overflow-y-auto"
                 style={{
                     boxShadow: '0 25px 70px -20px rgba(0,0,0,0.3)'
                 }}
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex justify-between items-center p-5 border-b-2 border-gray-200/60 sticky top-0 bg-white/95 backdrop-blur-sm z-10">
+                <div className="flex justify-between items-center p-5 border-b-2 border-gray-200/60 sticky top-0 bg-white/95 z-10">
                     <h3 className="font-bold text-lg md:text-xl text-gray-900">{t('driver_create_new_ride')}</h3>
                     <button
                         onClick={() => !isCreating && onClose()}
                         disabled={isCreating}
-                        className="text-gray-400 hover:text-gray-600 p-2 rounded-xl hover:bg-gray-100 transition-all min-w-[44px] min-h-[44px] md:min-w-[36px] md:min-h-[36px] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="text-gray-400 hover:text-gray-600 p-2 rounded-xl hover:bg-gray-100 min-w-[44px] min-h-[44px] md:min-w-[36px] md:min-h-[36px] flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <X size={20} className="md:w-5 md:h-5" strokeWidth={2.5} />
                     </button>
@@ -68,7 +68,7 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                             onChange={(e) => handleChange('roomNumber', e.target.value)}
                             placeholder="e.g. 101"
                             disabled={isCreating}
-                            className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-3.5 md:p-3 text-gray-900 text-sm md:text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-h-[44px] transition-all caret-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-3.5 md:p-3 text-gray-900 text-sm md:text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-h-[44px] caret-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
                             style={{ caretColor: '#10b981' }}
                         />
                     </div>
@@ -78,7 +78,7 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                             value={rideData.pickup}
                             onChange={(e) => handleChange('pickup', e.target.value)}
                             disabled={isCreating}
-                            className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-3.5 md:p-3 text-gray-900 text-sm md:text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-h-[44px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-3.5 md:p-3 text-gray-900 text-sm md:text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <option value="">{t('driver_select_pickup')}</option>
                             <option value="Current Location">Current Location</option>
@@ -96,7 +96,7 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                             value={rideData.guestCount ?? 1}
                             onChange={(e) => handleChange('guestCount', parseInt(e.target.value, 10) || 1)}
                             disabled={isCreating}
-                            className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-3.5 md:p-3 text-gray-900 text-sm md:text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-h-[44px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-3.5 md:p-3 text-gray-900 text-sm md:text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
                         />
                     </div>
                     <div>
@@ -105,7 +105,7 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                             value={rideData.destination}
                             onChange={(e) => handleChange('destination', e.target.value)}
                             disabled={isCreating}
-                            className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-3.5 md:p-3 text-gray-900 text-sm md:text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-h-[44px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl p-3.5 md:p-3 text-gray-900 text-sm md:text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <option value="">{t('driver_select_destination')}</option>
                             {locations.map(loc => (
@@ -122,7 +122,7 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                     <button
                         onClick={onSubmit}
                         disabled={!canSubmit}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold py-3.5 md:py-2 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed mt-4 text-base md:text-sm min-h-[48px] md:min-h-[48px] shadow-md transition-colors flex items-center justify-center gap-2 touch-manipulation"
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold py-3.5 md:py-2 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed mt-4 text-base md:text-sm min-h-[48px] md:min-h-[48px] shadow-md flex items-center justify-center gap-2 touch-manipulation"
                     >
                         {isCreating ? (
                             <>

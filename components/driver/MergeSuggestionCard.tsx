@@ -52,7 +52,7 @@ export const MergeSuggestionCard: React.FC<MergeSuggestionCardProps> = ({
                 <button
                     onClick={onAccept}
                     disabled={isMerging}
-                    className="flex-1 min-h-[48px] bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors touch-manipulation"
+                    className="flex-1 min-h-[48px] bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 touch-manipulation"
                 >
                     {isMerging ? (
                         <Loader2 size={18} className="animate-spin" />
@@ -62,7 +62,7 @@ export const MergeSuggestionCard: React.FC<MergeSuggestionCardProps> = ({
                 <button
                     onClick={onReject}
                     disabled={isMerging}
-                    className="flex-1 min-h-[48px] bg-slate-200 hover:bg-slate-300 active:bg-slate-400 text-slate-700 font-bold py-3 px-4 rounded-xl disabled:opacity-50 transition-colors touch-manipulation"
+                    className="flex-1 min-h-[48px] bg-slate-200 hover:bg-slate-300 active:bg-slate-400 text-slate-700 font-bold py-3 px-4 rounded-xl disabled:opacity-50 touch-manipulation"
                 >
                     {t('driver_reject_merge')}
                 </button>

@@ -22,8 +22,8 @@ const Loading: React.FC<LoadingProps> = ({
 
   if (fullScreen) {
     return (
-      <div className={`fixed inset-0 z-[100] bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center ${className}`}>
-        <div className="flex flex-col items-center space-y-6 animate-fade-in">
+      <div className={`fixed inset-0 z-[100] bg-white/95 flex flex-col items-center justify-center ${className}`}>
+        <div className="flex flex-col items-center space-y-6">
           {/* Brand Identity */}
           <div className="flex flex-col items-center">
             <div className="w-16 h-16 bg-emerald-600 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-emerald-600/20">
@@ -36,7 +36,7 @@ const Loading: React.FC<LoadingProps> = ({
           {/* Loading Indicator */}
           <div className="flex flex-col items-center space-y-3 mt-8">
             <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" strokeWidth={2.5} />
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-widest animate-pulse">
+            <p className="text-xs text-gray-400 font-medium uppercase tracking-widest">
               {message || 'Loading Application'}
             </p>
           </div>
@@ -49,9 +49,7 @@ const Loading: React.FC<LoadingProps> = ({
     <div className={`flex items-center justify-center p-8 ${className}`}>
       <div className="flex flex-col items-center justify-center space-y-3">
         <Loader2 className={`${sizeClasses[size]} text-emerald-600 animate-spin`} />
-        {message && (
-          <p className="text-sm text-gray-600 font-medium">{message}</p>
-        )}
+        <p className="text-sm text-gray-600 font-medium">{message || 'Loading...'}</p>
       </div>
     </div>
   );

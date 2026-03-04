@@ -78,7 +78,7 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
 
   const MapCard: React.FC<{ url: string; title: string }> = ({ url, title }) => (
     <a href={url} target="_blank" rel="noreferrer" className="block mt-2 group w-full max-w-sm">
-      <div className="bg-white/95 backdrop-blur-sm border-2 border-gray-200 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300">
+      <div className="bg-white/95 border-2 border-gray-200 rounded-xl overflow-hidden shadow-md hover:shadow-lg">
         {/* Visual Abstract Map Pattern */}
         <div className="h-20 bg-gradient-to-br from-blue-50 to-cyan-50 relative flex items-center justify-center overflow-hidden bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:16px_16px]">
           <div className="absolute inset-0 bg-gradient-to-t from-blue-100/30 to-transparent"></div>
@@ -86,14 +86,14 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
             <MapPin className="text-red-500 w-5 h-5 fill-current" />
           </div>
         </div>
-        <div className="p-3 bg-white flex justify-between items-center group-hover:bg-emerald-50/50 transition-colors">
+        <div className="p-3 bg-white flex justify-between items-center group-hover:bg-emerald-50/50">
           <div className="flex-1 min-w-0 pr-2">
             <h4 className="font-bold text-sm text-gray-800 truncate">{title}</h4>
             <p className="text-xs text-emerald-600 flex items-center mt-1 font-semibold">
               <Navigation size={10} className="mr-1 fill-current" /> {t('get_directions')}
             </p>
           </div>
-          <div className="bg-emerald-100 text-emerald-700 p-2 rounded-lg border border-emerald-200 group-hover:bg-emerald-200 transition-all duration-300">
+          <div className="bg-emerald-100 text-emerald-700 p-2 rounded-lg border border-emerald-200 group-hover:bg-emerald-200">
             <Navigation size={16} strokeWidth={2.5} />
           </div>
         </div>
@@ -484,13 +484,13 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
         onCancel={() => setShowPermissionModal(false)}
       />
       {/* Header - Modern Design */}
-      <div className="px-3 py-2 text-white shadow-lg backdrop-blur-md bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 flex justify-between items-center z-10 border-b border-white/20"
+      <div className="px-3 py-2 text-white shadow-lg bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 flex justify-between items-center z-10 border-b border-white/20"
         style={{
           boxShadow: '0 4px 20px -5px rgba(0,0,0,0.2)'
         }}
       >
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
+          <div className="w-7 h-7 rounded-xl bg-white/20 flex items-center justify-center border border-white/30">
             <MessageSquare className="w-3.5 h-3.5" />
           </div>
           <div>
@@ -500,7 +500,7 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
         </div>
         <button
           onClick={onClose}
-          className="p-1 rounded-lg text-white/90 hover:text-white hover:bg-white/10 transition-all"
+          className="p-1 rounded-lg text-white/90 hover:text-white hover:bg-white/10"
         >
           <X size={18} />
         </button>
@@ -522,7 +522,7 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
 
               {/* Contact Information Cards */}
               <div className="space-y-3">
-                <div className="bg-white/95 backdrop-blur-sm rounded-xl p-4 border-2 border-gray-200/60 shadow-md">
+                <div className="bg-white/95 rounded-xl p-4 border-2 border-gray-200/60 shadow-md">
                   <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
                     <MessageSquare className="w-4 h-4 text-emerald-600" />
                     {t('beta_contact_info')}
@@ -531,9 +531,9 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
                     {/* Phone */}
                     <a
                       href="tel:+842363847333"
-                      className="flex items-center gap-3 p-3 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg hover:from-emerald-100 hover:to-teal-100 transition-all border border-emerald-200/50 group"
+                      className="flex items-center gap-3 p-3 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg hover:from-emerald-100 hover:to-teal-100 border border-emerald-200/50 group"
                     >
-                      <div className="w-10 h-10 rounded-lg bg-emerald-600 flex items-center justify-center group-hover:bg-emerald-700 transition-all">
+                      <div className="w-10 h-10 rounded-lg bg-emerald-600 flex items-center justify-center group-hover:bg-emerald-700">
                         <Phone size={18} className="text-white" strokeWidth={2.5} />
                       </div>
                       <div className="flex-1">
@@ -545,9 +545,9 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
                     {/* Email */}
                     <a
                       href="mailto:reservation@furamavietnam.com"
-                      className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg hover:from-blue-100 hover:to-cyan-100 transition-all border border-blue-200/50 group"
+                      className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg hover:from-blue-100 hover:to-cyan-100 border border-blue-200/50 group"
                     >
-                      <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center group-hover:bg-blue-700 transition-all">
+                      <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center group-hover:bg-blue-700">
                         <Mail size={18} className="text-white" strokeWidth={2.5} />
                       </div>
                       <div className="flex-1">
@@ -561,9 +561,9 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
                       href="https://api.whatsapp.com/message/IJNAGKZC35SXC1?autoload=1&app_absent=0"
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-3 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg hover:from-green-100 hover:to-emerald-100 transition-all border border-green-200/50 group"
+                      className="flex items-center gap-3 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg hover:from-green-100 hover:to-emerald-100 border border-green-200/50 group"
                     >
-                      <div className="w-10 h-10 rounded-lg bg-green-600 flex items-center justify-center group-hover:bg-green-700 transition-all">
+                      <div className="w-10 h-10 rounded-lg bg-green-600 flex items-center justify-center group-hover:bg-green-700">
                         <MessageCircle size={18} className="text-white" strokeWidth={2.5} />
                       </div>
                       <div className="flex-1">
@@ -578,7 +578,7 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
           </div>
 
           {/* Disabled Input Area */}
-          <div className="p-3 backdrop-blur-xl bg-gray-100/80 border-t-2 border-gray-300/60 flex items-center space-x-2 safe-area-bottom"
+          <div className="p-3 bg-gray-100/80 border-t-2 border-gray-300/60 flex items-center space-x-2 safe-area-bottom"
             style={{
               boxShadow: '0 -10px 40px -10px rgba(0,0,0,0.1)',
               paddingBottom: 'max(0.75rem, calc(0.75rem + env(safe-area-inset-bottom)))'
@@ -587,7 +587,7 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
             <button
               type="button"
               onClick={handleMicClick}
-              className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-lg hover:bg-emerald-700 transition-all border border-emerald-500"
+              className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-lg hover:bg-emerald-700 border border-emerald-500"
             >
               <Mic size={18} strokeWidth={2.5} />
             </button>
@@ -616,11 +616,11 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
           </div>
 
           <div className="relative z-10 flex flex-col items-center max-w-md px-4">
-            <div className="w-28 h-28 rounded-2xl flex items-center justify-center mb-6 bg-white/20 backdrop-blur-sm border-2 border-white/30">
+            <div className="w-28 h-28 rounded-2xl flex items-center justify-center mb-6 bg-white/20 border-2 border-white/30">
               <Mic size={40} className="text-white" strokeWidth={2.5} />
             </div>
 
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full border-2 border-white/30 mb-4">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 rounded-full border-2 border-white/30 mb-4">
               <span className="text-xs font-bold text-white uppercase tracking-wide">Beta</span>
             </div>
 
@@ -631,7 +631,7 @@ const ConciergeChat: React.FC<ConciergeChatProps> = ({ onClose }) => {
 
             <button
               onClick={toggleLiveMode}
-              className="px-6 py-3 bg-white/20 backdrop-blur-sm border-2 border-white/30 text-white rounded-xl hover:bg-white/30 transition-all flex items-center gap-2 font-semibold shadow-lg"
+              className="px-6 py-3 bg-white/20 border-2 border-white/30 text-white rounded-xl hover:bg-white/30 flex items-center gap-2 font-semibold shadow-lg"
             >
               <X size={18} strokeWidth={2.5} /> {t('end_call')}
             </button>

@@ -108,8 +108,8 @@ const PWAInstallPrompt: React.FC = () => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 
     return (
-        <div className="fixed bottom-20 left-4 right-4 md:left-auto md:right-4 md:w-96 md:bottom-4 z-50 animate-in slide-in-from-bottom">
-            <div className="bg-gradient-to-br from-white to-emerald-50/30 backdrop-blur-md border-2 border-emerald-200 rounded-2xl shadow-2xl p-4 flex flex-col gap-3 mx-auto md:mx-0 max-w-sm">
+        <div className="fixed bottom-20 left-4 right-4 md:left-auto md:right-4 md:w-96 md:bottom-4 z-50 slide-in-from-bottom">
+            <div className="bg-gradient-to-br from-white to-emerald-50/30 border-2 border-emerald-200 rounded-2xl shadow-2xl p-4 flex flex-col gap-3 mx-auto md:mx-0 max-w-sm">
                 <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3 flex-1">
                         <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-2.5 rounded-xl shadow-lg">
@@ -129,7 +129,7 @@ const PWAInstallPrompt: React.FC = () => {
                     </div>
                     <button
                         onClick={handleDismiss}
-                        className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition flex-shrink-0"
+                        className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 flex-shrink-0"
                         aria-label="Dismiss"
                     >
                         <X size={16} />
@@ -138,13 +138,13 @@ const PWAInstallPrompt: React.FC = () => {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={handleDismiss}
-                        className="flex-1 px-3 py-2 text-xs font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition active:scale-95"
+                        className="flex-1 px-3 py-2 text-xs font-semibold text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg"
                     >
                         {t('not_now') || 'Not Now'}
                     </button>
                     <button
                         onClick={handleInstallClick}
-                        className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-md transition active:scale-95 flex items-center justify-center gap-1.5"
+                        className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-md flex items-center justify-center gap-1.5"
                     >
                         <Download size={14} />
                         {t('install') || 'Install'}

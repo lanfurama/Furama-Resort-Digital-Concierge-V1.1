@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Trash2, Pencil, X, Download, Copy, Check, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Pencil, X, Download, Copy, Check, RefreshCw, Loader2 } from 'lucide-react';
 import { User, RoomType } from '../../../types';
 import { addUser, updateUser, getUsers, generateCheckInCode, getGuestCSVContent, importGuestsFromCSV } from '../../../services/dataService';
+import { useToast } from '../../../hooks/useToast';
 
 interface GuestsTabProps {
     users: User[];
@@ -30,6 +31,7 @@ const getGuestStatus = (guest: User): 'Active' | 'Future' | 'Expired' => {
 };
 
 export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete, onRefresh, setUsers }) => {
+    const toast = useToast();
     const [guestStatusFilter, setGuestStatusFilter] = useState<'ALL' | 'Active' | 'Future' | 'Expired'>('ALL');
     const [showGuestForm, setShowGuestForm] = useState(false);
     const [newGuest, setNewGuest] = useState<{ lastName: string, room: string, type: string, checkIn: string, checkOut: string, language: string }>({
@@ -40,6 +42,16 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
     const [showGuestEditForm, setShowGuestEditForm] = useState(false);
     const [editGuest, setEditGuest] = useState<Partial<User>>({ lastName: '', roomNumber: '', villaType: '', language: 'English', checkIn: '', checkOut: '' });
     const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        try {
+            await onRefresh();
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const guestUsers = useMemo(() => {
         return users.filter(u => {
@@ -51,9 +63,10 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
 
     const handleAddGuest = async () => {
         if (!newGuest.lastName || !newGuest.room) {
-            alert('Please enter both last name and room number.');
+            toast.error('Please enter both last name and room number.');
             return;
         }
+        setIsSaving(true);
         try {
             await addUser({
                 lastName: newGuest.lastName,
@@ -65,7 +78,7 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                 checkOut: newGuest.checkOut ? new Date(newGuest.checkOut).toISOString() : undefined,
                 language: newGuest.language
             });
-            alert(`Guest "${newGuest.lastName}" created successfully!`);
+            toast.success(`Guest "${newGuest.lastName}" created successfully!`);
             setNewGuest({ lastName: '', room: '', type: 'Ocean Suite', checkIn: '', checkOut: '', language: 'English' });
             setShowGuestForm(false);
             const refreshedUsers = await getUsers();
@@ -73,15 +86,18 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
             await onRefresh();
         } catch (error: any) {
             console.error('Failed to add guest:', error);
-            alert(`Failed to add guest: ${error?.message || 'Unknown error'}`);
+            toast.error(`Failed to add guest: ${error?.message || 'Unknown error'}`);
+        } finally {
+            setIsSaving(false);
         }
     };
 
     const handleUpdateGuest = async () => {
         if (!editGuest.lastName || !editGuest.roomNumber) {
-            alert('Please enter last name and room number.');
+            toast.error('Please enter last name and room number.');
             return;
         }
+        setIsSaving(true);
         try {
             if (editingGuest && editingGuest.id) {
                 const userToUpdate: Partial<User> = {
@@ -99,14 +115,16 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                 };
                 await updateUser(editingGuest.id, userToUpdate as User);
                 setEditingGuest(null);
-                alert(`Guest "${editGuest.lastName}" updated successfully!`);
+                toast.success(`Guest "${editGuest.lastName}" updated successfully!`);
                 setEditGuest({ lastName: '', roomNumber: '', villaType: '', language: 'English', checkIn: '', checkOut: '' });
                 setShowGuestEditForm(false);
                 await onRefresh();
             }
         } catch (error) {
             console.error('Failed to save guest:', error);
-            alert('Failed to save guest. Please try again.');
+            toast.error('Failed to save guest. Please try again.');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -122,7 +140,7 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
             window.URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Failed to export guests:', error);
-            alert('Failed to export guests.');
+            toast.error('Failed to export guests.');
         }
     };
 
@@ -131,13 +149,13 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
         try {
             const text = await csvFile.text();
             await importGuestsFromCSV(text);
-            alert('Guests imported successfully!');
+            toast.success('Guests imported successfully!');
             setCsvFile(null);
             const refreshedUsers = await getUsers();
             setUsers(refreshedUsers);
             await onRefresh();
         } catch (error: any) {
-            alert(`Failed to import guests: ${error?.message || 'Unknown error'}`);
+            toast.error(`Failed to import guests: ${error?.message || 'Unknown error'}`);
         }
     };
 
@@ -163,6 +181,14 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h2 className="text-xl font-bold text-gray-800 flex items-center">Guest Check-in Management</h2>
                 <div className="flex items-center space-x-2">
+                    <button
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-70"
+                        title="Refresh"
+                    >
+                        <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+                    </button>
                     <div className="flex space-x-2 bg-white p-1.5 rounded-lg border border-gray-200">
                         <div className="flex items-center space-x-1 px-2">
                             <select
@@ -179,14 +205,14 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                     </div>
                     <button
                         onClick={handleExportGuests}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md active:scale-95"
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md"
                     >
                         <Download size={18} />
                         <span>Export CSV</span>
                     </button>
                     <button
                         onClick={() => setShowGuestForm(!showGuestForm)}
-                        className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md active:scale-95"
+                        className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md"
                     >
                         {showGuestForm ? <X size={18} /> : <Plus size={18} />}
                         <span>Add Guest</span>
@@ -268,13 +294,16 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                                     />
                                 </div>
                             </div>
-                            <button onClick={handleAddGuest} className="bg-emerald-800 text-white px-4 py-2 rounded-lg text-sm font-bold w-full">Add Guest</button>
+                            <button onClick={handleAddGuest} disabled={isSaving} className="bg-emerald-800 text-white px-4 py-2 rounded-lg text-sm font-bold w-full disabled:opacity-70 flex items-center justify-center gap-2">
+                                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                                Add Guest
+                            </button>
                         </div>
                         <div className="w-px bg-gray-200 hidden md:block"></div>
                         <div className="flex-1">
                             <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase">Bulk Import Guests (CSV)</h3>
                             <p className="text-xs text-gray-500 mb-4">Format: LastName, RoomNumber, VillaType, CheckIn, CheckOut, Language</p>
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center  active:scale-95 cursor-pointer relative">
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center  cursor-pointer relative">
                                 <input type="file" accept=".csv" onChange={(e) => setCsvFile(e.target.files?.[0] || null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                                 <Download className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
                                 <p className="text-sm text-gray-600 font-medium">{csvFile ? csvFile.name : 'Click to Upload CSV'}</p>
@@ -288,7 +317,7 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
             {/* Guest Edit Modal */}
             {showGuestEditForm && (
                 <div
-                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in"
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
                     onClick={() => {
                         setEditingGuest(null);
                         setEditGuest({ lastName: '', roomNumber: '', villaType: '', language: 'English', checkIn: '', checkOut: '' });
@@ -296,7 +325,7 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                     }}
                 >
                     <div
-                        className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[90vw] max-w-2xl p-6 animate-in slide-in-from-top-5 relative max-h-[90vh] overflow-y-auto"
+                        className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[90vw] max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <button
@@ -305,7 +334,7 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                                 setEditGuest({ lastName: '', roomNumber: '', villaType: '', language: 'English', checkIn: '', checkOut: '' });
                                 setShowGuestEditForm(false);
                             }}
-                            className="absolute top-4 right-4 text-gray-400  active:scale-95-colors"
+                            className="absolute top-4 right-4 text-gray-400 -colors"
                         >
                             <X size={20} />
                         </button>
@@ -390,8 +419,10 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                             </button>
                             <button
                                 onClick={handleUpdateGuest}
-                                className="bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold "
+                                disabled={isSaving}
+                                className="bg-emerald-600 text-white px-6 py-2 rounded-lg text-sm font-bold disabled:opacity-70 flex items-center gap-2"
                             >
+                                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                                 Update Guest
                             </button>
                         </div>
@@ -454,11 +485,11 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                                                                 }
                                                             } catch (error) {
                                                                 console.error('Failed to copy code:', error);
-                                                                alert('Failed to copy code. Please try again.');
+                                                                toast.error('Failed to copy code. Please try again.');
                                                             }
                                                         }
                                                     }}
-                                                    className="text-xs font-mono bg-gray-100 text-gray-800 px-2 py-1 rounded border border-gray-300 cursor-pointer  active:scale-95-colors select-all"
+                                                    className="text-xs font-mono bg-gray-100 text-gray-800 px-2 py-1 rounded border border-gray-300 cursor-pointer -colors select-all"
                                                     title="Click to copy"
                                                 >
                                                     {u.checkInCode}
@@ -489,11 +520,11 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                                                         if (u.id) {
                                                             try {
                                                                 const result = await generateCheckInCode(u.id);
-                                                                alert(`New check-in code generated: ${result.checkInCode}`);
+                                                                toast.success(`New check-in code generated: ${result.checkInCode}`);
                                                                 await onRefresh();
                                                             } catch (error) {
                                                                 console.error('Failed to generate check-in code:', error);
-                                                                alert('Failed to generate check-in code. Please try again.');
+                                                                toast.error('Failed to generate check-in code. Please try again.');
                                                             }
                                                         }
                                                     }}
@@ -509,11 +540,11 @@ export const GuestsTab: React.FC<GuestsTabProps> = ({ users, roomTypes, onDelete
                                                     if (u.id) {
                                                         try {
                                                             const result = await generateCheckInCode(u.id);
-                                                            alert(`Check-in code generated: ${result.checkInCode}`);
+                                                            toast.success(`Check-in code generated: ${result.checkInCode}`);
                                                             await onRefresh();
                                                         } catch (error) {
                                                             console.error('Failed to generate check-in code:', error);
-                                                            alert('Failed to generate check-in code. Please try again.');
+                                                            toast.error('Failed to generate check-in code. Please try again.');
                                                         }
                                                     }
                                                 }}

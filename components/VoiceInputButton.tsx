@@ -66,7 +66,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
         listening: {
             button: "bg-emerald-500 hover:bg-emerald-600 border-emerald-400 text-white",
             ring: "border-emerald-400",
-            glow: "shadow-lg shadow-emerald-500/50 animate-pulse",
+            glow: "shadow-lg shadow-emerald-500/50",
         },
         processing: {
             button: "bg-blue-500 hover:bg-blue-600 border-blue-400 text-white",
@@ -115,7 +115,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
                             strokeWidth="3"
                             strokeDasharray={`${countdownProgress * 125.6} 125.6`}
                             strokeLinecap="round"
-                            className="text-emerald-500 transition-all duration-100"
+                            className="text-emerald-500"
                         />
                     </svg>
                 )}
@@ -132,7 +132,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
                     className={`
             relative z-10 w-14 h-14 rounded-full border-2 
             flex items-center justify-center
-            transition-all duration-300 ease-out
+           
             disabled:opacity-50 disabled:cursor-not-allowed
             ${currentStyle.button} ${currentStyle.glow}
           `}
@@ -152,7 +152,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
                             {waveHeights.map((height, i) => (
                                 <div
                                     key={i}
-                                    className="w-1.5 bg-white rounded-full transition-all duration-75"
+                                    className="w-1.5 bg-white rounded-full"
                                     style={{ height: `${height}px` }}
                                 />
                             ))}
@@ -170,7 +170,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
 
                 {/* Countdown Number Badge */}
                 {state === "listening" && silenceCountdown !== null && silenceCountdown <= 5 && (
-                    <div className="absolute -top-1 -right-1 w-6 h-6 bg-orange-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg animate-bounce">
+                    <div className="absolute -top-1 -right-1 w-6 h-6 bg-orange-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg">
                         {silenceCountdown}
                     </div>
                 )}
@@ -178,7 +178,7 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
 
             {/* Status Label */}
             <span className={`
-        text-xs font-semibold transition-colors duration-300
+        text-xs font-semibold
         ${state === "idle" ? "text-gray-500" : ""}
         ${state === "listening" ? "text-emerald-600" : ""}
         ${state === "processing" ? "text-blue-600" : ""}
@@ -195,9 +195,9 @@ export const VoiceInputButton: React.FC<VoiceInputButtonProps> = ({
             {/* Real-time Transcript Display (during listening) */}
             {state === "listening" && transcript && (
                 <div className="absolute top-full mt-3 left-1/2 -translate-x-1/2 w-64 max-w-[80vw]">
-                    <div className="bg-white/95 backdrop-blur-sm border border-emerald-200 rounded-lg p-3 shadow-lg">
+                    <div className="bg-white/95 border border-emerald-200 rounded-lg p-3 shadow-lg">
                         <div className="text-xs text-emerald-600 font-semibold mb-1 flex items-center gap-1">
-                            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full" />
                             Đang ghi nhận
                         </div>
                         <p className="text-sm text-gray-700 leading-relaxed">

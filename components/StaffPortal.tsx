@@ -200,7 +200,7 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                     {newOrderAlert && (
                         <button
                             onClick={handleNewOrderClick}
-                            className="bg-red-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center shadow-md border border-white/30 animate-pulse transition-all"
+                            className="bg-red-500 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center shadow-md border border-white/30"
                         >
                             <Bell size={13} className="mr-1" />
                             New Orders!
@@ -219,7 +219,7 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                             }
                             onLogout();
                         }}
-                        className="text-sm font-semibold text-white/90 hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-all border border-white/20"
+                        className="text-sm font-semibold text-white/90 hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-white/10 border border-white/20"
                     >
                         Logout
                     </button>
@@ -231,7 +231,7 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                 <div className="flex space-x-2 border-b-2 border-gray-200/60">
                     <button
                         onClick={() => setViewMode('ACTIVE')}
-                        className={`group pb-2.5 px-3 font-bold text-sm flex items-center transition-all duration-300 ${viewMode === 'ACTIVE'
+                        className={`group pb-2.5 px-3 font-bold text-sm flex items-center ${viewMode === 'ACTIVE'
                                 ? 'border-b-2 border-indigo-600 text-indigo-600'
                                 : 'text-gray-500 hover:text-gray-700'
                             }`}
@@ -246,7 +246,7 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                     </button>
                     <button
                         onClick={() => setViewMode('HISTORY')}
-                        className={`group pb-2.5 px-3 font-bold text-sm flex items-center transition-all duration-300 ${viewMode === 'HISTORY'
+                        className={`group pb-2.5 px-3 font-bold text-sm flex items-center ${viewMode === 'HISTORY'
                                 ? 'border-b-2 border-purple-600 text-purple-600'
                                 : 'text-gray-500 hover:text-gray-700'
                             }`}
@@ -265,7 +265,7 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                         <button
                             key={type}
                             onClick={() => setServiceTypeFilter(type)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${serviceTypeFilter === type
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${serviceTypeFilter === type
                                     ? type === 'ALL'
                                         ? 'bg-indigo-600 text-white shadow-md'
                                         : type === 'DINING'
@@ -340,7 +340,7 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
 
                     // Get service type specific styling
                     const getServiceTypeStyle = (type: string, status: string) => {
-                        const baseStyle = 'bg-white p-4 rounded-xl shadow-md border-2 transition-all hover:shadow-lg';
+                        const baseStyle = 'bg-white p-4 rounded-xl shadow-md border-2 hover:shadow-lg';
 
                         // Service type colors
                         const typeColors: Record<string, { border: string, bg: string, badgePending: string, badgeConfirmed: string }> = {
@@ -566,9 +566,9 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                                             e.stopPropagation();
                                             handleAction(req.id, 'CONFIRMED', e);
                                         }}
-                                        className="group relative flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-md transition-all duration-300 overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] hover:bg-indigo-700"
+                                        className="group relative flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-md overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] hover:bg-indigo-700"
                                     >
-                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%]"></div>
                                         <span className="relative z-10">Confirm Order</span>
                                     </button>
                                 )}
@@ -579,9 +579,9 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                                             e.stopPropagation();
                                             handleAction(req.id, 'COMPLETED', e);
                                         }}
-                                        className="group relative flex-1 bg-green-600 text-white py-3 rounded-lg font-bold shadow-md transition-all duration-300 overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] hover:bg-green-700"
+                                        className="group relative flex-1 bg-green-600 text-white py-3 rounded-lg font-bold shadow-md overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] hover:bg-green-700"
                                     >
-                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%]"></div>
                                         <span className="relative z-10">Complete Order</span>
                                     </button>
                                 )}
@@ -590,7 +590,7 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                                 {(req.status === 'PENDING' || req.status === 'CONFIRMED') && (
                                     <button
                                         onClick={() => setActiveChatRequest({ roomNumber: req.roomNumber, type: req.type })}
-                                        className={`flex-1 border-2 py-2.5 rounded-lg font-bold flex items-center justify-center relative transition-all min-h-[48px] ${isUnread
+                                        className={`flex-1 border-2 py-2.5 rounded-lg font-bold flex items-center justify-center relative min-h-[48px] ${isUnread
                                                 ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100'
                                                 : 'border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100'
                                             }`}
@@ -598,7 +598,7 @@ const StaffPortal: React.FC<{ onLogout: () => void; user: User }> = ({ onLogout,
                                         <MessageSquare size={16} className="mr-2" strokeWidth={2.5} />
                                         {isUnread ? 'New Message' : 'Chat with Guest'}
                                         {isUnread && (
-                                            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white shadow-md animate-pulse"></span>
+                                            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white shadow-md"></span>
                                         )}
                                     </button>
                                 )}

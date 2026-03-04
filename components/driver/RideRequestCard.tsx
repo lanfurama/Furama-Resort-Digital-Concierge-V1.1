@@ -23,7 +23,7 @@ export const RideRequestCard: React.FC<RideRequestCardProps> = React.memo(({
     const isDisabled = loadingAction !== null;
 
     return (
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-gray-200 hover:border-emerald-400 hover:shadow-xl transition-all shadow-md">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-gray-200 hover:border-emerald-400 hover:shadow-xl shadow-md">
             <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                 <div className="flex items-center gap-4 sm:flex-col sm:items-center sm:min-w-[80px]">
                     <div className="text-2xl sm:text-3xl font-black text-emerald-700">#{ride.roomNumber}</div>
@@ -54,7 +54,7 @@ export const RideRequestCard: React.FC<RideRequestCardProps> = React.memo(({
                 <button
                     onClick={() => onAccept(ride.id)}
                     disabled={isAccepting || isDisabled}
-                    className="w-full sm:w-auto sm:min-w-[120px] min-h-[48px] sm:min-h-[56px] bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white px-6 py-3.5 rounded-xl font-bold text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center touch-manipulation"
+                    className="w-full sm:w-auto sm:min-w-[120px] min-h-[48px] sm:min-h-[56px] bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white px-6 py-3.5 rounded-xl font-bold text-base disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center touch-manipulation"
                 >
                     {isAccepting ? (
                         <Loader2 size={20} className="animate-spin" />

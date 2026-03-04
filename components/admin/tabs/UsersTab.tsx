@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Trash2, Pencil, Key, X, Shield, Users, RefreshCw, Clock } from 'lucide-react';
+import { Plus, Trash2, Pencil, Key, X, Shield, Users, RefreshCw, Clock, Loader2 } from 'lucide-react';
 import { User, UserRole, DriverSchedule } from '../../../types';
 import { addUser, updateUser, getUsers, resetUserPassword, getAllDriverSchedulesByDateRange, upsertDriverSchedule, updateDriverSchedule, deleteDriverSchedule } from '../../../services/dataService';
 import { useScheduleManagement } from '../../../hooks/useScheduleManagement';
+import { useToast } from '../../../hooks/useToast';
 
 interface UsersTabProps {
     users: User[];
@@ -13,6 +14,7 @@ interface UsersTabProps {
 }
 
 export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, onRefresh, setUsers }) => {
+    const toast = useToast();
     const [staffRoleFilter, setStaffRoleFilter] = useState<UserRole | 'ALL'>('ALL');
     const [newUser, setNewUser] = useState<Partial<User>>({ role: UserRole.STAFF, department: 'Dining' });
     const [showUserForm, setShowUserForm] = useState(false);
@@ -21,6 +23,16 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
     const [editStaff, setEditStaff] = useState<Partial<User>>({ lastName: '', roomNumber: '', department: 'Dining', role: UserRole.STAFF, vehicleType: 'NORMAL' });
     const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
     const [resetNewPassword, setResetNewPassword] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        try {
+            await onRefresh();
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const scheduleManagement = useScheduleManagement('USERS', staffRoleFilter, users);
     const {
@@ -48,9 +60,10 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
 
     const handleAddUser = async () => {
         if (!newUser.lastName || !newUser.roomNumber) {
-            alert('Please enter both name and username.');
+            toast.error('Please enter both name and username.');
             return;
         }
+        setIsSaving(true);
         try {
             await addUser({
                 lastName: newUser.lastName,
@@ -60,7 +73,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                 villaType: 'Staff',
                 password: '123'
             });
-            alert(`Staff "${newUser.lastName}" created successfully!`);
+            toast.success(`Staff "${newUser.lastName}" created successfully!`);
             setNewUser({ role: UserRole.STAFF, department: 'Dining' });
             setShowUserForm(false);
             const refreshedUsers = await getUsers();
@@ -68,28 +81,33 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
             await onRefresh();
         } catch (error: any) {
             console.error('Failed to add user:', error);
-            alert(`Failed to add user: ${error?.message || 'Unknown error'}`);
+            toast.error(`Failed to add user: ${error?.message || 'Unknown error'}`);
+        } finally {
+            setIsSaving(false);
         }
     };
 
     const handleUpdateStaff = async () => {
         if (!editStaff.lastName || !editStaff.roomNumber) {
-            alert('Please enter last name and ID.');
+            toast.error('Please enter last name and ID.');
             return;
         }
+        setIsSaving(true);
         try {
             if (editingStaff && editingStaff.id) {
                 await updateUser(editingStaff.id, editStaff as User);
                 const updatedUsers = await getUsers();
                 setUsers(updatedUsers);
-                alert(`Staff "${editStaff.lastName}" updated successfully!`);
+                toast.success(`Staff "${editStaff.lastName}" updated successfully!`);
                 setEditingStaff(null);
                 setEditStaff({ lastName: '', roomNumber: '', department: 'Dining', role: UserRole.STAFF });
                 setShowStaffEditForm(false);
             }
         } catch (error) {
             console.error('Error updating staff:', error);
-            alert('Failed to update staff. Please try again.');
+            toast.error('Failed to update staff. Please try again.');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -100,6 +118,14 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                 <h2 className="text-xl font-bold text-gray-800 flex items-center">Staff Management</h2>
                 {userRole === UserRole.ADMIN && (
                     <div className="flex items-center space-x-2">
+                        <button
+                            onClick={handleRefresh}
+                            disabled={isRefreshing}
+                            className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-70"
+                            title="Refresh"
+                        >
+                            <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+                        </button>
                         <div className="flex bg-white rounded-lg border border-gray-200 p-1">
                             <button onClick={() => setStaffRoleFilter('ALL')} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === 'ALL' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500'}`}>All</button>
                             <button onClick={() => setStaffRoleFilter(UserRole.ADMIN)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.ADMIN ? 'bg-red-100 text-red-800 font-bold' : 'text-gray-500'}`}>Admin</button>
@@ -110,7 +136,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                         </div>
                         <button
                             onClick={() => setShowUserForm(!showUserForm)}
-                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md active:scale-95"
+                            className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md"
                         >
                             {showUserForm ? <X size={18} /> : <Plus size={18} />}
                             <span>Add Staff</span>
@@ -201,8 +227,10 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                         </button>
                         <button
                             onClick={handleAddUser}
-                            className="bg-emerald-800 text-white px-6 py-2 rounded-lg text-sm font-bold"
+                            disabled={isSaving}
+                            className="bg-emerald-800 text-white px-6 py-2 rounded-lg text-sm font-bold disabled:opacity-70 flex items-center gap-2"
                         >
+                            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                             Create Staff
                         </button>
                     </div>
@@ -401,7 +429,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                         <div className="flex items-end gap-2">
                                             <button
                                                 onClick={saveSchedule}
-                                                className={`flex-1 px-4 py-2 rounded-lg text-sm font-bold active:scale-95 ${
+                                                className={`flex-1 px-4 py-2 rounded-lg text-sm font-bold ${
                                                     editingSchedule 
                                                         ? 'bg-amber-600  text-white' 
                                                         : 'bg-emerald-600  text-white'
@@ -442,7 +470,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                             {driverSchedules.filter(s => s.driver_id === selectedDriverForSchedule).map((schedule) => (
                                                 <div 
                                                     key={schedule.id} 
-                                                    className={`flex items-center justify-between p-3 rounded-lg active:scale-95-all ${
+                                                    className={`flex items-center justify-between p-3 rounded-lg-all ${
                                                         editingSchedule?.id === schedule.id 
                                                             ? 'bg-amber-100 border-2 border-amber-400 shadow-md' 
                                                             : 'bg-gray-50 border border-gray-200 '
@@ -485,7 +513,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                                                     }
                                                                 }, 100);
                                                             }}
-                                                            className={`p-1.5 rounded active:scale-95 ${
+                                                            className={`p-1.5 rounded ${
                                                                 editingSchedule?.id === schedule.id 
                                                                     ? 'bg-amber-600 text-white ' 
                                                                     : 'text-emerald-600  '
@@ -496,7 +524,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                                         </button>
                                                         <button
                                                             onClick={() => deleteSchedule(schedule.driver_id, schedule.date)}
-                                                            className="text-red-500   p-1.5 rounded active:scale-95"
+                                                            className="text-red-500   p-1.5 rounded"
                                                             title="Delete Schedule"
                                                         >
                                                             <Trash2 size={14} />
@@ -516,7 +544,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
             {/* Staff Edit Modal */}
             {showStaffEditForm && (
                 <div
-                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in"
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
                     onClick={() => {
                         setEditingStaff(null);
                         setEditStaff({ lastName: '', roomNumber: '', department: 'Dining', role: UserRole.STAFF, vehicleType: 'NORMAL' });
@@ -524,7 +552,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                     }}
                 >
                     <div
-                        className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[90vw] max-w-lg p-6 animate-in slide-in-from-top-5 relative"
+                        className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[90vw] max-w-lg p-6 relative"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <button
@@ -533,7 +561,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                 setEditStaff({ lastName: '', roomNumber: '', department: 'Dining', role: UserRole.STAFF, vehicleType: 'NORMAL' });
                                 setShowStaffEditForm(false);
                             }}
-                            className="absolute top-4 right-4 text-gray-400  active:scale-95"
+                            className="absolute top-4 right-4 text-gray-400 "
                         >
                             <X size={20} />
                         </button>
@@ -600,14 +628,16 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                         setEditStaff({ lastName: '', roomNumber: '', department: 'Dining', role: UserRole.STAFF, vehicleType: 'NORMAL' });
                                         setShowStaffEditForm(false);
                                     }}
-                                    className="px-4 py-2 bg-gray-200  text-gray-700 rounded-lg font-medium active:scale-95"
+                                    className="px-4 py-2 bg-gray-200  text-gray-700 rounded-lg font-medium"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     onClick={handleUpdateStaff}
-                                    className="px-4 py-2 bg-blue-600  text-white rounded-lg font-medium active:scale-95"
+                                    disabled={isSaving}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium disabled:opacity-70 flex items-center gap-2"
                                 >
+                                    {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                                     Save Changes
                                 </button>
                             </div>
@@ -648,16 +678,16 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                 <button
                                     onClick={async () => {
                                         if (!resetNewPassword) {
-                                            alert('Please enter a new password.');
+                                            toast.error('Please enter a new password.');
                                             return;
                                         }
                                         try {
                                             await resetUserPassword(resetPasswordUserId, resetNewPassword);
-                                            alert('Password reset successfully!');
+                                            toast.success('Password reset successfully!');
                                             setResetPasswordUserId(null);
                                             setResetNewPassword('');
                                         } catch (error: any) {
-                                            alert(`Failed to reset password: ${error?.message || 'Unknown error'}`);
+                                            toast.error(`Failed to reset password: ${error?.message || 'Unknown error'}`);
                                         }
                                     }}
                                     className="px-4 py-2 bg-emerald-600 text-white rounded font-bold"

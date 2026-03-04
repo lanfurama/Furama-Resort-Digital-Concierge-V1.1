@@ -102,7 +102,7 @@ export const CurrentJobCardMerged: React.FC<CurrentJobCardMergedProps> = React.m
                     <button
                         onClick={handleAction}
                         disabled={isLoadingStep || isCompleting}
-                        className={`${actionButtonClass} text-white px-6 py-4 rounded-xl font-bold text-base transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md min-w-[140px] min-h-[56px] flex items-center justify-center gap-2`}
+                        className={`${actionButtonClass} text-white px-6 py-4 rounded-xl font-bold text-base disabled:opacity-50 disabled:cursor-not-allowed shadow-md min-w-[140px] min-h-[56px] flex items-center justify-center gap-2`}
                     >
                         {isLoadingStep || isCompleting ? (
                             <Loader2 size={20} className="animate-spin" />

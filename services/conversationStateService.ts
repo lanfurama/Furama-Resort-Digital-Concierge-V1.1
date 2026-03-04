@@ -254,7 +254,7 @@ export const getPreviousStep = (
 };
 
 /**
- * Transition to next step with validation
+ * to next step with validation
  */
 export const transitionToNextStep = (
     state: ConversationState,
@@ -284,8 +284,7 @@ export const transitionToNextStep = (
         ...state,
         step: nextStep,
         data: mergedData,
-        retryCount: 0, // Reset retry count on successful transition
-        suggestions: [],
+        retryCount: 0, // Reset retry count on successful         suggestions: [],
         history: [
             ...state.history,
             {

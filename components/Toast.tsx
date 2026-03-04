@@ -74,8 +74,8 @@ const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
         p-4 mb-3 
         flex items-start gap-3
         animate-slideIn
-        backdrop-blur-sm
-        transform transition-all duration-300 ease-out
+       
+        transform
       `}
             role="alert"
         >
@@ -87,7 +87,7 @@ const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
             </div>
             <button
                 onClick={() => onClose(toast.id)}
-                className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+                className="flex-shrink-0 text-gray-400 hover:text-gray-600"
                 aria-label="Close notification"
             >
                 <X className="w-5 h-5" />

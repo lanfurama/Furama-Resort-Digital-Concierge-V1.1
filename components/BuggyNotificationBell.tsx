@@ -211,7 +211,7 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
     return (
         <>
             {notification && (
-                <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-5 ${notification.type === 'success' ? 'bg-emerald-600' : notification.type === 'info' ? 'bg-slate-600' : 'bg-amber-500'} text-white px-4 py-3 rounded-lg shadow flex items-center gap-2 max-w-[min(24rem,calc(100vw-1rem))]`}>
+                <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 z-50 ${notification.type === 'success' ? 'bg-emerald-600' : notification.type === 'info' ? 'bg-slate-600' : 'bg-amber-500'} text-white px-4 py-3 rounded-lg shadow flex items-center gap-2 max-w-[min(24rem,calc(100vw-1rem))]`}>
                     <CheckCircle size={20} />
                     <span className="font-semibold text-sm">{notification.message}</span>
                 </div>
@@ -220,7 +220,7 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
             <div className="relative z-[100]" ref={notificationBellRef}>
                 <button
                     onClick={() => setShowDropdown(!showDropdown)}
-                    className="relative p-2 min-h-[44px] min-w-[44px] rounded-lg transition-all bg-slate-700 text-white hover:bg-slate-600 touch-manipulation flex items-center justify-center"
+                    className="relative p-2 min-h-[44px] min-w-[44px] rounded-lg bg-slate-700 text-white hover:bg-slate-600 touch-manipulation flex items-center justify-center"
                     title="View notifications"
                 >
                     <Bell size={18} />
@@ -240,14 +240,14 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                                 <div className="flex items-center gap-2">
                                     <button
                                         onClick={(e) => { e.stopPropagation(); onSoundToggle(!soundEnabled); }}
-                                        className={`p-2 min-h-[36px] min-w-[36px] rounded-lg transition-all flex items-center justify-center touch-manipulation ${soundEnabled ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}
+                                        className={`p-2 min-h-[36px] min-w-[36px] rounded-lg flex items-center justify-center touch-manipulation ${soundEnabled ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}
                                         title={soundEnabled ? 'Sound on' : 'Sound off'}
                                     >
                                         <Bell size={16} className={soundEnabled ? '' : 'opacity-50'} />
                                     </button>
                                     <button
                                         onClick={() => setShowDropdown(false)}
-                                        className="p-2 min-h-[36px] min-w-[36px] rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-200 transition-all flex items-center justify-center touch-manipulation"
+                                        className="p-2 min-h-[36px] min-w-[36px] rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-200 flex items-center justify-center touch-manipulation"
                                     >
                                         <X size={18} strokeWidth={2.5} />
                                     </button>
@@ -286,7 +286,7 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                                                 return (
                                                     <div
                                                         key={ride.id}
-                                                        className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                                                        className="p-4 hover:bg-gray-50 cursor-pointer"
                                                         onClick={() => { setShowDropdown(false); if (onNavigate) onNavigate(); }}
                                                     >
                                                         <div className="flex justify-between items-start mb-2">

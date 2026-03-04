@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, FileText, X } from 'lucide-react';
+import { Plus, Trash2, FileText, X, Loader2, RefreshCw } from 'lucide-react';
 import { KnowledgeItem } from '../../../types';
 import { addKnowledgeItem, updateKnowledgeItem, getKnowledgeBase } from '../../../services/dataService';
+import { useToast } from '../../../hooks/useToast';
 
 interface KnowledgeTabProps {
     knowledge: KnowledgeItem[];
@@ -11,23 +12,35 @@ interface KnowledgeTabProps {
 }
 
 export const KnowledgeTab: React.FC<KnowledgeTabProps> = ({ knowledge, onDelete, onRefresh, setKnowledge }) => {
+    const toast = useToast();
     const [editingKnowledgeItem, setEditingKnowledgeItem] = useState<KnowledgeItem | null>(null);
     const [showKnowledgeForm, setShowKnowledgeForm] = useState(false);
     const [newKnowledgeItem, setNewKnowledgeItem] = useState<Partial<KnowledgeItem>>({ question: '', answer: '' });
+    const [isSaving, setIsSaving] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        try {
+            await onRefresh();
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const handleSave = async () => {
         if (!newKnowledgeItem.question || !newKnowledgeItem.answer) {
-            alert('Please fill in both question and answer.');
+            toast.error('Please fill in both question and answer.');
             return;
         }
+        setIsSaving(true);
         try {
             if (editingKnowledgeItem) {
                 const updated = await updateKnowledgeItem(editingKnowledgeItem.id, newKnowledgeItem as KnowledgeItem);
-                alert(`Knowledge item "${updated.question}" updated successfully!`);
+                toast.success(`Knowledge item "${updated.question}" updated successfully!`);
                 setEditingKnowledgeItem(null);
             } else {
                 await addKnowledgeItem(newKnowledgeItem as KnowledgeItem);
-                alert(`Knowledge item "${newKnowledgeItem.question}" created successfully!`);
+                toast.success(`Knowledge item "${newKnowledgeItem.question}" created successfully!`);
             }
             setNewKnowledgeItem({ question: '', answer: '' });
             setShowKnowledgeForm(false);
@@ -40,7 +53,9 @@ export const KnowledgeTab: React.FC<KnowledgeTabProps> = ({ knowledge, onDelete,
             await onRefresh();
         } catch (error: any) {
             console.error('Failed to save knowledge item:', error);
-            alert(`Failed to save knowledge item: ${error?.message || 'Unknown error'}`);
+            toast.error(`Failed to save knowledge item: ${error?.message || 'Unknown error'}`);
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -49,7 +64,16 @@ export const KnowledgeTab: React.FC<KnowledgeTabProps> = ({ knowledge, onDelete,
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h2 className="text-xl font-bold text-gray-800 flex items-center">AI Chatbot Knowledge Base</h2>
-                <button
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-70"
+                        title="Refresh"
+                    >
+                        <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+                    </button>
+                    <button
                     onClick={() => {
                         if (showKnowledgeForm && !editingKnowledgeItem) {
                             setShowKnowledgeForm(false);
@@ -62,16 +86,17 @@ export const KnowledgeTab: React.FC<KnowledgeTabProps> = ({ knowledge, onDelete,
                             }
                         }
                     }}
-                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md active:scale-95 flex-1 md:flex-none"
+                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md flex-1 md:flex-none"
                 >
                     {showKnowledgeForm && !editingKnowledgeItem ? <X size={18} /> : <Plus size={18} />}
                     <span>{showKnowledgeForm && !editingKnowledgeItem ? 'Cancel' : 'Add Knowledge'}</span>
                 </button>
+                </div>
             </div>
 
             {/* Knowledge Edit Form */}
             {showKnowledgeForm && (
-                <div className="bg-white p-4 rounded-xl shadow-lg border border-emerald-100 mb-6 animate-in slide-in-from-top-2">
+                <div className="bg-white p-4 rounded-xl shadow-lg border border-emerald-100 mb-6">
                     <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase">{editingKnowledgeItem ? 'Edit Knowledge Item' : 'Create Knowledge Item'}</h3>
                     <div className="grid grid-cols-1 gap-4 mb-4">
                         <div>
@@ -110,8 +135,10 @@ export const KnowledgeTab: React.FC<KnowledgeTabProps> = ({ knowledge, onDelete,
                         )}
                         <button
                             onClick={handleSave}
-                            className="bg-emerald-800 text-white px-6 py-2 rounded-lg text-sm font-bold"
+                            disabled={isSaving}
+                            className="bg-emerald-800 text-white px-6 py-2 rounded-lg text-sm font-bold disabled:opacity-70 flex items-center gap-2"
                         >
+                            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                             {editingKnowledgeItem ? 'Update Knowledge Item' : 'Create Knowledge Item'}
                         </button>
                     </div>

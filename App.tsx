@@ -425,7 +425,7 @@ const AppContent: React.FC = () => {
         >
           <div className="flex items-center space-x-2.5 flex-1 min-w-0">
             <div className="relative flex-shrink-0">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-white/30 to-white/15 rounded-xl flex items-center justify-center border-2 border-white/40 shadow-lg backdrop-blur-sm transition-transform active:scale-95">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-white/30 to-white/15 rounded-xl flex items-center justify-center border-2 border-white/40 shadow-lg">
                 <span className="font-bold text-base sm:text-lg text-white drop-shadow-lg">{user.lastName.charAt(0)}</span>
               </div>
               <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-emerald-800 shadow-md"></div>
@@ -442,7 +442,7 @@ const AppContent: React.FC = () => {
             <NotificationBell userId={user.roomNumber} />
             <button
               onClick={handleLogout}
-              className="p-2 rounded-xl hover:bg-white/15 active:bg-white/20 text-white/90 hover:text-white transition-colors duration-200 border border-white/20 backdrop-blur-sm touch-manipulation active:scale-95"
+              className="p-2 rounded-xl hover:bg-white/15 active:bg-white/20 text-white/90 hover:text-white border border-white/20 touch-manipulation"
               title={t('logout') || 'Logout'}
               aria-label={t('logout') || 'Logout'}
             >
@@ -550,7 +550,7 @@ const AppContent: React.FC = () => {
                         return (
                           <div
                             key={promo.id}
-                            className={`min-w-[280px] w-[280px] h-[200px] rounded-2xl snap-center shrink-0 overflow-hidden relative flex flex-col border border-white/20 shadow-xl active:scale-[0.98] transition-transform duration-200 ${
+                            className={`min-w-[280px] w-[280px] h-[200px] rounded-2xl snap-center shrink-0 overflow-hidden relative flex flex-col border border-white/20 shadow-xl active:scale-[0.98] ${
                               promo.imageUrl ? '' : `bg-gradient-to-br ${gradient}`
                             }`}
                             style={promo.imageUrl ? {
@@ -600,7 +600,7 @@ const AppContent: React.FC = () => {
                       })}
                     </div>
                   ) : (
-                    <div className="rounded-2xl bg-white/60 backdrop-blur-sm border border-emerald-100 px-6 py-8 text-center">
+                    <div className="rounded-2xl bg-white/60 border border-emerald-100 px-6 py-8 text-center">
                       <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 mb-3">
                         <Tag className="w-6 h-6" />
                       </div>
@@ -753,23 +753,23 @@ const AppContent: React.FC = () => {
     return (
       <button
         onClick={onClick}
-        className={`group flex flex-col items-center justify-center w-full h-full relative transition-all duration-300 ${active ? 'text-emerald-600' : 'text-gray-400'
+        className={`group flex flex-col items-center justify-center w-full h-full relative ${active ? 'text-emerald-600' : 'text-gray-400'
           }`}
       >
         <div className="mb-1 relative">
-          <div className={`p-2 rounded-xl transition-all duration-300 ${active
+          <div className={`p-2 rounded-xl ${active
             ? 'bg-gradient-to-br from-emerald-50 to-teal-50'
             : 'group-hover:bg-gray-50'
             }`}>
             <Icon
               size={22}
               strokeWidth={active ? 2.5 : 2}
-              className={`transition-all duration-300 ${active ? 'text-emerald-600' : 'text-gray-500 group-hover:text-gray-600'
+              className={`transition-all ${active ? 'text-emerald-600' : 'text-gray-500 group-hover:text-gray-600'
                 }`}
             />
           </div>
           {urgentBadge ? (
-            <span className="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-red-500 to-pink-600 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-lg animate-pulse">
+            <span className="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-red-500 to-pink-600 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-lg">
               !
             </span>
           ) : null}
@@ -777,8 +777,8 @@ const AppContent: React.FC = () => {
             <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-emerald-600 rounded-full"></div>
           )}
         </div>
-        <div className="flex flex-col items-center transition-all duration-300">
-          <span className={`text-[10px] font-semibold transition-all duration-300 ${active
+        <div className="flex flex-col items-center">
+          <span className={`text-[10px] font-semibold ${active
             ? 'text-emerald-600'
             : urgentBadge
               ? 'text-red-600 font-bold'
@@ -787,7 +787,7 @@ const AppContent: React.FC = () => {
             {label}
           </span>
           {statusLabel && !active && (
-            <span className="text-[9px] font-bold text-orange-600 mt-0.5 animate-pulse">
+            <span className="text-[9px] font-bold text-orange-600 mt-0.5">
               {statusLabel}
             </span>
           )}
@@ -809,36 +809,36 @@ const AppContent: React.FC = () => {
   }> = ({ active, onClick, icon: Icon, label, special, badge, urgentBadge, statusLabel }) => (
     <button
       onClick={onClick}
-      className={`group flex flex-col items-center justify-center w-full h-full relative transition-all duration-300 ${active ? 'text-emerald-600' : 'text-gray-400'
+      className={`group flex flex-col items-center justify-center w-full h-full relative ${active ? 'text-emerald-600' : 'text-gray-400'
         }`}
     >
       {special ? (
         <div className="relative mb-1">
-          <div className={`p-3.5 rounded-2xl shadow-2xl transform -translate-y-4 border-2 transition-all duration-300 ${active
+          <div className={`p-3.5 rounded-2xl shadow-2xl transform -translate-y-4 border-2 ${active
             ? 'bg-gradient-to-br from-emerald-600 to-teal-600 text-white border-emerald-400 shadow-emerald-300/50'
             : 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white border-emerald-300 shadow-emerald-200/30'
             }`}>
             <Icon size={22} strokeWidth={2.5} />
           </div>
           {active && (
-            <div className="absolute inset-0 -translate-y-4 rounded-2xl bg-emerald-400/20 blur-xl -z-10 animate-pulse"></div>
+            <div className="absolute inset-0 -translate-y-4 rounded-2xl bg-emerald-400/20 -z-10"></div>
           )}
         </div>
       ) : (
         <div className="mb-1 relative">
-          <div className={`p-2 rounded-xl transition-all duration-300 ${active
+          <div className={`p-2 rounded-xl ${active
             ? 'bg-gradient-to-br from-emerald-50 to-teal-50'
             : 'group-hover:bg-gray-50'
             }`}>
             <Icon
               size={22}
               strokeWidth={active ? 2.5 : 2}
-              className={`transition-all duration-300 ${active ? 'text-emerald-600' : 'text-gray-500 group-hover:text-gray-600'
+              className={`transition-all ${active ? 'text-emerald-600' : 'text-gray-500 group-hover:text-gray-600'
                 }`}
             />
           </div>
           {urgentBadge ? (
-            <span className="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-red-500 to-pink-600 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-lg animate-pulse">
+            <span className="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-red-500 to-pink-600 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-lg">
               !
             </span>
           ) : badge && badge > 0 ? (
@@ -851,8 +851,8 @@ const AppContent: React.FC = () => {
           )}
         </div>
       )}
-      <div className={`flex flex-col items-center transition-all duration-300 ${special ? '-mt-3' : ''}`}>
-        <span className={`text-[10px] font-semibold transition-all duration-300 ${active
+      <div className={`flex flex-col items-center ${special ? '-mt-3' : ''}`}>
+        <span className={`text-[10px] font-semibold ${active
           ? 'text-emerald-600'
           : urgentBadge
             ? 'text-red-600 font-bold'
@@ -861,7 +861,7 @@ const AppContent: React.FC = () => {
           {label}
         </span>
         {statusLabel && !active && (
-          <span className="text-[9px] font-bold text-orange-600 mt-0.5 animate-pulse">
+          <span className="text-[9px] font-bold text-orange-600 mt-0.5">
             {statusLabel}
           </span>
         )}

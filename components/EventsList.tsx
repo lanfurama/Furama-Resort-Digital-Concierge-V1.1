@@ -84,7 +84,7 @@ const EventsList: React.FC<EventsListProps> = ({ onBack }) => {
                         return (
                             <div 
                                 key={event.id} 
-                                className={`bg-white rounded-xl shadow-sm border overflow-hidden transition ${
+                                className={`bg-white rounded-xl shadow-sm border overflow-hidden ${
                                     expired 
                                         ? 'opacity-60 border-gray-300 cursor-not-allowed' 
                                         : 'border-pink-100 hover:shadow-md'

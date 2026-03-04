@@ -11,9 +11,11 @@ import {
     addRoomType, updateRoomType, deleteRoomType
 } from '../services/dataService';
 import { Location, MenuItem, ResortEvent, Promotion, KnowledgeItem, User, Room, RoomType } from '../types';
+import { useToast } from './useToast';
 
 export const useAdminCRUD = () => {
     const [isParsing, setIsParsing] = useState(false);
+    const toast = useToast();
 
     const handleDelete = async (id: string, type: 'LOCATION' | 'MENU_ITEM' | 'EVENT' | 'PROMOTION' | 'KNOWLEDGE_ITEM' | 'USER' | 'ROOM' | 'ROOM_TYPE') => {
         if (!confirm(`Delete this ${type}?`)) return;
@@ -47,7 +49,7 @@ export const useAdminCRUD = () => {
             }
         } catch (error: any) {
             console.error(`Failed to delete ${type}:`, error);
-            alert(`Failed to delete: ${error?.message || 'Unknown error'}`);
+            toast.error(`Failed to delete: ${error?.message || 'Unknown error'}`);
         }
     };
 
@@ -120,7 +122,7 @@ export const useAdminCRUD = () => {
                     if (typeObj) {
                         await addRoom({ id: '', number: result.number, typeId: typeObj.id, status: 'Available' });
                     } else {
-                        alert(`Room Type '${typeName}' not found. Please create it first.`);
+                        toast.error(`Room Type '${typeName}' not found. Please create it first.`);
                         return;
                     }
                 }
@@ -128,7 +130,7 @@ export const useAdminCRUD = () => {
                 onSuccess();
             } catch (error: any) {
                 console.error('Failed to add/update item:', error);
-                alert(`Failed to add/update item: ${error?.message || 'Unknown error'}. Please check console for details.`);
+                toast.error(`Failed to add/update item: ${error?.message || 'Unknown error'}. Please check console for details.`);
             }
         }
     };

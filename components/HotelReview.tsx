@@ -143,28 +143,28 @@ export const HotelReviewComponent: React.FC<HotelReviewProps> = ({ user, onRevie
             ) : !showHotelReview && !isHotelReviewSubmitted ? (
                 <button
                     onClick={() => setShowHotelReview(true)}
-                    className="group relative w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden"
+                    className="group relative w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold rounded-2xl shadow-lg hover:shadow-xl overflow-hidden"
                 >
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%]"></div>
                     <span className="relative z-10 flex items-center justify-center gap-2">
                         <Star className="w-5 h-5" />
                         {t('rate_stay')}
                     </span>
                 </button>
             ) : showHotelReview ? (
-                <div className="animate-in fade-in slide-in-from-top-2">
+                <div className="animate-in">
                     <p className="text-xs text-gray-500 mb-3 text-center">{t('review_rate_categories')}</p>
 
                     <div className="space-y-3 mb-4">
                         {ratings.map((item) => (
-                            <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white/80 backdrop-blur-sm p-3 rounded-xl border-2 border-gray-100 shadow-md hover:shadow-lg transition-all">
+                            <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white/80 p-3 rounded-xl border-2 border-gray-100 shadow-md hover:shadow-lg">
                                 <span className="text-xs font-bold text-gray-800 mb-2 sm:mb-0">{t(item.labelKey)}</span>
                                 <div className="flex space-x-1.5">
                                     {[1, 2, 3, 4, 5].map(star => (
                                         <button
                                             key={star}
                                             onClick={() => handleCategoryRate(item.id, star)}
-                                            className="focus:outline-none transition-all duration-200 hover:scale-110"
+                                            className="focus:outline-none"
                                         >
                                             <Star
                                                 size={22}
@@ -178,7 +178,7 @@ export const HotelReviewComponent: React.FC<HotelReviewProps> = ({ user, onRevie
                     </div>
 
                     <textarea
-                        className="w-full bg-white border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-900 placeholder:text-gray-400 mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all caret-emerald-600"
+                        className="w-full bg-white border-2 border-gray-200 rounded-xl p-3 text-sm text-gray-900 placeholder:text-gray-400 mb-3 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent caret-emerald-600"
                         style={{ caretColor: '#10b981' }}
                         rows={3}
                         placeholder={t('review_comment_placeholder')}
@@ -190,14 +190,14 @@ export const HotelReviewComponent: React.FC<HotelReviewProps> = ({ user, onRevie
                         <button
                             onClick={() => setShowHotelReview(false)}
                             disabled={isSubmittingReview}
-                            className="flex-1 py-3 text-gray-600 text-xs font-bold hover:bg-gray-100 rounded-xl border-2 border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            className="flex-1 py-3 text-gray-600 text-xs font-bold hover:bg-gray-100 rounded-xl border-2 border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {t('cancel')}
                         </button>
                         <button
                             onClick={handleSubmitHotelReview}
                             disabled={isSubmittingReview}
-                            className="group relative flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all overflow-hidden flex items-center justify-center"
+                            className="group relative flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden flex items-center justify-center"
                         >
                             {isSubmittingReview ? (
                                 <>
@@ -206,7 +206,7 @@ export const HotelReviewComponent: React.FC<HotelReviewProps> = ({ user, onRevie
                                 </>
                             ) : (
                                 <>
-                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%]"></div>
                                     <span className="relative z-10">{t('submit')}</span>
                                 </>
                             )}
@@ -220,7 +220,7 @@ export const HotelReviewComponent: React.FC<HotelReviewProps> = ({ user, onRevie
                     </div>
                     <div className="grid grid-cols-2 gap-2 mb-3">
                         {existingReview?.categoryRatings.map((cat, idx) => (
-                            <div key={idx} className="flex justify-between items-center bg-white/60 backdrop-blur-sm px-2 py-1.5 rounded-lg border border-gray-200">
+                            <div key={idx} className="flex justify-between items-center bg-white/60 px-2 py-1.5 rounded-lg border border-gray-200">
                                 <span className="truncate mr-1 text-[10px] font-semibold text-gray-700">{CATEGORY_LABEL_TO_KEY[cat.category] ? t(CATEGORY_LABEL_TO_KEY[cat.category]) : cat.category}</span>
                                 <span className="flex items-center font-bold text-amber-600 gap-0.5">
                                     {cat.rating} <Star size={10} className="fill-current" />
@@ -244,7 +244,7 @@ export const HotelReviewComponent: React.FC<HotelReviewProps> = ({ user, onRevie
                                 setHotelComment(existingReview.comment || '');
                             }
                         }}
-                        className="w-full text-center text-xs text-emerald-700 font-bold bg-emerald-50 hover:bg-emerald-100 py-2 rounded-xl border border-emerald-200 transition-all"
+                        className="w-full text-center text-xs text-emerald-700 font-bold bg-emerald-50 hover:bg-emerald-100 py-2 rounded-xl border border-emerald-200"
                     >
                         {t('edit_review')}
                     </button>

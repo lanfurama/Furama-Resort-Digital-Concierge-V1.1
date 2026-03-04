@@ -104,7 +104,7 @@ export const VoiceInputOverlay: React.FC<VoiceInputOverlayProps> = ({
                 <button
                     onClick={onGoBack}
                     disabled={currentStep === "ASKING_PICKUP" || currentStep === "LISTENING_INITIAL" || currentStep === "COMPLETED"}
-                    className="p-2 rounded-full hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="p-2 rounded-full hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Go back"
                 >
                     <ChevronLeft size={24} />
@@ -113,7 +113,7 @@ export const VoiceInputOverlay: React.FC<VoiceInputOverlayProps> = ({
                 <div className="text-center">
                     <h2 className="text-lg font-bold">Tạo chuyến bằng giọng nói</h2>
                     {currentStep === "LISTENING_INITIAL" ? (
-                        <p className="text-xs text-emerald-200 animate-pulse">
+                        <p className="text-xs text-emerald-200">
                             Hãy nói yêu cầu của bạn
                         </p>
                     ) : (
@@ -125,7 +125,7 @@ export const VoiceInputOverlay: React.FC<VoiceInputOverlayProps> = ({
 
                 <button
                     onClick={onCancel}
-                    className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                    className="p-2 rounded-full hover:bg-white/10"
                     aria-label="Close"
                 >
                     <X size={24} />
@@ -136,7 +136,7 @@ export const VoiceInputOverlay: React.FC<VoiceInputOverlayProps> = ({
             <div className="px-4">
                 <div className="h-1 bg-white/20 rounded-full overflow-hidden">
                     <div
-                        className="h-full bg-emerald-400 transition-all duration-500 ease-out"
+                        className="h-full bg-emerald-400"
                         style={{ width: `${progressPercentage}%` }}
                     />
                 </div>
@@ -147,7 +147,7 @@ export const VoiceInputOverlay: React.FC<VoiceInputOverlayProps> = ({
                 {/* AI Prompt */}
                 <div
                     ref={promptRef}
-                    className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-8 max-w-md text-center border border-white/20 shadow-xl"
+                    className="bg-white/10 rounded-2xl p-6 mb-8 max-w-md text-center border border-white/20 shadow-xl"
                 >
                     <div className="flex items-center justify-center gap-2 text-emerald-300 text-sm font-semibold mb-3">
                         <Volume2 size={16} />
@@ -215,13 +215,13 @@ export const VoiceInputOverlay: React.FC<VoiceInputOverlayProps> = ({
                 <div className="p-4 flex gap-3">
                     <button
                         onClick={onGoBack}
-                        className="flex-1 py-3 px-4 rounded-xl border border-white/30 text-white font-semibold hover:bg-white/10 transition-colors"
+                        className="flex-1 py-3 px-4 rounded-xl border border-white/30 text-white font-semibold hover:bg-white/10"
                     >
                         Sửa lại
                     </button>
                     <button
                         onClick={onConfirm}
-                        className="flex-1 py-3 px-4 rounded-xl bg-emerald-500 text-white font-semibold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2"
+                        className="flex-1 py-3 px-4 rounded-xl bg-emerald-500 text-white font-semibold hover:bg-emerald-600 flex items-center justify-center gap-2"
                     >
                         <Check size={18} />
                         Xác nhận
@@ -232,7 +232,7 @@ export const VoiceInputOverlay: React.FC<VoiceInputOverlayProps> = ({
             {/* Auto-close indicator for success */}
             {voiceResult.status === "success" && (
                 <div className="p-4 text-center">
-                    <p className="text-emerald-300 text-sm animate-pulse">
+                    <p className="text-emerald-300 text-sm">
                         {voiceResult.message}
                     </p>
                 </div>

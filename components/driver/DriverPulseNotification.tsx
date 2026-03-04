@@ -35,7 +35,7 @@ export const DriverPulseNotification: React.FC<DriverPulseNotificationProps> = (
 
     return (
         <div
-            className={`fixed left-2 right-2 ${topClass} z-[60] flex items-center gap-3 rounded-2xl border-2 ${config.border} ${config.bg} px-4 py-3 shadow-2xl animate-pulse`}
+            className={`fixed left-2 right-2 ${topClass} z-[60] flex items-center gap-3 rounded-2xl border-2 ${config.border} ${config.bg} px-4 py-3 shadow-2xl`}
             style={{ boxShadow: '0 8px 24px -8px rgba(0,0,0,0.35)' }}
             role="alert"
         >

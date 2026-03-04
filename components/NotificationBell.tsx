@@ -78,18 +78,18 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, variant = '
         <div className="relative z-[100]">
             <button 
                 onClick={toggleOpen}
-                className={`relative p-1.5 sm:p-2 rounded-lg transition-all duration-200 touch-manipulation active:scale-95 ${
+                className={`relative p-1.5 sm:p-2 rounded-lg touch-manipulation ${
                     isLight 
                         ? 'hover:bg-gray-100 border border-transparent' 
-                        : 'hover:bg-white/10 border border-white/10 hover:border-white/20 backdrop-blur-sm'
+                        : 'hover:bg-white/10 border border-white/10 hover:border-white/20'
                 } ${hasNewNotification ? 'animate-bounce' : ''}`}
                 aria-label={`${t('notifications')}${unreadCount > 0 ? ` (${unreadCount} ${t('notifications')})` : ''}`}
             >
-                <Bell className={`w-5 h-5 sm:w-6 sm:h-6 ${isLight ? 'text-gray-600' : 'text-white/90'} transition-transform ${hasNewNotification ? 'shake-once' : ''}`} strokeWidth={2.5} />
+                <Bell className={`w-5 h-5 sm:w-6 sm:h-6 ${isLight ? 'text-gray-600' : 'text-white/90'} ${hasNewNotification ? 'shake-once' : ''}`} strokeWidth={2.5} />
                 {unreadCount > 0 && (
                     <span className={`absolute -top-0.5 -right-0.5 w-5 h-5 sm:w-6 sm:h-6 bg-gradient-to-r from-red-500 to-pink-600 text-white text-[10px] sm:text-xs font-black flex items-center justify-center rounded-full shadow-lg border-2 ${
                         isLight ? 'border-white' : 'border-emerald-800'
-                    } ${hasNewNotification ? 'animate-bounce scale-110' : 'animate-pulse'}`}>
+                    } ${hasNewNotification ? 'animate-bounce' : 'animate-pulse'}`}>
                         {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                 )}
@@ -98,7 +98,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, variant = '
             {isOpen && (
                 <>
                     <div className="fixed inset-0 z-[100]" onClick={() => setIsOpen(false)}></div>
-                    <div className="absolute right-0 mt-2 w-80 backdrop-blur-xl bg-white/95 rounded-2xl shadow-2xl border-2 border-gray-200/60 overflow-hidden z-[101] animate-in fade-in zoom-in-95 duration-200"
+                    <div className="absolute right-0 mt-2 w-80 bg-white/95 rounded-2xl shadow-2xl border-2 border-gray-200/60 overflow-hidden z-[101]"
                         style={{
                             boxShadow: '0 20px 60px -15px rgba(0,0,0,0.3)'
                         }}
@@ -107,7 +107,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, variant = '
                             <h3 className="font-bold text-gray-800 text-base">{t('notifications')}</h3>
                             <button 
                                 onClick={() => setIsOpen(false)} 
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
                             >
                                 <X size={18} strokeWidth={2.5}/>
                             </button>
@@ -124,7 +124,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, variant = '
                                     <div 
                                         key={notif.id} 
                                         onClick={() => !notif.isRead && handleMarkRead(notif.id, {} as React.MouseEvent)}
-                                        className={`p-4 border-b border-gray-100/60 hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50/30 transition-all cursor-pointer relative ${notif.isRead ? 'opacity-60' : 'bg-white'}`}
+                                        className={`p-4 border-b border-gray-100/60 hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50/30 cursor-pointer relative ${notif.isRead ? 'opacity-60' : 'bg-white'}`}
                                     >
                                         <div className="flex justify-between items-start mb-2">
                                             <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border-2 ${getTypeStyles(notif.type)}`}>
@@ -140,7 +140,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, variant = '
                                         {!notif.isRead && (
                                             <button 
                                                 onClick={(e) => handleMarkRead(notif.id, e)}
-                                                className="absolute bottom-3 right-3 text-emerald-600 hover:bg-emerald-50 p-1.5 rounded-lg transition-all border border-emerald-200 hover:border-emerald-300"
+                                                className="absolute bottom-3 right-3 text-emerald-600 hover:bg-emerald-50 p-1.5 rounded-lg border border-emerald-200 hover:border-emerald-300"
                                                 title={t('mark_as_read')}
                                             >
                                                 <Check size={16} strokeWidth={2.5} />

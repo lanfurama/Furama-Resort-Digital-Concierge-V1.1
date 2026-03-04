@@ -146,7 +146,7 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
       {/* Optimized Background - Simplified for WebView performance */}
       {/* Emerald Green Section - Reduced animation complexity */}
       <div 
-        className={`absolute left-0 w-full h-1/2 z-0 transition-transform duration-500 ease-out ${
+        className={`absolute left-0 w-full h-1/2 z-0 ${
           loginMethod === 'code' 
             ? 'top-0 rounded-b-[3rem]' 
             : 'top-1/2 rounded-t-[3rem]'
@@ -156,7 +156,7 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
       
       {/* White Section - Simplified */}
       <div 
-        className={`absolute left-0 w-full h-1/2 z-0 transition-transform duration-500 ease-out ${
+        className={`absolute left-0 w-full h-1/2 z-0 ${
           loginMethod === 'code' 
             ? 'top-1/2 rounded-t-[3rem]' 
             : 'top-0 rounded-b-[3rem]'
@@ -166,7 +166,7 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
 
       {/* Main Login Card with enhanced animations */}
       <div 
-        className="w-full max-w-md bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl p-8 z-10 relative border border-emerald-100/50 animate-card-entrance"
+        className="w-full max-w-md bg-white/95 rounded-3xl shadow-2xl p-8 z-10 relative border border-emerald-100/50 animate-card-entrance"
         style={{
           boxShadow: '0 20px 60px -15px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1)',
           willChange: 'transform, opacity'
@@ -183,9 +183,9 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
           >
             <h1 className="font-serif text-3xl font-bold text-white">FURAMA</h1>
           </div>
-          <p className="text-xs tracking-widest text-emerald-800 uppercase font-semibold animate-fade-in-delay">Resort & Villas Danang</p>
+          <p className="text-xs tracking-widest text-emerald-800 uppercase font-semibold">Resort & Villas Danang</p>
           <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-amber-600 to-transparent mx-auto mt-4"></div>
-          <p className="text-sm text-gray-700 mt-4 font-semibold animate-fade-in-delay-2">Guest Login</p>
+          <p className="text-sm text-gray-700 mt-4 font-semibold-2">Guest Login</p>
         </div>
 
         {/* Login Method Selection with enhanced sliding animation */}
@@ -193,7 +193,7 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
           <div className="flex bg-gray-100 rounded-lg p-1 gap-1 relative overflow-hidden">
             {/* Enhanced animated sliding indicator with gradient */}
             <div 
-              className={`absolute top-1 bottom-1 rounded-md shadow-lg transition-all duration-500 ease-out ${
+              className={`absolute top-1 bottom-1 rounded-md shadow-lg ${
                 loginMethod === 'code' 
                   ? 'left-1 right-1/2' 
                   : 'left-1/2 right-1'
@@ -210,7 +210,7 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
             <button
               type="button"
               onClick={() => handleMethodChange('code')}
-              className={`relative z-10 flex-1 py-2.5 px-4 rounded-md text-sm font-semibold transition-colors duration-200 ${
+              className={`relative z-10 flex-1 py-2.5 px-4 rounded-md text-sm font-semibold ${
                 loginMethod === 'code'
                   ? 'text-white'
                   : 'text-gray-600 hover:text-gray-800 hover:bg-white/50'
@@ -222,7 +222,7 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
             <button
               type="button"
               onClick={() => handleMethodChange('room')}
-              className={`relative z-10 flex-1 py-2.5 px-4 rounded-md text-sm font-semibold transition-colors duration-200 ${
+              className={`relative z-10 flex-1 py-2.5 px-4 rounded-md text-sm font-semibold ${
                 loginMethod === 'room'
                   ? 'text-white'
                   : 'text-gray-600 hover:text-gray-800 hover:bg-white/50'
@@ -237,15 +237,15 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="relative min-h-[200px] overflow-hidden">
             {loginMethod === 'code' ? (
-              <div className="space-y-5 animate-form-slide-in" key="code-form">
+              <div className="space-y-5" key="code-form">
                 <div className="space-y-2">
-                  <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide animate-fade-in">Check-in Code</label>
+                  <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide">Check-in Code</label>
                   <div className="relative">
                     <input
                       type="text"
                       value={checkInCode}
                       onChange={handleCheckInCodeChange}
-                      className="w-full px-5 py-4 rounded-lg border-2 border-gray-200 bg-white focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 outline-none transition-colors duration-200 text-black text-center text-2xl font-bold tracking-widest hover:border-emerald-300 focus:shadow-lg focus:shadow-emerald-700/20"
+                      className="w-full px-5 py-4 rounded-lg border-2 border-gray-200 bg-white focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 outline-none text-black text-center text-2xl font-bold tracking-widest hover:border-emerald-300 focus:shadow-lg focus:shadow-emerald-700/20"
                       placeholder="Enter code"
                       maxLength={8}
                       required
@@ -253,18 +253,18 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
                       style={{ transform: 'translateZ(0)' }}
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-2 text-center animate-fade-in-delay">
+                  <p className="text-xs text-gray-500 mt-2 text-center">
                     Enter the 8-character code provided at check-in
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg animate-fade-in-delay-2 hover:bg-gray-100 transition-colors duration-200">
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
                     <input
                       type="checkbox"
                       id="rememberCode"
                       checked={rememberCode}
                       onChange={handleRememberCodeChange}
-                      className="w-4 h-4 text-emerald-800 border-gray-300 rounded focus:ring-emerald-800 focus:ring-2 cursor-pointer transition-colors duration-200"
+                      className="w-4 h-4 text-emerald-800 border-gray-300 rounded focus:ring-emerald-800 focus:ring-2 cursor-pointer"
                     />
                   <label htmlFor="rememberCode" className="text-sm text-gray-700 cursor-pointer font-medium">
                     Remember this code on this device
@@ -272,15 +272,15 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
                 </div>
               </div>
             ) : (
-              <div className="space-y-5 animate-form-slide-in" key="room-form">
+              <div className="space-y-5" key="room-form">
                 <div className="space-y-2">
-                  <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide animate-fade-in">Last Name</label>
+                  <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide">Last Name</label>
                   <div className="relative">
                     <input
                       type="text"
                       value={lastName}
                       onChange={handleLastNameChange}
-                      className="w-full px-5 py-4 rounded-lg border-2 border-gray-200 bg-white focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 outline-none transition-colors duration-200 text-black hover:border-emerald-300 focus:shadow-lg focus:shadow-emerald-700/20"
+                      className="w-full px-5 py-4 rounded-lg border-2 border-gray-200 bg-white focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 outline-none text-black hover:border-emerald-300 focus:shadow-lg focus:shadow-emerald-700/20"
                       placeholder="Enter your last name"
                       required
                       autoFocus
@@ -290,13 +290,13 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide animate-fade-in-delay">Room Number</label>
+                  <label className="block text-xs font-bold text-gray-600 uppercase tracking-wide">Room Number</label>
                   <div className="relative">
                     <input
                       type="text"
                       value={roomNumber}
                       onChange={handleRoomNumberChange}
-                      className="w-full px-5 py-4 rounded-lg border-2 border-gray-200 bg-white focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 outline-none transition-colors duration-200 text-black hover:border-emerald-300 focus:shadow-lg focus:shadow-emerald-700/20"
+                      className="w-full px-5 py-4 rounded-lg border-2 border-gray-200 bg-white focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 outline-none text-black hover:border-emerald-300 focus:shadow-lg focus:shadow-emerald-700/20"
                       placeholder="Enter your room number"
                       required
                       style={{ transform: 'translateZ(0)' }}
@@ -308,7 +308,7 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
           </div>
 
           {authError && (
-            <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg text-sm flex items-center gap-3 animate-error-shake shadow-md">
+            <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-lg text-sm flex items-center gap-3  shadow-md">
               <svg className="w-5 h-5 text-red-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
@@ -319,7 +319,7 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
           <button
             type="submit"
             disabled={isAuthLoading}
-            className="relative w-full bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 text-white font-bold py-4 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+            className="relative w-full bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 text-white font-bold py-4 rounded-lg shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2"
             style={{
               background: 'linear-gradient(135deg, #065f46 0%, #047857 50%, #059669 100%)',
               transform: 'translateZ(0)'
@@ -345,95 +345,6 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
           <p className="text-xs text-gray-500 font-medium">© 2025 Furama Resort Danang. All rights reserved.</p>
         </div>
       </div>
-
-      {/* Optimized CSS Animations - Simplified for WebView Performance */}
-      <style>{`
-        /* Simplified animations - GPU accelerated */
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.4s ease-out forwards;
-        }
-        .animate-fade-in-delay {
-          animation: fade-in 0.4s ease-out 0.15s forwards;
-          opacity: 0;
-        }
-        .animate-fade-in-delay-2 {
-          animation: fade-in 0.4s ease-out 0.3s forwards;
-          opacity: 0;
-        }
-
-        @keyframes slide-up {
-          from {
-            opacity: 0;
-            transform: translateY(20px) translateZ(0);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0) translateZ(0);
-          }
-        }
-        .animate-card-entrance {
-          animation: slide-up 0.5s ease-out forwards;
-        }
-        .animate-logo-entrance {
-          animation: slide-up 0.5s ease-out 0.1s forwards;
-          opacity: 0;
-        }
-
-        @keyframes slide-in {
-          from {
-            opacity: 0;
-            transform: translateX(-10px) translateZ(0);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0) translateZ(0);
-          }
-        }
-        .animate-form-slide-in {
-          animation: slide-in 0.4s ease-out forwards;
-        }
-
-        @keyframes shake {
-          0%, 100% { transform: translateX(0) translateZ(0); }
-          25% { transform: translateX(-6px) translateZ(0); }
-          75% { transform: translateX(6px) translateZ(0); }
-        }
-        .animate-error-shake {
-          animation: shake 0.4s ease-in-out forwards;
-        }
-
-        /* GPU acceleration hints */
-        .animate-card-entrance,
-        .animate-logo-entrance,
-        .animate-form-slide-in {
-          will-change: transform, opacity;
-        }
-
-        /* Reduce motion for accessibility and performance */
-        @media (prefers-reduced-motion: reduce) {
-          .animate-card-entrance,
-          .animate-logo-entrance,
-          .animate-fade-in,
-          .animate-fade-in-delay,
-          .animate-fade-in-delay-2,
-          .animate-form-slide-in,
-          .animate-error-shake {
-            animation: none !important;
-            opacity: 1 !important;
-            transform: none !important;
-          }
-        }
-
-        /* WebView optimizations */
-        * {
-          -webkit-font-smoothing: antialiased;
-          -moz-osx-font-smoothing: grayscale;
-        }
-      `}</style>
     </div>
   );
 }, (prevProps, nextProps) => {

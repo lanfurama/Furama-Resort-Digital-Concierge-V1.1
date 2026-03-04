@@ -142,7 +142,7 @@ export const useConversationState = (
                                     if (onError) {
                                         onError(`Không tìm thấy địa điểm "${aiResult.locationName}". Vui lòng thử lại.`);
                                     }
-                                    // Increment retry count but don't transition
+                                    // Increment retry count but don't update location
                                     setState((prev) => ({
                                         ...prev,
                                         retryCount: prev.retryCount + 1,
@@ -230,7 +230,7 @@ export const useConversationState = (
                         break;
                 }
 
-                // Update state with new data and transition
+                // Update state with new data and advance step
                 setState((prev) => {
                     const newState = transitionToNextStep(prev, newData, locations);
 
@@ -250,7 +250,7 @@ export const useConversationState = (
                         }, 3000);
                     }
 
-                    // Check if step transition failed due to validation
+                    // Check if step failed due to validation
                     if (newState.step === prev.step && newState.retryCount > prev.retryCount) {
                         // Validation failed, show error
                         const validation = validateStep(newState.step, newState.data, locations);

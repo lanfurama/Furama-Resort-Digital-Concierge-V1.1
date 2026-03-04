@@ -109,7 +109,7 @@ const CollectionLoginPage: React.FC = () => {
       <div className="relative">
         <button
           onClick={() => setSelectedRole(null)}
-          className="absolute top-6 left-6 z-20 text-gray-400 hover:text-gray-600 transition flex items-center gap-2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-md hover:shadow-lg"
+          className="absolute top-6 left-6 z-20 text-gray-400 hover:text-gray-600 flex items-center gap-2 bg-white/90 px-4 py-2 rounded-lg shadow-md hover:shadow-lg"
         >
           <ArrowLeft size={20} />
           <span className="text-sm font-semibold">Back to Role Selection</span>
@@ -133,11 +133,11 @@ const CollectionLoginPage: React.FC = () => {
       </div>
       
       {/* Floating decorative circles */}
-      <div className="absolute top-20 left-10 w-32 h-32 bg-amber-200/20 rounded-full blur-2xl animate-pulse"></div>
-      <div className="absolute bottom-20 right-10 w-40 h-40 bg-pink-200/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      <div className="absolute top-1/2 right-20 w-24 h-24 bg-blue-200/20 rounded-full blur-xl animate-pulse delay-500"></div>
+      <div className="absolute top-20 left-10 w-32 h-32 bg-amber-200/20 rounded-full"></div>
+      <div className="absolute bottom-20 right-10 w-40 h-40 bg-pink-200/20 rounded-full delay-1000"></div>
+      <div className="absolute top-1/2 right-20 w-24 h-24 bg-blue-200/20 rounded-full delay-500"></div>
 
-      <div className="w-full max-w-3xl bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl p-8 md:p-12 z-10 relative border border-white/20">
+      <div className="w-full max-w-3xl bg-white/95 rounded-3xl shadow-2xl p-8 md:p-12 z-10 relative border border-white/20">
         {/* Header Section */}
         <div className="text-center mb-10">
           <div className="relative inline-block mb-4">

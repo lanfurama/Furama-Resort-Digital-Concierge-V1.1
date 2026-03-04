@@ -66,7 +66,7 @@ export const RoleSelection: React.FC<RoleSelectionProps> = ({ onSelectRole, onBa
           {onBack && (
             <button
               onClick={onBack}
-              className="absolute top-6 left-6 text-gray-400 hover:text-gray-600 transition flex items-center gap-2"
+              className="absolute top-6 left-6 text-gray-400 hover:text-gray-600 flex items-center gap-2"
             >
               <ArrowLeft size={20} />
               <span className="text-sm">Back</span>
@@ -85,7 +85,7 @@ export const RoleSelection: React.FC<RoleSelectionProps> = ({ onSelectRole, onBa
               <button
                 key={config.role}
                 onClick={() => onSelectRole(config.role)}
-                className={`${config.bgColor} p-6 rounded-xl shadow-md hover:shadow-lg transition-all transform hover:scale-105 active:scale-95 border-2 border-transparent hover:border-${config.textColor.split('-')[1]}-300`}
+                className={`${config.bgColor} p-6 rounded-xl shadow-md hover:shadow-lg transform border-2 border-transparent hover:border-${config.textColor.split('-')[1]}-300`}
               >
                 <div className="flex items-center space-x-4">
                   <div className={`p-3 rounded-lg bg-gradient-to-br ${config.color} text-white shadow-lg`}>

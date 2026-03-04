@@ -75,7 +75,7 @@ const ServiceMenu: React.FC<ServiceMenuProps> = memo(({ onSelect }) => {
                 <button
                     key={s.id}
                     onClick={() => onSelect(s.id)}
-                    className={`relative flex flex-col items-center justify-center py-3.5 px-3 bg-white/80 backdrop-blur-sm rounded-2xl border-2 ${s.borderColor} transition-transform active:scale-95 overflow-hidden`}
+                    className={`relative flex flex-col items-center justify-center py-3.5 px-3 bg-white/80 rounded-2xl border-2 ${s.borderColor} overflow-hidden`}
                     style={{
                         boxShadow: '0 4px 16px -4px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.5)',
                         transform: 'translateZ(0)',

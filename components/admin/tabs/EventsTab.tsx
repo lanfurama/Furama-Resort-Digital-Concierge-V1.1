@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, FileText, X } from 'lucide-react';
+import { Plus, Trash2, FileText, X, Loader2, RefreshCw } from 'lucide-react';
 import { ResortEvent } from '../../../types';
 import { addEvent, updateEvent, getEvents } from '../../../services/dataService';
+import { useToast } from '../../../hooks/useToast';
 
 interface EventsTabProps {
     events: ResortEvent[];
@@ -33,23 +34,35 @@ const formatEventDate = (dateString: string): string => {
 };
 
 export const EventsTab: React.FC<EventsTabProps> = ({ events, onDelete, onRefresh, setEvents }) => {
+    const toast = useToast();
     const [editingEvent, setEditingEvent] = useState<ResortEvent | null>(null);
     const [showEventForm, setShowEventForm] = useState(false);
     const [newEvent, setNewEvent] = useState<Partial<ResortEvent>>({ title: '', date: '', time: '', location: '', description: '' });
+    const [isSaving, setIsSaving] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        try {
+            await onRefresh();
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
 
     const handleSave = async () => {
         if (!newEvent.title || !newEvent.date || !newEvent.time || !newEvent.location) {
-            alert('Please fill in all required fields (Title, Date, Time, Location).');
+            toast.error('Please fill in all required fields (Title, Date, Time, Location).');
             return;
         }
+        setIsSaving(true);
         try {
             if (editingEvent) {
                 const updated = await updateEvent(editingEvent.id, newEvent as ResortEvent);
-                alert(`Event "${updated.title}" updated successfully!`);
+                toast.success(`Event "${updated.title}" updated successfully!`);
                 setEditingEvent(null);
             } else {
                 await addEvent(newEvent as ResortEvent);
-                alert(`Event "${newEvent.title}" created successfully!`);
+                toast.success(`Event "${newEvent.title}" created successfully!`);
             }
             setNewEvent({ title: '', date: '', time: '', location: '', description: '' });
             setShowEventForm(false);
@@ -62,7 +75,9 @@ export const EventsTab: React.FC<EventsTabProps> = ({ events, onDelete, onRefres
             await onRefresh();
         } catch (error: any) {
             console.error('Failed to save event:', error);
-            alert(`Failed to save event: ${error?.message || 'Unknown error'}`);
+            toast.error(`Failed to save event: ${error?.message || 'Unknown error'}`);
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -71,7 +86,16 @@ export const EventsTab: React.FC<EventsTabProps> = ({ events, onDelete, onRefres
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h2 className="text-xl font-bold text-gray-800 flex items-center">Events Calendar</h2>
-                <button
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleRefresh}
+                        disabled={isRefreshing}
+                        className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-70"
+                        title="Refresh"
+                    >
+                        <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+                    </button>
+                    <button
                     onClick={() => {
                         if (showEventForm && !editingEvent) {
                             setShowEventForm(false);
@@ -84,16 +108,17 @@ export const EventsTab: React.FC<EventsTabProps> = ({ events, onDelete, onRefres
                             }
                         }
                     }}
-                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md active:scale-95 flex-1 md:flex-none"
+                    className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md flex-1 md:flex-none"
                 >
                     {showEventForm && !editingEvent ? <X size={18} /> : <Plus size={18} />}
                     <span>{showEventForm && !editingEvent ? 'Cancel' : 'Add Event'}</span>
                 </button>
+                </div>
             </div>
 
             {/* Event Edit Form */}
             {showEventForm && (
-                <div className="bg-white p-4 rounded-xl shadow-lg border border-emerald-100 mb-6 animate-in slide-in-from-top-2">
+                <div className="bg-white p-4 rounded-xl shadow-lg border border-emerald-100 mb-6">
                     <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase">{editingEvent ? 'Edit Event' : 'Create Event'}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div className="col-span-1 md:col-span-2">
@@ -160,8 +185,10 @@ export const EventsTab: React.FC<EventsTabProps> = ({ events, onDelete, onRefres
                         )}
                         <button
                             onClick={handleSave}
-                            className="bg-emerald-800 text-white px-6 py-2 rounded-lg text-sm font-bold"
+                            disabled={isSaving}
+                            className="bg-emerald-800 text-white px-6 py-2 rounded-lg text-sm font-bold disabled:opacity-70 flex items-center gap-2"
                         >
+                            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                             {editingEvent ? 'Update Event' : 'Create Event'}
                         </button>
                     </div>
