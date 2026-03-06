@@ -206,13 +206,13 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
                 value={guestCount}
                 onChange={(e) => {
                   const value = parseInt(e.target.value) || 1;
-                  if (value >= 1 && value <= 7) {
+                  if (value >= 1 && value <= 20) {
                     onGuestCountChange(value);
                   }
                 }}
                 className="w-full pl-9 pr-3 py-3 min-h-[44px] text-sm bg-white border border-gray-300 rounded-xl text-gray-900 font-medium hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 appearance-none cursor-pointer touch-manipulation"
               >
-                {[1, 2, 3, 4, 5, 6, 7].map((num) => (
+                {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
                   <option key={num} value={num}>
                     {num} {num === 1 ? t('guest') : t('guests')}
                   </option>
@@ -225,6 +225,13 @@ export const BuggyBookingForm: React.FC<BuggyBookingFormProps> = ({
                 <ChevronDown size={16} />
               </div>
             </div>
+            {guestCount > 7 && (
+              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-700 font-medium">
+                  {t('orders_will_split')?.replace('{count}', Math.ceil(guestCount / 7).toString()) || `Orders will be split into ${Math.ceil(guestCount / 7)} separate bookings`}
+                </p>
+              </div>
+            )}
           </div>
           <div className="relative group">
             <label className="text-xs font-bold text-gray-700 mb-1.5 block uppercase tracking-wide">{t('notes_optional')}</label>

@@ -121,21 +121,15 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
     setRememberCode(e.target.checked);
   }, []);
 
-  // Memoize background styles to prevent recalculation
+  // Simplified background styles for better performance
   const backgroundStyles = useMemo(() => ({
     emerald: {
-      background: loginMethod === 'code' 
-        ? 'linear-gradient(135deg, #065f46 0%, #047857 50%, #059669 100%)'
-        : 'linear-gradient(135deg, #059669 0%, #047857 50%, #065f46 100%)',
-      willChange: 'transform' as const,
-      transform: 'translateZ(0)'
+      background: '#047857'
     },
     white: {
-      background: 'linear-gradient(180deg, #f5f5f4 0%, #e7e5e4 100%)',
-      willChange: 'transform' as const,
-      transform: 'translateZ(0)'
+      background: '#f5f5f4'
     }
-  }), [loginMethod]);
+  }), []);
 
   if (showLoading) {
     return <Loading fullScreen={true} message="Loading Home..." />;
@@ -143,8 +137,7 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
 
   return (
     <div className="min-h-screen flex flex-col justify-center items-center p-6 relative overflow-hidden">
-      {/* Optimized Background - Simplified for WebView performance */}
-      {/* Emerald Green Section - Reduced animation complexity */}
+      {/* Simplified Background - Solid colors for better performance */}
       <div 
         className={`absolute left-0 w-full h-1/2 z-0 ${
           loginMethod === 'code' 
@@ -154,7 +147,6 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
         style={backgroundStyles.emerald}
       />
       
-      {/* White Section - Simplified */}
       <div 
         className={`absolute left-0 w-full h-1/2 z-0 ${
           loginMethod === 'code' 
@@ -166,25 +158,17 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
 
       {/* Main Login Card with enhanced animations */}
       <div 
-        className="w-full max-w-md bg-white/95 rounded-3xl shadow-2xl p-8 z-10 relative border border-emerald-100/50 animate-card-entrance"
-        style={{
-          boxShadow: '0 20px 60px -15px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1)',
-          willChange: 'transform, opacity'
-        }}
+        className="w-full max-w-md bg-white/95 rounded-3xl shadow-2xl p-8 z-10 relative border border-emerald-100/50"
       >
-        {/* Logo Section - Simplified */}
-        <div className="text-center mb-8 animate-logo-entrance">
+        {/* Logo Section */}
+        <div className="text-center mb-8">
           <div 
-            className="inline-block px-6 py-3 bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 rounded-xl mb-4 shadow-lg"
-            style={{
-              background: 'linear-gradient(135deg, #065f46 0%, #047857 50%, #059669 100%)',
-              transform: 'translateZ(0)'
-            }}
+            className="inline-block px-6 py-3 bg-emerald-800 rounded-xl mb-4 shadow-lg"
           >
             <h1 className="font-serif text-3xl font-bold text-white">FURAMA</h1>
           </div>
           <p className="text-xs tracking-widest text-emerald-800 uppercase font-semibold">Resort & Villas Danang</p>
-          <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-amber-600 to-transparent mx-auto mt-4"></div>
+          <div className="w-16 h-0.5 bg-amber-600 mx-auto mt-4"></div>
           <p className="text-sm text-gray-700 mt-4 font-semibold-2">Guest Login</p>
         </div>
 
@@ -193,20 +177,12 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
           <div className="flex bg-gray-100 rounded-lg p-1 gap-1 relative overflow-hidden">
             {/* Enhanced animated sliding indicator with gradient */}
             <div 
-              className={`absolute top-1 bottom-1 rounded-md shadow-lg ${
+              className={`absolute top-1 bottom-1 rounded-md shadow-lg bg-emerald-800 ${
                 loginMethod === 'code' 
                   ? 'left-1 right-1/2' 
                   : 'left-1/2 right-1'
               }`}
-              style={{
-                background: 'linear-gradient(135deg, #065f46 0%, #047857 100%)',
-                willChange: 'left, right',
-                transform: 'translateZ(0)'
-              }}
-            >
-              {/* Inner glow effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent rounded-md"></div>
-            </div>
+            />
             <button
               type="button"
               onClick={() => handleMethodChange('code')}
@@ -215,7 +191,6 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
                   ? 'text-white'
                   : 'text-gray-600 hover:text-gray-800 hover:bg-white/50'
               }`}
-              style={{ transform: 'translateZ(0)' }}
             >
               Check-in Code
             </button>
@@ -250,7 +225,6 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
                       maxLength={8}
                       required
                       autoFocus
-                      style={{ transform: 'translateZ(0)' }}
                     />
                   </div>
                   <p className="text-xs text-gray-500 mt-2 text-center">
@@ -284,7 +258,6 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
                       placeholder="Enter your last name"
                       required
                       autoFocus
-                      style={{ transform: 'translateZ(0)' }}
                     />
                   </div>
                 </div>
@@ -299,7 +272,6 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
                       className="w-full px-5 py-4 rounded-lg border-2 border-gray-200 bg-white focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/20 outline-none text-black hover:border-emerald-300 focus:shadow-lg focus:shadow-emerald-700/20"
                       placeholder="Enter your room number"
                       required
-                      style={{ transform: 'translateZ(0)' }}
                     />
                   </div>
                 </div>
@@ -319,11 +291,7 @@ export const GuestLogin: React.FC<GuestLoginProps> = memo(({ onLoginSuccess, set
           <button
             type="submit"
             disabled={isAuthLoading}
-            className="relative w-full bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 text-white font-bold py-4 rounded-lg shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2"
-            style={{
-              background: 'linear-gradient(135deg, #065f46 0%, #047857 50%, #059669 100%)',
-              transform: 'translateZ(0)'
-            }}
+            className="relative w-full bg-emerald-800 text-white font-bold py-4 rounded-lg shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center gap-2"
           >
             {isAuthLoading ? (
               <>

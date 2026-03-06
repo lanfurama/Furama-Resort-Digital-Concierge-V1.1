@@ -101,8 +101,36 @@ const BuggyBooking: React.FC<BuggyBookingProps> = ({ user, onBack }) => {
     }
     unlockGuestAudioContext();
     playSoundAndVibrate();
+    
+    const MAX_GUESTS_PER_BUGGY = 7;
+    const guestCount = bookingState.guestCount || 1;
+    
     try {
-      await bookRide(bookingState.pickup, bookingState.destination, bookingState.guestCount || 1, bookingState.notes || undefined);
+      if (guestCount <= MAX_GUESTS_PER_BUGGY) {
+        await bookRide(bookingState.pickup, bookingState.destination, guestCount, bookingState.notes || undefined);
+      } else {
+        const numberOfOrders = Math.ceil(guestCount / MAX_GUESTS_PER_BUGGY);
+        let remainingGuests = guestCount;
+        
+        for (let i = 0; i < numberOfOrders; i++) {
+          const guestsForThisOrder = Math.min(remainingGuests, MAX_GUESTS_PER_BUGGY);
+          const orderNotes = numberOfOrders > 1 
+            ? `${bookingState.notes || ''} [${i + 1}/${numberOfOrders}, ${guestsForThisOrder} ${guestsForThisOrder === 1 ? t('guest') : t('guests')}]`.trim()
+            : bookingState.notes || undefined;
+          
+          await bookRide(bookingState.pickup, bookingState.destination, guestsForThisOrder, orderNotes);
+          remainingGuests -= guestsForThisOrder;
+          
+          if (i < numberOfOrders - 1) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+          }
+        }
+        
+        setNotification({ 
+          message: t('orders_split_success')?.replace('{count}', numberOfOrders.toString()) || `Created ${numberOfOrders} orders for ${guestCount} guests`, 
+          type: 'info' 
+        });
+      }
     } catch {
       setNotification({ message: t('failed_to_request_ride'), type: 'warning' });
     }

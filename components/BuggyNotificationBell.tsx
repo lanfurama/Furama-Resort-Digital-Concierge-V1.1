@@ -235,7 +235,7 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                     <>
                         <div className="fixed inset-0 z-[100]" onClick={() => setShowDropdown(false)} />
                         <div className="absolute right-0 mt-2 w-full max-w-[min(24rem,calc(100vw-1rem))] bg-white rounded-xl shadow border border-gray-200 overflow-hidden z-[101]">
-                            <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                            <div className="p-2.5 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
                                 <h3 className="font-bold text-gray-800 text-base">Notifications</h3>
                                 <div className="flex items-center gap-2">
                                     <button
@@ -274,15 +274,31 @@ const BuggyNotificationBell: React.FC<BuggyNotificationBellProps> = ({
                                             default: return { label: 'BUGGY', cls: 'bg-gray-100 border-gray-200 text-gray-700' };
                                         }
                                     };
+                                    const formatDateTime = (timestamp: number) => {
+                                        const date = new Date(timestamp);
+                                        const now = new Date();
+                                        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                                        const notificationDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+                                        
+                                        const diffTime = today.getTime() - notificationDate.getTime();
+                                        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                                        
+                                        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                        
+                                        if (diffDays === 0) {
+                                            return timeStr;
+                                        } else {
+                                            return `${date.toLocaleDateString([], { day: '2-digit', month: '2-digit' })} ${timeStr}`;
+                                        }
+                                    };
                                     return (
                                         <div className="divide-y divide-gray-100">
                                             {allActivities.map(({ ride, activityType }) => {
                                                 const driver = users.find(u => u.id === ride.driverId);
                                                 const driverName = driver ? driver.lastName : 'Unknown';
                                                 const badge = getBadge(activityType, ride);
-                                                const displayTime = activityType === 'COMPLETED' && ride.completedAt
-                                                    ? new Date(ride.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                                    : new Date(ride.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                                const timestamp = activityType === 'COMPLETED' && ride.completedAt ? ride.completedAt : ride.timestamp;
+                                                const displayTime = formatDateTime(timestamp);
                                                 return (
                                                     <div
                                                         key={ride.id}

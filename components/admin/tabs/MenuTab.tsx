@@ -3,6 +3,7 @@ import { Plus, Trash2, Pencil, X, Loader2, RefreshCw } from 'lucide-react';
 import { MenuItem } from '../../../types';
 import { addMenuItem, updateMenuItem } from '../../../services/dataService';
 import { useToast } from '../../../hooks/useToast';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 interface MenuTabProps {
     menu: MenuItem[];
@@ -12,6 +13,7 @@ interface MenuTabProps {
 
 export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) => {
     const toast = useToast();
+    const { t } = useTranslation();
     const [menuFilter, setMenuFilter] = useState<'ALL' | 'Dining' | 'Spa' | 'Pool' | 'Butler'>('ALL');
     const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null);
     const [showMenuItemForm, setShowMenuItemForm] = useState(false);
@@ -33,11 +35,11 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
 
     const handleSave = async () => {
         if (!newMenuItem.name) {
-            toast.error('Please enter a name.');
+            toast.error(t('admin_error_required'));
             return;
         }
         if (!newMenuItem.price || newMenuItem.price <= 0) {
-            toast.error('Please enter a valid price.');
+            toast.error(t('admin_error_invalid'));
             return;
         }
         setIsSaving(true);
@@ -45,17 +47,17 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
             if (editingMenuItem && editingMenuItem.id) {
                 await updateMenuItem(editingMenuItem.id, newMenuItem as MenuItem);
                 setEditingMenuItem(null);
-                toast.success(`Menu item "${newMenuItem.name}" updated successfully!`);
+                toast.success(`"${newMenuItem.name}" ${t('admin_success_updated')}`);
             } else {
                 await addMenuItem(newMenuItem as MenuItem);
-                toast.success(`Menu item "${newMenuItem.name}" added successfully!`);
+                toast.success(`"${newMenuItem.name}" ${t('admin_success_added')}`);
             }
             setNewMenuItem({ name: '', price: 0, category: 'Dining', description: '' });
             setShowMenuItemForm(false);
             await onRefresh();
         } catch (error) {
             console.error('Failed to save menu item:', error);
-            toast.error('Failed to save menu item. Please try again.');
+            toast.error(t('admin_error_save'));
         } finally {
             setIsSaving(false);
         }
@@ -65,20 +67,20 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
         <>
             {/* Filters and Actions */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <h2 className="text-xl font-bold text-gray-800 flex items-center">Dining & Spa Menus</h2>
+                <h2 className="text-xl font-bold text-gray-800 flex items-center">{t('admin_menu_management')}</h2>
                 <div className="flex items-center space-x-2 w-full md:w-auto">
                     <div className="flex bg-white rounded-lg border border-gray-200 p-1">
-                        <button onClick={() => setMenuFilter('ALL')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'ALL' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500'}`}>All</button>
-                        <button onClick={() => setMenuFilter('Dining')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Dining' ? 'bg-orange-100 text-orange-800 font-bold' : 'text-gray-500'}`}>Dining</button>
-                        <button onClick={() => setMenuFilter('Spa')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Spa' ? 'bg-purple-100 text-purple-800 font-bold' : 'text-gray-500'}`}>Spa</button>
-                        <button onClick={() => setMenuFilter('Pool')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Pool' ? 'bg-blue-100 text-blue-800 font-bold' : 'text-gray-500'}`}>Pool</button>
-                        <button onClick={() => setMenuFilter('Butler')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Butler' ? 'bg-amber-100 text-amber-800 font-bold' : 'text-gray-500'}`}>Butler</button>
+                        <button onClick={() => setMenuFilter('ALL')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'ALL' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500'}`}>{t('admin_filter_all')}</button>
+                        <button onClick={() => setMenuFilter('Dining')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Dining' ? 'bg-orange-100 text-orange-800 font-bold' : 'text-gray-500'}`}>{t('admin_filter_dining')}</button>
+                        <button onClick={() => setMenuFilter('Spa')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Spa' ? 'bg-purple-100 text-purple-800 font-bold' : 'text-gray-500'}`}>{t('admin_filter_spa')}</button>
+                        <button onClick={() => setMenuFilter('Pool')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Pool' ? 'bg-blue-100 text-blue-800 font-bold' : 'text-gray-500'}`}>{t('admin_filter_pool')}</button>
+                        <button onClick={() => setMenuFilter('Butler')} className={`px-3 py-1 text-xs rounded ${menuFilter === 'Butler' ? 'bg-amber-100 text-amber-800 font-bold' : 'text-gray-500'}`}>{t('admin_filter_butler')}</button>
                     </div>
                     <button
                         onClick={handleRefresh}
                         disabled={isRefreshing}
                         className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-70"
-                        title="Refresh"
+                        title={t('admin_refresh')}
                     >
                         <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
                     </button>
@@ -93,7 +95,7 @@ export const MenuTab: React.FC<MenuTabProps> = ({ menu, onDelete, onRefresh }) =
                         className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 shadow-md flex-1 md:flex-none"
                     >
                         {showMenuItemForm && !editingMenuItem ? <X size={18} /> : <Plus size={18} />}
-                        <span>{showMenuItemForm && !editingMenuItem ? 'Cancel' : 'Add Item'}</span>
+                        <span>{showMenuItemForm && !editingMenuItem ? t('admin_cancel') : t('admin_add_item')}</span>
                     </button>
                 </div>
             </div>

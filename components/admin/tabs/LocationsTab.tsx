@@ -3,6 +3,7 @@ import { Plus, Trash2, Pencil, X, Search, MapPin, Loader2, RefreshCw } from 'luc
 import { Location } from '../../../types';
 import { addLocation, updateLocation } from '../../../services/dataService';
 import { useToast } from '../../../hooks/useToast';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 interface LocationsTabProps {
     locations: Location[];
@@ -12,6 +13,7 @@ interface LocationsTabProps {
 
 export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete, onRefresh }) => {
     const toast = useToast();
+    const { t } = useTranslation();
     const [locationFilter, setLocationFilter] = useState<'ALL' | 'VILLA' | 'FACILITY' | 'RESTAURANT'>('ALL');
     const [locationSearch, setLocationSearch] = useState<string>('');
     const [editingLocation, setEditingLocation] = useState<Location | null>(null);
@@ -38,11 +40,11 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
 
     const handleSave = async () => {
         if (!newLocation.name) {
-            toast.error('Please enter a name.');
+            toast.error(t('admin_error_required'));
             return;
         }
         if (!newLocation.lat || !newLocation.lng) {
-            toast.error('Please enter valid coordinates.');
+            toast.error(t('admin_error_invalid'));
             return;
         }
         setIsSaving(true);
@@ -50,17 +52,17 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
             if (editingLocation && editingLocation.id) {
                 await updateLocation(editingLocation.id, newLocation as Location);
                 setEditingLocation(null);
-                toast.success(`Location "${newLocation.name}" updated successfully!`);
+                toast.success(`"${newLocation.name}" ${t('admin_success_updated')}`);
             } else {
                 await addLocation(newLocation as Location);
-                toast.success(`Location "${newLocation.name}" added successfully!`);
+                toast.success(`"${newLocation.name}" ${t('admin_success_added')}`);
             }
             setNewLocation({ name: '', lat: 0, lng: 0, type: 'FACILITY' });
             setShowLocationForm(false);
             await onRefresh();
         } catch (error) {
             console.error('Failed to save location:', error);
-            toast.error('Failed to save location. Please try again.');
+            toast.error(t('admin_error_save'));
         } finally {
             setIsSaving(false);
         }
@@ -79,7 +81,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                     type="text"
                                     value={locationSearch}
                                     onChange={(e) => setLocationSearch(e.target.value)}
-                                    placeholder="Search locations..."
+                                    placeholder={t('admin_search_locations')}
                                     className="w-full pl-12 pr-10 py-3 text-sm border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 bg-white/80 placeholder-gray-400"
                                 />
                                 {locationSearch && (
@@ -102,7 +104,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                     : 'text-gray-600 bg-gray-50'
                             }`}
                         >
-                            <span>All</span>
+                            <span>{t('admin_filter_all')}</span>
                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                                 locationFilter === 'ALL' 
                                     ? 'bg-emerald-100 text-emerald-700' 
@@ -136,7 +138,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                     : 'text-gray-600 bg-gray-50'
                             }`}
                         >
-                            <span>Villa</span>
+                            <span>{t('admin_filter_villa')}</span>
                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                                 locationFilter === 'VILLA' 
                                     ? 'bg-purple-200 text-purple-800' 
@@ -153,7 +155,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                     : 'text-gray-600 bg-gray-50'
                             }`}
                         >
-                            <span>Restaurant</span>
+                            <span>{t('admin_filter_restaurant')}</span>
                             <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                                 locationFilter === 'RESTAURANT' 
                                     ? 'bg-amber-200 text-amber-800' 
@@ -171,7 +173,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                             title="Refresh list"
                         >
                             <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
-                            <span className="hidden sm:inline">Refresh</span>
+                            <span className="hidden sm:inline">{t('admin_refresh')}</span>
                         </button>
                         <button
                             onClick={() => {
@@ -182,7 +184,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                             className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-5 py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg font-semibold whitespace-nowrap"
                         >
                             <Plus size={18} />
-                            <span>Add Location</span>
+                            <span>{t('admin_add_location')}</span>
                         </button>
                     </div>
                 </div>
@@ -215,13 +217,13 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                         </button>
                         <div className="mb-6">
                             <h3 className="text-2xl font-bold bg-gradient-to-r from-emerald-700 to-teal-700 bg-clip-text text-transparent mb-2">
-                                {editingLocation ? 'Edit Location' : 'Create New Location'}
+                                {editingLocation ? t('admin_edit_location') : t('admin_add_location')}
                             </h3>
-                            <p className="text-sm text-gray-500">Fill in the details below to {editingLocation ? 'update' : 'add'} a location</p>
+                            <p className="text-sm text-gray-500">{editingLocation ? t('admin_update') : t('admin_add')} {t('admin_location_name').toLowerCase()}</p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
                             <div className="col-span-1 md:col-span-2">
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Location Name</label>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">{t('admin_location_name')}</label>
                                 <input
                                     type="text"
                                     className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm bg-white/80 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 outline-none text-gray-900 placeholder-gray-400"
@@ -231,7 +233,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Latitude</label>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">{t('admin_latitude')}</label>
                                 <input
                                     type="number"
                                     step="any"
@@ -242,7 +244,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Longitude</label>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">{t('admin_longitude')}</label>
                                 <input
                                     type="number"
                                     step="any"
@@ -253,15 +255,15 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                 />
                             </div>
                             <div className="col-span-1 md:col-span-2">
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Location Type</label>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">{t('admin_location_type')}</label>
                                 <select
                                     className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm bg-white/80 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 outline-none text-gray-900"
                                     value={newLocation.type || 'FACILITY'}
                                     onChange={e => setNewLocation({ ...newLocation, type: e.target.value as 'VILLA' | 'FACILITY' | 'RESTAURANT' })}
                                 >
-                                    <option value="VILLA">Villa</option>
-                                    <option value="FACILITY">Public Area</option>
-                                    <option value="RESTAURANT">Restaurant</option>
+                                    <option value="VILLA">{t('admin_filter_villa')}</option>
+                                    <option value="FACILITY">{t('admin_filter_facility')}</option>
+                                    <option value="RESTAURANT">{t('admin_filter_restaurant')}</option>
                                 </select>
                             </div>
                         </div>
@@ -274,7 +276,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                 }}
                                 className="px-6 py-3 rounded-xl text-sm font-semibold bg-gray-100 text-gray-700"
                             >
-                                Cancel
+                                {t('admin_cancel')}
                             </button>
                             <button
                                 onClick={handleSave}
@@ -282,7 +284,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ locations, onDelete,
                                 className="px-6 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
                             >
                                 {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-                                {editingLocation ? 'Update Location' : 'Create Location'}
+                                {editingLocation ? t('admin_update') : t('admin_create')}
                             </button>
                         </div>
                     </div>

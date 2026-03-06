@@ -4,6 +4,7 @@ import { User, UserRole, DriverSchedule } from '../../../types';
 import { addUser, updateUser, getUsers, resetUserPassword, getAllDriverSchedulesByDateRange, upsertDriverSchedule, updateDriverSchedule, deleteDriverSchedule } from '../../../services/dataService';
 import { useScheduleManagement } from '../../../hooks/useScheduleManagement';
 import { useToast } from '../../../hooks/useToast';
+import { useTranslation } from '../../../contexts/LanguageContext';
 
 interface UsersTabProps {
     users: User[];
@@ -15,6 +16,7 @@ interface UsersTabProps {
 
 export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, onRefresh, setUsers }) => {
     const toast = useToast();
+    const { t } = useTranslation();
     const [staffRoleFilter, setStaffRoleFilter] = useState<UserRole | 'ALL'>('ALL');
     const [newUser, setNewUser] = useState<Partial<User>>({ role: UserRole.STAFF, department: 'Dining' });
     const [showUserForm, setShowUserForm] = useState(false);
@@ -25,6 +27,7 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
     const [resetNewPassword, setResetNewPassword] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [showScheduleModal, setShowScheduleModal] = useState(false);
     const handleRefresh = async () => {
         setIsRefreshing(true);
         try {
@@ -115,31 +118,40 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
         <>
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <h2 className="text-xl font-bold text-gray-800 flex items-center">Staff Management</h2>
+                <h2 className="text-xl font-bold text-gray-800 flex items-center">{t('admin_staff_management')}</h2>
                 {userRole === UserRole.ADMIN && (
                     <div className="flex items-center space-x-2">
                         <button
                             onClick={handleRefresh}
                             disabled={isRefreshing}
                             className="p-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-70"
-                            title="Refresh"
+                            title={t('admin_refresh')}
                         >
                             <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
                         </button>
                         <div className="flex bg-white rounded-lg border border-gray-200 p-1">
-                            <button onClick={() => setStaffRoleFilter('ALL')} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === 'ALL' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500'}`}>All</button>
-                            <button onClick={() => setStaffRoleFilter(UserRole.ADMIN)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.ADMIN ? 'bg-red-100 text-red-800 font-bold' : 'text-gray-500'}`}>Admin</button>
-                            <button onClick={() => setStaffRoleFilter(UserRole.SUPERVISOR)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.SUPERVISOR ? 'bg-amber-100 text-amber-800 font-bold' : 'text-gray-500'}`}>Supervisor</button>
-                            <button onClick={() => setStaffRoleFilter(UserRole.STAFF)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.STAFF ? 'bg-blue-100 text-blue-800 font-bold' : 'text-gray-500'}`}>Staff</button>
-                            <button onClick={() => setStaffRoleFilter(UserRole.DRIVER)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.DRIVER ? 'bg-emerald-100 text-emerald-800 font-bold' : 'text-gray-500'}`}>Driver</button>
-                            <button onClick={() => setStaffRoleFilter(UserRole.RECEPTION)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.RECEPTION ? 'bg-purple-100 text-purple-800 font-bold' : 'text-gray-500'}`}>Reception</button>
+                            <button onClick={() => setStaffRoleFilter('ALL')} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === 'ALL' ? 'bg-gray-100 text-gray-800 font-bold' : 'text-gray-500'}`}>{t('admin_filter_all')}</button>
+                            <button onClick={() => setStaffRoleFilter(UserRole.ADMIN)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.ADMIN ? 'bg-red-100 text-red-800 font-bold' : 'text-gray-500'}`}>{t('admin_filter_admin')}</button>
+                            <button onClick={() => setStaffRoleFilter(UserRole.SUPERVISOR)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.SUPERVISOR ? 'bg-amber-100 text-amber-800 font-bold' : 'text-gray-500'}`}>{t('admin_filter_supervisor')}</button>
+                            <button onClick={() => setStaffRoleFilter(UserRole.STAFF)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.STAFF ? 'bg-blue-100 text-blue-800 font-bold' : 'text-gray-500'}`}>{t('admin_filter_staff')}</button>
+                            <button onClick={() => setStaffRoleFilter(UserRole.DRIVER)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.DRIVER ? 'bg-emerald-100 text-emerald-800 font-bold' : 'text-gray-500'}`}>{t('admin_filter_driver')}</button>
+                            <button onClick={() => setStaffRoleFilter(UserRole.RECEPTION)} className={`px-3 py-1 text-xs rounded ${staffRoleFilter === UserRole.RECEPTION ? 'bg-purple-100 text-purple-800 font-bold' : 'text-gray-500'}`}>{t('admin_filter_reception')}</button>
                         </div>
+                        {userRole === UserRole.ADMIN && staffRoleFilter === UserRole.DRIVER && (
+                            <button
+                                onClick={() => setShowScheduleModal(true)}
+                                className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 shadow-md"
+                            >
+                                <Clock size={18} />
+                                <span>{t('admin_schedule')}</span>
+                            </button>
+                        )}
                         <button
                             onClick={() => setShowUserForm(!showUserForm)}
                             className="bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2  shadow-md"
                         >
                             {showUserForm ? <X size={18} /> : <Plus size={18} />}
-                            <span>Add Staff</span>
+                            <span>{t('admin_add_staff')}</span>
                         </button>
                     </div>
                 )}
@@ -308,239 +320,6 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                 </table>
             </div>
 
-            {/* Driver Schedule Management */}
-            {userRole === UserRole.ADMIN && staffRoleFilter === UserRole.DRIVER && (
-                <div className="mt-8 space-y-6 border-t border-gray-200 pt-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-bold text-gray-800">Driver Schedule Management</h3>
-                    </div>
-
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                        <div className="flex items-center gap-4">
-                            <label className="text-sm font-semibold text-gray-700">Date Range:</label>
-                            <input
-                                type="date"
-                                value={scheduleDateRange.start}
-                                onChange={(e) => setScheduleDateRange({ ...scheduleDateRange, start: e.target.value })}
-                                className="border border-gray-300 rounded px-3 py-1.5 text-sm"
-                            />
-                            <span className="text-gray-500">to</span>
-                            <input
-                                type="date"
-                                value={scheduleDateRange.end}
-                                onChange={(e) => setScheduleDateRange({ ...scheduleDateRange, end: e.target.value })}
-                                className="border border-gray-300 rounded px-3 py-1.5 text-sm"
-                            />
-                            <button
-                                onClick={refreshSchedules}
-                                className="px-4 py-1.5 bg-emerald-600 text-white rounded  text-sm font-semibold flex items-center gap-2"
-                            >
-                                <RefreshCw size={14} /> Refresh
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Select Driver:</label>
-                        <select
-                            value={selectedDriverForSchedule || ''}
-                            onChange={(e) => setSelectedDriverForSchedule(e.target.value || null)}
-                            className="w-full md:w-64 border border-gray-300 rounded px-3 py-2 text-sm"
-                        >
-                            <option value="">All Drivers</option>
-                            {users.filter(u => u.role === UserRole.DRIVER).map(driver => (
-                                <option key={driver.id} value={driver.id}>
-                                    {driver.lastName || `Driver ${driver.id}`}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {selectedDriverForSchedule && (
-                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                            <div className="p-4 border-b border-gray-200 bg-gray-50">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h3 className="font-bold text-lg text-gray-800">Driver Schedules</h3>
-                                        <p className="text-sm text-gray-500 mt-1">Manage work shifts and days off for drivers</p>
-                                    </div>
-                                    {editingSchedule && (
-                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-100 border border-amber-300 rounded-lg">
-                                            <Pencil size={14} className="text-amber-700" />
-                                            <span className="text-sm font-semibold text-amber-800">Editing Schedule</span>
-                                            <button
-                                                onClick={() => {
-                                                    setEditingSchedule(null);
-                                                    setNewSchedule({
-                                                        date: new Date().toISOString().split('T')[0],
-                                                        shift_start: '08:00:00',
-                                                        shift_end: '17:00:00',
-                                                        is_day_off: false,
-                                                        notes: null
-                                                    });
-                                                }}
-                                                className="ml-2 text-amber-700 "
-                                                title="Cancel Edit"
-                                            >
-                                                <X size={16} />
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="p-4" data-schedule-form>
-                                <div className={`space-y-4 ${editingSchedule ? 'bg-amber-50/50 p-4 rounded-lg border-2 border-amber-200' : ''}`}>
-                                    {editingSchedule && (
-                                        <div className="mb-3 p-2 bg-amber-100 border border-amber-300 rounded text-sm text-amber-800">
-                                            <strong>Editing:</strong> Schedule for {editingSchedule.date} - Click "Update Schedule" to save changes or click X to cancel.
-                                        </div>
-                                    )}
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-500 mb-1">Date</label>
-                                            <input
-                                                type="date"
-                                                className={`w-full border rounded p-2 text-sm ${editingSchedule ? 'border-amber-400 bg-white' : 'border-gray-300'}`}
-                                                value={newSchedule.date}
-                                                onChange={(e) => setNewSchedule({ ...newSchedule, date: e.target.value })}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-500 mb-1">Shift Start</label>
-                                            <input
-                                                type="time"
-                                                className={`w-full border rounded p-2 text-sm ${editingSchedule ? 'border-amber-400 bg-white' : 'border-gray-300'}`}
-                                                value={newSchedule.shift_start}
-                                                onChange={(e) => setNewSchedule({ ...newSchedule, shift_start: e.target.value })}
-                                            />
-                                            {!newSchedule.is_day_off && (
-                                                <p className="text-xs text-gray-500 mt-1">Day: 07:00-23:00, Night: 22:00-07:00</p>
-                                            )}
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-500 mb-1">Shift End</label>
-                                            <input
-                                                type="time"
-                                                className={`w-full border rounded p-2 text-sm ${editingSchedule ? 'border-amber-400 bg-white' : 'border-gray-300'}`}
-                                                value={newSchedule.shift_end}
-                                                onChange={(e) => setNewSchedule({ ...newSchedule, shift_end: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="flex items-end gap-2">
-                                            <button
-                                                onClick={saveSchedule}
-                                                className={`flex-1 px-4 py-2 rounded-lg text-sm font-bold ${
-                                                    editingSchedule 
-                                                        ? 'bg-amber-600  text-white' 
-                                                        : 'bg-emerald-600  text-white'
-                                                }`}
-                                            >
-                                                {editingSchedule ? 'Update' : 'Add'} Schedule
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={newSchedule.is_day_off}
-                                            onChange={(e) => setNewSchedule({ ...newSchedule, is_day_off: e.target.checked })}
-                                            className="w-4 h-4"
-                                        />
-                                        <label className="text-sm text-gray-700">Day Off</label>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-500 mb-1">Notes (Optional)</label>
-                                        <input
-                                            type="text"
-                                            className="w-full border border-gray-300 rounded p-2 text-sm"
-                                            value={newSchedule.notes || ''}
-                                            onChange={(e) => setNewSchedule({ ...newSchedule, notes: e.target.value || null })}
-                                            placeholder="Additional notes..."
-                                        />
-                                    </div>
-                                </div>
-                                <div className="mt-6">
-                                    <h4 className="text-sm font-bold text-gray-700 mb-3">Existing Schedules:</h4>
-                                    {driverSchedules.filter(s => s.driver_id === selectedDriverForSchedule).length === 0 ? (
-                                        <div className="text-center py-8 text-gray-500 text-sm">
-                                            No schedules found for this driver in the selected date range.
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {driverSchedules.filter(s => s.driver_id === selectedDriverForSchedule).map((schedule) => (
-                                                <div 
-                                                    key={schedule.id} 
-                                                    className={`flex items-center justify-between p-3 rounded-lg-all ${
-                                                        editingSchedule?.id === schedule.id 
-                                                            ? 'bg-amber-100 border-2 border-amber-400 shadow-md' 
-                                                            : 'bg-gray-50 border border-gray-200 '
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center gap-4">
-                                                        <Clock size={16} className={editingSchedule?.id === schedule.id ? 'text-amber-600' : 'text-gray-400'} />
-                                                        <div>
-                                                            <div className={`font-semibold text-sm ${editingSchedule?.id === schedule.id ? 'text-amber-900' : 'text-gray-800'}`}>
-                                                                {schedule.date}
-                                                            </div>
-                                                            <div className={`text-xs ${editingSchedule?.id === schedule.id ? 'text-amber-700' : 'text-gray-500'}`}>
-                                                                {schedule.is_day_off ? (
-                                                                    <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-semibold">Day Off</span>
-                                                                ) : (
-                                                                    `${schedule.shift_start.substring(0, 5)} - ${schedule.shift_end.substring(0, 5)}`
-                                                                )}
-                                                                {schedule.notes && (
-                                                                    <span className="ml-2 text-gray-400">• {schedule.notes}</span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex gap-2">
-                                                        <button
-                                                            onClick={() => {
-                                                                setEditingSchedule(schedule);
-                                                                setNewSchedule({
-                                                                    date: schedule.date,
-                                                                    shift_start: schedule.shift_start,
-                                                                    shift_end: schedule.shift_end,
-                                                                    is_day_off: schedule.is_day_off,
-                                                                    notes: schedule.notes
-                                                                });
-                                                                // Scroll to form
-                                                                setTimeout(() => {
-                                                                    const formElement = document.querySelector('[data-schedule-form]');
-                                                                    if (formElement) {
-                                                                        formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                                                    }
-                                                                }, 100);
-                                                            }}
-                                                            className={`p-1.5 rounded ${
-                                                                editingSchedule?.id === schedule.id 
-                                                                    ? 'bg-amber-600 text-white ' 
-                                                                    : 'text-emerald-600  '
-                                                            }`}
-                                                            title="Edit Schedule"
-                                                        >
-                                                            <Pencil size={14} />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => deleteSchedule(schedule.driver_id, schedule.date)}
-                                                            className="text-red-500   p-1.5 rounded"
-                                                            title="Delete Schedule"
-                                                        >
-                                                            <Trash2 size={14} />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
             {/* Staff Edit Modal */}
             {showStaffEditForm && (
                 <div
@@ -641,6 +420,252 @@ export const UsersTab: React.FC<UsersTabProps> = ({ users, userRole, onDelete, o
                                     Save Changes
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Driver Schedule Management Modal */}
+            {showScheduleModal && userRole === UserRole.ADMIN && (
+                <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                    onClick={() => setShowScheduleModal(false)}
+                >
+                    <div
+                        className="bg-white rounded-xl shadow-2xl border border-gray-200 w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto p-6 relative"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button
+                            onClick={() => setShowScheduleModal(false)}
+                            className="absolute top-4 right-4 text-gray-400 "
+                        >
+                            <X size={20} />
+                        </button>
+                        <h3 className="text-xl font-bold text-gray-800 mb-6 pr-8">Driver Schedule Management</h3>
+                        
+                        <div className="space-y-6">
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <div className="flex items-center gap-4 flex-wrap">
+                                    <label className="text-sm font-semibold text-gray-700">Date Range:</label>
+                                    <input
+                                        type="date"
+                                        value={scheduleDateRange.start}
+                                        onChange={(e) => setScheduleDateRange({ ...scheduleDateRange, start: e.target.value })}
+                                        className="border border-gray-300 rounded px-3 py-1.5 text-sm"
+                                    />
+                                    <span className="text-gray-500">to</span>
+                                    <input
+                                        type="date"
+                                        value={scheduleDateRange.end}
+                                        onChange={(e) => setScheduleDateRange({ ...scheduleDateRange, end: e.target.value })}
+                                        className="border border-gray-300 rounded px-3 py-1.5 text-sm"
+                                    />
+                                    <button
+                                        onClick={refreshSchedules}
+                                        className="px-4 py-1.5 bg-emerald-600 text-white rounded text-sm font-semibold flex items-center gap-2"
+                                    >
+                                        <RefreshCw size={14} /> Refresh
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Select Driver:</label>
+                                <select
+                                    value={selectedDriverForSchedule || ''}
+                                    onChange={(e) => setSelectedDriverForSchedule(e.target.value || null)}
+                                    className="w-full md:w-64 border border-gray-300 rounded px-3 py-2 text-sm"
+                                >
+                                    <option value="">All Drivers</option>
+                                    {users.filter(u => u.role === UserRole.DRIVER).map(driver => (
+                                        <option key={driver.id} value={driver.id}>
+                                            {driver.lastName || `Driver ${driver.id}`}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {selectedDriverForSchedule && (
+                                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                                    <div className="p-4 border-b border-gray-200 bg-gray-50">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h4 className="font-bold text-lg text-gray-800">Driver Schedules</h4>
+                                                <p className="text-sm text-gray-500 mt-1">Manage work shifts and days off for drivers</p>
+                                            </div>
+                                            {editingSchedule && (
+                                                <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-100 border border-amber-300 rounded-lg">
+                                                    <Pencil size={14} className="text-amber-700" />
+                                                    <span className="text-sm font-semibold text-amber-800">Editing Schedule</span>
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingSchedule(null);
+                                                            setNewSchedule({
+                                                                date: new Date().toISOString().split('T')[0],
+                                                                shift_start: '08:00:00',
+                                                                shift_end: '17:00:00',
+                                                                is_day_off: false,
+                                                                notes: null
+                                                            });
+                                                        }}
+                                                        className="ml-2 text-amber-700 "
+                                                        title="Cancel Edit"
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="p-4" data-schedule-form>
+                                        <div className={`space-y-4 ${editingSchedule ? 'bg-amber-50/50 p-4 rounded-lg border-2 border-amber-200' : ''}`}>
+                                            {editingSchedule && (
+                                                <div className="mb-3 p-2 bg-amber-100 border border-amber-300 rounded text-sm text-amber-800">
+                                                    <strong>Editing:</strong> Schedule for {editingSchedule.date} - Click "Update Schedule" to save changes or click X to cancel.
+                                                </div>
+                                            )}
+                                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Date</label>
+                                                    <input
+                                                        type="date"
+                                                        className={`w-full border rounded p-2 text-sm ${editingSchedule ? 'border-amber-400 bg-white' : 'border-gray-300'}`}
+                                                        value={newSchedule.date}
+                                                        onChange={(e) => setNewSchedule({ ...newSchedule, date: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Shift Start</label>
+                                                    <input
+                                                        type="time"
+                                                        className={`w-full border rounded p-2 text-sm ${editingSchedule ? 'border-amber-400 bg-white' : 'border-gray-300'}`}
+                                                        value={newSchedule.shift_start}
+                                                        onChange={(e) => setNewSchedule({ ...newSchedule, shift_start: e.target.value })}
+                                                    />
+                                                    {!newSchedule.is_day_off && (
+                                                        <p className="text-xs text-gray-500 mt-1">Day: 07:00-23:00, Night: 22:00-07:00</p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Shift End</label>
+                                                    <input
+                                                        type="time"
+                                                        className={`w-full border rounded p-2 text-sm ${editingSchedule ? 'border-amber-400 bg-white' : 'border-gray-300'}`}
+                                                        value={newSchedule.shift_end}
+                                                        onChange={(e) => setNewSchedule({ ...newSchedule, shift_end: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="flex items-end gap-2">
+                                                    <button
+                                                        onClick={saveSchedule}
+                                                        className={`flex-1 px-4 py-2 rounded-lg text-sm font-bold ${
+                                                            editingSchedule 
+                                                                ? 'bg-amber-600 text-white' 
+                                                                : 'bg-emerald-600 text-white'
+                                                        }`}
+                                                    >
+                                                        {editingSchedule ? 'Update' : 'Add'} Schedule
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={newSchedule.is_day_off}
+                                                    onChange={(e) => setNewSchedule({ ...newSchedule, is_day_off: e.target.checked })}
+                                                    className="w-4 h-4"
+                                                />
+                                                <label className="text-sm text-gray-700">Day Off</label>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Notes (Optional)</label>
+                                                <input
+                                                    type="text"
+                                                    className="w-full border border-gray-300 rounded p-2 text-sm"
+                                                    value={newSchedule.notes || ''}
+                                                    onChange={(e) => setNewSchedule({ ...newSchedule, notes: e.target.value || null })}
+                                                    placeholder="Additional notes..."
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="mt-6">
+                                            <h4 className="text-sm font-bold text-gray-700 mb-3">Existing Schedules:</h4>
+                                            {driverSchedules.filter(s => s.driver_id === selectedDriverForSchedule).length === 0 ? (
+                                                <div className="text-center py-8 text-gray-500 text-sm">
+                                                    No schedules found for this driver in the selected date range.
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    {driverSchedules.filter(s => s.driver_id === selectedDriverForSchedule).map((schedule) => (
+                                                        <div 
+                                                            key={schedule.id} 
+                                                            className={`flex items-center justify-between p-3 rounded-lg ${
+                                                                editingSchedule?.id === schedule.id 
+                                                                    ? 'bg-amber-100 border-2 border-amber-400 shadow-md' 
+                                                                    : 'bg-gray-50 border border-gray-200'
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-center gap-4">
+                                                                <Clock size={16} className={editingSchedule?.id === schedule.id ? 'text-amber-600' : 'text-gray-400'} />
+                                                                <div>
+                                                                    <div className={`font-semibold text-sm ${editingSchedule?.id === schedule.id ? 'text-amber-900' : 'text-gray-800'}`}>
+                                                                        {schedule.date}
+                                                                    </div>
+                                                                    <div className={`text-xs ${editingSchedule?.id === schedule.id ? 'text-amber-700' : 'text-gray-500'}`}>
+                                                                        {schedule.is_day_off ? (
+                                                                            <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-semibold">Day Off</span>
+                                                                        ) : (
+                                                                            `${schedule.shift_start.substring(0, 5)} - ${schedule.shift_end.substring(0, 5)}`
+                                                                        )}
+                                                                        {schedule.notes && (
+                                                                            <span className="ml-2 text-gray-400">• {schedule.notes}</span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setEditingSchedule(schedule);
+                                                                        setNewSchedule({
+                                                                            date: schedule.date,
+                                                                            shift_start: schedule.shift_start,
+                                                                            shift_end: schedule.shift_end,
+                                                                            is_day_off: schedule.is_day_off,
+                                                                            notes: schedule.notes
+                                                                        });
+                                                                        setTimeout(() => {
+                                                                            const formElement = document.querySelector('[data-schedule-form]');
+                                                                            if (formElement) {
+                                                                                formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                                            }
+                                                                        }, 100);
+                                                                    }}
+                                                                    className={`p-1.5 rounded ${
+                                                                        editingSchedule?.id === schedule.id 
+                                                                            ? 'bg-amber-600 text-white' 
+                                                                            : 'text-emerald-600'
+                                                                    }`}
+                                                                    title="Edit Schedule"
+                                                                >
+                                                                    <Pencil size={14} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => deleteSchedule(schedule.driver_id, schedule.date)}
+                                                                    className="text-red-500 p-1.5 rounded"
+                                                                    title="Delete Schedule"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

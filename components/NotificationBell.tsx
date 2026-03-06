@@ -72,6 +72,24 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, variant = '
         }
     };
 
+    const formatDateTime = (timestamp: number) => {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const notificationDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        
+        const diffTime = today.getTime() - notificationDate.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        
+        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        if (diffDays === 0) {
+            return timeStr;
+        } else {
+            return `${date.toLocaleDateString([], { day: '2-digit', month: '2-digit' })} ${timeStr}`;
+        }
+    };
+
     const isLight = variant === 'light';
     
     return (
@@ -103,7 +121,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, variant = '
                             boxShadow: '0 20px 60px -15px rgba(0,0,0,0.3)'
                         }}
                     >
-                        <div className="p-4 bg-gradient-to-r from-gray-50 to-blue-50/50 border-b border-gray-200/60 flex justify-between items-center">
+                        <div className="p-2.5 bg-gradient-to-r from-gray-50 to-blue-50/50 border-b border-gray-200/60 flex justify-between items-center">
                             <h3 className="font-bold text-gray-800 text-base">{t('notifications')}</h3>
                             <button 
                                 onClick={() => setIsOpen(false)} 
@@ -131,7 +149,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ userId, variant = '
                                                 {getTypeLabel(notif.type)}
                                             </span>
                                             <span className="text-[10px] text-gray-500 font-medium">
-                                                {new Date(notif.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                {formatDateTime(notif.timestamp)}
                                             </span>
                                         </div>
                                         <h4 className={`text-sm font-bold mb-1 ${notif.isRead ? 'text-gray-600' : 'text-gray-900'}`}>{notif.title}</h4>
